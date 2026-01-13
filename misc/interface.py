@@ -5554,25 +5554,61 @@ class strpath(object):
         The `Fcollect` parameter contains the callable that will be used to store each path item.
         """
         SF_UNION = getattr(idaapi, 'SF_UNION', 0x2)
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
 
         # Seed some variables that we'll use to emit some friendlier error messages.
-        count, position = 0, 0
-        formatlog = functools.partial(u"{:s}.resolve(Fcollect={:s}, {:#x}, {:+#x}) : {:s}".format, '.'.join([__name__, cls.__name__]), '...', sptr.id, offset)
+        count, position, sid = 0, 0, sptr.get_tid() if isinstance(sptr, idaapi.tinfo_t) else sptr if isinstance(sptr, internal.types.integer) else sptr.id
+        formatlog = functools.partial(u"{:s}.resolve(Fcollect={:s}, {:#x}, {:+#x}) : {:s}".format, '.'.join([__name__, cls.__name__]), '...', sid, offset)
 
-        description = "{:s} ({:#x}) of size ({:#x})".format('union' if sptr.props & SF_UNION else 'structure', sptr.id, idaapi.get_struc_size(sptr))
+        sid = sptr.get_tid() if isinstance(sptr, idaapi.tinfo_t) else sptr if isinstance(sptr, internal.types.integer) else sptr.id
+
+        ti = idaapi.tinfo_t()
+        if isinstance(sptr, idaapi.tinfo_t):
+            v9, ti, sid = True, tinfo.copy(sptr), sptr.get_tid()
+            description = "{:s} ({:#x}) of size ({:#x})".format('union' if ti.is_union() else 'structure', sid, 8 * tinfo.size(ti))
+        elif isinstance(sptr, internal.types.integer) and node.identifier(sptr) and ti.get_type_by_tid(sptr):
+            v9, ti, sid = True, ti, sptr
+            description = "{:s} ({:#x}) of size ({:#x})".format('union' if ti.is_union() else 'structure', sid, 8 * tinfo.size(ti))
+        elif hasattr(sptr, 'id'):
+            v9, ti, sid = False, None, sptr.id
+            description = "{:s} ({:#x}) of size ({:#x})".format('union' if sptr.props & SF_UNION else 'structure', sid, idaapi.get_struc_size(sptr))
+            v9 = False
+        else:
+            raise internal.exceptions.InvalidParameterError(formatlog(u"Unable to find the type for the specified identifier {:#x}".format(sid)))
         logging.debug(formatlog(u"Resolving path for the {:s} towards the offset {:+#x}.".format(description, offset)))
 
         # Continue looping while we still have choices left. We start each iteration
         # by figuring out what members are at the chosen offset for the user to choose.
         # If there aren't any candidates, then add our current position and leave.
-        while sptr:
+        while sptr and sptr != idaapi.BADADDR:
             sptr, candidates, carry = cls.candidates(sptr, offset)
+
+            # If the sptr is a struc_t, then there is no stype. Otherwise, we
+            # check if it's a tinfo_t or an identifer and assign it if so.
+            stype = idaapi.tinfo_t()
+            if v9 and isinstance(sptr, idaapi.tinfo_t):
+                stype, is_union, sid = tinfo.copy(sptr), sptr.is_union(), sptr.get_tid()
+            elif v9 and isinstance(sptr, internal.types.integer) and node.identifier(sptr) and stype.get_type_by_tid(sptr):
+                stype, is_union, sid = stype, stype.is_union(), sptr
+            elif hasattr(sptr, 'props'):
+                stype, is_union, sid = None, sptr.props & SF_UNION, sptr
+            else:
+                raise internal.exceptions.StructureNotFoundError(formatlog(u"Unable to find the type for the specified identifier ({!s})".format(sptr)))
+
+            # Next, we get the details unless it's a struc_t.
+            utd = idaapi.udt_type_data_t()
+            if v9 and stype.get_udt_details(utd):
+                pass
+            elif not v9 and hasattr(sptr, 'props'):
+                pass
+            else:
+                raise internal.exceptions.DisassemblerError(formatlog(u"Unable to get the details for the specified type ({:#x}).".format(sid)))
 
             # Give the caller the candidates and the offset we aimed for
             # for so that they can either make a choice or re-adjust it.
-            [ logging.debug(formatlog(u"Potential {:s}candidate ({:d} of {:d}) for item {:d} (offset {:#x}{:+#x}) of path : {:s}".format('union ' if sptr.props & SF_UNION else '', 1 + index, len(candidates), count, position, offset, cls.format(sptr, item)))) for index, item in enumerate(candidates) ]
+            [ logging.debug(formatlog(u"Potential {:s}candidate ({:d} of {:d}) for item {:d} (offset {:#x}{:+#x}) of path : {:s}".format('union ' if is_union else '', 1 + index, len(candidates), count, position, offset, cls.format(sptr, item)))) for index, item in enumerate(candidates) ]
             try:
-                choice, shift = (yield (sptr, candidates, carry))
+                choice, shift = (yield (sid, candidates, carry))
 
             # If we're being told to clean up, then ignore the decision, use
             # the carry value that we determined on their behalf and quit.
@@ -5583,21 +5619,47 @@ class strpath(object):
             # If they didn't give us a value to shift by, then assume they want the
             # offset that we used to determine the member candidates with.
             else:
-                offset = carry if shift is None else shift
+                udm, offset = udm_t(), carry if shift is None else shift
+                if choice is None:
+                    mindex, cid, udm = -1, idaapi.BADADDR, None
+                elif v9 and isinstance(choice, internal.types.integer) and node.identifier(choice):
+                    mindex, cid, udm = stype.get_udm_by_tid(udm, choice), choice, udm
+                elif v9 and 0 <= choice < utd.size():
+                    mindex, cid, udm = choice, stype.get_udm_tid(choice), utd[choice]
+                elif hasattr(choice, 'id'):
+                    mindex, cid, udm = -1, choice.id, None
+                else:
+                    raise internal.exceptions.MemberNotFoundError(formatlog(u"Unable to get the specified member ({!s}) for type ({:#x}).".format(choice, sid)))
 
             # If we weren't given a choice then we have to make some decisions on
             # their behalf. If there was only one candidate, then use it. Otherwise
             # we'll just do what they tell us and use None (which will terminate).
-            if not choice and len(candidates or []) in {0, 1}:
+            ctype = idaapi.tinfo_t()
+            if choice in {None, idaapi.BADADDR} and len(candidates or []) in {0, 1}:
                 mptr = candidates[0] if candidates else None
 
+            # Next we use the choice to get its member by identifier.
+            elif v9 and not ctype.get_type_by_tid(cid):
+                raise internal.exceptions.StructureNotFoundError(formatlog(u"Unable to find the type for the specified identifier {:#x}".format(cid)))
+
+            # If we are processing local types, then check the choice id against
+            # the list of candidates that we determined.
+            elif v9 and cid in {id for id in (candidates or [])}:
+                mptr = choice
+
+            # If we are processing local types, and the choice is a structure
+            # then the caller is choosing to use the size.
+            elif v9 and choice not in {None, idaapi.BADADDR} and ctype.get_tid() == cid:
+                mptr = choice
+                break
+
             # If their choice is one of our candidates, then we'll take it.
-            elif isinstance(choice, idaapi.member_t) and choice.id in {item.id for item in (candidates or [])}:
+            elif not v9 and isinstance(choice, idaapi.member_t) and cid in {item.id for item in (candidates or [])}:
                 mptr = choice
 
             # If their choice is the structure (which is not a candidate), then they're
             # choosing its size. We're friendly, though, and honor their desired offset.
-            elif choice and choice.id == sptr.id:
+            elif not v9 and choice is not None and cid == sid:
                 mptr = choice
                 break
 
@@ -5605,52 +5667,134 @@ class strpath(object):
             # decide for them. So we need to freak out. If they want to recover, the
             # they'll will need to compare the length of what they gave us with the
             # results we've been aggregating in order to determine what happened.
+            elif v9:
+                description = 'union' if stype.is_union() else "{:+#x} structure".format(tinfo.size(stype))
+                message = "no valid candidates being chosen ({:s})".format(', '.join(map("{:#x}".format, (stype.get_udm_tid(mptr) for mptr in candidates)))) if choice is None else "an invalid candidate ({:s}) being chosen".format("{:#x}".format(cid) if hasattr(choice, 'id') else "{!r}".format(choice))
+                raise internal.exceptions.MemberNotFoundError(formatlog(u"Path terminated at item {:d} (offset {:#x}{:+#x}) of {:s} ({:#x}) due to {:s}.".format(count, position, offset, description, sid, message)))
+
             else:
                 description = 'union' if sptr.props & SF_UNION else "{:+#x} structure".format(idaapi.get_struc_size(sptr.id))
                 message = "no valid candidates being chosen ({:s})".format(', '.join(map("{:#x}".format, (mptr.id for mptr in candidates)))) if choice is None else "an invalid candidate ({:s}) being chosen".format("{:#x}".format(choice.id) if hasattr(choice, 'id') else "{!r}".format(choice))
                 raise internal.exceptions.MemberNotFoundError(formatlog(u"Path terminated at item {:d} (offset {:#x}{:+#x}) of {:s} ({:#x}) due to {:s}.".format(count, position, offset, description, sptr.id, message)))
 
+            # If we're not using the structure api, then we need to figure out
+            # the element size in order to determine the maximum index.
+            udm = udm_t()
+            if v9:
+                if node.identifier(mptr):
+                    if not(0 <= stype.get_udm_by_tid(udm, mptr) < utd.size()):
+                        raise internal.exceptions.DisassemblerError(formatlog(u"Unable to get the specified member ({:#x}) for the given type ({:#x}).".format(mptr, sid)))
+                    udm = udm
+                elif 0 <= mptr < utd.size():
+                    udm = utd[mptr]
+                else:
+                    udm = None
+
+                # Next we need to figure out the member size and calculate the
+                # maximum index if the selected member was an array type.
+                mtype = tinfo.copy(udm.type) if udm else None
+                if udm and mtype.is_array():
+                    size, (melement, _) = udm.size, tinfo.array(mtype)
+                    msize = 8 * melement.get_size()
+                elif udm:
+                    size, msize = udm.size, udm.size
+                else:
+                    size, msize = 0, 1
+
+                arrayQ, maxindex = mptr and msize != size, (size - 1) // msize
+
+                # Now we'll use the offset and member size to calculate the
+                # array index that was selected by the user.
+                uindex, ubits = divmod(offset, msize) if arrayQ else (0, offset)
+
+                index, bits = (uindex, ubits) if any([uindex * msize < size, arrayQ and udm and udm.size == 0]) else (maxindex, ubits + (offset - maxindex * msize))
+                logging.debug(formatlog(u"Sender chose {:s} which will result in {:s}carrying offset {:+#x}.".format(cls.format(sptr, mptr, offset), "preserving offset {:+#x} (index {:d}) and ".format(index * msize, index) if arrayQ else '', bits)))
+
+                # If we landed on a member using a type that does not have any
+                # members, then we can exit our loop with what we have.
+                if mtype.get_tid() == idaapi.BADADDR:
+                    break
+
+                # Now we can store the caller's choice but adjust it by the
+                # offset that we received. Then we can transition to the next
+                # item adjusting our offset so that it points to the member.
+                Fcollect((sptr, mptr, (offset - carry) + index * msize))
+
+                count, position = count + 1, position + (0 if stype.is_union() else udm.offset) + index * msize
+                sptr, offset = None if mtype.get_tid() == idaapi.BADADDR else mtype, bits
+
             # Now that we determined the mptr for the user's choice, figure out the
             # member's total size and it's member size. From this we'll check if it's
             # actually an array, and determine its maximum index as necessary.
-            size, msize = (idaapi.get_member_size(mptr), idaapi.get_data_elsize(mptr.id, mptr.flag)) if mptr else (0, 1)
-            arrayQ, maxindex = mptr and msize != size, (size - 1) // msize
+            else:
+                size, msize = (idaapi.get_member_size(mptr), idaapi.get_data_elsize(mptr.id, mptr.flag)) if mptr else (0, 1)
+                arrayQ, maxindex = mptr and msize != size, (size - 1) // msize
 
-            # Using their offset and the mptr's member size, calculate what index the user
-            # referenced. We then adjust the index so that it's clamped at the maximum possible
-            # array index in order to carry the correct offset into the next item we receive.
-            uindex, ubytes = divmod(offset, msize) if arrayQ else (0, offset)
-            index, bytes = (uindex, ubytes) if any([uindex * msize < size, arrayQ and mptr.soff == mptr.eoff]) else (maxindex, ubytes + (offset - maxindex * msize))
-            logging.debug(formatlog(u"Sender chose {:s} which will result in {:s}carrying offset {:+#x}.".format(cls.format(sptr, mptr, offset), "preserving offset {:+#x} (index {:d}) and ".format(index * msize, index) if arrayQ else '', bytes)))
+                # Using their offset and the mptr's member size, calculate what index the user
+                # referenced. We then adjust the index so that it's clamped at the maximum possible
+                # array index in order to carry the correct offset into the next item we receive.
+                uindex, ubytes = divmod(offset, msize) if arrayQ else (0, offset)
+                index, bytes = (uindex, ubytes) if any([uindex * msize < size, arrayQ and mptr.soff == mptr.eoff]) else (maxindex, ubytes + (offset - maxindex * msize))
+                logging.debug(formatlog(u"Sender chose {:s} which will result in {:s}carrying offset {:+#x}.".format(cls.format(sptr, mptr, offset), "preserving offset {:+#x} (index {:d}) and ".format(index * msize, index) if arrayQ else '', bytes)))
 
-            # If we've landed on a member (get_sptr returns None from either the mptr
-            # being invalid or it not being a structure), then there's nothing to
-            # do but exit our loop with whatever state the user has given us.
-            if not idaapi.get_sptr(mptr):
-                break
+                # If we've landed on a member (get_sptr returns None from either the mptr
+                # being invalid or it not being a structure), then there's nothing to
+                # do but exit our loop with whatever state the user has given us.
+                if not idaapi.get_sptr(mptr):
+                    break
 
-            # Store the caller's choice but adjust it by the offset that we received
-            # (relative to carry) and the index that needs to be preserved in the item.
-            Fcollect((sptr, mptr, (offset - carry) + index * msize))
+                # Store the caller's choice but adjust it by the offset that we received
+                # (relative to carry) and the index that needs to be preserved in the item.
+                Fcollect((sptr, mptr, (offset - carry) + index * msize))
 
-            # Now we'll update our state for error messages, and then transition to the next
-            # item while adjusting our offset so that way it points to the next member.
-            count, position = count + 1, position + (0 if sptr.props & SF_UNION else mptr.soff) + index * msize
-            sptr, offset = idaapi.get_sptr(mptr), bytes
+                # Now we'll update our state for error messages, and then transition to the next
+                # item while adjusting our offset so that way it points to the next member.
+                count, position = count + 1, position + (0 if sptr.props & SF_UNION else mptr.soff) + index * msize
+                sptr, offset = idaapi.get_sptr(mptr), bytes
+
+            continue
 
         # No path members left to process, so the whole path should be resolved and we
         # only need to add the last member that was determined.
-        Fcollect((sptr, mptr, offset))
-        count, position = count + 1, position + (0 if sptr.props & SF_UNION else mptr.soff if mptr else 0)
+        if not v9:
+            Fcollect((sptr, mptr, offset))
 
-        # Before we go, send the user off with a friendly message to thank them for their business.
-        if mptr is None:
-            left, right = 0, idaapi.get_struc_size(sptr)
-            description = ' '.join(["{:s} ({:#x})".format('union' if sptr.props & SF_UNION else 'structure', sptr.id), "{:#x}<>{:+#x}".format(left, right)])
+            # Before we go, send the user off with a friendly message to thank them for their business.
+            if mptr is None:
+                left, right = 0, idaapi.get_struc_size(sptr)
+                description = ' '.join(["{:s} ({:#x})".format('union' if sptr.props & SF_UNION else 'structure', sptr.id), "{:#x}..{:+#x}".format(left, right)])
+            else:
+                left, right = 0 if sptr.props & SF_UNION else mptr.soff, mptr.eoff
+                description = ' '.join(["field ({:#x})".format(mptr.id), "{:#x}..{:s}".format(left, "{:+#x}({:+#x})".format(right, idaapi.get_struc_size(sptr)) if mptr.soff == mptr.eoff else "{:+#x}".format(right))])
+
+            count, position = count + 1, position + (0 if sptr.props & SF_UNION else mptr.soff if mptr else 0)
+
+        # Now we need to figure the last item to collect to resolve the type.
         else:
-            left, right = 0 if sptr.props & SF_UNION else mptr.soff, mptr.eoff
-            description = ' '.join(["field ({:#x})".format(mptr.id), "{:#x}<>{:s}".format(left, "{:+#x}({:+#x})".format(right, idaapi.get_struc_size(sptr)) if mptr.soff == mptr.eoff else "{:+#x}".format(right))])
+            Fcollect((sptr, mptr, offset))
+
+            udm = udm_t()
+            if mptr is None or mptr == idaapi.BADADDR:
+                udm = None
+            elif node.identifier(mptr) and stype.get_udm_by_tid(udm, mptr):
+                pass
+            elif 0 <= mptr < utd.size():
+                udm = utd[mptr]
+            else:
+                udm = None
+
+            # Before we go, send the user off with a friendly log message.
+            if udm is None:
+                left, right = 0, tinfo.size(stype)
+                description = ' '.join(["{:s} ({:#x})".format('union' if stype.is_union() else 'structure', sid), "{:#x}..{:+#x}".format(left, right)])
+            else:
+                left, right = 0 if stype.is_union() else udm.offset, udm.offset + udm.size
+                description = ' '.join(["field ({:#x})".format(mptr), "{:#x}..{:s}".format(left, "{:+#x}({:+#x})".format(right, tinfo.size(stype)) if udm.offset == udm.offset + udm.size else "{:+#x}".format(right))])
+
+            count, position = count + 1, position + (0 if stype.is_union() else udm.offset if udm else 0)
+
         logging.debug(formatlog(u"Path terminated at item {:d} (offset {:#x}{:+#x}) with {:s}.".format(count, position, offset, description)))
+        return
 
     @classmethod
     def calculate(cls, delta=0, Fcollect=operator.truth):
