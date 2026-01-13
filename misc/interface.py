@@ -5911,16 +5911,37 @@ class strpath(object):
         '''Just a utility functions that uses the provided offset and a list of tids (`tid_array`) to return the complete path.'''
         iterable = (tid for tid in tids)
 
-        # Start out by grabbing the first tid and converting it to an sptr before we start.
+        # Figure out whether we use a local type or a structure.
         sid = builtins.next(iterable, idaapi.BADADDR)
-        sptr = idaapi.get_struc(sid)
-        if sptr is None:
-            raise internal.exceptions.StructureNotFoundError(u"{:s}.of_tids({:#x}, {:s}) : Unable to find a structure for the given identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), sid))
+        if hasattr(sid, 'id'):
+            v9 = False
+        elif all(hasattr(idaapi, name) for name in ['visit_stroff_fields', 'visit_stroff_udms']):
+            v9 = isinstance(sid, idaapi.tinfo_t) or idaapi.get_struc(sid) is None
+        else:
+            v9 = hasattr(idaapi, 'visit_stroff_udms')
+
+        # Start out by grabbing the first tid and converting it to an sptr before we start.
+        ti = idaapi.tinfo_t()
+        if v9 and isinstance(sid, idaapi.tinfo_t):
+            ti, sid, sptr = tinfo.copy(sid), sid.get_tid(), None
+        elif v9 and isinstance(sid, internal.types.integer) and node.identifier(sid) and ti.get_type_by_tid(sid):
+            ti, sid, sptr = ti, sid, None
+        elif v9:
+            raise internal.exceptions.StructureNotFoundError(u"{:s}.of_tids({:#x}, {:s}) : Unable to find {:s} for the given identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), 'structure' if hasattr(idaapi, 'get_struc') else 'type', sid))
+        elif hasattr(sid, 'id'):
+            ti, sid, sptr = None, sid.id, sid
+        else:
+            ti, sid, sptr = None, sid, idaapi.get_struc(sid)
+        tids = [id for id in itertools.chain([sid], iterable)]
 
         # Define a class that we'll use to aggregate our results from visit_stroff_fields.
-        class visitor_t(idaapi.struct_field_visitor_t):
+        parent_t = idaapi.udm_visitor_t if v9 else idaapi.struct_field_visitor_t
+        class visitor_t(parent_t):
             def visit_field(self, sptr, mptr):
                 calculator.send((sptr, mptr, 0))
+                return 0
+            def visit_udm(self, tid, tif, udt, idx):
+                calculator.send((tid, idx, 0))
                 return 0
 
         # We plan on both collecting and calculating our path so that we can figure out how
@@ -5933,24 +5954,40 @@ class strpath(object):
         length, path = len(tids), idaapi.tid_array(len(tids))
         for index, item in enumerate(tids):
             path[index] = item
-        disp = idaapi.sval_pointer()
-        disp.assign(offset)
-        visit_zero = 1
 
-        res = idaapi.visit_stroff_fields(visitor, path, length, disp, visit_zero) if idaapi.__version__ < 7.0 else  idaapi.visit_stroff_fields(visitor, tids, disp.cast(), visit_zero)
+        # If we're using the v9 visit_stroff_udms API, then we divide the target
+        # offset into bytes since the API uses them instead of bits like the
+        # rest of the udm_t-related functions.
+        disp, visit_zero = idaapi.sval_pointer(), 1
+        if v9:
+            disp.assign(offset // 8)
+            sequence = [path[idx] for idx in builtins.range(len(tids))]
+            res = idaapi.visit_stroff_udms(visitor, sequence, disp.cast(), visit_zero)
+
+        # Otherwise, we just assign it and dispatch to visit_stroff_fields in
+        # order to figure out the fields that were selected.
+        else:
+            disp.assign(offset)
+            res = idaapi.visit_stroff_fields(visitor, path, length, disp, visit_zero) if idaapi.__version__ < 7.0 else  idaapi.visit_stroff_fields(visitor, tids, disp.cast(), visit_zero)
+
+        # After calculating the delta and the visitor path, go ahead and grab
+        # the delta and close the calculator prior to resolving the path.
         leftover, visitordelta = disp.value(), builtins.next(calculator)
         calculator.close()
 
-        if idaapi.BADADDR & offset != idaapi.BADADDR & (visitordelta + leftover):
-            callable = idaapi.visit_stroff_fields
-            raise internal.exceptions.DisassemblerError(u"{:s}.of_tids({:#x}, {:s}) : Expected the call to `{:s}` to return {:#x} bytes but {:#x}{:+#x} ({:#x}) was returned instead.".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), '.'.join(getattr(callable, attribute) for attribute in ['__module__', '__name__'] if hasattr(callable, attribute)), offset, visitordelta, leftover, visitordelta + leftover))
+        # FIXME: should probably check that the requested offset and delta are
+        # accurate or something.
+
+        #if idaapi.BADADDR & offset != idaapi.BADADDR & (visitordelta + leftover):
+        #    callable = idaapi.visit_stroff_udms if v9 else idaapi.visit_stroff_fields
+        #    raise internal.exceptions.DisassemblerError(u"{:s}.of_tids({:#x}, {:s}) : Expected the call to `{:s}` to return {:#x} bits but {:#x}{:+#x} ({:#x}) was returned instead.".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), '.'.join(getattr(callable, attribute) for attribute in ['__module__', '__name__'] if hasattr(callable, attribute)), offset, visitordelta, leftover, visitordelta + leftover))
 
         # Now we can rely on cls.resolve to figure out where our decisions actually belong. We can
         # target the offset the user gave us because IDA did all of the work for the path, and we
         # only need to figure out which fields the offset is applied to.
         result = []
         calculator = cls.calculate(0, result.append)
-        resolver = cls.resolve(calculator.send, sptr, offset - leftover)
+        resolver = cls.resolve(calculator.send, sptr or sid, offset - leftover)
         flailer = cls.flail(visitorpath)
 
         resultdelta, _ = (builtins.next(item) for item in [calculator, flailer])
@@ -5961,8 +5998,9 @@ class strpath(object):
         try:
             while True:
                 owner, choice, zero = flailer.send((sptr, candidates, carry))
-                if choice and choice.id not in {item.id for item in candidates}:
-                    logging.info(u"{:s}.of_tids({:#x}, {:s}) : Ignoring the recommended choice ({:#x}) for index {:d} at offset ({:+#x}) as it was not in the list of candidates ([{:s}]).".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), choice.id, len(result), builtins.next(calculator), ', '.join("{:#x}".format(item.id) for item in candidates)))
+                cid = choice if isinstance(choice, internal.types.integer) else choice.id
+                if choice and cid not in {getattr(item, 'id', item) for item in candidates}:
+                    logging.info(u"{:s}.of_tids({:#x}, {:s}) : Ignoring the recommended choice ({:#x}) for index {:d} at offset ({:+#x}) as it was not in the list of candidates ([{:s}]).".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), cid, len(result), builtins.next(calculator), ', '.join("{:#x}".format(getattr(item, 'id', item)) for item in candidates)))
                     break
 
                 sptr, candidates, carry = resolver.send((choice, carry))
