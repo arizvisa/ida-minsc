@@ -6065,14 +6065,26 @@ class strpath(object):
     @classmethod
     def suggest(cls, struc, suggestion):
         '''This takes a path given by the user and returns the resulting path along with its delta.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        items = [item for item in suggestion]
 
         # We first need to convert the path that the user gave us into the actual
         # path that we'll apply to the operand. We also need to calculate the delta
         # so we'll just connect our collector to our calculator which will then
         # add any items that get processed to our items.
-        result, items = [], [item for item in suggestion]
+        result = []
         calculator = cls.calculate(0, result.append)
         collector = cls.collect(struc, calculator.send)
+
+        owner = idaapi.tinfo_t()
+        if isinstance(struc, idaapi.tinfo_t):
+            v9, owner, sid = True, tinfo.copy(struc), struc.get_tid()
+        elif hasattr(struc, 'id'):
+            v9, owner, sid = False, None, struc.id
+        elif owner.get_type_by_tid(struc):
+            v9, owner, sid = True, owner, struc
+        else:
+            raise internal.exceptions.StructureNotFoundError(u"{:s}.suggest({:#x}, {!r}) : Unable to find the type for the given identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), struc, suggestion, struc))
 
         # Now we can start both of them so we can feed inputs to our collector
         # until we're asked to stop. We keep track of the last sptr to ensure
@@ -6085,21 +6097,68 @@ class strpath(object):
             while items:
                 item = items.pop(0)
 
+                # If we're doing suggestions for a local type instead of a
+                # structure, then go ahead and handle that first.
+                if v9:
+                    ti = idaapi.tinfo_t()
+
+                    # Figure out what type we're currently referencing and grab
+                    # the udm containing the list of members that we will use.
+                    if isinstance(sptr, idaapi.tinfo_t):
+                        ok, ti, tid = True, tinfo.copy(sptr), sptr.get_tid()
+                    elif isinstance(sptr, internal.types.integer):
+                        ok, ti, tid = ti.get_type_by_tid(sptr), ti, sptr
+                    else:
+                        raise internal.exceptions.StructureNotFoundError(u"{:s}.suggest({:#x}, {!r}) : Unable to find the type associated with the given item due to being of an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), sid, suggestion, sptr.__class__))
+
+                    utd = idaapi.udt_type_data_t()
+                    if ok and not ti.get_udt_details(utd):
+                        raise internal.exceptions.DisassemblerError(u"{:s}.suggest({:#x}, {!r}) : Unable to get the details associated with the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, suggestion, tid))
+                    utd_index = isinstance(item, internal.types.integer) and 0 <= item < utd.size()
+
+                    # Now we need to convert what the user specified as the next
+                    # member to an index for the type we are processing.
+                    udm, udm_found = udm_t(), True
+                    if isinstance(item, internal.types.integer) and node.identifier(item):
+                        mindex, mid, udm = ti.get_udm_by_tid(udm, item), item, udm
+                    elif isinstance(item, internal.types.integer):
+                        mindex, mid, udm = item, ti.get_udm_tid(item) if utd_index else idaapi.BADADDR, utd[item] if utd_index else None
+                    elif isinstance(item, internal.types.string):
+                        udm.name = internal.utils.string.to(item)
+                        mindex = ti.find_udm(udm, idaapi.STRMEM_NAME)
+                        mid = ti.get_udm_tid(mindex) if 0 <= mindex < utd.size() else idaapi.BADADDR
+                    else:
+                        mindex, mid, udm = -1, idaapi.BADADDR, None
+                        sptr, mptr = collector.send(item), mid
+                        continue
+
+                    # Now we need to send it to the collector. If we couldn't
+                    # find the member, then we just raise an exception to abort.
+                    if udm is None:
+                        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.suggest({:#x}, {!r}) : Unable to find the type associated with the given item due to being of an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), sid, suggestion, item.__class__))
+
+                    # Otherwise, we got a correct member and need to add the
+                    # member to our collection and move onto the next type.
+                    else:
+                        current = collector.send(mid)
+                        sptr, mptr = udm.type.get_tid(), mid
+                    continue
+
                 # If our item is a structure or a member, then we need to convert
                 # it into either an idaapi.struc_t or an idaapi.member_t.
-                if hasattr(item, 'ptr'):
+                elif hasattr(item, 'ptr'):
                     mptr = item.ptr
 
                 # If it's a string and the previous element was an mptr, then we need
                 # to transition to the last member's type (sptr) and then look it up.
-                elif isinstance(item, internal.types.string) and isinstance(last, idaapi.member_t):
+                elif isinstance(item, internal.types.string) and hasattr(last, 'id') and isinstance(last, idaapi.member_t):
                     last = idaapi.get_sptr(last)
                     sptr = collector.send(last)
                     mptr = idaapi.get_member_by_name(sptr, internal.utils.string.to(item))
 
                 # If it's a string, then we can just look it up in our current
                 # sptr to figure out which member_t it is.
-                elif isinstance(item, internal.types.string):
+                elif isinstance(item, internal.types.string) and hasattr(sptr, 'id') and isinstance(sptr, idaapi.struc_t):
                     mptr = idaapi.get_member_by_name(sptr, internal.utils.string.to(item))
 
                 # Anything else should by one of the native types or an offset.
@@ -6113,7 +6172,7 @@ class strpath(object):
         # in the collected path which we'll need to add back to our list.
         except internal.exceptions.InvalidTypeOrValueError as exc:
             ok, items = False, [mptr] + items
-            logging.debug(u"{:s}.suggestion({:#x}, {!r}) : Collection was terminated with {:d} items left ({!r}) due to an invalid type ({!r}).".format('.'.join([__name__, cls.__name__]), struc.id, suggestion, len(items), items, mptr))
+            logging.debug(u"{:s}.suggest({:#x}, {!r}) : Collection was terminated with {:d} items left ({!r}) due to an invalid type ({!r}).".format('.'.join([__name__, cls.__name__]), sid, suggestion, len(items), items, mptr))
 
         # If we had no issues, then we only have to do one thing
         else:
@@ -6125,16 +6184,16 @@ class strpath(object):
             delta, _ = builtins.next(calculator), calculator.close()
 
         # Now we can check for any issues that happened while collecting their path.
-        suggested = (''.join(['.'.join(map("{:#x}".format, [sptr.id, mptr.id] if mptr else [sptr.id])), "{:+#x}".format(offset) if offset else '']) for sptr, mptr, offset in result)
+        suggested = (''.join(['.'.join(map("{:#x}".format, [getattr(sptr, 'id', sptr), getattr(mptr, 'id', mptr)] if mptr is not None else [getattr(sptr, 'id', sptr)])), "{:+#x}".format(offset) if offset else '']) for sptr, mptr, offset in result)
         suggestion_description = [item for item in itertools.chain(suggested, map("{!r}".format, items))]
         if ok:
-            [ logging.debug(u"{:s}.suggestion({:#x}, [{:s}]) : Successfully interpreted path suggestion at index {:d} as {:s}.".format('.'.join([__name__, cls.__name__]), struc.id, ', '.join(suggestion_description), index, cls.format(*item))) for index, item in enumerate(result) ]
+            [ logging.debug(u"{:s}.suggest({:#x}, [{:s}]) : Successfully interpreted path suggestion at index {:d} as {:s}.".format('.'.join([__name__, cls.__name__]), sid, ', '.join(suggestion_description), index, cls.format(*item))) for index, item in enumerate(result) ]
 
         # Verify that our path is empty and that we successfully consumed everything.
         else:
-            logging.warning(u"{:s}.suggestion({:#x}, [{:s}]) : There was an error trying to interpret the suggestions for the path and was truncated to {:s}.".format('.'.join([__name__, cls.__name__]), struc.id, ', '.join(suggestion_description), cls.fullname(result)))
+            logging.warning(u"{:s}.suggest({:#x}, [{:s}]) : There was an error trying to interpret the suggestions for the path and was truncated to {:s}.".format('.'.join([__name__, cls.__name__]), sid, ', '.join(suggestion_description), cls.fullname(result)))
 
-        [ logging.info(u"{:s}.suggestion({:#x}, [{:s}]) : Unable to interpret path suggestion at index {:d} from {!r}.".format('.'.join([__name__, cls.__name__]), struc.id, ', '.join(suggestion_description), len(suggestion) - len(items) + index, item)) for index, item in enumerate(items) ]
+        [ logging.info(u"{:s}.suggest({:#x}, [{:s}]) : Unable to interpret path suggestion at index {:d} from {!r}.".format('.'.join([__name__, cls.__name__]), sid, ', '.join(suggestion_description), len(suggestion) - len(items) + index, item)) for index, item in enumerate(items) ]
         return delta, result
 
     @classmethod
