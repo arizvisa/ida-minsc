@@ -6381,6 +6381,102 @@ class strpath(object):
             return points[start], point, []
         return points[start], point, result[::-1 if istep < 0 else +1]
 
+    @classmethod
+    def v9members(cls, type, slice):
+        '''Select the contiguous members of the structure `type` using the given `slice` and return a tuple containing the start offset, stop offset, and ordered list containing each member id or each size.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = tinfo.copy(type), type.get_tid()
+        elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        else:
+            raise internal.exceptions.StructureNotFoundError(u"{:s}.v9members({!s}, {!s}) : Unable to find the type using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), tinfo.quoted(type), slice, type.__class__))
+
+        # Now we need to grab the utd type so that we assign the initial values
+        # to the variables that we will use for slicing the type's members.
+        utd = idaapi.udt_type_data_t()
+        if not ti.get_udt_details(utd):
+            raise internal.exceptions.DisassemblerError(u"{:s}.v9members({!s}, {!s}) : Unable to get the details associated with the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), tinfo.quoted(type), slice, sid))
+
+        members = [index for index in builtins.range(utd.size())]
+        size = 8 * ti.get_size()
+        slice = slice if isinstance(slice, builtins.slice) else builtins.slice(slice, 1 + slice or None)
+        istart, istop, istep = slice.indices(len(members))
+        indices = [index for index in builtins.range(istart, istop, istep)]
+
+        # If the type is a union, then the type doesn't need to be contiguous at
+        # all. So we can just include the index and return it.
+        if ti.is_union():
+            results = [members[index] for index in indices]
+            sizes = [utd[mindex].size for mindex in results]
+            return min(sizes), max(sizes), [(utd[mindex].offset, ti.get_udm_tid(mindex)) for mindex in results]
+
+        # Add all the points and segments found within the type.
+        iterable = itertools.chain(*((utd[mindex].offset, utd[mindex].offset + utd[mindex].size) for mindex in members))
+        points = [point for point, duplicates in itertools.groupby(iterable)]
+        segments, iterable = {}, ((mindex, utd[mindex].offset, utd[mindex].offset + utd[mindex].size) for mindex in members)
+        points.insert(0, 0) if points and operator.lt(0, *points[:+1]) else points
+        points.append(size) if points and operator.gt(size, *points[-1:]) else points
+
+        for mindex, soff, eoff in iterable:
+            segments[soff] = segments[eoff] = mindex
+
+        # Next we select the members that were specified and use them to figure
+        # out the interval being selected.
+        selected = [mindex for mindex in indices]
+
+        # If our selection is ordered then we can treat everything as normal
+        # ensuring that there's some empty space in front of the last member.
+        if selected and istart <= istop:
+            imaximum = 1 + max(indices)
+            maximum = utd[members[imaximum]].offset if imaximum < utd.size() else points[-1]
+            start = bisect.bisect_left(points, points[0] if slice.start is None else utd[selected[0]].offset)
+            stop = bisect.bisect_left(points, points[-1] if slice.stop is None else maximum) + 1
+
+        # If our selection is reversed, then we need to invert our tests against
+        # the slice and adjust it to figure out the minimum point.
+        elif selected:
+            iminimum = min(indices)
+            minimum = utd[members[iminimum - 1]].offset + utd[members[iminimum - 1]].size if iminimum > 0 else points[0]
+            start = bisect.bisect_left(points, points[0] if slice.stop is None else minimum)
+            stop = bisect.bisect_left(points, points[-1] if slice.start is None else utd[selected[0]].offset + utd[selected[0]].size)
+
+        # Then, if there is no selection and we use the boundaries within the
+        # requested slice to identify all of the points.
+        elif members:
+            sleft, sright = (slice.start, slice.stop) if istart <= istop else (slice.stop, slice.start)
+            iterable = ((utd[members[mindex]].offset if mindex < len(members) else utd[members[-1]].offset + utd[members[-1]].size) for mindex in [istart, istop])
+            minimum = min(points) if sleft is None else min(*iterable)
+            iterable = ((utd[members[mindex]].offset + utd[members[mindex]].size if mindex < len(members) else utd[members[-1]].offset + utd[members[-1]].size) for mindex in [istart, istop])
+            maximum = max(points) if sright is None else max(*iterable)
+            start = bisect.bisect_left(points, minimum)
+            stop = bisect.bisect_left(points, maximum) + 1 if istart < istop else bisect.bisect_left(points, maximum)
+
+        # Otherwise, there isn't anything to actually return.
+        else:
+            return 0, size, []
+
+        # Figure out which direction we will be slicing elements in.
+        step, point = -1 if istep < 0 else +1, 0 if start < 0 else points[start] if start < len(points) else size
+
+        # The very last thing we need to do is to iterate through each point to
+        # yield each member once along with any holes.
+        offset, result, available = point, [], {ti.get_udm_tid(mindex) for mindex in selected}
+        for point in points[start : stop]:
+            if offset < point:
+                result.append((offset, point - offset))
+            mindex = segments.get(point, -1)
+            mexists = 0 <= mindex < utd.size()
+            mid = ti.get_udm_tid(mindex) if mexists else idaapi.BADADDR
+            if mexists and mid in available:
+                result.append((point, mid)), available.remove(mid)
+            offset = utd[mindex].offset + utd[mindex].size if mexists else point
+
+        # We now verify that the specified slice actually selected something.
+        if not any([istart <= istop and istep > 0, istart > istop and istep < 0]) and not available:
+            return points[start], point, []
+        return points[start], point, result[::-1 if istep < 0 else +1]
+
 class contiguous(object):
     """
     This namespace contains any useful functions that can be used
