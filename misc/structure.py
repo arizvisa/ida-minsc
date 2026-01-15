@@ -2607,11 +2607,77 @@ class v9members(object):
 
     @classmethod
     def at(cls, type, offset, *filter):
-        """Traverse into the specified structure `type` yielding each member located at the specified `offset`.
+        """Traverse into the specified `type` yielding the identifier of each member located at the specified `offset`.
 
         If a closure is passed as the `filter` parameter, then use the function to filter the chosen candidates during descent.
         """
-        raise NotImplementedError
+        base, selected = 0, [packed for packed in cls.at_offset(type, int(offset))]
+        candidates = [ti.get_udm_tid(mindex) for ti, mindex, udm in selected]
+        table = {ti.get_udm_tid(mindex) : index for index, (ti, mindex, udm) in enumerate(selected)}
+
+        # Filter our candidates and begin traversing through them.
+        count, [F] = 0, filter if filter else [lambda stype, items: items]
+        result, filtered = [], F(type, candidates) if len(candidates) > 1 else candidates
+
+        while filtered:
+            if len(filtered) == 1:
+                [mid] = filtered
+
+                # If this member doesn't contain the offset for some reason, then bail.
+                if not v9member.contains(mid, offset):
+                    break
+
+                # Figure out the location of the member for the offset.
+                index, remainder = v9member.at(mid, offset)
+                melement = v9member.element(mid)
+                res = index * melement
+
+                mowner, _, mindex, udm = v9member.by(mid)
+                mtype = interface.tinfo.copy(udm.type)
+
+            # If we're in a union and we have more than one member, then stop
+            # traversing here.
+            elif filtered and type.is_union():
+                break
+
+            # If it's not a union, then assume the neareset member in front.
+            elif filtered:
+                choice = cls.nearest(type, offset)
+                if not choice:
+                    break
+                mowner, mindex, mptr = choice
+
+                # Grab the location of the offset into the member.
+                index, remainder = v9member.at(mptr, offset)
+                melement = v9member.element(mptr)
+                res = index * melement
+
+                mowner, _, mindex, udm = v9member.by(mid)
+                mtype = interface.tinfo.copy(udm.type)
+
+            # Now we have a member to yield and can adjust our offset.
+            base, offset, moffset, count = base, remainder, 0 if mowner.is_union() else udm.offset, count + 1
+            yield base, selected[table[mid]]
+
+            # If we can't descend any farther, then we can leave.
+            if not mtype.is_sue():
+                break
+
+            # Adjust for the next iteration, and descend into the structure for the selected member.
+            sptr, base = mtype, base + res + moffset
+            selected = [packed for packed in cls.at_offset(mtype, offset)]
+            table = {mowner.get_udm_tid(mindex) : index for index, (mowner, mindex, udm) in enumerate(selected)}
+            candidates = [mid for mid in table]
+            filtered = F(sptr, candidates) if len(candidates) > 1 else candidates
+
+        # If we didn't return anything at all, then use the nearest member.
+        if not count:
+            choice = cls.nearest(sptr, offset)
+            mowner, mindex, mptr = choice
+            index, remainder = v9member.at(mptr, offset)
+            melement = v9member.element(mptr)
+            yield base + index * melement, choice
+        return
 
     @classmethod
     def slice(cls, type, slice):
