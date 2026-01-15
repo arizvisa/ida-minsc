@@ -2530,8 +2530,80 @@ class v9members(object):
 
     @classmethod
     def references(cls, type):
-        '''Return the structure members and operand references that reference the specified structure `type`.'''
-        raise NotImplementedError
+        '''Return the type members and operand references that reference the specified structure `type`.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        else:
+            raise E.InvalidParameterError(u"{:s}.references({!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(type)))
+
+        # Collect each identifier referenced by this structure.
+        iterable = itertools.chain([sid], [tinfo.get_udm_tid(mindex) for tinfo, mindex, udm in cls.iterate(ti)])
+        identifiers = {identifier for identifier in iterable}
+
+        # Iterate through them and gather each of their references.
+        ichainable = (interface.xref.to(identifier, idaapi.XREF_ALL) for identifier in identifiers)
+        refs = [packed_frm_iscode_type for packed_frm_iscode_type in itertools.chain(*ichainable)]
+
+        # We now need to filter each of the items in our list of references for
+        # only the ones that point to a database address.
+        results, matches = {}, {identifier for identifier in identifiers}
+        for xrfrom, xriscode, xrtype in refs:
+            flags = address.flags(xrfrom)
+
+            # Identifiers are not addresses, so we can skip them.
+            if interface.node.identifier(xrfrom):
+                continue
+
+            # If the target address is not pointing at code, then we skip this
+            # too since there's no way for us to figure out the operand number.
+            elif not address.code(xrfrom):
+                logging.debug(u"{:s}.references({:#x})) : Skipping {:s} reference at {:#x} with the type ({:d}) due to its address not being marked as code.".format('.'.join([__name__, cls.__name__]), sid, 'code' if xriscode else 'data', xrfrom, xrtype))
+                continue
+
+            # Now we go through all the operands and filter them for only the
+            # ones which have operand information for it.
+            access = [ref.access for ref in interface.instruction.access(xrfrom)]
+            for opnum, operand in enumerate(address.operands(xrfrom)):
+                value = idaapi.as_signed(operand.value if operand.type in {idaapi.o_imm} else operand.addr)
+
+                # Collect the operand information into a proper path. This delta
+                # will need to be converted from bytes to bits in order to use
+                # it with the interface.strpath namespace for local types.
+                delta, tids = interface.node.get_stroff_path(xrfrom, opnum)
+                bytes = delta + value
+                bits = 8 * bytes
+
+                # If a path was actually grabbed, then we can use the structure
+                # to get the identifiers for each of its members.
+                ti = idaapi.tinfo_t()
+                if tids and ti.get_type_by_tid(tids[0]):
+                    v9tids = [item for item in itertools.chain([ti], tids[1:])]
+                    path = interface.strpath.of_tids(bits, v9tids)
+                    candidates, not_a_member = {mid for _, mid, _ in path if mid not in {None, idaapi.BADADDR}}, any(mid in {None, idaapi.BADADDR} for _, mid, _ in path)
+
+                    # Verify that one of our ids is contained by the operand. If
+                    # none of the members in the path are related, then skip it.
+                    if not any([candidates & matches, not_a_member]):
+                        continue
+
+                    # Unify the operand reference we found with the current
+                    # access for the operand.
+                    #results.setdefault(xrfrom, []).append(interface.opref_t(xrfrom, opnum, interface.access_t(xrtype, xriscode) | access[opnum]))
+                    results.setdefault(xrfrom, []).append(interface.opref_t(xrfrom, opnum, interface.access_t(xrtype, xriscode)))
+
+                # Otherwise, this is probably a refinfo or a stack variable of
+                # some kind. We only need to follow the reference to grab it.
+                elif idaapi.is_stkvar(flags, opnum) or idaapi.is_stroff(flags, opnum) or idaapi.is_off(flags, opnum):
+                    results.setdefault(xrfrom, []).append(interface.opref_t(xrfrom, opnum, interface.access_t(xrtype, xriscode)))
+                continue
+            continue
+
+        # Now we just go ahead and merge all our references for each address.
+        merged = {ea : functools.reduce(operator.or_, items) for ea, items in results.items()}
+        return [merged[ea] for ea in sorted(results)]
 
     @classmethod
     def at(cls, type, offset, *filter):
