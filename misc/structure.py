@@ -3307,7 +3307,7 @@ class members(object):
 
         If a closure is passed as the `filter` parameter, then use the function to filter the chosen candidates during descent.
         """
-        base, selected = 0, [packed for packed in members.at_offset(sptr, int(offset))]
+        base, selected = 0, [packed for packed in cls.at_offset(sptr, int(offset))]
         candidates = [mptr for mowner, mindex, mptr in selected]
         table = {mptr.id : index for index, (_, _, mptr) in enumerate(selected)}
 
@@ -3335,7 +3335,7 @@ class members(object):
             # If it's not a union, then we assume the neareset member in
             # front of the offset. This way the full path is relative to it.
             elif filtered:
-                choice = members.nearest(sptr, offset)
+                choice = cls.nearest(sptr, offset)
                 if not choice:
                     break
                 mowner, mindex, mptr = choice
@@ -3355,14 +3355,14 @@ class members(object):
 
             # Adjust for the next iteration, and descend into the structure for the selected member.
             sptr, base = mtype, base + res + moffset
-            selected = [packed for packed in members.at_offset(mtype, offset)]
+            selected = [packed for packed in cls.at_offset(mtype, offset)]
             candidates = [mptr for mowner, mindex, mptr in selected]
             table = {mptr.id : index for index, (_, _, mptr) in enumerate(selected)}
             filtered = F(sptr, candidates) if len(candidates) > 1 else candidates
 
         # If we didn't return anything yet, then use the nearest member.
         if not count:
-            choice = members.nearest(sptr, offset)
+            choice = cls.nearest(sptr, offset)
             mowner, mindex, mptr = choice
             index, remainder = member.at(mptr, offset)
             melement = member.element(mptr)
