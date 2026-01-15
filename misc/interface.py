@@ -6201,6 +6201,15 @@ class strpath(object):
         '''This tries to determine a complete path from the sptr in `struc` to the offset `goal` using `suggestion` as a sloppy (sorta) guidance.'''
         result, suggestion_description = [], [item for item in itertools.starmap(cls.format, suggestion)]
 
+        # First figure out whether we're processing a structure or a local type.
+        ti = idaapi.tinfo_t()
+        if isinstance(struc, idaapi.tinfo_t):
+            v9, ti, sid = True, tinfo.copy(struc), struc.get_tid()
+        elif isinstance(struc, internal.types.integer) and node.identifier(struc) and ti.get_type_by_tid(struc):
+            v9, ti, sid = True, ti, struc
+        else:
+            v9, ti, sid = False, None, struc.id
+
         # Now we have the suggested path and the delta that they're aiming at. All
         # they really did was give us a suggestion as guidance, so we need to resolve
         # it to make sure it makes sense and that way we can store it in our real path.
@@ -6217,8 +6226,18 @@ class strpath(object):
             # Now we can process all the crap they might've given us in their suggestion.
             for index, (sptr, mptr, offset) in enumerate(suggestion):
 
+                # If we're using the v9 local types, then check if we weren't
+                # given a member so. If so, then use the offset wer were given.
+                if v9 and mptr in {None, idaapi.BADADDR}:
+                    carry = carry + offset
+
+                # If the choice is not a valid candidate, then we need to try a
+                # different method to figure out what the suggestion meant.
+                elif v9 and mptr in candidates:
+                    break
+
                 # If we don't have an mptr, then we use the offset we were given.
-                if not mptr:
+                elif not mptr:
                     carry = carry + offset
 
                 # If our choice is not one of the candidates, then we need to bail so that we
@@ -6239,7 +6258,7 @@ class strpath(object):
         # If we received this exception, then the user is doing something crazy and wants an
         # invalid path. Bump up the logging level and just leave since we can't do anything.
         except internal.exceptions.MemberNotFoundError:
-            logging.critical(u"{:s}.guide({:#x}, {:#x}, {:s}) : The suggested path was invalid for offset {:#x} and was truncated at index {:d} ({:s}).".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), goal, index, cls.fullname(result)))
+            logging.critical(u"{:s}.guide({:#x}, {:#x}, {:s}) : The suggested path was invalid for offset {:#x} and was truncated at index {:d} ({:s}).".format('.'.join([__name__, cls.__name__]), goal, sid, "[{:s}]".format(', '.join(suggestion_description)), goal, index, cls.fullname(result)))
             Flogging, discard_reason = logging.info, 'was discarded'
 
         # We are finally done and we can stop resolving things. Any other elements that are
@@ -6250,7 +6269,7 @@ class strpath(object):
         # If there's any suggestions left, then just log them so we can see what's left to do.
         finally:
             for rindex, item in enumerate(suggestion[index:]):
-                Flogging(u"{:s}.guide({:#x}, {:#x}, {:s}) : The path suggestion at index {:d} {:s} {:s}.".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), index + rindex, cls.format(*item), discard_reason))
+                Flogging(u"{:s}.guide({:#x}, {:#x}, {:s}) : The path suggestion at index {:d} {:s} {:s}.".format('.'.join([__name__, cls.__name__]), goal, sid, "[{:s}]".format(', '.join(suggestion_description)), index + rindex, cls.format(*item), discard_reason))
 
         # If we didn't end up processing all of our suggestions, then we need to flail using
         # everything that's left in case the user's path was busted and needs to be repaired.
@@ -6264,12 +6283,12 @@ class strpath(object):
 
         # If we have no suggestions left or we've stopped. Then we should be good to go.
         except StopIteration:
-            logging.debug(u"{:s}.guide({:#x}, {:#x}, {:s}) : Successfully processed {:d} suggestion{:s} and terminated at index {:d} after processing {:s}.".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), len(suggestion[index:]), '' if len(suggestion[index:]) == 1 else 's', len(result), cls.format(sptr, mptr, offset)))
+            logging.debug(u"{:s}.guide({:#x}, {:#x}, {:s}) : Successfully processed {:d} suggestion{:s} and terminated at index {:d} after processing {:s}.".format('.'.join([__name__, cls.__name__]), goal, sid, "[{:s}]".format(', '.join(suggestion_description)), len(suggestion[index:]), '' if len(suggestion[index:]) == 1 else 's', len(result), cls.format(sptr, mptr, offset)))
 
         # If resolving gave us an exception, then we couldn't do anything with the suggestion
         # even when we were flailing when trying to use all of them.
         except internal.exceptions.MemberNotFoundError:
-            logging.info(u"{:s}.guide({:#x}, {:#x}, {:s}) : The suggested path was invalid for offset {:#x} and was truncated at index {:d} ({:s}).".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), goal, len(result), cls.fullname(result)))
+            logging.info(u"{:s}.guide({:#x}, {:#x}, {:s}) : The suggested path was invalid for offset {:#x} and was truncated at index {:d} ({:s}).".format('.'.join([__name__, cls.__name__]), goal, sid, "[{:s}]".format(', '.join(suggestion_description)), goal, len(result), cls.fullname(result)))
 
         # Completed flailing our arms around trying to make sense of the user's suggestion.
         finally:
@@ -6288,7 +6307,7 @@ class strpath(object):
         # If we got an exception here, then we needed to make a choice but didn't. It's
         # okay, though, because the user's path was completely resolved.
         except internal.exceptions.MemberNotFoundError:
-            logging.info(u"{:s}.guide({:#x}, {:#x}, {:s}) : The suggested path was terminated at index {:d} of the result with {:d} candidate{:s} left{:s}.".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), len(result), len(candidates), '' if len(candidates) == 1 else 's', " ({:s})".format(', '.join("{:#x}".format(item.id) for item in candidates) if candidates else '')))
+            logging.info(u"{:s}.guide({:#x}, {:#x}, {:s}) : The suggested path was terminated at index {:d} of the result with {:d} candidate{:s} left{:s}.".format('.'.join([__name__, cls.__name__]), goal, sid, "[{:s}]".format(', '.join(suggestion_description)), len(result), len(candidates), '' if len(candidates) == 1 else 's', " ({:s})".format(', '.join("{:#x}".format(getattr(item, 'id', item)) for item in candidates) if candidates else '')))
 
         finally:
             resolver.close()
