@@ -1808,6 +1808,7 @@ class v9members(object):
     @classmethod
     def iterate(cls, type, *slice):
         '''Yield each member specified by `slice` from the structure identified by `sptr`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
         if not (tinfo.is_struct() or union(tinfo)):
             raise E.InvalidTypeOrValueError(u"{:s}.iterate({!s}, {!r}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), slice))
@@ -1818,7 +1819,10 @@ class v9members(object):
         [selection] = slice if slice else [builtins.slice(None)]
         count = utd.size()
         for index in range(*selection.indices(count)):
-            udm = utd[index]
+            udm = udm_t()
+            udm.offset = index
+            if index != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+                raise E.MemberNotFoundError(u"{:s}.iterate({!s}, {!r}) : Unable to find the member at index {:d} of the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), slice, index, tinfo.get_tid()))
             yield tinfo, index, udm
         return
 
@@ -1888,7 +1892,11 @@ class v9members(object):
 
         # Now we need to figure out if the specified offset is actually
         # contained by the member. If it is within bounds, then we got it.
-        udm = utd[mindex]
+        udm = udm_t()
+        udm.offset = mindex
+        if mindex != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+            raise E.MemberNotFoundError(u"{:s}.index_after({!s}, {:#x}) : Unable to find the member at index (:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset, mindex, tinfo.get_tid()))
+
         moffset, msize = udm.offset, udm.size
         if moffset <= offset < moffset + msize:
             return mindex + 1
@@ -1943,19 +1951,19 @@ class v9members(object):
 
         # Next we figure out if the member actually contains the specified
         # offset. If it is, then we already got the correct index.
-        udm = utd[mindex]
-        moffset, msize = udm.offset, udm.size
-        if moffset <= offset < moffset + msize:
-            return mindex
+        udm = udm_t()
+        udm.offset = mindex
+        if mindex != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+            raise E.MemberNotFoundError(u"{:s}.index_before({!s}, {:#x}) : Unable to find the member at index (:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset, mindex, tinfo.get_tid()))
 
         # If the found member is a gap, then return the predecessor of the index
         # unless the predecessor index is before the first index (index < 0).
-        return mindex if offset <= moffset else min(count, mindex + 1)
+        moffset, msize = udm.offset, udm.size
+        return mindex if offset <= moffset + msize else min(count, mindex + 1)
 
     @classmethod
     def contains(cls, type, offset):
         '''Return whether the given `offset` is within the boundaries of the specified structure or union `type`.'''
-        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
         if not (tinfo.is_struct() or union(tinfo)):
             raise E.InvalidTypeOrValueError(u"{:s}.contains({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
@@ -2185,7 +2193,12 @@ class v9members(object):
         if not(0 <= index < utd.size()):
             is_union = union(tinfo)
             raise E.MemberNotFoundError(u"{:s}.by_index({!s}, {:d}) : Unable to find a member at the specified index ({:d}) of the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), index, index, 'union' if is_union else 'frame' if frame(tinfo) else 'structure', tinfo.get_tid()))
-        return tinfo, index, utd[index]
+
+        udm = udm_t()
+        udm.offset = index
+        if index != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+            raise E.MemberNotFoundError(u"{:s}.by_index({!s}, {:d}) : Unable to find the member at index ({:d}) of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), index, index, tinfo.get_tid()))
+        return tinfo, index, udm
 
     @classmethod
     def by_name(cls, type, name):
@@ -2205,7 +2218,12 @@ class v9members(object):
         mindex = utd.find_member(key, idaapi.STRMEM_NAME)
         if not(0 <= mindex < utd.size()):
             raise E.MemberNotFoundError(u"{:s}.by_name({!s}, {!r}) : Unable to locate a member with the specified name \"{:s}\" for the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), name, utils.string.escape(packed, '"'), 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', tinfo.get_tid()))
-        return tinfo, mindex, utd[mindex]
+
+        udm = udm_t()
+        udm.offset = mindex
+        if mindex != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+            raise E.MemberNotFoundError(u"{:s}.by_name({!s}, {!r}) : Unable to find the member at index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), name, index, tinfo.get_tid()))
+        return tinfo, mindex, udm
 
     @classmethod
     def by_fullname(cls, name, delimiter='.'):
@@ -2286,7 +2304,10 @@ class v9members(object):
 
             # Iterate through each member in the union and check their sizes.
             for index in range(utd.size()):
-                udm = utd[index]
+                udm = udm_t()
+                udm.offset = index
+                if index != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+                    raise E.MemberNotFoundError(u"{:s}.at_offset({!s}, {:+#x}) : Unable to find the member at index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), realoffset, index, tinfo.get_tid()))
                 mbits = udm.size
 
                 # If the requested offset is within the boundaries of our union
@@ -2327,19 +2348,24 @@ class v9members(object):
         # then we can go ahead and check its bounds against the offset.
         mindex = utd.find_member(key, idaapi.STRMEM_OFFSET)
         if mindex < 0:
-            raise E.DisassemblerError(u"{:s}.at_offset({!s}, {:+#x}) : Unable to find a member at the given offset ({:+#x}) of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), realoffset, key.offset, tinfo.get_tid()))
+            raise E.MemberNotFoundError(u"{:s}.at_offset({!s}, {:+#x}) : Unable to find a member at the given offset ({:+#x}) of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), realoffset, key.offset, tinfo.get_tid()))
+
+        udm = udm_t()
+        udm.offset = mindex
+        if mindex != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+            raise E.MemberNotFoundError(u"{:s}.at_offset({!s}, {:+#x}) : Unable to find a member at index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), realoffset, mindex, tinfo.get_tid()))
 
         # If it's using a variable-length structure, then we do some explicit
         # checks to see if it points past the end of the variable-length member.
-        elif is_variable and not(utd[mindex].size):
-            if utd[mindex].offset <= realoffset:
-                yield tinfo, mindex, utd[mindex]
+        elif is_variable and not(udm.size):
+            if udm.offset <= realoffset:
+                yield tinfo, mindex, udm
             pass
 
         # If it's just a regular structure with the member being sized, then we
         # just check if the given offset is within the member's boundaries.
-        elif utd[mindex].offset <= realoffset < utd[mindex].offset + utd[mindex].size:
-            yield tinfo, mindex, utd[mindex]
+        elif udm.offset <= realoffset < udm.offset + udm.size:
+            yield tinfo, mindex, udm
         return
 
     @classmethod
@@ -2359,6 +2385,7 @@ class v9members(object):
         bits, key, count = 8 * utd.total_size, udm_t(), utd.size()
         key.offset, is_union, is_variable = realoffset, union(tinfo), tinfo.is_varstruct()
 
+        # FIXME: this is incomplete
         raise NotImplementedError
 
     @classmethod
@@ -2368,9 +2395,9 @@ class v9members(object):
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
 
         if not (tinfo.is_struct() or union(tinfo)):
-            raise E.InvalidTypeOrValueError(u"{:s}.at_bounds({!s}, {:+#x}, {:+#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+            raise E.InvalidTypeOrValueError(u"{:s}.at_bounds({!s}, {:+#x}, {:+#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop))
         elif not tinfo.get_udt_details(utd):
-            raise E.DisassemblerError(u"{:s}.at_bounds({!s}, {:+#x}, {:+#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+            raise E.DisassemblerError(u"{:s}.at_bounds({!s}, {:+#x}, {:+#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop))
         else:
             left, right = sorted(map(int, [start, stop]))
 
@@ -2411,7 +2438,11 @@ class v9members(object):
                 # Now we just have to yield each member in order. This is a
                 # union anyways, so all members should really be the same.
                 for mindex in ordered:
-                    yield tinfo, mindex, utd[mindex]
+                    udm = udm_t()
+                    udm.offset = mindex
+                    if mindex != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+                        raise E.MemberNotFoundError(u"{:s}.at_bounds({!s}, {:+#x}, {:+#x}) : Unable to find the member at index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop, mindex, tinfo.get_tid()))
+                    yield tinfo, mindex, udm
                 continue
             return
 
@@ -2425,7 +2456,10 @@ class v9members(object):
         # Now we can iterate through our slice and check if each member's
         # boundaries are within the bounds that we were given.
         for index in range(*ordering.indices(count)):
-            udm = utd[index]
+            udm = udm_t()
+            udm.offset = index
+            if index != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+                raise E.MemberNotFoundError(u"{:s}.at_bounds({!s}, {:+#x}, {:+#x}) : Unable to find the member at index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop, index, tinfo.get_tid()))
             mleft, mbits = udm.offset, udm.size
 
             # Here we adjust the element size so that at least one element will
@@ -2499,7 +2533,11 @@ class v9members(object):
                 # them as. This is a union, so all members should generally be
                 # the same.
                 for mindex in ordered:
-                    yield tinfo, mindex, utd[mindex]
+                    udm = udm_t()
+                    udm.offset = mindex
+                    if mindex != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+                        raise E.MemberNotFoundError(u"{:s}.overlaps({!s}, {:+#x}, {:+#x}) : Unable to find the member at index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop, mindex, tinfo.get_tid()))
+                    yield tinfo, mindex, udm
                 continue
             return
 
@@ -2512,7 +2550,10 @@ class v9members(object):
 
         # Now we can iterate through our slice and check each members bounds.
         for index in range(*ordering.indices(count)):
-            udm = utd[index]
+            udm = udm_t()
+            udm.offset = index
+            if index != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+                raise E.MemberNotFoundError(u"{:s}.overlaps({!s}, {:+#x}, {:+#x}) : Unable to find the member at index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop, index, tinfo.get_tid()))
             mleft, mbits = udm.offset, udm.size
             mright = mleft + mbits
 
@@ -2637,7 +2678,7 @@ class v9members(object):
 
             # If we're in a union and we have more than one member, then stop
             # traversing here.
-            elif filtered and type.is_union():
+            elif filtered and union(type):
                 break
 
             # If it's not a union, then assume the neareset member in front.
@@ -2656,7 +2697,7 @@ class v9members(object):
                 mtype = interface.tinfo.copy(udm.type)
 
             # Now we have a member to yield and can adjust our offset.
-            base, offset, moffset, count = base, remainder, 0 if mowner.is_union() else udm.offset, count + 1
+            base, offset, moffset, count = base, remainder, 0 if union(mowner) else udm.offset, count + 1
             yield base, selected[table[mid]]
 
             # If we can't descend any farther, then we can leave.
