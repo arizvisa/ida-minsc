@@ -373,7 +373,12 @@ class v9member(object):
             # If the index is out-of-bounds, then abort.
             if not (0 <= mindex < count):
                 raise E.MemberNotFoundError(u"{:s} : Unable to find the member at the given index ({:d}) of the specified type ({:#x}).".format(caller_format, mindex, tinfo.get_tid()))
-            return tinfo, utd, mindex, utd[mindex]
+
+            udm = udm_t()
+            udm.offset = mindex
+            if mindex != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member at the index {:d} of the specified type ({:#x}).".format(caller_format, mindex, tinfo.get_tid()))
+            return tinfo, utd, mindex, udm
 
         # Try using a type and the offset for the member.
         elif len(args) == 2 and isinstance(args[-1], udm_t):
@@ -396,7 +401,12 @@ class v9member(object):
             if not (0 <= mindex < count):
                 description = "index ({:d})".format(udm.offset) if union(tinfo) else "offset ({:#x})".format(udm.offset)
                 raise E.MemberNotFoundError(u"{:s} : Unable to find the member at the given {:s} of the specified type ({:#x}).".format(caller_format, description, tinfo.get_tid()))
-            return tinfo, utd, mindex, utd[mindex]
+
+            udm = udm_t()
+            udm.offset = mindex
+            if mindex != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member at index {:d} of the specified type ({:#x}).".format(caller_format, mindex, tinfo.get_tid()))
+            return tinfo, utd, mindex, udm
 
         # If we couldn't figure out what the arguments mean, then just give up.
         iterable = (("{!r}".format(arg) if isinstance(arg, types.string) else interface.tinfo.quoted(arg) if isinstance(arg, idaapi.tinfo_t) else "{!s}".format(arg)) for arg in args)
@@ -476,7 +486,7 @@ class v9member(object):
         # for the member identifier. A valid index means that it was found.
         udm = udm_t()
         mindex = tinfo.get_udm_by_tid(udm, mid)
-        return 0 <= mindex
+        return 0 <= mindex < utd.size()
 
     @classmethod
     def index(cls, *args):
@@ -620,12 +630,12 @@ class v9member(object):
         # an offset, then cull it out since the member index was specified.
         elif (len(args) == 1 and isinstance(args[0], types.integer) and interface.node.identifier(args[0])) or (len(args) == 2 and isinstance(args[0], idaapi.tinfo_t)):
             tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'default_name'])
-            mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), udm.name
+            mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), utils.string.of(udm.name)
             offset = udm.offset if udm else mindex if union(tinfo) else 8 * tinfo.get_size()
 
         elif (len(args) == 2 and isinstance(args[0], types.integer) and interface.node.identifier(args[0])) or (len(args) == 3 and isinstance(args[0], idaapi.tinfo_t)):
             tinfo, utd, mindex, udm = cls.by(*args[:-1], caller=[__name__, cls.__name__, 'default_name'], args=["{:#x}".format(*args[-1:])])
-            mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), udm.name
+            mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), utils.string.of(udm.name)
             [offset] = args[-1:]
 
         else:
@@ -2177,6 +2187,11 @@ class v9members(object):
         mindex = ti.get_udm_by_tid(udm, identifier)
         if not(0 <= mindex < count) or not(count):
             raise E.MemberNotFoundError(u"{:s}.by_identifier({!s}, {:#x}) : Unable to locate the member using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier, identifier))
+
+        udm = udm_t()
+        udm.offset = mindex
+        if mindex != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+            raise E.MemberNotFoundError(u"{:s}.by_identifier({!s}, {:#x}) : Unable to find the member at index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier, mindex, identifier))
         return tinfo, mindex, udm
 
     @classmethod
@@ -2197,7 +2212,7 @@ class v9members(object):
         udm = udm_t()
         udm.offset = index
         if index != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
-            raise E.MemberNotFoundError(u"{:s}.by_index({!s}, {:d}) : Unable to find the member at index ({:d}) of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), index, index, tinfo.get_tid()))
+            raise E.MemberNotFoundError(u"{:s}.by_index({!s}, {:d}) : Unable to find the member at index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), index, index, tinfo.get_tid()))
         return tinfo, index, udm
 
     @classmethod
