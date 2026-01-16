@@ -2738,7 +2738,15 @@ class v9members(object):
     @classmethod
     def slice(cls, type, slice):
         '''Return a `slice` of the contiguous list of members belonging to the specified structure `type`.'''
-        raise NotImplementedError
+        slice = slice if isinstance(slice, builtins.slice) else builtins.slice(slice, 1 + slice)
+        start, stop, selected = interface.strpath.v9members(type, slice)
+
+        # Now we just need to transform the selected elements back into the
+        # member ids or a size representing the empty space.
+        # member that was included or a size representing the empty space.
+        iterable = (mid_or_size for offset, mid_or_size in selected)
+        results = ((cls.by_identifier(type, mid_or_size) if interface.node.identifier(mid_or_size) else mid_or_size) for mid_or_size in iterable)
+        return [packed_or_size for packed_or_size in results]
 
     @classmethod
     def remove_slice(cls, type, slice, *offset):
