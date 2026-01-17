@@ -8751,7 +8751,7 @@ class tinfo(object):
             4 : idaapi.BTMT_BOOL4,
         }
 
-        remove = {8} if database.bits() != 64 else {2}
+        removed = {8} if database.bits() != 64 else {2}
         filtered = {size for size in sizes} - removed if sizes else boolean_sizes.keys()
         requested = {boolean_sizes[size] for size in filtered} | {0}
 
