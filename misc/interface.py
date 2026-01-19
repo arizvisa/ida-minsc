@@ -11548,7 +11548,7 @@ class function(object):
         elif isinstance(ea, tuple):
             start, stop = ea.bounds if hasattr(ea, 'bounds') else ea
         else:
-            start, stop = interface.range.unpack(ea)
+            start, stop = range.unpack(ea)
 
         # Now we have an address that we can use to get the chunk.
         res = idaapi.get_fchunk_num(start)
