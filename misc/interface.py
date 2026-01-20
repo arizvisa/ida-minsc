@@ -88,6 +88,10 @@ class typemap(object):
             (int,  1):(idaapi.byteflag(), -1), (int, 2):(idaapi.wordflag(), -1), (int,  3):(idaapi.tribyteflag(), -1),
             (int,  4):(idaapi.dwrdflag(), -1), (int, 8):(idaapi.qwrdflag(), -1), (int, 10):(idaapi.tbytflag(), -1),
             (int, 16):(idaapi.owrdflag(), -1),
+
+            (bool,  1):(idaapi.byteflag(), -1), (bool, 2):(idaapi.wordflag(), -1), (bool,  3):(idaapi.tribyteflag(), -1),
+            (bool,  4):(idaapi.dwrdflag(), -1), (bool, 8):(idaapi.qwrdflag(), -1), (bool, 10):(idaapi.tbytflag(), -1),
+            (bool, 16):(idaapi.owrdflag(), -1),
         }
         if hasattr(idaapi, 'ywrdflag'):
             integermap[int, 32] = getattr(idaapi, 'ywrdflag')(), -1
@@ -140,6 +144,10 @@ class typemap(object):
             (int,  1):(idaapi.byte_flag(), -1),  (int, 2):(idaapi.word_flag(), -1),
             (int,  4):(idaapi.dword_flag(), -1), (int, 8):(idaapi.qword_flag(), -1), (int, 10):(idaapi.tbyte_flag(), -1),
             (int, 16):(idaapi.oword_flag(), -1),
+
+            (bool,  1):(idaapi.byte_flag(), -1),  (bool, 2):(idaapi.word_flag(), -1),
+            (bool,  4):(idaapi.dword_flag(), -1), (bool, 8):(idaapi.qword_flag(), -1), (bool, 10):(idaapi.tbyte_flag(), -1),
+            (bool, 16):(idaapi.oword_flag(), -1),
         }
         if hasattr(idaapi, 'yword_flag'):
             integermap[int, 32] = getattr(idaapi, 'yword_flag')(), -1
@@ -197,7 +205,7 @@ class typemap(object):
         if hasattr(builtins, 'unicode'):
             stringmap.setdefault(builtins.unicode, (idaapi.strlit_flag(), idaapi.STRTYPE_C_16))
 
-        ptrmap = { (type, sz) : (idaapi.off_flag() | flg, 0) for (_, sz), (flg, _) in integermap.items() }
+        ptrmap = { (type, sz) : (idaapi.off_flag() | flg, 0) for (_, sz), (flg, _) in integermap.items()}
         #nonemap = { (None, pow(2, sz)) : (idaapi.align_flag(), -1) for sz in builtins.range(16) }
         nonemap = { None : (idaapi.align_flag(), -1) }
 
@@ -215,6 +223,7 @@ class typemap(object):
         int:integermap, float:decimalmap,
         str:stringmap, chr:stringmap,
         type:ptrmap, None:nonemap,
+        bool:integermap,
     }
     if hasattr(builtins, 'long'): typemap.setdefault(builtins.long, integermap)
     if hasattr(builtins, 'unicode'): typemap.setdefault(builtins.unicode, stringmap)
@@ -227,7 +236,9 @@ class typemap(object):
     # loop doesn't iterate.. resulting in an exception if we try to delete them.
     inverted, s = _, f = _, _ = {}, None
     for s, (f, _) in integermap.items():
-        inverted[f & FF_MASKSIZE] = s
+        if s[0] is not bool:                # XXX: avoid returning boolean types
+            inverted[f & FF_MASKSIZE] = s
+        continue
     for s, (f, _) in decimalmap.items():
         inverted[f & FF_MASKSIZE] = s
     for s, (f, _) in stringmap.items():
