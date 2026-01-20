@@ -270,6 +270,80 @@ class typemap(object):
         (type, 4) : idaapi.REF_OFF32,   (type, 8) : idaapi.REF_OFF64,
     }
 
+    # Now we define the mappings for the different variations of a local type.
+    typeinfo_booleansize = {
+        idaapi.BTMT_BOOL1 | idaapi.BT_BOOL: 1,
+        idaapi.BTMT_BOOL2 | idaapi.BT_BOOL: None,  # only avail if not 64-bit
+        idaapi.BTMT_BOOL8 | idaapi.BT_BOOL: None,  # only avail if 64-bit
+        idaapi.BTMT_BOOL4 | idaapi.BT_BOOL: 1,
+    }
+
+    typeinfo_floatsize = {
+        idaapi.BTMT_FLOAT | idaapi.BT_FLOAT: 4,
+        idaapi.BTMT_DOUBLE | idaapi.BT_FLOAT: 8,
+        idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT: None,
+        idaapi.BTMT_SPECFLT | idaapi.BT_FLOAT: 10,
+    }
+
+    typeinfo_integersize = {
+        idaapi.BT_INT: None,
+        idaapi.BT_INT8: 1,
+        idaapi.BT_INT16: 2,
+        idaapi.BT_INT32: 4,
+        idaapi.BT_INT64: 8,
+        idaapi.BT_INT128: 16,
+
+        # This one is for char.
+        idaapi.BTMT_CHAR | idaapi.BT_INT8: 1,
+
+        # These are for signed and unsigned integers. We use a negative size to
+        # signify the sign. We don't support explicit unsigned unfortunately.
+        idaapi.BTMT_SIGNED | idaapi.BT_INT: None,
+        idaapi.BTMT_SIGNED | idaapi.BT_INT8: -1,
+        idaapi.BTMT_SIGNED | idaapi.BT_INT16: -2,
+        idaapi.BTMT_SIGNED | idaapi.BT_INT32: -4,
+        idaapi.BTMT_SIGNED | idaapi.BT_INT64: -8,
+        idaapi.BTMT_SIGNED | idaapi.BT_INT128: -16,
+
+        # These are things like _BYTE, _WORD, _DWORD, _QWORD, _OWORD
+        idaapi.BTMT_SIZE12 | idaapi.BT_VOID : 1,
+        idaapi.BTMT_SIZE12 | idaapi.BT_UNK : 2,
+        idaapi.BTMT_SIZE48 | idaapi.BT_VOID : 4,
+        idaapi.BTMT_SIZE48 | idaapi.BT_UNK : 8,
+        idaapi.BTMT_SIZE128 | idaapi.BT_VOID : 16,
+
+        # These are for boolean types.
+        idaapi.BTMT_BOOL1 | idaapi.BT_BOOL: 1,
+        idaapi.BTMT_BOOL2 | idaapi.BT_BOOL: None,   # only avail if not 64-bit
+        idaapi.BTMT_BOOL8 | idaapi.BT_BOOL: None,   # only avail if 64-bit
+        idaapi.BTMT_BOOL4 | idaapi.BT_BOOL: 1,
+
+        # These are for floating-point types.
+        idaapi.BTMT_FLOAT | idaapi.BT_FLOAT: 4,
+        idaapi.BTMT_DOUBLE | idaapi.BT_FLOAT: 8,
+        idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT: None,
+        idaapi.BTMT_SPECFLT | idaapi.BT_FLOAT: 10,
+
+        # FIXME: we don't have a way of supporting the __int128, __m256, and
+        #        __m512 integer types since the disassembler uses them as
+        #        aliases.
+        # '__int128': 0x10,
+        # '__m256': 0x20,
+        # '__m512': 0x40,
+    }
+
+    typeinfo_pointersize = {
+        idaapi.BTMT_DEFPTR | idaapi.BT_PTR: 4,
+        idaapi.BTMT_NEAR | idaapi.BT_PTR: 8,
+        idaapi.BTMT_FAR | idaapi.BT_PTR: None,
+        idaapi.BTMT_CLOSURE | idaapi.BT_PTR: 10,
+    }
+
+    typeinfo_typemap = {
+        int:typeinfo_integersize, float:typeinfo_floatsize,
+        type:typeinfo_pointersize, bool:typeinfo_booleansize,
+    }
+
     # Assign the default values for the processor that was selected for the database.
     @classmethod
     def __newprc__(cls, pnum):
@@ -281,10 +355,27 @@ class typemap(object):
             bits = 64 if idaapi.inf_is_64bit() else 32 if Fis_32bit else 16
         if bits is None: return
 
+        # Assign the default types so that they correspond to the word size.
         typemap.integermap[None] = typemap.integermap[int, bits // 8]
         typemap.decimalmap[None] = typemap.decimalmap[float, bits // 8]
         typemap.ptrmap[None] = typemap.ptrmap[type, bits // 8]
         typemap.stringmap[None] = typemap.stringmap[str]
+
+        # Update the local types map with the default integer sizes.
+        typemap.typeinfo_integersize[idaapi.BT_INT] = tinfo.size(idaapi.tinfo_t(idaapi.BT_INT))
+        typemap.typeinfo_integersize[idaapi.BTMT_SIGNED | idaapi.BT_INT] = -tinfo.size(idaapi.tinfo_t(idaapi.BTMT_SIGNED | idaapi.BT_INT))
+
+        if bits < 64:
+            typemap.typeinfo_booleansize[idaapi.BTMT_BOOL2 | idaapi.BT_BOOL] = tinfo.size(idaapi.tinfo_t(idaapi.BTMT_BOOL2 | idaapi.BT_BOOL))
+            typemap.typeinfo_integersize[idaapi.BTMT_BOOL2 | idaapi.BT_BOOL] = tinfo.size(idaapi.tinfo_t(idaapi.BTMT_BOOL2 | idaapi.BT_BOOL))
+        else:
+            typemap.typeinfo_booleansize[idaapi.BTMT_BOOL8 | idaapi.BT_BOOL] = tinfo.size(idaapi.tinfo_t(idaapi.BTMT_BOOL8 | idaapi.BT_BOOL))
+            typemap.typeinfo_integersize[idaapi.BTMT_BOOL8 | idaapi.BT_BOOL] = tinfo.size(idaapi.tinfo_t(idaapi.BTMT_BOOL8 | idaapi.BT_BOOL))
+
+        # Figure out the default size for a long double.
+        typemap.typeinfo_floatsize[idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT] = tinfo.size(idaapi.tinfo_t(idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT))
+        typemap.typeinfo_integersize[idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT] = tinfo.size(idaapi.tinfo_t(idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT))
+        return
 
     @classmethod
     def __ev_newprc__(cls, pnum, keep_cfg):
@@ -511,6 +602,72 @@ class typemap(object):
         # update the flags with FF_SIGN if that's what the user intended.
         typeid = idaapi.BADADDR if typeid < 0 else typeid
         return flag | (idaapi.FF_SIGN if sz < 0 else 0), typeid, abs(sz) * count
+
+    @classmethod
+    def dissolvetype(cls, type, offset=None):
+        '''Convert the specified `type` into a pythonic type at the optional `offset`.'''
+        ti, offset = idaapi.tinfo_t(), offset if offset is None else int(offset)
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = tinfo.copy(type), type.get_tid()
+        elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.dissolvetype({!s}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), '' if offset is None else ", offset={:#x}".format(offset), type.__class__))
+
+        # If our type is a structure type, then return an internal structure.
+        # FIXME: We should be emitting the actual structure for the type.
+        if ti.is_struct():
+            logging.warning(u"{:s}.dissolvetype({!s}{:s}) : Processing the specified structure type ({:#x}) as an array of bytes due to not being implemented yet.".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), '' if offset is None else ", offset={:#x}".format(offset), sid))
+            byte = builtins.int, 1
+            return [byte, tinfo.size(ti)]
+
+        # If our type is an array type, then get its base type and length so we
+        # can return it as a list of things.
+        elif ti.is_array():
+            element, length = tinfo.array(ti)
+            return [cls.dissolvetype(element, offset=offset), length]
+
+        # Otherwise, we unpack the declaration type and flags for the type.
+        masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
+        decl, size = ti.get_decltype(), tinfo.size(ti)
+        base, flags, modifiers = (decl & mask for mask in masks)
+
+        # First figure out if our declaration type is something that we couldn't
+        # fit into the tables. Afterwards, we figure out the group for our type.
+        if base in {idaapi.BT_PTR, idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD}:
+            pass
+        elif cls.typeinfo_booleansize.get(base | flags) is not None and size == abs(cls.typeinfo_booleansize[base | flags]):
+            return builtins.bool, cls.typeinfo_booleansize[base | flags]
+        elif cls.typeinfo_floatsize.get(base | flags) is not None and size == abs(cls.typeinfo_floatsize[base | flags]):
+            return builtins.float, cls.typeinfo_floatsize[base | flags]
+        elif cls.typeinfo_integersize.get(base | flags) is not None and size == abs(cls.typeinfo_integersize[base | flags]):
+            return builtins.int, cls.typeinfo_integersize[base | flags]
+
+        # If the type is a pointer, then figure out its size so that we can
+        # return the pythonic type that represents it. We do this by checking
+        # the pointer details, if we can't do that then just use the size as-is.
+        # FIXME: does it make sense to nest these somehow? so that describing a
+        #        a pointer to a pointer to a 32-bit pointer to a pointer is
+        #        actually feasible. maybe add support for a 3-element tuple that
+        #        lets you specify the pointer size, but also append a type for
+        #        the pointer target. i.e. (type, 4, (type, 8, (int, 4))) will be
+        #        a 32-bit pointer to a 64-bit pointer to a 4-byte integer. i am
+        #        quite unsure about this because pythonic types are intended to
+        #        be fairly blunt instruments where you only know the size.
+        ptd = idaapi.ptr_type_data_t()
+        if base in cls.typeinfo_pointersize:
+            if not ti.get_ptr_details(ptd):
+                return builtins.type, size
+            elif ptd.taptr_bits == idaapi.TAPTR_PTR32:
+                return builtins.type, 4
+            elif ptd.taptr_bits == idaapi.TAPTR_PTR64:
+                return builtins.type, 8
+            return builtins.type, size
+
+        # We couldn't determine the type, so we need to figure out something
+        # that makes sense. So, we fall back to an array of bytes.
+        byte = builtins.int, 1
+        return [byte, size]
 
     @classmethod
     def update_refinfo(cls, identifier, flag):
