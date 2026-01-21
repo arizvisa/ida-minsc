@@ -271,58 +271,58 @@ class typemap(object):
     }
 
     # Now we define the mappings for the different variations of a local type.
-    typeinfo_booleansize = {
-        idaapi.BTMT_BOOL1 | idaapi.BT_BOOL: 1,
+    typeinfo_booleans = {
+        idaapi.BTMT_BOOL1 | idaapi.BT_BOOL: (bool, 1),
         idaapi.BTMT_BOOL2 | idaapi.BT_BOOL: None,  # only avail if not 64-bit
         idaapi.BTMT_BOOL8 | idaapi.BT_BOOL: None,  # only avail if 64-bit
-        idaapi.BTMT_BOOL4 | idaapi.BT_BOOL: 1,
+        idaapi.BTMT_BOOL4 | idaapi.BT_BOOL: (bool, 4),
     }
 
-    typeinfo_floatsize = {
-        idaapi.BTMT_FLOAT | idaapi.BT_FLOAT: 4,
-        idaapi.BTMT_DOUBLE | idaapi.BT_FLOAT: 8,
+    typeinfo_floats = {
+        idaapi.BTMT_FLOAT | idaapi.BT_FLOAT: (float, 4),
+        idaapi.BTMT_DOUBLE | idaapi.BT_FLOAT: (float, 8),
         idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT: None,
-        idaapi.BTMT_SPECFLT | idaapi.BT_FLOAT: 10,
+        idaapi.BTMT_SPECFLT | idaapi.BT_FLOAT: (float, 10),
     }
 
-    typeinfo_integersize = {
+    typeinfo_integers = {
         idaapi.BT_INT: None,
-        idaapi.BT_INT8: 1,
-        idaapi.BT_INT16: 2,
-        idaapi.BT_INT32: 4,
-        idaapi.BT_INT64: 8,
-        idaapi.BT_INT128: 16,
+        idaapi.BT_INT8: (int, 1),
+        idaapi.BT_INT16: (int, 2),
+        idaapi.BT_INT32: (int, 4),
+        idaapi.BT_INT64: (int, 8),
+        idaapi.BT_INT128: (int, 16),
 
         # This one is for char.
-        idaapi.BTMT_CHAR | idaapi.BT_INT8: 1,
+        idaapi.BTMT_CHAR | idaapi.BT_INT8: (int, 1),
 
         # These are for signed and unsigned integers. We use a negative size to
         # signify the sign. We don't support explicit unsigned unfortunately.
         idaapi.BTMT_SIGNED | idaapi.BT_INT: None,
-        idaapi.BTMT_SIGNED | idaapi.BT_INT8: -1,
-        idaapi.BTMT_SIGNED | idaapi.BT_INT16: -2,
-        idaapi.BTMT_SIGNED | idaapi.BT_INT32: -4,
-        idaapi.BTMT_SIGNED | idaapi.BT_INT64: -8,
-        idaapi.BTMT_SIGNED | idaapi.BT_INT128: -16,
+        idaapi.BTMT_SIGNED | idaapi.BT_INT8: (int, -1),
+        idaapi.BTMT_SIGNED | idaapi.BT_INT16: (int, -2),
+        idaapi.BTMT_SIGNED | idaapi.BT_INT32: (int, -4),
+        idaapi.BTMT_SIGNED | idaapi.BT_INT64: (int, -8),
+        idaapi.BTMT_SIGNED | idaapi.BT_INT128: (int, -16),
 
         # These are things like _BYTE, _WORD, _DWORD, _QWORD, _OWORD
-        idaapi.BTMT_SIZE12 | idaapi.BT_VOID : 1,
-        idaapi.BTMT_SIZE12 | idaapi.BT_UNK : 2,
-        idaapi.BTMT_SIZE48 | idaapi.BT_VOID : 4,
-        idaapi.BTMT_SIZE48 | idaapi.BT_UNK : 8,
-        idaapi.BTMT_SIZE128 | idaapi.BT_VOID : 16,
+        idaapi.BTMT_SIZE12 | idaapi.BT_VOID : (int, 1),
+        idaapi.BTMT_SIZE12 | idaapi.BT_UNK : (int, 2),
+        idaapi.BTMT_SIZE48 | idaapi.BT_VOID : (int, 4),
+        idaapi.BTMT_SIZE48 | idaapi.BT_UNK : (int, 8),
+        idaapi.BTMT_SIZE128 | idaapi.BT_VOID : (int, 16),
 
         # These are for boolean types.
-        idaapi.BTMT_BOOL1 | idaapi.BT_BOOL: 1,
+        idaapi.BTMT_BOOL1 | idaapi.BT_BOOL: (int, 1),
         idaapi.BTMT_BOOL2 | idaapi.BT_BOOL: None,   # only avail if not 64-bit
         idaapi.BTMT_BOOL8 | idaapi.BT_BOOL: None,   # only avail if 64-bit
-        idaapi.BTMT_BOOL4 | idaapi.BT_BOOL: 1,
+        idaapi.BTMT_BOOL4 | idaapi.BT_BOOL: (int, 4),
 
         # These are for floating-point types.
-        idaapi.BTMT_FLOAT | idaapi.BT_FLOAT: 4,
-        idaapi.BTMT_DOUBLE | idaapi.BT_FLOAT: 8,
+        idaapi.BTMT_FLOAT | idaapi.BT_FLOAT: (int, 4),
+        idaapi.BTMT_DOUBLE | idaapi.BT_FLOAT: (int, 8),
         idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT: None,
-        idaapi.BTMT_SPECFLT | idaapi.BT_FLOAT: 10,
+        idaapi.BTMT_SPECFLT | idaapi.BT_FLOAT: (int, 10),
 
         # FIXME: we don't have a way of supporting the __int128, __m256, and
         #        __m512 integer types since the disassembler uses them as
@@ -332,16 +332,16 @@ class typemap(object):
         # '__m512': 0x40,
     }
 
-    typeinfo_pointersize = {
-        idaapi.BTMT_DEFPTR | idaapi.BT_PTR: 4,
-        idaapi.BTMT_NEAR | idaapi.BT_PTR: 8,
+    typeinfo_pointers = {
+        idaapi.BTMT_DEFPTR | idaapi.BT_PTR: (type, 4),
+        idaapi.BTMT_NEAR | idaapi.BT_PTR: (type, 8),
         idaapi.BTMT_FAR | idaapi.BT_PTR: None,
-        idaapi.BTMT_CLOSURE | idaapi.BT_PTR: 10,
+        idaapi.BTMT_CLOSURE | idaapi.BT_PTR: (type, 10),
     }
 
     typeinfo_typemap = {
-        int:typeinfo_integersize, float:typeinfo_floatsize,
-        type:typeinfo_pointersize, bool:typeinfo_booleansize,
+        int:typeinfo_integers, float:typeinfo_floats,
+        type:typeinfo_pointers, bool:typeinfo_booleans,
     }
 
     # Assign the default values for the processor that was selected for the database.
@@ -362,19 +362,19 @@ class typemap(object):
         typemap.stringmap[None] = typemap.stringmap[str]
 
         # Update the local types map with the default integer sizes.
-        typemap.typeinfo_integersize[idaapi.BT_INT] = tinfo.size(idaapi.tinfo_t(idaapi.BT_INT))
-        typemap.typeinfo_integersize[idaapi.BTMT_SIGNED | idaapi.BT_INT] = -tinfo.size(idaapi.tinfo_t(idaapi.BTMT_SIGNED | idaapi.BT_INT))
+        typemap.typeinfo_integers[idaapi.BT_INT] = int, tinfo.size(idaapi.tinfo_t(idaapi.BT_INT))
+        typemap.typeinfo_integers[idaapi.BTMT_SIGNED | idaapi.BT_INT] = int, -tinfo.size(idaapi.tinfo_t(idaapi.BTMT_SIGNED | idaapi.BT_INT))
 
         if bits < 64:
-            typemap.typeinfo_booleansize[idaapi.BTMT_BOOL2 | idaapi.BT_BOOL] = tinfo.size(idaapi.tinfo_t(idaapi.BTMT_BOOL2 | idaapi.BT_BOOL))
-            typemap.typeinfo_integersize[idaapi.BTMT_BOOL2 | idaapi.BT_BOOL] = tinfo.size(idaapi.tinfo_t(idaapi.BTMT_BOOL2 | idaapi.BT_BOOL))
+            typemap.typeinfo_booleans[idaapi.BTMT_BOOL2 | idaapi.BT_BOOL] = bool, tinfo.size(idaapi.tinfo_t(idaapi.BTMT_BOOL2 | idaapi.BT_BOOL))
+            typemap.typeinfo_integers[idaapi.BTMT_BOOL2 | idaapi.BT_BOOL] = int, tinfo.size(idaapi.tinfo_t(idaapi.BTMT_BOOL2 | idaapi.BT_BOOL))
         else:
-            typemap.typeinfo_booleansize[idaapi.BTMT_BOOL8 | idaapi.BT_BOOL] = tinfo.size(idaapi.tinfo_t(idaapi.BTMT_BOOL8 | idaapi.BT_BOOL))
-            typemap.typeinfo_integersize[idaapi.BTMT_BOOL8 | idaapi.BT_BOOL] = tinfo.size(idaapi.tinfo_t(idaapi.BTMT_BOOL8 | idaapi.BT_BOOL))
+            typemap.typeinfo_booleans[idaapi.BTMT_BOOL8 | idaapi.BT_BOOL] = bool, tinfo.size(idaapi.tinfo_t(idaapi.BTMT_BOOL8 | idaapi.BT_BOOL))
+            typemap.typeinfo_integers[idaapi.BTMT_BOOL8 | idaapi.BT_BOOL] = int, tinfo.size(idaapi.tinfo_t(idaapi.BTMT_BOOL8 | idaapi.BT_BOOL))
 
         # Figure out the default size for a long double.
-        typemap.typeinfo_floatsize[idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT] = tinfo.size(idaapi.tinfo_t(idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT))
-        typemap.typeinfo_integersize[idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT] = tinfo.size(idaapi.tinfo_t(idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT))
+        typemap.typeinfo_floats[idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT] = float, tinfo.size(idaapi.tinfo_t(idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT))
+        typemap.typeinfo_integers[idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT] = float, tinfo.size(idaapi.tinfo_t(idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT))
         return
 
     @classmethod
@@ -636,12 +636,12 @@ class typemap(object):
         # fit into the tables. Afterwards, we figure out the group for our type.
         if base in {idaapi.BT_PTR, idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD}:
             pass
-        elif cls.typeinfo_booleansize.get(base | flags) is not None and size == abs(cls.typeinfo_booleansize[base | flags]):
-            return builtins.bool, cls.typeinfo_booleansize[base | flags]
-        elif cls.typeinfo_floatsize.get(base | flags) is not None and size == abs(cls.typeinfo_floatsize[base | flags]):
-            return builtins.float, cls.typeinfo_floatsize[base | flags]
-        elif cls.typeinfo_integersize.get(base | flags) is not None and size == abs(cls.typeinfo_integersize[base | flags]):
-            return builtins.int, cls.typeinfo_integersize[base | flags]
+        elif cls.typeinfo_booleans.get(base | flags) is not None and size == abs(cls.typeinfo_booleans[base | flags][-1]):
+            return cls.typeinfo_booleans[base | flags]
+        elif cls.typeinfo_floats.get(base | flags) is not None and size == abs(cls.typeinfo_floats[base | flags][-1]):
+            return cls.typeinfo_floats[base | flags]
+        elif cls.typeinfo_integers.get(base | flags) is not None and size == abs(cls.typeinfo_integers[base | flags][-1]):
+            return cls.typeinfo_integers[base | flags]
 
         # If the type is a pointer, then figure out its size so that we can
         # return the pythonic type that represents it. We do this by checking
@@ -655,7 +655,7 @@ class typemap(object):
         #        quite unsure about this because pythonic types are intended to
         #        be fairly blunt instruments where you only know the size.
         ptd = idaapi.ptr_type_data_t()
-        if base in cls.typeinfo_pointersize:
+        if base in cls.typeinfo_pointers:
             if not ti.get_ptr_details(ptd):
                 return builtins.type, size
             elif ptd.taptr_bits == idaapi.TAPTR_PTR32:
