@@ -236,28 +236,30 @@ class typemap(object):
     # loop doesn't iterate.. resulting in an exception if we try to delete them.
     inverted, s = _, f = _, _ = {}, None
     for s, (f, _) in integermap.items():
-        if s[0] is not bool:                # XXX: avoid returning boolean types
+        if s is not None and s[0] is not bool:  # XXX: avoid returning boolean types
             inverted[f & FF_MASKSIZE] = s
         continue
     for s, (f, _) in decimalmap.items():
-        inverted[f & FF_MASKSIZE] = s
+        if s is not None:
+            inverted[f & FF_MASKSIZE] = s
+        continue
     for s, (f, _) in stringmap.items():
-        if (next(iter(s)) if isinstance(s, internal.types.tuple) else s) in {str}: # prioritize `str`
+        if s is not None and (next(iter(s)) if isinstance(s, internal.types.tuple) else s) in {str}: # prioritize `str`
             inverted[f & FF_MASKSIZE, _] = s
         continue
 
     # Default size for alignflag is 1, since alignment is not actually a type and
     # isn't understood by the disassembler when applied to a member.
-    # XXX: still would be nice if we could somehow connect this to NALT_ALIGN,
-    #      and use the size parameter as the actual alignment size...
     for s, (f, _) in nonemap.items():
         inverted[f & FF_MASKSIZE] = s, 1
 
     # Add all the available flag types to support all available pointer types.
     for s, (f, _) in ptrmap.items():
-        inverted[f & FF_MASK] = s
-        inverted[f & FF_MASK & ~MS_0TYPE] = s
-        inverted[f & FF_MASK & ~MS_1TYPE] = s
+        if s is not None:
+            inverted[f & FF_MASK] = s
+            inverted[f & FF_MASK & ~MS_0TYPE] = s
+            inverted[f & FF_MASK & ~MS_1TYPE] = s
+        continue
     del s, (f, [[[[_]]]]) # let's pick the worst possible syntax
 
     # FIXME: this is a hack for dealing with structures that
@@ -375,7 +377,52 @@ class typemap(object):
         # Figure out the default size for a long double.
         typemap.typeinfo_floats[idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT] = float, tinfo.size(idaapi.tinfo_t(idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT))
         typemap.typeinfo_integers[idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT] = float, tinfo.size(idaapi.tinfo_t(idaapi.BTMT_LNGDBL | idaapi.BT_FLOAT))
-        return
+
+        # Now we go ahead and create the inverted tables that will be used to
+        # look up the data type information using a pythonic type. To start out,
+        # we first process all of the defined integer types.
+        FF_MASK, FF_MASKSIZE, MS_0TYPE, MS_1TYPE = cls.FF_MASK, cls.FF_MASKSIZE, cls.MS_0TYPE, cls.MS_1TYPE
+        inverted = {}
+        for s, (f, _) in cls.integermap.items():
+            if s is not None and s[0] is not bool:  # XXX: avoid returning boolean types
+                inverted[f & FF_MASKSIZE] = s
+            continue
+
+        # Add all of the floating-point types to the inverted lookup table.
+        for s, (f, _) in cls.decimalmap.items():
+            if s is not None:
+                inverted[f & FF_MASKSIZE] = s
+            continue
+
+        # Add all of the available string types to the inverted lookup table.
+        for s, (f, _) in cls.stringmap.items():
+            if s is not None and (next(iter(s)) if isinstance(s, internal.types.tuple) else s) in {str}: # prioritize `str`
+                inverted[f & FF_MASKSIZE, _] = s
+            continue
+
+        # This is for looking up the alignment. We always set this to 1, because
+        # the alignment is not actually a real type and isn't understood by the
+        # disassembler when it is applied to a member.
+        # XXX: still would be nice if we could somehow connect this to NALT_ALIGN,
+        #      and use the size parameter as the actual alignment size...
+        for s, (f, _) in cls.nonemap.items():
+            inverted[f & FF_MASKSIZE] = s, 1
+
+        # Add each available flag type so that we can support all of the pointer
+        # types that are actually available.
+        for s, (f, _) in cls.ptrmap.items():
+            if s is not None:
+                inverted[f & FF_MASK] = s
+                inverted[f & FF_MASK & ~MS_0TYPE] = s
+                inverted[f & FF_MASK & ~MS_1TYPE] = s
+            continue
+
+        # FIXME: this is a hack for dealing with structures that
+        #        have the flag set but aren't actually structures..
+        inverted[idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU] = (int, 1)
+
+        # Finally we can update our inverted lookup table.
+        cls.inverted.update(inverted)
 
     @classmethod
     def __ev_newprc__(cls, pnum, keep_cfg):
