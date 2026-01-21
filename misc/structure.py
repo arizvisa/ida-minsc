@@ -346,28 +346,87 @@ class comment(object):
     """
 
     @classmethod
-    def get(cls, sptr, repeatable=True):
-        '''Return the `repatable` or nonrepeatable comment for the structure specified by `sptr`.'''
-        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
-        res = idaapi.get_struc_cmt(sid, True if repeatable else False)
+    def get(cls, type, repeatable=True):
+        '''Return the `repeatable` or non-repeatable comment for the specified structure `type`.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), type.get_tid()
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        elif isinstance(type, structure_t):
+            ti, sid = type.ptr, type.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            ti, sid = type, type.id
+        else:
+            raise E.InvalidParameterError(u"{:s}.get({!s}, repeatable={!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, repeatable, type.__class__))
+
+        # If the user gave us anything else other than a local type, then we
+        # assume its a structure which requires us to the older structure API.
+        if not isinstance(ti, idaapi.tinfo_t):
+            res = idaapi.get_struc_cmt(sid, True if repeatable else False)
+            return utils.string.of(res)
+
+        # Otherwise, we need to go ahead and get the comment using the new API.
+        res = ti.get_type_cmt()
         return utils.string.of(res)
 
     @classmethod
-    def set(cls, sptr, string, repeatable=True):
-        '''Apply the specified `string` as a `repeatable` or nonrepeatable comment to the structure in `sptr`.'''
-        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
-        res, ok = idaapi.get_struc_cmt(sid, True if repeatable else False), idaapi.set_struc_cmt(sid, utils.string.to(string), True if repeatable else False)
-        if not ok:
-            raise E.DisassemblerError(u"{:s}.set({:#x}, {!r}, {!s}) : Unable to set the {:s} of the specified structure ({:#x}) to \"{:s}\".".format(__name__, sid, string, True if repeatable else False, 'repeatable comment' if repeatable else 'comment', sid, utils.string.escape(string, '"')))
+    def set(cls, type, string, repeatable=True):
+        '''Apply the specified `string` as a `repeatable` or non-repeatable comment to the specified structure `type`.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), type.get_tid()
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        elif isinstance(type, structure_t):
+            ti, sid = type.ptr, type.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            ti, sid = type, type.id
+        else:
+            raise E.InvalidParameterError(u"{:s}.set({!s}, {!r}, repeatable={!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, string, repeatable, type.__class__))
+
+        # Check which type we determined from the parameter. If it's not a local
+        # type, then we need to use the older structure API.
+        if not isinstance(ti, idaapi.tinfo_t):
+            res, ok = idaapi.get_struc_cmt(sid, True if repeatable else False), idaapi.set_struc_cmt(sid, utils.string.to(string), True if repeatable else False)
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.set({:#x}, {!r}, repeatable={!s}) : Unable to set the {:s} of the specified structure ({:#x}) to \"{:s}\".".format(__name__, sid, string, True if repeatable else False, 'repeatable comment' if repeatable else 'comment', sid, utils.string.escape(string, '"')))
+            return utils.string.of(res)
+
+        # Otherwise, we need apply the given comment using the new API.
+        res, ok = ti.get_type_cmt(), ti.set_type_cmt(utils.string.to(string), False if repeatable else True, 0)
+        if ok != idaapi.TERR_OK:
+            message = interface.tinfo.format_type_error(ok)
+            raise E.DisassemblerError(u"{:s}.set({:#x}, {!r}, repeatable={!s}) : Unable to set the {:s} of the specified structure ({:#x}) to \"{:s}\" due to error {:#x} ({!s}).".format(__name__, sid, string, True if repeatable else False, 'repeatable comment' if repeatable else 'comment', sid, utils.string.escape(string, '"'), ok, message))
         return utils.string.of(res)
 
     @classmethod
-    def remove(cls, sptr, repeatable=True):
-        '''Removed the `repeatable` or nonrepeatable comment from the structure in `sptr`.'''
-        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
-        res, ok = idaapi.get_struc_cmt(sid, True if repeatable else False), idaapi.set_struc_cmt(sid, utils.string.to(u''), True if repeatable else False)
-        if not ok:
-            raise E.DisassemblerError(u"{:s}.remove({:#x}, {!s}) : Unable to remove the {:s} from the specified structure ({:#x}).".format(__name__, sid, True if repeatable else False, 'repeatable comment' if repeatable else 'comment', sid))
+    def remove(cls, type, repeatable=True):
+        '''Removed the `repeatable` or non-repeatable comment from the specified structure `type`.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), type.get_tid()
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        elif isinstance(type, structure_t):
+            ti, sid = type.ptr, type.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            ti, sid = type, type.id
+        else:
+            raise E.InvalidParameterError(u"{:s}.remove({!s}, repeatable={!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, repeatable, type.__class__))
+
+        # If we didn't get a type, then we're supposed to use the old api.
+        if not isinstance(ti, idaapi.tinfo_t):
+            res, ok = idaapi.get_struc_cmt(sid, True if repeatable else False), idaapi.set_struc_cmt(sid, utils.string.to(u''), True if repeatable else False)
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.remove({:#x}, {!s}) : Unable to remove the {:s} from the specified structure ({:#x}).".format(__name__, sid, True if repeatable else False, 'repeatable comment' if repeatable else 'comment', sid))
+            return utils.string.of(res)
+
+        # Otherwise, we need clear the existing comment using the new API.
+        res, ok = ti.get_type_cmt(), ti.set_type_cmt(utils.string.to(''), False if repeatable else True, 0)
+        if ok != idaapi.TERR_OK:
+            message = interface.tinfo.format_type_error(ok)
+            raise E.DisassemblerError(u"{:s}.remove({:#x}, repeatable={!s}) : Unable to clear the {:s} of the specified structure ({:#x}) to \"{:s}\" due to error {:#x} ({!s}).".format(__name__, sid, True if repeatable else False, 'repeatable comment' if repeatable else 'comment', sid, utils.string.escape(string, '"'), ok, message))
         return utils.string.of(res)
 
 class xref(object):
