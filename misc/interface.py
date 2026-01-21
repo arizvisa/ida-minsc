@@ -335,16 +335,38 @@ class typemap(object):
     }
 
     typeinfo_pointers = {
-        idaapi.BTMT_DEFPTR | idaapi.BT_PTR: (type, 4),
-        idaapi.BTMT_NEAR | idaapi.BT_PTR: (type, 8),
+        idaapi.BTMT_DEFPTR | idaapi.BT_PTR: None,
+        idaapi.BTMT_NEAR | idaapi.BT_PTR: None,
         idaapi.BTMT_FAR | idaapi.BT_PTR: None,
-        idaapi.BTMT_CLOSURE | idaapi.BT_PTR: (type, 10),
+        idaapi.BTMT_CLOSURE | idaapi.BT_PTR: None,
     }
 
     typeinfo_typemap = {
         int:typeinfo_integers, float:typeinfo_floats,
         type:typeinfo_pointers, bool:typeinfo_booleans,
     }
+
+    # Next we can precalculate the inverted lookup table that will be used for
+    # mapping type information to a pythonic type. We will process the booleans,
+    # floats, integers, and pointers.
+    typeinfo_inverted = {}
+
+    fl = t = None
+    for fl, t in typeinfo_booleans.items():
+        if t is not None:
+            typeinfo_inverted[t] = fl
+        continue
+
+    for fl, t in typeinfo_floats.items():
+        if t is not None:
+            typeinfo_inverted[t] = fl
+        continue
+
+    for fl, t in typeinfo_integers.items():
+        if t is not None and t[0] is not bool:
+            typeinfo_inverted[t] = fl
+        continue
+    del fl, t
 
     # Assign the default values for the processor that was selected for the database.
     @classmethod
@@ -421,8 +443,51 @@ class typemap(object):
         #        have the flag set but aren't actually structures..
         inverted[idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU] = (int, 1)
 
-        # Finally we can update our inverted lookup table.
+        # Then we can update the inverted lookup table in our class definition.
         cls.inverted.update(inverted)
+
+        # Now we'll need to create the inverted tables that will be used for
+        # mapping type information to a pythonic type. We do this for booleans,
+        # floats, integers, and pointers.
+        typeinfo_inverted = {}
+        for fl, t in cls.typeinfo_booleans.items():
+            if t is not None:
+                typeinfo_inverted[t] = fl
+            continue
+
+        for fl, t in cls.typeinfo_floats.items():
+            if t is not None:
+                typeinfo_inverted[t] = fl
+            continue
+
+        for fl, t in cls.typeinfo_integers.items():
+            if t is not None and all(fl not in inverted for inverted in [cls.typeinfo_booleans, cls.typeinfo_floats]):
+                typeinfo_inverted[t] = fl
+            continue
+
+        # No need to update the the inverted lookup table for pointers since we
+        # specially handle these as a result of needing to set their taptr bits.
+        #for fl, t in cls.typeinfo_pointers.items():
+        #    if t is not None:
+        #        typeinfo_inverted[t] = fl
+        #    continue
+
+        # Finally we can update the inverted lookup table for type information.
+        cls.typeinfo_inverted.update(typeinfo_inverted)
+
+        # Now we need to create the table for our pointers.
+        for btmt in [idaapi.BTMT_DEFPTR, idaapi.BTMT_NEAR, idaapi.BTMT_FAR, idaapi.BTMT_CLOSURE]:
+            cls.typeinfo_pointers[btmt | idaapi.BT_PTR] = type, bits // 8
+            cls.typeinfo_inverted[type] = btmt | idaapi.BT_PTR
+
+        # Now we create some default types for the type information.
+        boolean = idaapi.BTMT_BOOL4 if bits < 64 else idaapi.BTMT_BOOL8
+        cls.typeinfo_inverted[bool] = idaapi.BT_BOOL | boolean
+        floating = idaapi.BTMT_FLOAT if bits < 64 else idaapi.BTMT_DOUBLE
+        cls.typeinfo_inverted[float] = idaapi.BT_FLOAT | floating
+        integering = idaapi.BT_VOID | idaapi.BTMT_SIZE48 if bits < 64 else idaapi.BT_UNK | idaapi.BTMT_SIZE48
+        cls.typeinfo_inverted[int] = integering
+        cls.typeinfo_inverted[chr] = idaapi.BTMT_CHAR | idaapi.BT_INT8
 
     @classmethod
     def __ev_newprc__(cls, pnum, keep_cfg):
@@ -715,6 +780,90 @@ class typemap(object):
         # that makes sense. So, we fall back to an array of bytes.
         byte = builtins.int, 1
         return [byte, size]
+
+    @classmethod
+    def resolvetype(cls, pythonType):
+        '''Convert the provided `pythonType` into an `idaapi.tinfo_t`.'''
+        sz, count = None, 1
+
+        # If our pythonType is a list, then we need to unpack its element and
+        # length in order to create an array from the element type.
+        if isinstance(pythonType, internal.types.list):
+            [res, count] = pythonType
+            element = cls.resolvetype(res)
+
+            atd = idaapi.array_type_data_t()
+            atd.elem_type = element
+            atd.elem_base, atd.nelems = 0, count
+
+            ti = idaapi.tinfo_t()
+            if not ti.create_array(atd):
+                raise internal.exceptions.DisassemblerError(u"{:s}.resolvetype({!s}) : Unable the create an array of type {!s} with the specified length ({:d}).".format('.'.join([__name__, cls.__name__]), pythonType, tinfo.quoted(element), count))
+            return ti
+
+        # If our pythonType is a tuple, with the first element being a type or
+        # structure of some kind, then this is a variable-length structure.
+        elif isinstance(pythonType, internal.types.tuple) and isinstance(next(iter(pythonType)), (idaapi.struc_t, internal.structure.structure_t)):
+            raise NotImplementedError(u"{:s}.resolvetype({!s}) : Unable the return a type for the variable-length structure {!s}.".format('.'.join([__name__, cls.__name__]), pythonType, tinfo.quoted(element), count))
+
+        # If a tuple and the first element is not a type or structure, then this
+        # is an atomic type that we'll return.
+        elif isinstance(pythonType, internal.types.tuple) and next(iter(pythonType)) is not type:
+            table = cls.typemap.get(builtins.next(item for item in pythonType), {})
+
+            # Check if our type already exists in the table.
+            if pythonType in cls.typeinfo_inverted:
+                decl = cls.typeinfo_inverted[pythonType]
+                return idaapi.tinfo_t(decl)
+
+            elif len(pythonType) != 2:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.resolvetype({!s}) : Unable the resolve the type {!s} to a corresponding local type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+
+            # Now we go ahead and unpack the tuple into its basic type. If it
+            # isn't in our table, then raise an exception so that we can abort.
+            (t, sz), count = pythonType, 1
+            if (t, sz) in cls.typeinfo_inverted:
+                decl = cls.typeinfo_inverted[t, sz]
+                return idaapi.tinfo_t(decl)
+
+            # Otherwise raise an exception because we don't know this type.
+            raise internal.exceptions.InvalidParameterError(u"{:s}.resolvetype({!s}) : Unable the resolve the type {!s} to a corresponding local type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+
+        # If it's already a local type, then return it.
+        elif isinstance(pythonType, idaapi.tinfo_t):
+            return tinfo.copy(pythonType)
+
+        # If it's a default type, then we'll be okay with the inverted table.
+        elif pythonType in {bool, float, int, chr}:
+            decl = cls.typeinfo_inverted[pythonType]
+            return idaapi.tinfo_t(decl)
+
+        # If it's a supported pointer type, then convert the pythonType into the
+        # actual localtype that was described.
+        elif pythonType in cls.typeinfo_typemap or hasattr(pythonType, '__iter__') and next(iter(pythonType)) in cls.typeinfo_typemap:
+            _, sz = (pythonType, 0) if pythonType in cls.typeinfo_typemap else pythonType
+
+            ptd = idaapi.ptr_type_data_t()
+            ptd.obj_type = idaapi.tinfo_t(idaapi.BT_VOID)
+
+            if sz == 4:
+                ptd.taptr_bits = idaapi.TAPTR_PTR32
+            elif sz == 8:
+                ptd.taptr_bits = idaapi.TAPTR_PTR64
+            else:
+                ptd.taptr_bits = 0
+
+            ti = idaapi.tinfo_t()
+            if not ti.create_ptr(ptd):
+                raise internal.exceptions.DisassemblerError(u"{:s}.resolvetype({!s}) : Unable the create a pointer for the given type ({!s}).".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+            return ti
+
+        # If it's a structure or a type, then snag the identifer and size of it
+        # so that we can create a type for it.
+        elif isinstance(pythonType, (idaapi.struc_t, internal.structure.structure_t)):
+            pass
+
+        raise internal.exceptions.InvalidParameterError(u"{:s}.resolvetype({!s}) : Unable the resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
 
     @classmethod
     def update_refinfo(cls, identifier, flag):
