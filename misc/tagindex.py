@@ -810,9 +810,8 @@ class tags(schema):
 
         # check if we're just decrementing the count, or removing the tag.
         if not(count > amount):
-            bit, count = cls.discard(position)
+            position, count = cls.discard(position)
             logging.debug(u"{:s}.decrement({!s}, {:d}) : Removed the tag with bit position {:d} from the current netnode ({:#x}) due to its reference count being {:d}.".format('.'.join([__name__, cls.__name__]), "{!r}".format(name), amount, position, node, count - 1))
-            return count
 
         elif not netnode.alt.set(node, position, count - amount, tag=cls.counttag):
             raise exceptions.DisassemblerError(u"{:s}.decrement({!s}, {:d}) : Unable to decrement the reference count ({:d}) in the current netnode ({:#x}) for the specified tag ({!s}).".format('.'.join([__name__, cls.__name__]), "{!r}".format(name), amount, count, node, "{!r}".format(name)))
