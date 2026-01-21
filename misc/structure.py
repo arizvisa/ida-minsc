@@ -186,38 +186,152 @@ class naming(object):
     """
 
     @classmethod
-    def get(cls, sptr):
-        '''Return the name that has been applied to the structure specified by `sptr`.'''
-        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
+    def get(cls, type):
+        '''Return the name that has been applied to the structure specified by `type`.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), type.get_tid()
+
+        # If our type is an identifier, then store and get the type from it.
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+
+        # If it's an internal structure, then get its backing type and its id.
+        elif isinstance(type, structure_t):
+            ti, sid = type.ptr, type.id
+
+        # If it's a `struc_t` from the older api, then store its type and id.
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            ti, sid = type, type.id
+
+        # Otherwise, throw up an exception and bail.
+        else:
+            raise E.InvalidParameterError(u"{:s}.get({!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
+
+        # If our structure backing is a local type, then use `get_tid_name`.
+        if isinstance(ti, idaapi.tinfo_t):
+            res = idaapi.get_tid_name(sid)
+            return utils.string.of(res)
+
+        # Otherwise, this is a `struc_t` and we need to use `get_struc_name`.
         res = idaapi.get_struc_name(sid)
         return utils.string.of(res)
 
     @classmethod
-    def set(cls, sptr, string):
-        '''Apply the specified `string` to the structure in `sptr` as its name.'''
-        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
-        res, ok = idaapi.get_struc_name(sid), idaapi.set_struc_name(sid, utils.string.to(string))
-        if not ok:
-            raise E.DisassemblerError(u"{:s}.set({:#x}, {!r}) : Unable to set the name of the specified structure ({:#x}) to \"{:s}\".".format(__name__, sid, string, sid, utils.string.escape(string, '"')))
+    def set(cls, type, string):
+        '''Apply the specified `string` to the structure in `type` as its name.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), type.get_tid()
+
+        # If our type is an identifier, then store and get the type from it.
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+
+        # If it's an internal structure, then get its backing type and its id.
+        elif isinstance(type, structure_t):
+            ti, sid = type.ptr, type.id
+
+        # If it's a `struc_t` from the older api, then store its type and id.
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            ti, sid = type, type.id
+
+        # Otherwise, throw up the invalid parameter exception and bail.
+        else:
+            raise E.InvalidParameterError(u"{:s}.set({!s}, {!r}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, string, type.__class__))
+
+        # If we are a `struc_t` (not a local type), then use the older api.
+        if not isinstance(ti, idaapi.tinfo_t):
+            res, ok = idaapi.get_struc_name(sid), idaapi.set_struc_name(sid, utils.string.to(string))
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.set({:#x}, {!r}) : Unable to set the name of the specified structure ({:#x}) to \"{:s}\".".format(__name__, sid, string, sid, utils.string.escape(string, '"')))
+            return utils.string.of(res)
+
+        # Otherwise, we are a local type, and we'll need to use the newer api.
+        res, ok = idaapi.get_tid_name(sid), ti.rename_type(utils.string.to(string), idaapi.NTF_TYPE | idaapi.NTF_FIXNAME)
+        if ok != idaapi.TERR_OK:
+            errname, errdesc = interface.tinfo.format_type_error(ok)
+            description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+            raise E.DisassemblerError(u"{:s}.set({:#x}, {!r}) : Unable to set the name of the specified structure ({:#x}) to \"{:s}\" due to error {!s}.".format(__name__, sid, string, sid, utils.string.escape(string, '"'), description))
         return utils.string.of(res)
 
     @classmethod
-    def remove(cls, sptr):
-        '''Removed the name from the structure specified by `sptr`.'''
-        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
-        # FIXME: rather than removing the name, we should figure out what kind
-        #        of structure it is, and then set a default name matching what
-        #        the disassembler will actually choose. this way we can
-        #        differentiate a custom name from a general one.
-        res, ok = idaapi.get_struc_name(sid), idaapi.set_struc_name(sid, utils.string.to(''))
-        if not ok:
-            raise E.DisassemblerError(u"{:s}.remove({:#x}) : Unable to remove the name from the specified structure ({:#x}).".format(__name__, sid, sid))
+    def remove(cls, type):
+        '''Remove the name from the structure specified by `type`.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), type.get_tid()
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        elif isinstance(type, structure_t):
+            ti, sid = type.ptr, type.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            ti, sid = type, type.id
+        else:
+            raise E.InvalidParameterError(u"{:s}.remove({!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
+
+        # Now we can figure out which api to use for removing the name. If it is
+        # not a local type, but rather `struc_t` then we can set the structure
+        # name to empty in order to remove it.
+        if not isinstance(ti, idaapi.tinfo_t):
+            res, ok = idaapi.get_struc_name(sid), idaapi.set_struc_name(sid, utils.string.to(''))
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.remove({:#x}) : Unable to remove the name from the specified structure ({:#x}).".format(__name__, sid, sid))
+            return utils.string.of(res)
+
+        # Otherwise, we need to use the type to figure out what its default name
+        # could be. To do this, we need both its index (ordinal) and its type.
+        ordinal = interface.tinfo.ordinal(ti)
+        if union(ti):
+            erasedname = "union_{:d}".format(ordinal)
+
+        elif ti.is_struct():
+            erasedname = "struc_{:d}".format(ordinal)
+
+        elif ti.is_enum():
+            erasedname = "enum_{:d}".format(ordinal)
+
+        # If this structure type is a frame, then figure out the address its for
+        # and set the type name to what we think IDA will name it.
+        # FIXME: Check if the address is padded to some number of digits.
+        elif False:
+            erasedname = "$ F{:#X}".format(ordinal)
+
+        # Otherwise, we just use a generic name here.
+        else:
+            erasedname = "type_{:d}".format(ordinal)
+
+        # If our type is a `struc_t`, then use the old api to apply the erased
+        # name to the structure type.
+        if not isinstance(ti, idaapi.tinfo_t):
+            res, ok = idaapi.get_struc_name(sid), idaapi.set_struc_name(sid, utils.string.to(erasedname))
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.remove({:#x}) : Unable to remove the name from the specified structure ({:#x}).".format(__name__, sid, sid))
+            return utils.string.of(res)
+
+        # Otherwise, we use the new API to apply the erased name to the type.
+        res, ok = idaapi.get_tid_name(sid), ti.rename_type(utils.string.to(erasedname), idaapi.NTF_TYPE | idaapi.NTF_FIXNAME)
+        if ok != idaapi.TERR_OK:
+            errname, errdesc = interface.tinfo.format_type_error(ok)
+            description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+            raise E.DisassemblerError(u"{:s}.set({:#x}) : Unable to set the name of the specified structure ({:#x}) to \"{:s}\" due to error {!s}.".format(__name__, sid, sid, utils.string.escape(erasedname, '"'), description))
         return utils.string.of(res)
 
     @classmethod
-    def netnode(cls, sptr):
-        '''Return the name of the netnode for the structure specified by `sptr`.'''
-        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
+    def netnode(cls, type):
+        '''Return the name of the netnode for the specified structure by `type`.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), type.get_tid()
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        elif isinstance(type, structure_t):
+            ti, sid = type.ptr, type.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            ti, sid = type, type.id
+        else:
+            raise E.InvalidParameterError(u"{:s}.netnode({!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
+
         if not internal.netnode.name.has(sid):
             raise E.DisassemblerError(u"{:s}.netnode({:#x}) : Unable to return the name of the netnode for the specified structure ({:#x}).".format(__name__, sid, sid))
         return internal.netnode.name.get(sid)
