@@ -698,9 +698,11 @@ class v9member(object):
             caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'get_type'])
             raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
 
-        # FIXME: return the pythonic type
+        # Figure out the member and extract its type so that we can convert it
+        # to a pythonic type using the `interface.typemap` namespace.
         tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'get_type'], args="{:#x}".format(offset))
-        raise NotImplementedError
+        moffset, mtype, mid = udm.offset, interface.tinfo.copy(udm.type), interface.tinfo.member_identifier(tinfo, mindex)
+        return interface.typemap.dissolvetype(mid, mtype, moffset)
 
     @classmethod
     def set_type(cls, *args):
@@ -713,9 +715,16 @@ class v9member(object):
             caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'get_type'])
             raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
 
-        # FIXME: return the pythonic type
+        # Get the information about the member prior to modifying its type.
         tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'get_type'], args="{:#x}".format(offset))
-        raise NotImplementedError
+        moffset, mtype, mid = udm.offset, interface.tinfo.copy(udm.type), interface.tinfo.member_identifier(tinfo, mindex)
+
+        # Convert the pythonic type that we received into a regular type that we
+        # can apply to the structure member being modified. Afterwards, we can
+        # dissolve what we received back into a pythonic type and return it.
+        ti = interface.typemap.resolvetype(type)
+        res = cls.set_typeinfo(tinfo, mindex, ti)
+        return interface.typemap.dissolvetype(mid, res, moffset)
 
     @classmethod
     def has_typeinfo(cls, *args):
@@ -881,9 +890,10 @@ class v9member(object):
     def packed(cls, *args):
         '''Pack the information about the specified member with its structure at the specified `offset` into a tuple in case it is to be removed.'''
         tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'packed'])
-        mid = tinfo.get_udm_tid(mindex)
+        mid = interface.tinfo.member_identifier(tinfo, mindex)
         name = utils.string.of(udm.name)
-        ptype = ()      # FIXME: return the pythonic type
+        mtype = interface.tinfo.copy(udm.type)
+        ptype = interface.typemap.dissolvetype(mid, mtype, udm.offset)
         location = interface.location_t(udm.offset, udm.size)
         type = interface.tinfo.copy(udm.type)
         comment = utils.string.of(udm.cmt)
