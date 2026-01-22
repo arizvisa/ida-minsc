@@ -456,13 +456,34 @@ class xref(object):
         return
 
     @classmethod
-    def structure(cls, sptr):
-        '''Yield each structure member or reference that uses the structure identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr if isinstance(sptr, types.integer) else sptr.id)
-        for offset, reference_or_member in interface.xref.structure(sptr):
+    def structure(cls, type):
+        '''Yield each structure member or reference that uses the specified structure `type`.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), type.get_tid()
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        elif isinstance(type, structure_t):
+            ti, sid = type.ptr, type.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            ti, sid = type, type.id
+        else:
+            raise E.InvalidParameterError(u"{:s}.structure({!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
+
+        # Use the type to figure which function to use. This returns a generator
+        # that we can use to iterate through and collect all the references.
+        v9, iterable = (True, interface.xref.typeinfo(ti)) if isinstance(ti, idaapi.tinfo_t) else (False, interface.xref.structure(ti))
+        for offset, reference_or_member in iterable:
             if isinstance(reference_or_member, interface.refbase_t):
                 reference = reference_or_member
                 yield reference
+
+            # If we're using a type, then this is a tuple containing the
+            # information needed to select the specified type member.
+            # FIXME: return a structure `member_t` rather than its position.
+            elif v9:
+                tinfo, utd, mindex, udm = reference_or_member
+                yield tinfo, mindex
 
             # Otherwise it is a tuple for a structure member, and we need to
             # use it to construct a structure_t and fetch the member by index.
