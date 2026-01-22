@@ -11617,7 +11617,7 @@ class xref(object):
                 # If we were unable to get the frame, then we're referencing a
                 # member from a different type and we can yield what we got.
                 if ea == idaapi.BADADDR:
-                    yield 0, packed
+                    offset, packed = 0, packed
 
                 # If we couldn't grab the func, then we just bail.
                 elif not func:
@@ -11630,7 +11630,11 @@ class xref(object):
                 # Otherwise we're referencing a frame member, and we need to figure out
                 # the base that the type will be at and then we can return it.
                 # FIXME: this has not been tested at all yet.
-                yield function.frame_offset(func), packed
+                else:
+                    offset, packed = function.frame_offset(func), packed
+
+                # Yield the information related to the referenced member.
+                yield offset, packed
 
             # If it's not code, then we're just a reference to an address and so we
             # need to yield the address it's for along with its reference type.
