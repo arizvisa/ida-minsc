@@ -6565,6 +6565,7 @@ class strpath(object):
     def guide(cls, goal, struc, suggestion):
         '''This tries to determine a complete path from the sptr in `struc` to the offset `goal` using `suggestion` as a sloppy (sorta) guidance.'''
         result, suggestion_description = [], [item for item in itertools.starmap(cls.format, suggestion)]
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
 
         # First figure out whether we're processing a structure or a local type.
         ti = idaapi.tinfo_t()
@@ -6588,26 +6589,58 @@ class strpath(object):
         (owner, candidates, carry) = builtins.next(resolver)
         index, (sptr, mptr, offset) = 0, (owner, None, 0)
         try:
+            Flogging, discard_reason = logging.debug, 'was not actually used'
+
             # Now we can process all the crap they might've given us in their suggestion.
             for index, (sptr, mptr, offset) in enumerate(suggestion):
+                mowner = idaapi.tinfo_t()
+                if isinstance(sptr, idaapi.tinfo_t):
+                    mowner, mownerid = tinfo.copy(sptr), sptr.get_tid()
+                elif isinstance(sptr, internal.types.integer) and node.identifier(sptr) and mowner.get_type_by_tid(sptr):
+                    mowner, mownerid = mowner, sptr
+                elif not v9:
+                    mowner, mownerid = getattr(sptr, 'ptr', sptr), sptr.id
+                else:
+                    raise internal.exceptions.MemberNotFoundError(u"{:s}.guide({:#x}, {:#x}, {:s}) : The suggested path includes an unsupported type ({!s}) as one of its members at index {:d}.".format('.'.join([__name__, cls.__name__]), goal, sid, "[{:s}]".format(', '.join(suggestion_description)), sptr.__class__, index))
+
+                # If our mptr is an identifier, then convert it to an index so
+                # that we can check to see if it's in our candidates.
+                if isinstance(mptr, internal.types.integer) and node.identifier(mptr):
+                    mindex = mowner.get_udm_by_tid(udm_t(), mptr)
+                    if mindex < 0:
+                        raise internal.exceptions.MemberNotFoundError(u"{:s}.guide({:#x}, {:#x}, {:s}) : Unable to find the member at index {:d} with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), goal, sid, "[{:s}]".format(', '.join(suggestion_description)), goal, index, mptr))
+                    mptr = mindex
 
                 # If we're using the v9 local types, then check if we weren't
-                # given a member so. If so, then use the offset wer were given.
-                if v9 and mptr in {None, idaapi.BADADDR}:
+                # given a member so. If so, then use the offset we were given.
+                if isinstance(mowner, idaapi.tinfo_t) and mptr in {None, idaapi.BADADDR}:
                     carry = carry + offset
 
                 # If the choice is not a valid candidate, then we need to try a
                 # different method to figure out what the suggestion meant.
-                elif v9 and mptr in candidates:
+                elif isinstance(mowner, idaapi.tinfo_t) and mptr not in candidates:
                     break
 
-                # If we don't have an mptr, then we use the offset we were given.
-                elif not mptr:
+                # Otherwise, the member was a valid candidate and we can move
+                # onto the next iteration of our loop and the next field.
+                elif isinstance(mowner, idaapi.tinfo_t):
+                    if not(mptr in candidates):
+                        raise AssertionError(u"{:s}.guide({:#x}, {:#x}, {:s}) : Unable to find the specified member at index {:d} within the candidates ({:s}) for the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), goal, sid, "[{:s}]".format(', '.join(suggestion_description)), index, ', '.join("{:#x}".format(id) for id in candidates), mownerid))
+                    pass
+
+                # Any other conditions will be using the older structure api. If
+                # there is no member ptr, then use the offset we were given.
+                elif mptr is None:
                     carry = carry + offset
 
-                # If our choice is not one of the candidates, then we need to bail so that we
-                # can start flailing trying to figure out what the suggestion actually meant.
-                elif mptr.id not in {item.id for item in candidates}:
+                # If the member identifier is one of the valid candidates, then
+                # we can continue to the next iteration and the next field.
+                elif mptr.id in {item.id for item in candidates}:
+                    pass
+
+                # If the member is not a candidate, then we need to bail so that
+                # we can flail to figure out what the suggestion actually meant.
+                else:
                     break
 
                 # Our suggestion still makes sense, so send our choice to the resolver
