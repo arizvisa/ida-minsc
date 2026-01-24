@@ -5826,6 +5826,20 @@ class strpath(object):
             fullname = '.'.join([sname, mname])
             return "{:s}({:#x}, {:#x}, \"{:s}\", {:s}={!s}{:s})".format(tinfo_description, ti.get_tid(), ti.get_udm_tid(mindex), internal.utils.string.escape(fullname, '"'), 'index' if ti.is_union() else 'offset', "{:d}".format(udm.offset) if ti.is_union() else "{:#x}".format(udm.offset), offset_description)
 
+        # If we were given a member id, but no owning type then we figure it out
+        # ourselves and then recurse with whatever it was we found.
+        elif isinstance(sptr, internal.types.none) and isinstance(mptr, internal.types.integer) and node.identifier(mptr):
+            sptr, mname = idaapi.tinfo_t(), internal.netnode.name.get(mptr)
+            if not sptr.get_type_by_tid(mptr):
+                member = "member_t({:#x}, \"{:s}\")".format(mptr, internal.utils.string.escape(mname, '"'))
+                return ' '.join(['(ERROR)', member, 'has no owner'])
+            return cls.format(sptr, mptr, offset)
+
+        elif isinstance(sptr, internal.types.none) and isinstance(mptr, internal.types.integer):
+            mname = internal.netnode.name.get(mptr)
+            member = "member_t({:#x}, \"{:s}\")".format(mptr, internal.utils.string.escape(mname, '"'))
+            return ' '.join(['(ERROR)', member, 'has no owner'])
+
         # otherwise we can figure everything out using the structure/member api.
         sptr_t, mptr_t = idaapi.struc_t if sptr is None else sptr.__class__, idaapi.member_t if mptr is None else mptr.__class__
         sptr_description = '.'.join([sptr_t.__module__, sptr_t.__name__] if hasattr(sptr_t, '__module__') else [sptr_t.__name__])
