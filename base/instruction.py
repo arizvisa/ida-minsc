@@ -2028,11 +2028,12 @@ def op_references(ea, opnum):
             raise E.UnsupportedCapability(u"{:s}.op_references({:#x}, {:d}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}.".format(__name__, ea, opnum, res.__class__, opnum, insn.ea))
 
         # Hopefully that was it, now we should be able to figure out our path.
-        _, items = interface.node.calculate_stroff_path(offset, items)
+        iterable = itertools.chain([(items[0], items[1] if len(items) > 1 else None, 0)], [(None, item, 0) for item in items[2:]])
+        _, items = interface.strpath.guide(offset, idaapi.get_struc(items[0]), [item for item in iterable])
 
         # If we actually got some items, then we can assign it to members.
         if items:
-            members = items
+            members = [(sptr, mptr) for sptr, mptr, offset in items]
 
         # If we couldn't figure out the path, then we'll just fall back
         # to the op_structure implementation. This should give us the
@@ -2098,16 +2099,17 @@ def op_references(ea, opnum):
                     # the ids for the operand.
                     op = operand(ea, refopnum)
                     offset = idaapi.as_signed(op.value if op.type in {idaapi.o_imm} else op.addr, 8 * op_size(ea, refopnum))
-                    _, items = interface.node.calculate_stroff_path(offset + delta, identifiers)
+                    iterable = itertools.chain([(identifiers[0], identifiers[1] if len(identifiers) > 1 else None, 0)], [(None, id, 0) for id in identifiers[2:]])
+                    _, items = interface.strpath.guide(offset + delta, idaapi.get_struc(identifiers[0]), [item for item in iterable])
 
                     # If this path does not even include our structure inside it,
                     # then we can just exclude it from our list of candidates.
-                    if sptr.id not in {sptr.id for sptr, _ in items}:
+                    if sptr.id not in {sptr.id for sptr, _, _ in items}:
                         continue
 
                     # Now we have the items, we need to grab their identifiers
                     # and then we can later test for them.
-                    ids = [sptr.id for sptr, _ in items[:1]] + [mptr.id for _, mptr in items[:]]
+                    ids = [sptr.id for sptr, _, _ in items[:1]] + [mptr.id for _, mptr, _ in items[:]]
                     candidates.append((refopnum, {id for id in ids}))
                 continue
 
