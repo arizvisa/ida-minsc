@@ -6240,7 +6240,18 @@ class strpath(object):
         # that the user gave us in the suggested path and collect our description.
         suggestion_description = []
         for sptr, mptr, offset in suggestion:
-            sid = getattr(sptr, 'id', sptr)
+            stype = idaapi.tinfo_t()
+            if isinstance(sptr, idaapi.tinfo_t):
+                stype, sid = tinfo.copy(sptr), sptr.get_tid()
+            elif isinstance(sptr, internal.types.integer) and node.identifier(sptr) and stype.get_type_by_tid(sptr):
+                stype, sid = stype, sptr
+            elif isinstance(sptr, internal.types.none) and isinstance(mptr, internal.types.integer) and node.identifier(mptr) and stype.get_type_by_tid(mptr):
+                stype, sid = stype, stype.get_tid()
+            elif hasattr(sptr, 'props'):
+                stype, sid = sptr, sptr.id
+            else:
+                raise internal.exceptions.StructureNotFoundError(u"{:s}.flail({!s}) : Unable to find the type for the specified identifier ({!s}).".format('.'.join([__name__, cls.__name__]), suggestion, sptr))
+
             items = flailer.setdefault(sid, [])
             items.append((mptr, offset))
             suggestion_description.append(cls.format(sptr, mptr, offset))
@@ -6249,27 +6260,35 @@ class strpath(object):
         # in our table and chooses the default candidate when it doesn't exist.
         sptr, candidates, carry = (yield)
         while flailer:
-            sid = sptr.get_tid() if isinstance(sptr, idaapi.tinfo_t) else getattr(sptr, 'id', sptr)
+            stype, iterable = idaapi.tinfo_t(), (mid for mid in candidates if node.identifier(mid))
+            if isinstance(sptr, idaapi.tinfo_t):
+                stype, sid = tinfo.copy(sptr), sptr.get_tid()
+            elif isinstance(sptr, internal.types.integer) and node.identifier(sptr) and stype.get_type_by_tid(sptr):
+                stype, sid = stype, sptr
+            elif isinstance(sptr, internal.types.none) and any(node.identifier(mid) for mid in candidates) and stype.get_type_by_tid(next(iterable, idaapi.BADADDR)):
+                stype, sid = stype, stype.get_tid()
+            elif hasattr(sptr, 'props'):
+                stype, sid = sptr, sptr.id
+            else:
+                raise internal.exceptions.StructureNotFoundError(u"{:s}.flail({:s}) : Unable to find the type for the specified identifier ({!s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(suggestion_description)), sptr))
+
             items = flailer[sid] if flailer.get(sid, []) else flailer.pop(sid, [])
 
             # If we know about this structure, then grab the element out of it and
-            # adjust our offset by the delta we found within our suggestion.
-            if items:
-                mptr, delta = items.pop(0)
+            # adjust our offset by the delta we found within our suggestion. If
+            # there is nothing to flail with then use None for the default item.
+            mptr, delta = items.pop(0) if items else (None, 0)
 
-            # If there's nothing to flail with, then carry with the default item.
-            else:
-                mptr, delta = None, 0
-
-            # If our current item has an offset, then log that we're adjusting it.
+            # If our current item has an offset due to the carried value and the
+            # delta being different, then log that we're adjusting it.
             if mptr and carry != delta:
-                logging.debug(u"{:s}.flail([{:s}]) : The suggested path item {:s} does not match {:s} and its difference ({:+#x}) will likely be carried into the next member.".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(suggestion_description)), cls.format(sptr, mptr, delta), cls.format(sptr, None, carry), delta))
+                logging.debug(u"{:s}.flail({:s}) : The suggested path item {:s} does not match {:s} and its difference ({:+#x}) will likely be carried into the next member.".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(suggestion_description)), cls.format(sptr, mptr, delta), cls.format(sptr, None, carry), delta))
 
             # Send it off.. pray that our flailing accomplished something.
             sptr, candidates, carry = (yield (sptr, mptr, carry))
 
         # We terminated, so let the caller know where we actually stopped at.
-        logging.debug(u"{:s}.flail([{:s}]) : Flailing ended at {:s} with {:d} possible candidates ({:s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(suggestion_description)), cls.format(sptr, None, carry), len(candidates), ', '.join("{:#x}".format(getattr(item, 'id', item)) for item in candidates)))
+        logging.debug(u"{:s}.flail({:s}) : Flailing ended at {:s} with {:d} possible candidates ({:s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(suggestion_description)), cls.format(sptr, None, carry), len(candidates), ', '.join("{:#x}".format(getattr(item, 'id', item)) for item in candidates)))
 
     @classmethod
     def of_tids(cls, offset, tids):
