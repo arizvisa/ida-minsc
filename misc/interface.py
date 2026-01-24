@@ -5831,13 +5831,13 @@ class strpath(object):
         elif isinstance(sptr, internal.types.none) and isinstance(mptr, internal.types.integer) and node.identifier(mptr):
             sptr, mname = idaapi.tinfo_t(), internal.netnode.name.get(mptr)
             if not sptr.get_type_by_tid(mptr):
-                member = "member_t({:#x}, \"{:s}\")".format(mptr, internal.utils.string.escape(mname, '"'))
+                member = "member_t({:#x}, {:#x}, \"{:s}\")".format(idaapi.BADADDR, mptr, internal.utils.string.escape(mname, '"'))
                 return ' '.join(['(ERROR)', member, 'has no owner'])
             return cls.format(sptr, mptr, offset)
 
         elif isinstance(sptr, internal.types.none) and isinstance(mptr, internal.types.integer):
             mname = internal.netnode.name.get(mptr)
-            member = "member_t({:#x}, \"{:s}\")".format(mptr, internal.utils.string.escape(mname, '"'))
+            member = "member_t({:#x}, {:#x}, \"{:s}\")".format(idaapi.BADADDR, mptr, internal.utils.string.escape(mname, '"'))
             return ' '.join(['(ERROR)', member, 'has no owner'])
 
         # otherwise we can figure everything out using the structure/member api.
@@ -5864,12 +5864,12 @@ class strpath(object):
         # to the sptr by comparing it to the member's structure id that we got.
         if result and sptr.id == result[2].id:
             _, name, _ = result
-            return "{:s}({:#x}, {:#x}, \"{:s}\" {:s}={:#x}{:s})".format(mptr_description, mptr.id, sptr.id, internal.utils.string.escape(name, '"'), 'index' if mptr.props & MF_UNIMEM else 'offset', mptr.soff, offset_description)
+            return "{:s}({:#x}, {:#x}, \"{:s}\" {:s}={:#x}{:s})".format(mptr_description, sptr.id, mptr.id, internal.utils.string.escape(name, '"'), 'index' if mptr.props & MF_UNIMEM else 'offset', mptr.soff, offset_description)
 
         # Anything else means the member is not part of the structure and we
         # clarify that by listing the full name of the member and the parent.
         sname, mname = idaapi.get_struc_name(sptr.id), idaapi.get_struc_name(mptr.id)
-        member = "{:s}({:#x}, \"{:s}\" {:s}={:#x}{:s})".format(mptr_description, mptr.id, internal.utils.string.escape(mname, '"'), 'index' if mptr.props & MF_UNIMEM else 'offset', mptr.soff, offset_description)
+        member = "{:s}({:#x}, {:#x}, \"{:s}\" {:s}={:#x}{:s})".format(mptr_description, sptr.id, mptr.id, internal.utils.string.escape(mname, '"'), 'index' if mptr.props & MF_UNIMEM else 'offset', mptr.soff, offset_description)
         parent = "{:s}({:#x}, \"{:s}\")".format(sptr_description, sptr.id, internal.utils.string.escape(sname, '"'))
         return ' '.join(['(ERROR)', parent, 'is unrelated to', member])
 
