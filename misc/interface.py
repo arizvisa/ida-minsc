@@ -6894,21 +6894,29 @@ class contiguous(object):
     def size(cls, items):
         '''Return the total size of the given list of `items` containing structures, members, boundaries, locations, registers, and integers in `items`.'''
         size = {integer_t : internal.utils.fidentity for integer_t in internal.types.integer}
+        v9 = not hasattr(idaapi, 'struc_t')
 
         # Start by building the lookup table that will map an individual item to its size.
-        size[idaapi.member_t] = idaapi.get_member_size
-        size[idaapi.struc_t] = idaapi.get_struc_size
-        size[idaapi.func_t] = size[idaapi.range_t] = size[idaapi.segment_t] = range.size
-        size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_struc_size)
-        size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('ptr'), idaapi.get_struc_size)
-        size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size)
+        if v9:
+            size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('typeinfo'), tinfo.size)
+            size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('typeinfo'), tinfo.size)
+            size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('typeinfo'), tinfo.size)
+
+        else:
+            size[idaapi.member_t] = idaapi.get_member_size
+            size[idaapi.struc_t] = idaapi.get_struc_size
+            size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_struc_size)
+            size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('ptr'), idaapi.get_struc_size)
+            size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size)
+
+        size[idaapi.func_t] = size[idaapi.segment_t] = size[idaapi.range_t] = range.size
         size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
-        size[idaapi.tinfo_t] = operator.methodcaller('get_size')
+        size[idaapi.tinfo_t] = tinfo.size
 
         # If we were given a string, then we need to try to parse it. We try it first with
         # a variable and if that doesn't work, we fallback to parsing it as a regular type.
         Fparse_type_declaration = lambda string: tinfo.parse(None, string, idaapi.PT_SIL|idaapi.PT_VAR)[-1] if tinfo.parse(None, string, idaapi.PT_SIL|idaapi.PT_VAR) else tinfo.parse(None, string, idaapi.PT_SIL)
-        size[u''.__class__] = size[''.__class__] = internal.utils.fcompose(Fparse_type_declaration, internal.utils.fcondition(operator.truth)(operator.methodcaller('get_size'), 0))
+        size[u''.__class__] = size[''.__class__] = internal.utils.fcompose(Fparse_type_declaration, internal.utils.fcondition(operator.truth)(tinfo.size, 0))
 
         # Before doing anything, convert our parameter into a list that we can process.
         items = [(item if item.__class__ in size else typemap.size(item)) for item in items]
@@ -6922,24 +6930,32 @@ class contiguous(object):
         return sum(F(item) for F, item in iterable)
 
     @classmethod
-    def layout(cls, offset, items, direction=0):
+    def layout(cls, offset, items, direction):
         '''Yield the offset and item for each of the given `items` when laid out contiguously in the specified `direction` from `offset`.'''
         size = {integer_t : internal.utils.fidentity for integer_t in internal.types.integer}
+        v9 = not hasattr(idaapi, 'struc_t')
 
         # Start by building the lookup table that will map an individual item to its size.
-        size[idaapi.member_t] = idaapi.get_member_size
-        size[idaapi.struc_t] = idaapi.get_struc_size
-        size[idaapi.func_t] = size[idaapi.range_t] = size[idaapi.segment_t] = range.size
-        size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_struc_size)
-        size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('ptr'), idaapi.get_struc_size)
-        size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size)
+        if v9:
+            size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('typeinfo'), tinfo.size)
+            size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('typeinfo'), tinfo.size)
+            size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('typeinfo'), tinfo.size)
+
+        else:
+            size[idaapi.member_t] = idaapi.get_member_size
+            size[idaapi.struc_t] = idaapi.get_struc_size
+            size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_struc_size)
+            size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('ptr'), idaapi.get_struc_size)
+            size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size)
+
+        size[idaapi.func_t] = size[idaapi.segment_t] = size[idaapi.range_t] = range.size
         size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
-        size[idaapi.tinfo_t] = operator.methodcaller('get_size')
+        size[idaapi.tinfo_t] = tinfo.size
 
         # If we were given a string, then we need to try to parse it. We first attempt to parse
         # it with a variable name first, and if that doesn't work we fall back to a regular type.
         Fparse_type_declaration = lambda string: tinfo.parse(None, string, idaapi.PT_SIL|idaapi.PT_VAR)[-1] if tinfo.parse(None, string, idaapi.PT_SIL|idaapi.PT_VAR) else tinfo.parse(None, string, idaapi.PT_SIL)
-        size[u''.__class__] = size[''.__class__] = internal.utils.fcompose(Fparse_type_declaration, internal.utils.fcondition(operator.truth)(operator.methodcaller('get_size'), 0))
+        size[u''.__class__] = size[''.__class__] = internal.utils.fcompose(Fparse_type_declaration, internal.utils.fcondition(operator.truth)(tinfo.size, 0))
 
         # Listify our items and ensure that all of them are a type that we support.
         items = [(item if item.__class__ in size else typemap.size(item), item) for item in items]
@@ -6969,17 +6985,21 @@ class contiguous(object):
     def describe(cls, items):
         '''Yield a description for each one of the provided `items` that are laid out contiguously.'''
         area = idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t
+        v9 = not hasattr(idaapi, 'struc_t')
         for item in items:
             if isinstance(item, internal.types.integer):
                 yield "{:+#x}".format(item)
-            elif isinstance(item, (internal.structure.structure_t, internal.structure.member_t, internal.structure.members_t, namedtypedtuple, symbol_t)):
-                yield "{!s}".format(item if isinstance(item, (namedtypedtuple, symbol_t)) else (lambda item: "{:s}({:#x})".format(internal.netnode.name.get(item.id), item.id))(item.owner if isinstance(item, internal.structure.members_t) else item))
-            elif isinstance(item, (idaapi.struc_t, idaapi.member_t)):
-                yield "{:s}({:#x})".format(internal.utils.pycompat.fullname(item.__class__), item.id)
+
             elif isinstance(item, area):
                 yield "{:s}({:s})".format(internal.utils.pycompat.fullname(item.__class__), range.bounds(item))
             elif isinstance(item, (idaapi.tinfo_t, internal.types.string)):
                 yield "{:s}(\"{:s}\")".format(internal.utils.pycompat.fullname(idaapi.tinfo_t), internal.utils.string.escape("{!s}".format(item), '"'))
+
+            elif isinstance(item, (internal.structure.structure_t, internal.structure.member_t, internal.structure.members_t, namedtypedtuple, symbol_t)):
+                yield "{!s}".format(item if isinstance(item, (namedtypedtuple, symbol_t)) else (lambda item: "{:s}({:#x})".format(internal.netnode.name.get(item.id), item.id))(item.owner if isinstance(item, internal.structure.members_t) else item))
+            elif not v9 and isinstance(item, (idaapi.struc_t, idaapi.member_t)):
+                yield "{:s}({:#x})".format(internal.utils.pycompat.fullname(item.__class__), item.id)
+
             else:
                 yield "{!r}".format(item)
             continue
@@ -6988,17 +7008,25 @@ class contiguous(object):
     @classmethod
     def left(cls, offset, items):
         '''Bind the specified list of `items` contiguously as a list with the beginning of the first item aligned to the given `offset`.'''
-        result, beginning, layout = [], int(offset), [item for item in items]
+        result, beginning, layout, v9 = [], int(offset), [item for item in items], not hasattr(idaapi, 'struc_t')
         for offset, item in cls.layout(beginning, layout, +1):
-            if isinstance(item, (internal.structure.structure_t, idaapi.struc_t, internal.structure.members_t)):
-                result.append(internal.structure.new(item.owner.id, offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(item.id, offset))
-            elif isinstance(item, (internal.structure.member_t, idaapi.member_t)):
-                mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id)
-                result.append(internal.structure.new(mowner.id, offset - (0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff)).members[mindex])
-            elif isinstance(item, (bounds_t, location_t)):
+            if isinstance(item, (bounds_t, location_t)):
                 result.append(location_t(offset, item.size) if isinstance(item, location_t) else bounds_t(offset, offset + item.size))
             elif isinstance(item, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t):
                 result.append(range.bounds(item).range())
+
+            elif v9 and isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
+                result.append(internal.structure.new(item.owner.typeinfo.get_tid(), offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(item.typeinfo.get_tid(), offset))
+            elif v9 and isinstance(item, internal.structure.member_t):
+                mowner, mindex, udm = internal.structure.v9members.by_identifier(item.parent.typeinfo, item.id)
+                result.append(internal.structure.new(mowner.get_tid(), offset - (0 if internal.structure.union(mowner) else udm.offset)).members[mindex])
+
+            elif not v9 and isinstance(item, (internal.structure.structure_t, idaapi.struc_t, internal.structure.members_t)):
+                result.append(internal.structure.new(item.owner.id, offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(item.id, offset))
+            elif not v9 and isinstance(item, (internal.structure.member_t, idaapi.member_t)):
+                mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id)
+                result.append(internal.structure.new(mowner.id, offset - (0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff)).members[mindex])
+
             else:
                 result.append(item)
             continue
@@ -7007,17 +7035,25 @@ class contiguous(object):
     @classmethod
     def right(cls, offset, items):
         '''Bind the specified list of `items` contiguously as a list with the end of the last item aligned to the given `offset`.'''
-        result, ending, layout = [], int(offset), [item for item in items]
+        result, ending, layout, v9 = [], int(offset), [item for item in items], not hasattr(idaapi, 'struc_t')
         for offset, item in cls.layout(ending, layout[::-1], -1):
-            if isinstance(item, (internal.structure.structure_t, idaapi.struc_t, internal.structure.members_t)):
+            if isinstance(item, (bounds_t, location_t)):
+                result.append(location_t(offset, item.size) if isinstance(item, location_t) else bounds_t(offset, offset + item.size))
+            if isinstance(item, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t):
+                result.append(range.bounds(item).range())
+
+            elif v9 and isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
+                result.append(internal.structure.new(item.owner.typeinfo.get_tid(), offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(item.typeinfo.get_tid(), offset))
+            elif v9 and isinstance(item, internal.structure.member_t):
+                mowner, mindex, udm = internal.structure.v9members.by_identifier(item.parent.typeinfo, item.id)
+                result.append(internal.structure.new(mowner.get_tid(), offset - (0 if internal.structure.union(mowner) else udm.offset)).members[mindex])
+
+            elif not v9 and isinstance(item, (internal.structure.structure_t, idaapi.struc_t, internal.structure.members_t)):
                 result.append(internal.structure.new(item.owner.id, offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(item.id, offset))
-            elif isinstance(item, (internal.structure.member_t, idaapi.member_t)):
+            elif not v9 and isinstance(item, (internal.structure.member_t, idaapi.member_t)):
                 mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id)
                 result.append(internal.structure.new(mowner.id, offset - (0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff)).members[mindex])
-            elif isinstance(item, (bounds_t, location_t)):
-                result.append(location_t(offset, item.size) if isinstance(item, location_t) else bounds_t(offset, offset + item.size))
-            elif isinstance(item, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t):
-                result.append(range.bounds(item).range())
+
             else:
                 result.append(item)
             continue
@@ -7029,9 +7065,9 @@ class contiguous(object):
         type_has_offset = (idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, internal.structure.structure_t, internal.structure.members_t, internal.structure.member_t, bounds_t, location_t)
         if isinstance(item, type_has_offset):
             return True
-        elif isinstance(item, idaapi.struc_t):
+        elif hasattr(idaapi, 'struc_t') and isinstance(item, idaapi.struc_t):
             return True if item.props & idaapi.SF_FRAME else False
-        elif isinstance(item, idaapi.member_t):
+        elif hasattr(idaapi, 'member_t') and isinstance(item, idaapi.member_t):
             return False if item.flag & getattr(idaapi, 'MF_UNIMEM', 2) else True
         return False
 
@@ -7059,7 +7095,7 @@ class contiguous(object):
 
         # if the item is a structure or a member, then we need to check if it
         # is part of a frame. if it is, then we calculate its actual offset.
-        elif isinstance(item, (idaapi.struc_t, idaapi.member_t)):
+        elif hasattr(idaapi, 'struc_t') and isinstance(item, (idaapi.struc_t, idaapi.member_t)):
             mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id) if isinstance(item, idaapi.member_t) else (item, 0, None)
             ea, moffset = idaapi.get_func_by_frame(mowner.id), 0 if not mptr or mowner.props & idaapi.SF_UNION else mptr.soff
             offset = function.frame_offset(ea, moffset) if mowner.props & idaapi.SF_FRAME and ea != idaapi.BADADDR else moffset
@@ -7093,7 +7129,7 @@ class contiguous(object):
 
         # if we're dealing with a native structure or member, then we have to
         # check whether it's referencing a frame to calculate its real offset.
-        elif isinstance(item, (idaapi.struc_t, idaapi.member_t)):
+        elif hasattr(idaapi, 'struc_t') and isinstance(item, (idaapi.struc_t, idaapi.member_t)):
             mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id) if isinstance(item, idaapi.member_t) else (item, 0, None)
             ea, moffset = idaapi.get_func_by_frame(mowner.id), mptr.eoff if mptr else idaapi.get_struc_size(item)
             offset = function.frame_offset(ea, moffset) if mowner.props & idaapi.SF_FRAME and ea != idaapi.BADADDR else moffset
