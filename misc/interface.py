@@ -7076,16 +7076,19 @@ class contiguous(object):
         '''Return the starting offset for a list of `items` to be used for a contiguous layout.'''
         items = [item for item in items] if isinstance(items, internal.types.list) else [items]
 
-        # if the first element in the list has an offset, then extract it.
-        if items and all(map(cls.has, items[:+1])):
-            [item] = items[:+1]
+        # find the index of the first item that has an offset we can use.
+        iterable = (index for index, item in enumerate(items) if cls.has(item))
+        index = next(iterable, -1)
 
-        # if there were no elements in the list or the first item
-        # did not have an offset, then just assume that it is 0.
-        else:
+        # if there were no elements in the list with an offset, then just assume
+        # that the offset is 0.
+        if index < 0:
             return 0
 
-        # figure out the offset for the extracted item and then return it.
+        # otherwise we can figure out the offset, and then use the index to
+        # figure out which elements come before what we found. we will use the
+        # size of these elements to subtract from the offset.
+        item = items[index]
         if isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
             offset = item.baseoffset if isinstance(item, internal.structure.members_t) else item.members.baseoffset
         elif isinstance(item, internal.structure.member_t):
@@ -7102,24 +7105,29 @@ class contiguous(object):
 
         else:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.start({:s}) : Unable to determine the offset for the first item ({!r}) due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), item, item.__class__))
-        return offset
+
+        # adjust the offset we determined by subtracting the size of the
+        # elements that do not have an associated offset.
+        delta = cls.size(items[:index])
+        return offset - delta
 
     @classmethod
     def stop(cls, items):
         '''Return the ending offset for a list of `items` to be used for a contiguous layout.'''
         items = [item for item in items] if isinstance(items, internal.types.list) else [items]
 
-        # if the last element in the list has an offset, then extract it.
-        if items and all(map(cls.has, items[-1:])):
-            [item] = items[-1:]
+        # find the index of the last item that has an offset we can use.
+        iterable = (1 + index for index, item in enumerate(items[::-1]) if cls.has(item))
+        index = next(iterable, -1)
 
-        # if there were no elements in the list or the last item
-        # did not have an offset, then we can just use the size.
-        else:
+        # if there were no elements in the list with a usable offset, then just
+        # return the overall size of the specified items.
+        if index < 0:
             return cls.size(items)
 
         # figure out the offset for the right side of the first item with an offset, and
         # add it to the total size of the selected elements that don't have an offset.
+        item = items[-index]
         if isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
             offset = sum([item.baseoffset, item.owner.size]) if isinstance(item, internal.structure.members_t) else sum([item.members.baseoffset, item.size])
         elif isinstance(item, internal.structure.member_t):
@@ -7136,7 +7144,11 @@ class contiguous(object):
 
         else:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.stop({:s}) : Unable to determine the offset for the last item ({!r}) due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), item, item.__class__))
-        return offset
+
+        # adjust the offset that we extracted by adding the size of all the
+        # elements which follow the last item with an offset.
+        delta = cls.size(items[1 - index:]) if index > 1 else 0
+        return offset + delta
 
 class tinfo(object):
     """
