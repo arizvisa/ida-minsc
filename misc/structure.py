@@ -1081,14 +1081,15 @@ class v9member(object):
         return index, remainder
 
     @classmethod
-    def packed(cls, *args):
+    def packed(cls, offset, *args):
         '''Pack the information about the specified member with its structure at the specified `offset` into a tuple in case it is to be removed.'''
         tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'packed'])
         mid = interface.tinfo.member_identifier(tinfo, mindex)
         name = utils.string.of(udm.name)
         mtype = interface.tinfo.copy(udm.type)
-        ptype = interface.typemap.dissolvetype(mid, mtype, udm.offset)
-        location = interface.location_t(udm.offset, udm.size)
+        moffset = int(offset) if union(tinfo) else int(offset) + udm.offset
+        ptype = interface.typemap.dissolvetype(mid, mtype, moffset)
+        location = interface.location_t(moffset, udm.size)
         type = interface.tinfo.copy(udm.type)
         comment = utils.string.of(udm.cmt)
         return mid, name, ptype, location, type, comment
