@@ -2973,9 +2973,192 @@ class v9members(object):
         raise NotImplementedError
 
     @classmethod
-    def layout_getslice(cls, type, slice):
+    def layout_getslice(cls, type, slice, withgaps=False):
         '''Return a contiguous `slice` of the layout belonging to the specified structure or union `type`.'''
-        raise NotImplementedError
+        ti, utd = idaapi.tinfo_t(), idaapi.udt_type_data_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        else:
+            raise E.InvalidParameterError(u"{:s}.layout_getslice({!s}, {!s}, withgaps={!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), slice, True if withgaps else False, type.__class__))
+
+        # Get the members and the number of members for the specified type.
+        utd = idaapi.udt_type_data_t()
+        if not ti.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.layout_getslice({!s}, {!s}, withgaps={!s}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), slice, True if withgaps else False))
+        count, is_variable = utd.size(), ti.is_varstruct()
+
+        # Figure out the indices for the slice being selected. We'll be grabbing
+        # the boundaries of the member past these indices so that we can include
+        # any empty space within the selection.
+        slice, size = slice if isinstance(slice, builtins.slice) else builtins.slice(slice, 1 + slice or None), 8 * interface.tinfo.size(ti)
+        istart, istop, istep = slice.indices(count)
+        listable = [(mowner, mindex, udm) for mowner, mindex, udm in cls.iterate(ti, slice)]
+        indices = [mindex for _, mindex, _ in listable]
+        selected = [(mindex, udm) for mowner, mindex, udm in listable]
+
+        # If gaps are excluded from our selection, then adjust the stop index to
+        # include any trailing gaps that may exist. This is so the logic for a
+        # slice is the same as the older structure api from the disassembler.
+        index = istop
+        while not withgaps and index < count and utd[index].is_gap():
+            index += 1
+        istop = index
+
+        # If the structure is a union, then our slice doesn't need to be
+        # contiguous. So we can simply include the index and return it.
+        if union(ti):
+            sizes = [udm.size for _, udm in selected]
+            iterable = ((udm.offset, ti.get_udm_tid(mindex)) for mindex, udm in selected)
+            if sizes:
+                return min(sizes), max(sizes), [(moffset, mid) for moffset, mid in iterable]
+            return 0, 0, []
+
+        # Otherwise, we need to figure out the start and end offsets.
+        if istart < istop:
+            ileft, iright = istart, istop
+            if ileft < 0 or slice.start is None:
+                left = 0
+            elif ileft < count:
+                left = utd[ileft].offset
+            else:
+                left = 8 * interface.tinfo.size(ti)
+
+            if count <= iright or slice.stop is None:
+                right = 8 * interface.tinfo.size(ti)
+            elif iright < 0:
+                right = 0
+            else:
+                right = utd[iright].offset
+
+            soff, eoff = left, right
+
+        elif istart > istop:
+            ileft, iright = istop, istart
+            if ileft < 0 or slice.stop is None:
+                left = 0
+            elif ileft < count:
+                left = utd[ileft].offset + utd[ileft].size
+            else:
+                left = 8 * interface.tinfo.size(ti)
+
+            if count <= iright or slice.start is None:
+                eoff = 8 * interface.tinfo.size(ti)
+            elif iright < 0:
+                eoff = 0
+            else:
+                eoff = utd[iright].offset + utd[iright].size
+
+            soff, eoff = left, right
+
+        # If the start and end indices are the same, and something was
+        # selected, then use the boundaries for the selected member.
+        elif indices:
+            soff, eoff = utd[istart].offset, utd[istop].offset + utd[istop].size
+
+        # Otherwise nothing was selected, which makes this sort of
+        # like selecting a single point within the list of members.
+        else:
+            index = min(istart, istop)
+            if index < 0:
+                point = 0
+            elif index < count:
+                point = utd[index].offset
+            else:
+                point = 8 * interface.tinfo.size(ti)
+            soff = 0 if slice.start is None else point
+            eoff = 8 * interface.tinfo.size(ti) if slice.stop is None else point
+
+        # Store the unique points (sorted) with the segments from the selection.
+        used = ((mindex, udm) for mindex, udm in selected) if withgaps else ((mindex, udm) for mindex, udm in selected if not udm.is_gap())
+        iterable = itertools.chain(*([udm.offset, udm.offset + udm.size] for mindex, udm in used))
+        points = [point for point, duplicates in itertools.groupby(sorted(iterable))]
+
+        # Add the boundary points to our list that we figured out from the selection.
+        points.insert(0, soff) if any([not points, points and operator.lt(soff, *points[:+1])]) else points
+        points.append(eoff) if any([not points, points and operator.gt(eoff, *points[-1:])]) else points
+
+        # Iterate through the members and add each one to its corresponding segment.
+        segments, iterable = {}, ((mindex, udm.offset, udm.offset + udm.size) for mindex, udm in selected)
+        for mindex, mstart, mstop in sorted(iterable, key=operator.itemgetter(1)):
+            start = mstart
+            if mstart < mstop:
+                stop = mstop
+            elif is_variable and mstart == mstop:
+                stop = mstop + v9member.element(ti, mindex)
+            else:
+                stop = mstop
+            segments[mstart] = segments[mstop] = mindex
+
+        # If our selection is from left to right (ordered), then we treat it as
+        # normal and be sure to include the empty space in front of the last member.
+        if selected and istart <= istop:
+            imaximum = 1 + max(indices) if indices else 0
+            maximum = utd[imaximum].offset if imaximum < count else points[-1]
+            iterable = (udm.offset for _, udm in selected)
+            start = bisect.bisect_left(points, points[0] if slice.start is None else next(iterable))
+            stop = bisect.bisect_left(points, points[-1] if slice.stop is None else maximum) + 1
+
+        # If the selection is from right to left (reversed), then we need to
+        # invert our tests against the slice and adjust for the minimum point.
+        elif selected:
+            iminimum = min(istart, istop)
+            minimum = utd[iminimum].offset + utd[iminimum].size if iminimum > 0 else points[0]
+            iterable = (udm.offset + udm.size for _, udm in selected)
+            start = bisect.bisect_left(points, points[0] if slice.stop is None else minimum)
+            stop = bisect.bisect_left(points, points[-1] if slice.start is None else next(iterable))
+
+        # If we couldn't select anything, then use the boundaries of the
+        # members that were within the requested slice to identify the points.
+        elif count:
+            sleft, sright = (slice.start, slice.stop) if istart <= istop else (slice.stop, slice.start)
+            iterable = ((utd[index].offset if index < count else eoff) for index in [istart, istop])
+            minimum = min(points) if sleft is None else min(*iterable)
+            iterable = ((utd[index].offset + utd[index].size if index < count else eoff) for index in [istart, istop])
+            maximum = max(points) if sright is None else max(*iterable)
+            start = bisect.bisect_left(points, minimum)
+            stop = bisect.bisect_left(points, maximum) + 1 if istart <= istop else bisect.bisect_left(points, maximum)
+
+        # Otherwise since there's no selection or even members, we have nothing to return.
+        else:
+            return soff, eoff, []
+
+        # if we're not including the gaps as a valid index, then adjust our stop
+        # index so that we include all of the gaps that follow it.
+        if not withgaps and stop > 0:
+            index = stop - 1
+            while index < count and utd[index].is_gap():
+                index += 1
+            stop = index + 1
+
+        # Now we need to figure out which direction to slice the elements in.
+        step, point = -1 if istep < 0 else +1, 0 if start < 0 else points[start] if start < len(points) else eoff
+
+        # Last thing to do is to iterate through each point to yield each member and
+        # any holes. Each member should only be yielded once, so we track that too.
+        offset, result, iterable = point, [], ((mindex, udm) for mindex, udm in selected) if withgaps else ((mindex, udm) for mindex, udm in selected if not udm.is_gap())
+        available = {mindex : ti.get_udm_tid(mindex) for mindex, _ in iterable}
+        for point in points[start : stop]:
+            if offset < point:
+                result.append((offset, point - offset))
+
+            mindex = segments.get(point, -1)
+            if mindex in available:
+                result.append((point, available.pop(mindex)))
+                offset = utd[mindex].offset + utd[mindex].size
+
+            elif withgaps and 0 <= mindex < count:
+                offset = utd[mindex].offset + utd[mindex].size
+
+            else:
+                offset = point
+            continue
+
+        # Verify that the slice we were given is able to select something.
+        if not any([istart <= istop and istep > 0, istart > istop and istep < 0]) and not available:
+            return points[start], point, []
+        return points[start], point, result[::-1 if istep < 0 else +1]
 
     @classmethod
     def layout_setslice(cls, type, slice, layout, *offset):
