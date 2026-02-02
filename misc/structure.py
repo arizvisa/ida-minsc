@@ -818,12 +818,9 @@ class v9member(object):
         default = cls.default_name(mid, udm.offset)
         return cls.set_name(mid, default)
 
-    # FIXME: this function requires specifying the type and member in order to
-    #        allow calculating the default name for when a member doesn't exist.
-    #        declaration could be `default_name(tid, mid, offset)`.
     @classmethod
     def default_name(cls, *args):
-        '''Return the default name for the member given by `mid` at the given `offset` if provided.'''
+        '''Return the default name for the member given by `mid` at the given byte `offset` if provided.'''
         utd = idaapi.udt_type_data_t()
 
         # If we were given 3 parameters (type and member index), then check if
@@ -835,8 +832,29 @@ class v9member(object):
             if not tinfo.get_udt_details(utd):
                 caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'default_name'], args=["{:+#x}".format(moffset)])
                 raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, offset, tinfo.get_tid()))
-            udm, offset = None, abs(mindex) if union(tinfo) else 8 * int(moffset)
+            udm, offset = None, abs(mindex) if union(tinfo) else int(moffset)
             mid, tname, mname = idaapi.BADNODE, tinfo.get_type_name(), None
+
+        # If we weren't given a member, then we need to figure it out ourselves.
+        elif len(args) in {2, 3} and args[1] in {None, idaapi.BADADDR} and isinstance(args[0], (idaapi.tinfo_t, types.integer)):
+            tinfo = idaapi.tinfo_t()
+            if isinstance(args[0], idaapi.tinfo_t):
+                tinfo = interface.tinfo.copy(*args[:1])
+            elif isinstance(args[0], types.integer) and tinfo.get_type_by_tid(args[0]):
+                tinfo = tinfo
+            elif isinstance(args[0], types.integer):
+                caller_format = cls.format_args(*args[:2], caller=[__name__, cls.__name__, 'default_name'], args=["{:+#x}".format(*args[2:])] if len(args) > 2 else [])
+                raise E.DisassemblerError(u"{:s} : Unable to find the type for the specified identifier ({:#x}).".format(caller_format, args[0]))
+            else:
+                caller_format = cls.format_args(*args[:2], caller=[__name__, cls.__name__, 'default_name'], args=["{:+#x}".format(*args[2:])] if len(args) > 2 else [])
+                raise E.InvalidParameterError(u"{:s} : Unable to find the type using an unsupported parameter ({!s}).".format(caller_format, "{:#x}".format(args[0]) if isinstance(args[0], types.integer) else "{!r}".format(args[0])))
+
+            if not tinfo.get_udt_details(utd):
+                caller_format = cls.format_args(*args[:2], caller=[__name__, cls.__name__, 'default_name'], args=["{:+#x}".format(*args[2:])] if len(args) > 2 else [])
+                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, tinfo.get_tid()))
+
+            size = utd.size() if union(tinfo) else interface.tinfo.size(tinfo)
+            offset = size if len(args) == 2 else int(args[-1])
 
         # Otherwise we were only given the type and member information, so we'll
         # need to calculate the member offset ourselves. In case we were given
@@ -844,7 +862,7 @@ class v9member(object):
         elif (len(args) == 1 and isinstance(args[0], types.integer) and interface.node.identifier(args[0])) or (len(args) == 2 and isinstance(args[0], idaapi.tinfo_t)):
             tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'default_name'])
             mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), utils.string.of(udm.name)
-            offset = udm.offset if udm else mindex if union(tinfo) else 8 * tinfo.get_size()
+            offset, _ = divmod(udm.offset, 8) if udm else mindex if union(tinfo) else (tinfo.get_size(), 0)
 
         elif (len(args) == 2 and isinstance(args[0], types.integer) and interface.node.identifier(args[0])) or (len(args) == 3 and isinstance(args[0], idaapi.tinfo_t)):
             tinfo, utd, mindex, udm = cls.by(*args[:-1], caller=[__name__, cls.__name__, 'default_name'], args=["{:#x}".format(*args[-1:])])
@@ -866,8 +884,8 @@ class v9member(object):
         ea = tinfo.get_frame_func() if hasattr(tinfo, 'get_frame_func') else idaapi.BADADDR
         fn, count = idaapi.get_func(ea), utd.size()
         if ea == idaapi.BADADDR or not fn:
-            moffset, _ = divmod(offset, 8)
-            return fmtField(abs(mindex) if union(tinfo) else moffset)
+            moffset = int(offset)
+            return fmtField(abs(moffset) if union(tinfo) else moffset)
 
         # Now we need to figure out where our member is. If it's within the
         # `func_t.frsize`, then we're a "var_" relative to `func_t.frsize`.
