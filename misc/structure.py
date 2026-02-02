@@ -522,13 +522,13 @@ class v9member(object):
         # Grab the caller name from the parameters and prepare a format string
         # so that the error message accurately displays the caller.
         prefix = caller.get('caller', [__name__, cls.__name__, 'by'])
-        caller_args = caller.get('args', '')
+        caller_args = caller.get('args', [])
         prefix_format = u"{:s}({{!s}}{{!s}})".format('.'.join(prefix))
         iterable = (("{:d}".format(arg) if isinstance(arg, types.integer) else interface.tinfo.quoted(arg) if isinstance(arg, idaapi.tinfo_t) else "{!s}".format(arg)) for arg in caller_args)
         extra_args = ', '.join(iterable)
 
         # Get the member information using a member identifier.
-        if len(args) == 1 and (interface.node.identifier(*args) or operator.eq(idaapi.BADADDR, *args)):
+        if len(args) == 1 and isinstance(*itertools.chain(args, [types.integer])) and (interface.node.identifier(*args) or operator.eq(idaapi.BADADDR, *args)):
             [mid] = args
             formatted_args = "{:#x}".format(mid)
             caller_format = prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
@@ -579,7 +579,7 @@ class v9member(object):
             [type, udm] = args
             tinfo = interface.tinfo.copy(type)
             formatted_args = ', '.join([interface.tinfo.quoted(tinfo), "{:d}".format(udm.offset) if union(tinfo) else "{:#x}".format(udm.offset)])
-            caller_format = prefix_format.format(formatted_args, ", {:s}".format(caller_args) if caller_args else '')
+            caller_format = prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
             tinfo = interface.tinfo.copy(tinfo)
 
             # Verify the type we were given and use it to get its details.
@@ -602,10 +602,19 @@ class v9member(object):
                 raise E.MemberNotFoundError(u"{:s} : Unable to find the member at index {:d} of the specified type ({:#x}).".format(caller_format, mindex, tinfo.get_tid()))
             return tinfo, utd, mindex, udm
 
+        # If we got a member_t of some sort, then use its id to get the member.
+        elif hasattr(idaapi, 'member_t') and len(args) == 1 and isinstance(*itertools.chain(args, [(idaapi.member_t, member_t)])):
+            [res] = args
+            return cls.by(res.id, **caller)
+
+        elif len(args) == 1 and isinstance(*itertools.chain(args, [member_t])):
+            [res] = args
+            return cls.by(res.id, **caller)
+
         # If we couldn't figure out what the arguments mean, then just give up.
         iterable = (("{!r}".format(arg) if isinstance(arg, types.string) else interface.tinfo.quoted(arg) if isinstance(arg, idaapi.tinfo_t) else "{!s}".format(arg)) for arg in args)
         formatted_args = ', '.join(iterable)
-        caller_format = prefix_format.format(formatted_args, ", {:s}".format(caller_args) if caller_args else '')
+        caller_format = prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
         raise E.InvalidParameterError(u"{:s} : Unable to find the member using the specified parameters.".format(caller_format))
 
     @classmethod
