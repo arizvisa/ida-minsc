@@ -650,11 +650,21 @@ class v9member(object):
             formatted_args = "{:#x}".format(mid)
             return prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
 
-        # Try using a type and its udm index.
-        elif len(args) == 2 and isinstance(args[-1], types.integer):
+        # Try using a type (identifier or `tinfo_t`) and its udm index.
+        elif len(args) == 2 and isinstance(args[-1], (types.integer, types.none)):
             [type, mindex] = args
-            tinfo = interface.tinfo.copy(type)
-            formatted_args = ', '.join([interface.tinfo.quoted(tinfo), "{:d}".format(mindex)])
+            tinfo = idaapi.tinfo_t()
+            if isinstance(type, idaapi.tinfo_t):
+                tinfo = interface.tinfo.copy(type)
+            elif isinstance(type, types.integer) and tinfo.get_type_by_tid(type):
+                pass
+            elif isinstance(type, types.integer):
+                iterable = ["{:#x}".format(type), "{!s}".format(None) if mindex in {None, idaapi.BADADDR} else "{:d}".format(mindex)]
+                raise E.DisassemblerError(u"{:s} : Unable to find the type for the specified identifier ({:#x}).".format(prefix_format.format(', '.join(iterable), ", {:s}".format(extra_args) if extra_args else ''), type))
+            else:
+                iterable = ["{:#x}".format(type), "{!s}".format(None) if mindex in {None, idaapi.BADADDR} else "{:d}".format(mindex)]
+                raise E.InvalidParameterError(u"{:s} : Unable to find the type using an unsupported parameter ({!s}).".format(prefix_format.format(', '.join(iterable), ", {:s}".format(extra_args) if extra_args else ''), "{:#x}".format(type) if isinstance(type, types.integer) else "{!r}".format(type)))
+            formatted_args = ', '.join([interface.tinfo.quoted(tinfo), "{!s}".format(mindex) if mindex in {None, idaapi.BADADDR} else "{:d}".format(mindex)])
             return prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
 
         # Try using a type and the udm offset for the member.
