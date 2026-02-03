@@ -2231,6 +2231,22 @@ class v9members(object):
         return 0 <= offset < 8 * utd.total_size
 
     @classmethod
+    def has_identifier(cls, type, identifier):
+        '''Return whether the member with the specified `identifier` belongs to the given structure or union `type`.'''
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        if not (tinfo.is_struct() or union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.by_identifier({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.by_identifier({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier))
+        else:
+            sid = tinfo.get_tid()
+
+        ti = idaapi.tinfo_t()
+        if not ti.get_type_by_tid(identifier):
+            raise E.StructureNotFoundError(u"{:s}.by_identifier({!s}, {:#x}) : Unable to find the type for the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier, identifier))
+        return sid == ti.get_tid()
+
+    @classmethod
     def has_name(cls, type, name):
         '''Return whether a member with the given `name` exists within the specified structure or union `type`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
