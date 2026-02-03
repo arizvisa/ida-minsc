@@ -1128,8 +1128,8 @@ class v9member(object):
         ptype = interface.typemap.dissolvetype(mtype, moffset)
         location = interface.location_t(moffset, udm.size)
         type = interface.tinfo.copy(udm.type)
-        comment = utils.string.of(udm.cmt)
-        return mid, name, ptype, location, type, comment
+        comment, regular = utils.string.of(udm.cmt), udm.is_regcmt()
+        return mid, name, ptype, location, type, (not regular, comment)
 
     @classmethod
     def has_references(cls, *args):
