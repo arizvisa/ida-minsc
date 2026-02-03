@@ -367,7 +367,10 @@ class comment(object):
             return utils.string.of(res)
 
         # Otherwise, we need to go ahead and get the comment using the new API.
-        res = ti.get_type_cmt()
+        if ti.get_type_rptcmt():
+            res = ti.get_type_cmt() if repeatable else None
+        else:
+            res = ti.get_type_cmt() if not repeatable else None
         return utils.string.of(res)
 
     @classmethod
@@ -394,10 +397,12 @@ class comment(object):
             return utils.string.of(res)
 
         # Otherwise, we need apply the given comment using the new API.
-        res, ok = ti.get_type_cmt(), ti.set_type_cmt(utils.string.to(string), False if repeatable else True, 0)
+        res = ti.get_type_rptcmt() if repeatable else ti.get_type_cmt()
+        ok = ti.set_type_cmt(utils.string.to(string), False if repeatable else True, 0)
         if ok != idaapi.TERR_OK:
-            message = interface.tinfo.format_type_error(ok)
-            raise E.DisassemblerError(u"{:s}.set({:#x}, {!r}, repeatable={!s}) : Unable to set the {:s} of the specified structure ({:#x}) to \"{:s}\" due to error {:#x} ({!s}).".format(__name__, sid, string, True if repeatable else False, 'repeatable comment' if repeatable else 'comment', sid, utils.string.escape(string, '"'), ok, message))
+            errname, errdesc = interface.tinfo.format_type_error(ok)
+            description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+            raise E.DisassemblerError(u"{:s}.set({:#x}, {!r}, repeatable={!s}) : Unable to set the {:s} of the specified structure ({:#x}) to \"{:s}\" due to error {!s}.".format(__name__, sid, string, True if repeatable else False, 'repeatable comment' if repeatable else 'comment', sid, utils.string.escape(string, '"'), description))
         return utils.string.of(res)
 
     @classmethod
@@ -423,10 +428,12 @@ class comment(object):
             return utils.string.of(res)
 
         # Otherwise, we need clear the existing comment using the new API.
-        res, ok = ti.get_type_cmt(), ti.set_type_cmt(utils.string.to(''), False if repeatable else True, 0)
+        res = ti.get_type_rptcmt() if repeatable else ti.get_type_cmt()
+        ok = ti.set_type_cmt(utils.string.to(''), False if repeatable else True, 0)
         if ok != idaapi.TERR_OK:
-            message = interface.tinfo.format_type_error(ok)
-            raise E.DisassemblerError(u"{:s}.remove({:#x}, repeatable={!s}) : Unable to clear the {:s} of the specified structure ({:#x}) to \"{:s}\" due to error {:#x} ({!s}).".format(__name__, sid, True if repeatable else False, 'repeatable comment' if repeatable else 'comment', sid, utils.string.escape(string, '"'), ok, message))
+            errname, errdesc = interface.tinfo.format_type_error(ok)
+            description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+            raise E.DisassemblerError(u"{:s}.remove({:#x}, repeatable={!s}) : Unable to clear the {:s} of the specified structure ({:#x}) to \"{:s}\" due to error {!s}.".format(__name__, sid, True if repeatable else False, 'repeatable comment' if repeatable else 'comment', sid, utils.string.escape(string, '"'), description))
         return utils.string.of(res)
 
 class xref(object):
