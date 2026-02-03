@@ -2249,6 +2249,19 @@ class v9members(object):
         return 0 <= mindex < utd.size()
 
     @classmethod
+    def has_index(cls, type, index):
+        '''Return whether a member exists at the specified `index` of the given structure or union `type`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        if not (tinfo.is_struct() or union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.has_index({!s}, {:d}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), int(index)))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.has_index({!s}, {:d}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), int(index)))
+        else:
+            index = int(index)
+        return 0 <= index < utd.size()
+
+    @classmethod
     def has_offset(cls, type, offset):
         '''Return whether a member exists at the `offset` of the specified structure or union `type`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
