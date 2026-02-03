@@ -3235,9 +3235,564 @@ class v9members(object):
         return points[start], point, result[::-1 if istep < 0 else +1]
 
     @classmethod
-    def layout_setslice(cls, type, slice, layout, *offset):
+    def layout_setslice(cls, type, slice, layout, *offset, withgaps=False):
         '''Update the contigious `slice` belonging to the specified structure or union `type` with the specified `layout`.'''
-        raise NotImplementedError
+        ti, udm_t = idaapi.tinfo_t(), idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        multiple = isinstance(layout, types.ordered) and not isinstance(layout, interface.namedtypedtuple)
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        else:
+            iterable = interface.contiguous.describe(layout if multiple else [layout])
+            raise E.InvalidParameterError(u"{:s}.layout_setslice({!s}, {!s}, {:s}{:s}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), "{!s}".format(slice), "[{:s}]".format(', '.join(iterable)), ", {:+#x}".format(*offset) if offset else '', ", withgaps={!s}".format(True if withgaps else False), type.__class__))
+
+        # Get an array containing all the members for the type. We will use this
+        # anytime we need to reference a specific member by the index.
+        utd = idaapi.udt_type_data_t()
+        if not ti.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.layout_setslice({!s}, {!s}, {:s}{:s}{:s}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), "{!s}".format(slice), "[{:s}]".format(', '.join(iterable)), ", {:+#x}".format(*offset) if offset else '', ", withgaps={!s}".format(True if withgaps else False)))
+        count, is_variable, is_frame = utd.size(), ti.is_varstruct(), ti.is_frame() if hasattr(ti, 'is_frame') else False
+
+        # If we are acting on a function frame, then get the function that it's
+        # for. We use this to calculate the base offset if we weren't given one.
+        ea = ti.get_frame_func() if hasattr(ti, 'get_frame_func') else idaapi.get_func_by_frame(sid)
+        fn = idaapi.get_func(ea)
+        [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn and is_frame else 0]
+
+        # Assign some descriptions for the parameters we were given that we will
+        # use to display any exceptions or warnings to the user. Then we are
+        # ready to validate our parameters to ensure we were given a slice if
+        # we're being asked to assign with some kind of iterable.
+        slice_description = "{!s}".format(slice)
+        offset_description = ", {:#x}".format(base) if offset else ''
+        offset_description+= ", withgaps={!s}".format(True if withgaps else False)
+        type_description = 'frame' if is_frame else 'union' if union(ti) else 'structure'
+
+        multiple = isinstance(layout, types.ordered) and not isinstance(layout, interface.namedtypedtuple)
+        if multiple and not isinstance(slice, builtins.slice):
+            iterable = interface.contiguous.describe(layout if multiple else [layout])
+            raise E.InvalidParameterError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to assign a non-iterable to a slice ({!s}) for the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, slice_description, "[{:s}]".format(', '.join(iterable)), offset_description, slice_description, type_description, sid))
+
+        # Order our layout or selection as a list, and then use the slice we
+        # were given to select all the contiguous items we need to assign to.
+        iterable = layout if multiple else [layout]
+        newlayout = [item for item in iterable]
+        layout_description = "[{:s}]".format(', '.join(interface.contiguous.describe(newlayout)))
+        left, right, selected = cls.layout_getslice(ti, slice, withgaps=True if withgaps else False)
+
+        # Now that we were given a slice and we've fetched the relevant members,
+        # check each to see if it's special and raise an error if so.
+        Fis_special_member = (lambda mid, udm: udm.is_special_member()) if hasattr(udm_t, 'is_special_member') else (lambda mid, udm: idaapi.is_special_member(mid))
+        iterable = ((mindex, ti.get_udm_tid(mindex)) for mindex in range(count))
+        specials = {mid for mindex, mid in iterable if Fis_special_member(mid, utd[mindex])}
+        if specials and any(mid in specials for _, mid in selected if interface.node.identifier(mid)):
+            midx = next(mindex for mindex in range(count) if ti.get_udm_tid(mindex) in specials)
+            mname = v9member.get_name(ti, midx)
+            raise E.InvalidParameterError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to replace the special member \"{:s}\" at index {:d} of the {:s} belonging to function {:#x}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mname, midx, type_description, ea))
+
+        # This slice assignment will be destructive, so we need to calculate the
+        # original and new size before figuring out how to assign things.
+        iterable = (((offset, v9member.by(mid) if interface.node.identifier(mid) else mid)) for offset, mid in selected)
+        iterable = ((packed if isinstance(packed, types.integer) else packed[-1].size) for offset, packed in iterable)
+        iterable = map(operator.itemgetter(0), (divmod(integer, 8) for integer in iterable))
+        oldsize, newsize = (interface.contiguous.size(members) for members in [iterable, newlayout])
+
+        # Now we lay out each member that's going to be contiguously assigned,
+        # and connect the offset along with their attributes into a list.
+        iterable = interface.contiguous.layout(left // 8, newlayout, +1)
+        if union(ti):
+            layout = ((count + idx, item) for idx, (_, item) in enumerate(iterable))
+        else:
+            layout = iterable
+
+        # We will to track all of the references that will be destroyed. So, we
+        # collect all references to any of the members being selected.
+        iterable = ((offset, mid, interface.xref.to(mid, idaapi.XREF_ALL)) for offset, mid in selected if isinstance(mid, types.integer) and interface.node.identifier(mid))
+        references = {offset : (mid, [packed_frm_iscode_type for packed_frm_iscode_type in refs]) for offset, mid, refs in iterable}
+        references[interface.tinfo.size(ti)] = sid, [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(sid, idaapi.XREF_ALL)]
+
+        # Before doing anything serious to our type, save the selected member
+        # data that we will be overwriting with our new layout. If the member is
+        # a gap of empty space, then use it to simulate a packed member tuple.
+        olditems = {}
+        for offset, mid in selected:
+            if union(ti) and interface.node.identifier(mid):
+                _, _, mindex, _ = v9member.by(mid)
+                olditems[mindex] = v9member.packed(base, mid)
+            elif interface.node.identifier(mid):
+                olditems[offset] = v9member.packed(base, mid)
+            else:
+                olditems[offset] = idaapi.BADADDR, '', (), interface.location_t(offset, mid), None, (True, '')
+            continue
+
+        # Now we lay out each specific member that will be contiguously assigned
+        # and collect each offset along with its attributes into a list.
+        newitems, area_t = [], idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t
+        for offset, item in layout:
+            mtype = None
+
+            # First, we need to convert the item to an `idaapi.tinfo_t` or an
+            # integer size so that we can process it.
+            if isinstance(item, (types.integer, interface.bounds_t, area_t, interface.namedtypedtuple, interface.symbol_t)):
+                msize = interface.range.size(item) if isinstance(item, area_t) else item.size if hasattr(item, 'size') else item
+                assert(isinstance(msize, types.integer)), u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to determine {:s} member size ({!r}) for an unsupported type {!s} ({!r}).".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, msize, item.__class__, item)
+                mtype, mcomments = msize, (True, '')
+
+            # If it's a type of some sort, then we need to see if we can actually parse it.
+            elif isinstance(item, (idaapi.tinfo_t, types.string)):
+                parsed = item if isinstance(item, idaapi.tinfo_t) else interface.tinfo.parse(None, item, idaapi.PT_SIL|idaapi.PT_VAR) or interface.tinfo.parse(None, item, idaapi.PT_SIL)
+                if not parsed:
+                    raise E.InvalidTypeOrValueError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to parse the given string (\"{:s}\") into a valid type.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, utils.string.escape("{!s}".format(item), '"')))
+                elif isinstance(parsed, idaapi.tinfo_t):
+                    tinfo = parsed
+                else:
+                    _, tinfo = parsed
+                mtype, rptcmt = item, tinfo.get_type_rptcmt()
+                mcomments = (False, tinfo.get_type_cmt()) if rptcmt is None else (True, rptcmt)
+
+            # If it's one of the member or structure types, then we can extract.
+            elif hasattr(idaapi, 'member_t') and isinstance(item, (member_t, idaapi.member_t)):
+                mptr = item if isinstance(item, idaapi.member_t) else item.ptr
+                mtype = member.get_typeinfo(mptr)
+                regcmt, rptcmt = member.get_comment(mptr, repeatable=False), member.get_comment(mptr, repeatable=True)
+                mcomments = (True, rptcmt) if rptcmt else (False, regcmt)
+
+            elif hasattr(idaapi, 'struc_t') and isinstance(item, (structure_t, members_t, idaapi.struc_t)):
+                owner = item.owner if isinstance(item, idaapi.member_t) else item
+                sptr = owner if isinstance(owner, idaapi.struc_t) else owner.ptr
+                mtype = address.type(sptr.id)
+                regcmt, rptcmt = comment.get(sptr, repeatable=False), comment.get(sptr, repeatable=True)
+                mcomments = (True, rptcmt) if rptcmt else (False, regcmt)
+
+            # If it's one of our custom classes, then extract the type from it.
+            elif isinstance(item, member_t):
+                mtype, mid = item.typeinfo, item.id
+                _, _, _, udm = v9member.by(mid)
+                regcmt = udm.is_regcmt()
+                mcomments = not(regcmt), v9member.get_comment(mid)
+
+            elif isinstance(item, (structure_t, members_t)):
+                mtype = item.owner.typeinfo if isinstance(item, members_t) else item.typeinfo
+                regcmt, rptcmt = comment.get(mtype, repeatable=False), comment.get(sptr, repeatable=True)
+                mcomments = (True, rptcmt) if rptcmt else (False, regcmt)
+
+            # If it's pythonic and we can get a non-zero size, then convert into
+            # a type that we can use.
+            elif interface.typemap.size(item):
+                mtype = interface.typemap.resolvetype(item)
+                mcomments = False, None
+
+            # Anything else, we have no idea how to handle and so we can just bail here.
+            else:
+                raise E.InvalidTypeOrValueError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to determine {:s} member attributes for an unsupported type {!s} ({!r}).".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, item.__class__, item))
+
+            # The previous conditional should have converted the current item to
+            # a type that we can process. If the item is a type, then everything
+            # is pretty straightforward.
+            if isinstance(mtype, idaapi.tinfo_t):
+                tinfo, msize, tid = mtype, interface.tinfo.size(mtype), interface.tinfo.identifier(mtype)
+
+            # If it's an integer, then this is just a size and nothing else.
+            elif isinstance(mtype, types.integer):
+                tinfo, msize, tid = None, mtype, idaapi.BADADDR
+
+            # If this is a string, then its a type that has a name which we will
+            # need to extract later when we are calculating the field names.
+            elif isinstance(mtype, types.string):
+                parsed = interface.tinfo.parse(None, mtype, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC) or interface.tinfo.parse(None, item, idaapi.PT_SIL)
+                if parsed is None:
+                    location_description = "index {:d}".format(offset) if is_union else "offset {:+#x}".format(offset + base)
+                    raise E.InvalidTypeOrValueError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to parse the specified string \"{:s}\" for {:s} member at {!s} into a valid type.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, utils.string.escape(mtype, '"'), type_description, location_description))
+                mname, tinfo = ('', parsed) if isinstance(parsed, idaapi.tinfo_t) else parsed
+                tinfo, msize, tid = mtype, interface.tinfo.size(tinfo), interface.tinfo.identifier(tinfo)
+
+            # Anything else is an unsupported type resulting in an error.
+            else:
+                raise E.InvalidTypeOrValueError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to determine {:s} member attributes for an unsupported type {!s} ({!r}).".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, mtype.__class__, mtype))
+
+            # Now we can pack all the member information so that we can add it
+            # all later. We verify the size to ensure we aren't trying to add a
+            # variable-sized member here.
+            # FIXME: we should also copy the `value_repr_t` from `udm_t.repr`.
+            packed = tinfo, msize, tid, mcomments, None
+            if tinfo:
+                newitems.append((offset, item, packed))
+            else:
+                logging.info(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Adding a gap for the member at {:s} of {:s} with size ({:d}) due to not having an explicit type.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, "index {:d}".format(offset) if union(ti) else "offset {:#x}".format(base + offset), type_description, msize))
+            continue
+
+        # We need to ensure that there won't be any errors when we try to assign
+        # members. We do this by confirming that any new members will not have a
+        # duplicate name. This situation can occur when expanding or shrinking a
+        # structure without adjusting the names, or if the user explicitly
+        # specified a name already being used. So we go through all of the
+        # newitems and figure out if any will be duplicates. We do this in
+        # multiple passes, where the first one gathers the default names.
+        newnames = {}
+        for offset, item, _ in newitems:
+            if hasattr(idaapi, 'struc_t') and isinstance(item, (idaapi.struc_t, idaapi.member_t)):
+                mname = member.get_name(item) if isinstance(item, idaapi.member_t) else member.default_name(item, None, offset)
+            elif isinstance(item, (structure_t, members_t)):
+                mname = v9member.default_name(item.owner.id if isinstance(item, members_t) else item.id, None, offset)
+            elif isinstance(item, member_t):
+                mname = v9member.get_name(item.id)
+            elif isinstance(item, types.string) and interface.tinfo.parse(None, item, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC):
+                mname, _ = interface.tinfo.parse(None, item, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC)
+            elif isinstance(item, types.integer):
+                mname = ''
+            else:
+                mname = v9member.default_name(ti, None, offset)
+            newnames[offset] = utils.string.of(mname)
+
+        # Now we do the second pass, going through the items to extract each
+        # name into a dictionary of candidates. These will be given priority to
+        # any of the default names discovered during the first pass.
+        original, candidates = {}, {}
+        for offset, item, _ in newitems:
+            if isinstance(item, (idaapi.tinfo_t, types.string)):
+                parsed = item if isinstance(item, idaapi.tinfo_t) else interface.tinfo.parse(None, item, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC) or interface.tinfo.parse(None, item, idaapi.PT_SIL)
+                mname, tinfo = (newnames[offset], parsed) if isinstance(parsed, idaapi.tinfo_t) else parsed
+                originalname = utils.string.of(mname) or member.default_name(sid, None, offset)
+                original[offset] = newnames[offset] = originalname
+                candidates.setdefault(originalname, []).append(offset)
+
+            # If we were given a member, then we copy its name if it exists.
+            elif hasattr(idaapi, 'member_t') and isinstance(item, idaapi.member_t):
+                mname = '' if idaapi.is_special_member(mptr.id) else newnames[offset]
+                originalname = mname or member.default_name(sid, None, offset)
+                original[offset] = newnames[offset] = originalname
+                candidates.setdefault(mname, []).append(offset)
+
+            elif isinstance(item, member_t):
+                mowner, _, mindex, udm = v9member.by(item.id)
+                mname = '' if udm.is_special_member() else newnames[offset]
+                originalname = mname or member.default_name(sid, None, offset)
+                orginal[offset] = newnames[offset] = originalname
+                candidates.setdefault(mname, []).append(offset)
+
+            # Check if the item is non-anonymous type by checking against an
+            # integer. If it's not an integer, then we ensure it gets a name.
+            elif not isinstance(item, types.integer):
+                mname = v9member.default_name(sid, None, offset)
+                original[offset] = newnames[offset] = mname
+                candidates.setdefault(mname, []).append(offset)
+            continue
+
+        # Now we need to check if any of our candidate names are already being
+        # used by something within the database. We also need to figure out a
+        # way to calculate the real offset for each discovered member.
+        sname = internal.netnode.name.get(idaapi.ea2node(sid))
+        iterable = ((mname, offsets, v9members.by_name(ti, utils.string.to(mname)) if v9members.has_name(ti, utils.string.to(mname)) else None) for mname, offsets in candidates.items())
+        duplicates = {mname : offsets for mname, offsets, item in iterable if len(offsets) > 1 or item}
+
+        frargs = idaapi.frame_off_args(fn) if fn else 0
+        calculate_offset = lambda moff: offset - frargs if frargs <= offset else offset - fn.frsize
+        delta = newsize - oldsize
+
+        # We can now go through the list of duplicates, and calculate a unique
+        # name for each member, and add it to the newnames dictionary.
+        for mname, offsets in duplicates.items():
+            for offset in offsets:
+                oldname = newnames[offset]
+                assert(oldname == mname)
+
+                # If the member name already exists and the name is used by the
+                # current member, then we don't need to fix it.
+                mowner, mindex, udm = v9members.by_name(ti, utils.string.to(oldname)) if v9members.has_name(ti, utils.string.to(oldname)) else (ti, -1, None)
+                moffset, _ = divmod(udm.offset, 8)
+                if udm and offset == (moffset + delta if udm.offset >= right else moffset):
+                    continue
+
+                # Then we attempt to calculate the new name if it was a
+                # duplicate by continuing to suffix the member offset.
+                name, adjusted = mname, calculate_offset(offset) if fn else offset
+                while name in candidates or v9members.has_name(ti, utils.string.to(name)):
+                    name = '_'.join([name, "{:X}".format(abs(adjusted))])
+                newname = name
+
+                # Update our dictionary with the new name that we determined.
+                newnames[offset] = newname
+
+        # Now we need to do the final pass through the members so that we can
+        # log what we were able to use and what ones were duplicates.
+        for offset, item, packed in newitems:
+            if isinstance(item, types.integer) or original[offset] == newnames[offset]:
+                continue
+            tinfo, msize, tid, _, _ = packed
+
+            # Only members that are non-anonymous get their name change logged.
+            oldname, newname = original[offset], newnames[offset]
+            if isinstance(item, (idaapi.member_t, member_t)):
+                mowner, mindex, udm = v9members.by_identifier(mowner, item.id)
+                new_descr = "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset)
+                old_descr = "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + udm.offset // 8)
+                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Using alternative name \"{:s}\" for new member ({!s}) at {:s} of {:s} ({:#x}) as the member ({:#x}) at {:s} is currently using the requested name \"{:s}\".".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, utils.string.escape(newname, '"'), utils.pycompat.fullname(member_t), new_descr, type_description, interface.tinfo.identifier(mowner), mowner.get_udm_tid(mindex), old_descr, utils.string.escape(oldname, '"')))
+
+            elif isinstance(item, (idaapi.tinfo_t, types.string)):
+                mowner, mindex, conflict = v9members.by_name(ti, utils.string.to(oldname))
+                new_descr = "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset)
+                old_descr = "member ({:#x}) at {:s} is currently using the requested name \"{:s}\"".format(mowner.get_udm_tid(mindex), "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + conflict.offset // 8), utils.string.escape(oldname, '"')) if conflict else "original name \"{:s}\" is currenty being used".format(utils.string.escape(oldname, '"'))
+                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Using alternative name \"{:s}\" for new member ({!s}) at {:s} of {:s} ({:#x}) as the {:s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, utils.string.escape(newname, '"'), utils.pycompat.fullname(idaapi.tinfo_t), new_descr, type_description, sid, old_descr))
+
+            elif not isinstance(item, types.integer):
+                mowner, mindex, conflict = v9members.by_name(ti, utils.string.to(oldname))
+                new_descr = "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset)
+                old_descr = "member ({:#x}) at {:s} is currently using the requested name \"{:s}\"".format(mowner.get_udm_tid(mindex), "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + conflict.offset), utils.string.escape(oldname, '"')) if conflict else "original name \"{:s}\" is currenty being used".format(utils.string.escape(oldname, '"'))
+                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Using alternative name \"{:s}\" for new member ({:s}) at {:s} of {:s} ({:#x}) as the {:s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, utils.string.escape(newname, '"'), 'integer', new_descr, type_description, sid, old_descr))
+            continue
+
+        # If our type is a union, then we need some way to identify each member
+        # since removing a member changes the index and reorders everything. So,
+        # we use the member identifier as a unique key.
+        if union(ti):
+            res, identifiers = 0, {mid for offset, mid in selected if offset in olditems}
+            for mid in filter(v9member.has, identifiers):
+                mowner, mutd, mindex, udm = v9member.by(mid)
+
+                # Unpack the member using the identifier, and smoke-check it.
+                ok = ti.del_udm(mindex) if interface.tinfo.identifier(mowner) == sid else idaapi.TERR_BAD_ARG
+
+                # If the identifer didn't match then we got the wrong type
+                # somehow. We log a warning to avoid interrupting the removal of
+                # members from the current structure.
+                if ok != idaapi.TERR_OK and interface.tinfo.identifier(mowner) != sid:
+                    errname, errdesc = interface.tinfo.format_type_error(ok)
+                    description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+                    logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : The {:s} owning the member ({:#x}) at {:s} that is attempting to be removed does not actually belong to us and may result in a fatal error.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, mid, "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + udm.offset)))
+
+                elif ok != idaapi.TERR_OK:
+                    errname, errdesc = interface.tinfo.format_type_error(ok)
+                    description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+                    logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the {:s} member ({:#x}) at {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, mid, "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + udm.offset), description))
+
+                # Now we can tally that we've removed the member.
+                res += 1 if ok == idaapi.TERR_OK else 0
+
+            deleted = res
+
+        # Otherwise, since we extracted all of the member information and the
+        # references for the old items, we can delete the entire range.
+        elif olditems:
+            [lindex, rindex] = [v9members.index_before(ti, left), v9members.index_after(ti, right)]
+
+            ok = ti.del_udms(lindex, rindex)
+            if ok != idaapi.TERR_OK:
+                errname, errdesc = interface.tinfo.format_type_error(ok)
+                description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+                raise E.DisassemblerError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the elements from offset {:+#x} (index {:d}) to offset {:+#x} (index {:d}) due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, 8 * left, lindex, 8 * right, rindex, '"', description))
+
+            deleted = len(range(lindex, rindex))
+
+        # If there were no items being removed, then set `deleted` to be 0.
+        else:
+            deleted = 0
+
+        # Then we will need to re-fetch the `udt_type_data_t` due to the element
+        # removal, and then figure out what errors we encountered so that we can
+        # log our failures to the user.
+        if not ti.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.layout_setslice({!s}, {!s}, {:s}{:s}{:s}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), "{!s}".format(slice), "[{:s}]".format(', '.join(iterable)), offset_description, ", withgaps={!s}".format(True if withgaps else False)))
+        count = utd.size()
+
+        if union(ti) and deleted != len(olditems):
+            iterable = (v9member.by(mid) for offset, mid in selected if offset in olditems if v9member.has(mid))
+            errors = {mindex : (mowner, mutd, mindex, udm) for mowner, mutd, mindex, udm in iterable}
+            for index in sorted(errors):
+                packed = errors[index]
+                logging.critical(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the selected {:s} from {:s} of {:s} for replacement.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, "member ({:#x})".format(mid) if interface.node.identifier(mid) else "gap of size {:#x}".format(mid), "index {:d}".format(index), type_description)) 
+
+        elif deleted != len(olditems):
+            errors = {offset : (next(v9members.at_offset(ti, offset)) if v9members.has_offset(ti, offset) else None) for offset in olditems}
+            for offset, mid in selected:
+                if errors.get(offset):
+                    logging.critical(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the selected {:s} from {:s} of {:s} for replacement.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, "member ({:#x})".format(mid) if interface.node.identifier(mid) else "gap of size {:#x}".format(mid), "offset {:+#x}".format(base + offset), type_description)) 
+                continue
+
+        # If we didn't remove the items that we expected, then we should bail.
+        # FIXME: We should probably revert and restore the "olditems" that we've
+        #        already partially removed.
+        if deleted != len(olditems):
+            raise E.DisassemblerError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Expected to remove {:d} {:s} member{:s}, but {:d} were removed.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, len(olditems), type_description, '' if len(olditems) == 1 else 's', deleted))
+
+        # Now we need to figure whether we're growing it, or shrinking it.
+        size, delta = interface.tinfo.size(ti), 0 if union(ti) else newsize - oldsize
+        _, mindex, _ = next(v9members.at_offset(ti, left)) if v9members.has_offset(ti, left) else (ti, -1, None)
+
+        # If we're shrinking it, then we need an index to a real member
+        # in order to reduce the size of its gap.
+        if delta < 0 and 0 <= mindex:
+            index = mindex
+            while index < count and utd[index].is_gap():
+                index += 1
+            mindex = index
+
+        # Now we can go and do our resize of the structure type.
+        ok = ti.expand_udt(mindex, delta) if 0 <= mindex < count and delta and left < size else idaapi.TERR_OK
+        if ok != idaapi.TERR_OK:
+            errname, errdesc = interface.tinfo.format_type_error(ok)
+            description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+            raise E.DisassemblerError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to {:s} the size of the {:s} by {:d} byte{:s} at offset {:+#x} (index {:d}) due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, 'decrease' if delta < 0 else 'increase', type_description, abs(delta), '' if abs(delta) == 1 else 's', left, mindex, description))
+
+        # If any members were shifted, then we need to add them to our olditems
+        # so that we can track their references.
+        mindex = v9members.index_after(ti, left)
+        if delta > 0 and 0 <= mindex:
+            iterable = (v9member.by(ti, index) for index in range(mindex, count))
+            olditems.update({udm.offset : v9member.packed(base, mowner, index) for mowner, mutd, index, udm in iterable})
+
+        # Hopefully that is everything and we should only need to add the new
+        # members to the structure from "newitems"
+        results, oldsize = [], interface.tinfo.size(ti)
+        for offset, item, packed in newitems:
+            tinfo, msize, _, _, _ = packed
+
+            # If the member type is None, then this is a size for empty space.
+            if tinfo is None:
+                logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Skipping {:d} byte{:s} of space at {:s} of {:s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, msize, '' if msize == 1 else 's', "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), type_description))
+                err, udm = idaapi.TERR_OK, None
+
+            # If the member type is a string, then we need to parse the type and
+            # extract the name.
+            elif isinstance(tinfo, types.string):
+                logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Adding {:s} member at {:s} as {:d} byte{:s} of space.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), msize, '' if msize == 1 else 's'))
+                parsed = interface.tinfo.parse(None, tinfo, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC) or interface.tinfo.parse(None, tinfo, idaapi.PT_SIL)
+
+                udm = udm_t()
+                udm.offset = 0 if union(ti) else 8 * offset
+                udm.size = 8 * msize
+                udm.name = utils.string.to(newnames[offset])
+                _, udm.type = ('', parsed) if isinstance(parsed, idaapi.tinfo_t) else parsed
+                err = ti.add_udm(udm, idaapi.ETF_AUTONAME, 1, -1) if union(ti) else ti.add_udm(udm, idaapi.ETF_AUTONAME)
+
+            # Otherwise, go ahead and add the element using its attributes.
+            else:
+                logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Adding {:s} member at {:s} as {:d} byte{:s} of space.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), msize, '' if msize == 1 else 's'))
+
+                udm = udm_t()
+                udm.offset = 0 if union(ti) else 8 * offset
+                udm.size = 8 * msize
+                udm.name = utils.string.to(newnames[offset])
+                udm.type = interface.tinfo.copy(tinfo)
+                err = ti.add_udm(udm, idaapi.ETF_AUTONAME, 1, -1) if union(ti) else ti.add_udm(udm, idaapi.ETF_AUTONAME)
+
+            # If we got an error of some kind then log the error we received.
+            if err != idaapi.TERR_OK:
+                error_description = {}
+                error_description[idaapi.TERR_BAD_NAME] = 'a duplicate field name', "\"{:s}\"".format(utils.string.escape(newnames[offset], '"'))
+                error_description[idaapi.TERR_BAD_OFFSET] = 'an invalid offset', "{:+#x}".format(offset)
+                error_description[idaapi.TERR_BAD_SIZE] = 'an invalid field size', "{:d}".format(msize)
+                error_description[idaapi.TERR_BAD_TYPE] = 'an invalid type', "{!r}".format(mtype)
+
+                if err in error_description:
+                    reason, culprit = error_description[err]
+                    logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Error ({:d}) adding member at {:s} of {:s} ({:#x}) due to {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, err, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), type_description, sid, reason, culprit))
+                else:
+                    logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Error ({:d}) while adding member at {:s} of {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, err, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset),type_description, sid))
+                continue
+
+            # Otherwise, we need to use the member index to get its identifier.
+            if union(ti) and v9members.has_index(ti, offset - deleted):
+                _, index, _ = v9members.by_index(ti, offset - deleted)
+                results.append((offset, item, packed, ti.get_udm_tid(index)))
+
+            elif v9members.has_offset(ti, 8 * offset):
+                _, index, _ = next(v9members.at_offset(ti, 8 * offset))
+                results.append((8 * offset, item, packed, ti.get_udm_tid(index)))
+
+            else:
+                logging.error(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Error ({:d}) adding member at {:s} of {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, err, "index {:d}".format(offset - count) if union(ti) else "offset {:+#x}".format(base + 8 * offset), type_description, sid))
+            continue
+
+        # The very last thing we need to do is to update the type member with
+        # its metadata such as comments, type information, name, etc.
+        for offset, item, packed, mid in results:
+            tinfo, msize, tid, mcomments, mrepr = packed
+            mowner, mutd, mindex, udm = v9member.by(mid)
+            mcommenttype, mcomment = mcomments
+
+            # First we'll verify that the owner of the member matches the type
+            # that is being updated. Skip it if it's not.
+            if sid != interface.tinfo.identifier(mowner):
+                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : The {:s} ({:#x}) owning the member ({:#x}) at {:s} that is attempting to be removed does not actually belong to us ({:#x}) and will not have its type information copied.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, interface.tinfo.identifier(mowner), mid, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), sid))
+                continue
+
+            # If our type is a string, then we convert it to a `idaapi.tinfo_t`.
+            elif isinstance(tinfo, types.string):
+                parsed = interface.tinfo.parse(None, tinfo, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC) or interface.tinfo.parse(None, tinfo, idaapi.PT_SIL)
+                _, tinfo = ('', parsed) if isinstance(parsed, idaapi.tinfo_t) else parsed
+
+            # Now we can go and update each of the available member fields.
+            ok = ti.set_udm_type(mindex, tinfo) if tinfo else idaapi.TERR_OK
+            if ok != idaapi.TERR_OK:
+                errname, errdesc = interface.tinfo.format_type_error(ok)
+                description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+                logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} type {!s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mid, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), type_description, sid, 'repeatable' if mcommenttype else 'non-repeatable', interface.tinfo.quoted(tinfo), description))
+
+            ok = ti.set_udm_cmt(mindex, mcomment, mcommenttype) if mcomment else idaapi.TERR_OK
+            if ok != idaapi.TERR_OK:
+                errname, errdesc = interface.tinfo.format_type_error(ok)
+                description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+                logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} comment \"{:s}\" due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mid, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), type_description, sid, 'repeatable' if mcommenttype else 'non-repeatable', utils.string.escape(mcomment, '"'), description))
+
+            ok = ti.set_udm_repr(mindex, mrepr) if mrepr else idaapi.TERR_OK
+            if ok != idaapi.TERR_OK:
+                errname, errdesc = interface.tinfo.format_type_error(ok)
+                description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+                raise E.NotImplementedError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} representation {!r} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mid, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), type_description, sid, 'repeatable' if mcommenttype else 'non-repeatable', mrepr, description))
+            continue
+
+        # Finally, the very last thing we need to do is to update any references
+        # that were changed by our assignment. This is done by stepping the
+        # auto-queue near the addresses that are being referenced, and then
+        # checking which members gained or lost a reference.
+        iterable = (([id] * len(refs), refs) for offset, (id, refs) in references.items())
+        old = {xfrm : id for id, (xfrm, xiscode, xtype) in itertools.chain.from_iterable(itertools.starmap(zip, iterable))}
+        [idaapi.auto_make_step(xfrm, xfrm + 1) for xfrm in old]
+
+        # Next we'll grab all the identifiers for the members that we just
+        # added so that we can filter them and figure out where they moved to.
+        name = naming.get(ti)
+        oldmembers = {id : (name, offset) for offset, (id, name, _, location, _, _) in olditems.items()}
+        newmembers = {id : (v9member.get_name(id), offset) for offset, _, packed, id in results}
+        oldmembers[sid] = name, oldsize
+        newmembers[sid] = name, interface.tinfo.size(ti)
+
+        # If we shifted any of the old members, then add their references too.
+        if delta > 0:
+            newmembers.update({id : (name, offset + delta) for id, (name, offset) in oldmembers.items()})
+
+        # Grab the references that we used to step the autoqueue so that we can
+        # compare both the new and old references to see how they were applied.
+        iterable = ((xfrm, interface.xref.of(xfrm, idaapi.XREF_ALL)) for xfrm in old)
+        filtered = ((xfrm, {xto for xto, xiscode, xtype in refs if xto in newmembers}) for xfrm, refs in iterable)
+        new = {xfrm : xtos for xfrm, xtos in filtered if xtos}
+
+        # Now we can just take a union of the references to figure out what
+        # member references were changed and how.
+        oldrefs, newrefs = ({ea for ea in refs} for refs in [old, new])
+        for ea in oldrefs & newrefs:
+            assert(new[ea])
+            old_ea = old[ea]
+            for new_ea in new[ea]:
+                olditem, newitem = oldmembers[old[ea]], newmembers[new_ea]
+                newname, newoffset = newitem
+                oldname, oldoffset = olditem
+                old_descr, new_descr = ("structure \"{:s}\"".format(utils.string.escape(name, '"')) if id == sid else "field \"{:s}\" ({:+#x})".format(utils.string.escape(name, '"'), offset) for id, offset, name in zip([old_ea, new_ea], [oldoffset, newoffset], [oldname, newname]))
+                logging.info(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Reference at address {:#x} has moved from {:s} to new {:s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, ea, old_descr, new_descr))
+            continue
+
+        # Any older references that don't exist in the set of new references
+        # were lost during our assignment.
+        for ea in oldrefs - newrefs:
+            old_ea = old[ea]
+            oldname, oldoffset = oldmembers[old[ea]]
+            logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Reference at address {:#x} that was referencing {:s} \"{:s}\" ({:+#x}) was lost during assignment.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, ea, 'structure' if old_ea == sid else 'field', utils.string.escape(oldname, '"'), oldoffset))
+
+        # We are finally fucking done and just need to return everything that we
+        # had removed from the structure type.
+        iterable = (olditems[offset] for offset, _ in selected if offset in olditems)
+        return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
 
 class members(object):
     """
@@ -4796,8 +5351,8 @@ class members(object):
                 mname = member.get_name(mptr)
             elif isinstance(mptr, idaapi.struc_t):
                 mname = member.default_name(sptr, None, offset)
-            elif isinstance(mptr, types.string) and interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR):
-                mname, _ = interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR)
+            elif isinstance(mptr, types.string) and interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC):
+                mname, _ = interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC)
             elif not isinstance(mptr, types.integer):
                 mname = member.default_name(sptr, None, offset)
             else:
@@ -4812,7 +5367,7 @@ class members(object):
             if isinstance(mptr, (idaapi.tinfo_t, types.string)):
                 has_name = interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR) if isinstance(mptr, types.string) else False
                 ti = mptr if isinstance(mptr, idaapi.tinfo_t) else interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR)[-1] if has_name else interface.tinfo.parse(None, mptr, idaapi.PT_SIL)
-                mname = interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR)[0] if isinstance(mptr, types.string) and has_name else newnames[offset]
+                mname = interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC)[0] if isinstance(mptr, types.string) and has_name else newnames[offset]
                 originalname = mname or member.default_name(sptr, None, offset)
                 original[offset] = newnames[offset] = originalname
                 candidates.setdefault(originalname, []).append(offset)
