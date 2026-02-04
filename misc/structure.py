@@ -1193,7 +1193,7 @@ class v9member(object):
 
                 # if it's a union, then we update our working queue.
                 if union(mowner):
-                    candidates = [(mowner.get_udm_tid(index), (mowner, udt, index, udt[index])) for index in range(mudt.size())]
+                    candidates = [(mowner.get_udm_tid(index), (mowner, utd, index, utd[index])) for index in range(mudt.size())]
                     table.update((mcandidateid, mcandidate) for mcandidateid, mcandidate in candidates if mcandidateid != idaapi.BADADDR)
                     children.update(mcandidateid for mcandidateid, mcandidate in candidates if cls.contains(mcandidateid, mrealoffset))
 
@@ -2177,7 +2177,7 @@ class v9members(object):
             return 0 if offset < 0 else count
 
         # Next thing is to try and find the gaps in the structure so that we can
-        # determine when udt.find_member will return a -1 for a missing member.
+        # determine when `utd.find_member` will return -1 for a missing member.
         segments, points = cls.gaps(tinfo)
         if points:
             index = bisect.bisect_right(points, offset) - 1
@@ -2189,8 +2189,8 @@ class v9members(object):
             key = udm_t()
             key.offset = 1 + right if (left <= offset < right) else offset
 
-        # Hopefully we can trust the udt.find_member api and use it in order to
-        # get the index of the member at the specified offset.
+        # Hopefully we can trust the `utd.find_member` api and use it in order
+        # to get the index of the member at the specified offset.
         else:
             key = udm_t()
             key.offset = offset
@@ -2249,7 +2249,7 @@ class v9members(object):
             key.offset = left - 1 if (left <= offset < right) else offset
 
         # Otherwise, we should be able to use the offset we were given with the
-        # udt.find_member api in order to find the index of the correct member.
+        # `utd.find_member` api in order to find the index of the correct member.
         else:
             key = udm_t()
             key.offset = offset
@@ -6881,7 +6881,7 @@ class member_t(object):
         # it. Otherwise, we are only able to apply it if it doesn't use any ordinals.
         if typeinfo and (type_is_trusted or not any([typeinfo.get_ordinal(), typeinfo.is_array() and typeinfo.get_array_element().get_ordinal()])):
 
-            # FIXME: if the type is a structure (udt), and none of its members were serialized,
+            # FIXME: if the type is a structure (utd), and none of its members were serialized,
             #        then things like field alignment and such are not applied. This results
             #        in a struct->til conversion failed error when trying to calc alignments.
             try:
