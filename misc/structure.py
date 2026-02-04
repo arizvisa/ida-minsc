@@ -2065,6 +2065,62 @@ class v9members(object):
         return {point: gaps[index] for point, index in segments.items()}, sorted(points)
 
     @classmethod
+    def intervals(cls, type, critique=lambda mowner, mutd, mindex, udm: True):
+        '''Return a dictionary and list of points for the boundaries of each element from the specified `type` selected by the callable `critique`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        if not (tinfo.is_struct() or union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.intervals({!s}, {!s}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), utils.pycompat.fullname(critique)))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.intervals({!s}, {!s}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), utils.pycompat.fullname(critique)))
+        else:
+            sid = tinfo.get_tid()
+
+        # If the type is a union, then all the members overlap and thus
+        # selecting the intervals to return doesn't make any sense.
+        if union(tinfo):
+            left, right = 0, interface.tinfo.size(tinfo)
+            udms = [udm_t() for index in range(utd.size())]
+            for index, udm in enumerate(udms):
+                udm.offset = index
+                if index != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+                    raise E.MemberNotFoundError(u"{:s}.intervals({!s}, {!s}) : Unable to find the member at the index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), utils.pycompat.fullname(critique), index, sid))
+                continue
+
+            iterable = ((tinfo, utd, index, udm) for index, udm in enumerate(udms))
+            result = next((packed for packed in iterable if critique(*packed)), ())
+            if not result:
+                raise E.MemberNotFoundError(u"{:s}.intervals({!s}, {!s}) : Unable to find a member with the provided callable ({!s}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), utils.pycompat.fullname(critique), index, utils.pycompat.fullname(critique)))
+
+            tinfo, utd, index, udm = result
+            return {0: index, udm.size: index}, [0, udm.size]
+
+        # Otherwise, we iterate through all of the critiqued members and gather
+        # them into a list of points. The member positions are ordered, so we
+        # don't need to do anything specific when populated them.
+        segments, points = {}, []
+        for index in range(utd.size()):
+            udm = udm_t()
+            udm.offset = index
+            if index != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
+                raise E.MemberNotFoundError(u"{:s}.intervals({!s}, {!s}) : Unable to find the member at the index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), utils.pycompat.fullname(critique), index, sid))
+
+            # Now we critique the current member to see if we should add it.
+            packed = tinfo, utd, index, udm
+            if not(critique(*packed)):
+                continue
+
+            # This was selected, so we can now add the member and its points.
+            left, right = udm.offset, udm.offset + udm.size
+            segments.setdefault(right, index)
+            segments[left] = packed
+
+            if not points: points.append(left)
+            points.append(left) if points and points[-1] != left else points
+            points.append(right) if points and points[-1] != right else points
+        return segments, points
+
+    @classmethod
     def iterate(cls, type, *slice):
         '''Yield each member specified by `slice` from the structure identified by `sptr`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
