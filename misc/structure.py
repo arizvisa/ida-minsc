@@ -4586,7 +4586,6 @@ class members(object):
 
         # Determine if the structure is a frame so that we can avoid removing
         # members that might interfere with how the disassembler uses it.
-        # that we shouldn't delete because it will break the frame.
         ea = idaapi.get_func_by_frame(sptr.id)
         fn = None if ea == idaapi.BADADDR else idaapi.get_func(ea)
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
@@ -4721,7 +4720,7 @@ class members(object):
                 location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
                 logging.debug(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove member {:s} at {:s} with id ({:#x}) from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', mname, location_description, mid, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
                 continue
-            removed.add(id)
+            removed.add(mid)
 
         # Finally we can complain about the identifers that were not removed,
         # and then proceed to return whatever we were actually able to do.
@@ -4876,7 +4875,7 @@ class members(object):
             mptr = idaapi.get_member(sptr, mindex if is_union else moffset)
             if mptr and mptr.id == mid:
                 location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
-                logging.debug(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove member {:s} at {:s} with id ({:#x}) from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', mname, location_description, mid, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
+                logging.debug(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove member \"{:s}\" at {:s} with id ({:#x}) from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', utils.string.escape(mname, '"'), location_description, mid, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
                 continue
             removed.add(id)
 
