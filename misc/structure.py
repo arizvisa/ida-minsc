@@ -3466,7 +3466,157 @@ class v9members(object):
     @classmethod
     def clear_slice(cls, type, slice, *offset):
         '''Clear a `slice` of the members belonging to the specified structure or union `type`.'''
-        raise NotImplementedError
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        else:
+            raise E.InvalidParameterError(u"{:s}.clear_slice({!s}, {!s}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), slice, ", {:+#x}".format(*offset) if offset else '', type.__class__))
+        is_variable, is_frame = ti.is_varstruct(), ti.is_frame() if hasattr(ti, 'is_frame') else False
+
+        # Some descriptions that we will use for logging and exceptions.
+        type_description = 'frame' if is_frame else 'union' if union(ti) else 'structure'
+        offset_description = ", {:+#x}".format(*offset) if offset else ''
+
+        # Get the details for the structure type we were given and turn our
+        # slice if it was an integer to an actual slice.
+        utd = idaapi.udt_type_data_t()
+        if not ti.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to get the details for the specified {:s} type.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, type_description))
+        size, is_union = interface.tinfo.size(ti), union(ti)
+        slice = slice if isinstance(slice, builtins.slice) else builtins.slice(slice, 1 + slice or None)
+
+        # Next we need to avoid members that are specially treated by the
+        # disassembler. This only happens when our type is a frame. So, we first
+        # check to see if the type is associated with a function.
+        ea = ti.get_frame_func() if hasattr(ti, 'get_frame_func') else idaapi.get_func_by_frame(sid)
+        fn = None if ea == idaapi.BADADDR else idaapi.get_func(ea)
+        [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn else 0]
+
+        # Now we can go through and gather the identifiers for each member.
+        iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
+        iterable = (next(v9members.at_offset(ti, moffset)) for moffset in iterable if v9members.has_offset(ti, moffset))
+        specials = {mowner.get_udm_tid(mindex) for mowner, _, mindex, _ in iterable}
+
+        # Before clearing things, we stash them and gather the references for
+        # each member so that we can update things and return the result later.
+        selected, lindex, rindex, members, member_references = [], utd.size(), 0, {}, {}
+        for mowner, mindex, udm in cls.iterate(ti, slice):
+            lindex, rindex = min(mindex, lindex), max(mindex, rindex)
+            mid = mowner.get_udm_tid(mindex)
+
+            # Gather the references for the member so we know the addresses that
+            # need to be updated after clearing it.
+            member_references.setdefault(mid, []).extend(ea for ea, _, _ in interface.xref.to(mid, idaapi.XREF_ALL))
+
+            # If the member is not a special member, then add it.
+            if mid not in specials:
+                members[mindex if is_union else udm.offset] = v9member.packed(base, mid)
+                selected.append((mindex, udm.offset, mid))
+            continue
+
+        # Clear out any references to special members that were identified.
+        [member_references.pop(mid, ()) for mid in specials]
+
+        # Now we need to invert our dictionary of references so that
+        # they are keyed by address instead of by the member id.
+        references = {}
+        for mid, addresses in member_references.items():
+            [references.setdefault(ea, []).append(mid) for ea in addresses]
+        member_references.clear()
+
+        # Before deleting the members, use the slice to gather the indices that
+        # will be cleared, and reverse them so that the indices won't change.
+        indices = sorted(builtins.range(*slice.indices(utd.size())))
+        iterable = ((mindex, v9member.packed(base, ti, mindex)) for mindex in indices[::-1])
+        iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
+        listable = [(mid, mname, mindex, moffset, msize) for mindex, mid, mname, mtype, (moffset, msize), mtypeinfo, mcomment in iterable if mid not in specials]
+
+        # We got everything, so we can start lasking the disassembler to delete
+        # each member from our list of indices. This list has been sorted and
+        # reversed so that clearing an index won't change any of the other ones.
+        count, failed = 0, {moffset for moffset in []}
+        for mid, mname, mindex, moffset, msize in listable:
+            mkey = mindex if is_union else moffset
+            if mkey not in members:
+                continue
+
+            # Fetch the member index, and then we can go ahead and delete it.
+            location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
+            ok = ti.del_udm(mindex)
+
+            if ok != idaapi.TERR_OK:
+                errname, errdesc = v9member.format_error_typeinfo(ok)
+                description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+                logging.warning(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to clear member \"{:s}\" ({:#x}) at {:s} of the {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, utils.string.escape(mname, '"'), mid, location_description, type_description, description))
+                ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
+
+            elif not is_union and v9members.has_offset(ti, moffset) and not(next(cls.at_offset(ti, moffset))[-1].is_gap()):
+                logging.warning(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Member \"{:s}\" ({:#x}) at {:s} of {:s} was not cleared.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, utils.string.escape(mname, '"'), mid, location_description, type_description))
+                ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
+
+            # If we were successful, then it worked and we cleared the member.
+            else:
+                count += 1
+            continue
+
+        # If there were no elements cleared, but some were selected then we log
+        # the failure and return the elements that were cleared.. which is none.
+        if selected and not count:
+            logging.fatal(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to clear {:d} member{:s} in the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, len(selected), '' if len(selected) == 1 else 's', type_description, sid))
+            return []
+
+        # The disassembler hasn't yet updated the changed references, so we use
+        # the references we collected earlier to ensure they are updated.
+        if hasattr(idaapi, 'auto_make_step'):
+            [idaapi.auto_make_step(ea, idaapi.next_not_tail(ea)) for ea in references]
+
+        elif hasattr(idaapi, 'auto_wait_range'):
+            [idaapi.auto_wait_range(ea, idaapi.next_not_tail(ea)) for ea in references]
+
+        # If the number of elements cleared match what was selected, then we can
+        # return everything that was cleared since we were successful.
+        if is_union:
+            iterable = (members[mindex] for mindex, moffset, mid in selected if mindex in members)
+        else:
+            iterable = (members[moffset] for mindex, moffset, mid in selected if moffset in members)
+
+        if len(selected) == count:
+            return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
+
+        # Figure out what we were supposed to clear so that we can identify
+        # which members were actually successfully cleared.
+        else:
+            expected = {mid : (mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable}
+
+        # Go through each member so that we can verify that it doesn't exist. If
+        # it does exist, then we collect the member so we can complain about it.
+        cleared = {mid for mid in []}
+        for mindex, moffset, mid in selected:
+            mkey = mindex if is_union else moffset
+            if mkey not in members:
+                continue
+
+            mid, mname, _, _, _ = members[mkey]
+
+            # Check if the member actually exists at the offset or index.
+            exists = v9members.has_index(ti, mindex) if is_union else v9members.has_offset(ti, moffset)
+            if exists:
+                location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(base + moffset)
+                logging.debug(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to clear member \"{:s}\" at {:s} with id ({:#x}) in the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, utils.string.escape(mname, '"'), location_description, mid, type_description, sid))
+
+            # If it doesn't exist, then we successfully cleared the member.
+            else:
+                cleared.add(mid)
+            continue
+
+        # Now we can complain about the non-cleared members so that we can
+        # complain about it, and then return the ones we did actaully clear.
+        logging.warning(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to clear {:d} of {:s} in the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, len(expected) - len(cleared), "{:d} members".format(len(expected)) if len(expected) == 1 else "the expected {:d} members".format(len(expected)), type_description, sid))
+        iterable = (mindex for mindex, moffset, mid in selected if mid in cleared) if is_union else (moffset for mindex, moffset, mid in selected if mid in cleared)
+        iterable = (members[moffset_or_mindex] for moffset_or_mindex in iterable)
+        return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
 
     @classmethod
     def clear_bounds(cls, type, start, stop, *offset):
