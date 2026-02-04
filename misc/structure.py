@@ -3262,7 +3262,206 @@ class v9members(object):
     @classmethod
     def remove_bounds(cls, type, start, stop, *offset):
         '''Remove the members at the offset `start` to `stop` from the specified structure or union `type`.'''
-        raise NotImplementedError
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        else:
+            raise E.InvalidParameterError(u"{:s}.remove_bounds({!s}, {:#x}, {:#x}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), start, stop, ", {:+#x}".format(*offset) if offset else '', type.__class__))
+        is_variable, is_frame = ti.is_varstruct(), ti.is_frame() if hasattr(ti, 'is_frame') else False
+
+        # Assign some descriptions that we can use for exceptions and logging.
+        type_description = 'frame' if is_frame else 'union' if union(ti) else 'structure'
+        offset_description = ", {:+#x}".format(*offset) if offset else ''
+
+        # Get the details for the type, and gather any attributes we might need.
+        utd = idaapi.udt_type_data_t()
+        if not ti.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to get the details for the specified {:s} type.".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, type_description))
+        size, is_union = interface.tinfo.size(ti), union(ti)
+
+        # First check if our type belongs to a frame so that we avoid removing
+        # members that are treated specially by the disassembler. We also
+        # calculate the base offset for the type if we were not given an offset.
+        ea = ti.get_frame_func() if hasattr(ti, 'get_frame_func') else idaapi.get_func_by_frame(sid)
+        fn = None if ea == idaapi.BADADDR else idaapi.get_func(ea)
+        [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn else 0]
+
+        iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
+        iterable = (next(v9members.at_offset(ti, moffset)) for moffset in iterable if v9members.has_offset(ti, moffset))
+        specials = {mowner.get_udm_tid(mindex) for mowner, _, mindex, _ in iterable}
+
+        # We now need to collect the members matching the specified slice so
+        # that we can stash them for returning later.
+        selected, lindex, rindex, members, member_references = [], utd.size(), 0, {}, {}
+        for mowner, mindex, udm in cls.at_bounds(ti, start - base, stop - base):
+            lindex, rindex = min(mindex, lindex), max(mindex, rindex)
+            mid = mowner.get_udm_tid(mindex)
+
+            # Gather the references for the member so we know the addresses that
+            # need to be updated after the removal.
+            member_references.setdefault(mid, []).extend(ea for ea, _, _ in interface.xref.to(mid, idaapi.XREF_ALL))
+
+            # If the member is not a special member, then add it.
+            if mid not in specials:
+                members[mindex if is_union else udm.offset] = v9member.packed(base, mid)
+                selected.append((mindex, udm.offset, mid))
+            continue
+
+        # If our type is not a union, then deleting elements will shift over all
+        # the members that follow our given boundaries. So we need to collect
+        # references to those members too since they will also be affected.
+        if not union(ti):
+            references = {}
+            for mowner, mindex, udm in cls.iterate(ti, slice(rindex, None)):
+                mid = mowner.get_udm_tid(mindex)
+                for ea, _, _ in interface.xref.to(mid, idaapi.XREF_ALL):
+                    references.setdefault(ea, []).append(mid)
+                continue
+
+            # Now we have the indices that we can use to figure out the exact
+            # boundaries to delete. After deleting this range, we preserve the
+            # number of elements so that we can complain in case we failed.
+            mleft = v9member.by(ti, lindex) if lindex < utd.size() else ()
+            if is_union and mleft:
+                soff = 0
+            elif mleft:
+                soff = mleft[-1].offset
+            else:
+                soff = size
+            mright = v9member.by(ti, rindex) if rindex < utd.size() else ()
+            eoff = mright[-1].offset + mright[-1].size if mright else size
+
+            # We now need the indices to remove in reverse so that we can avoid
+            # having to do any calculations for members that will be shifted.
+            indices = builtins.range(*slice(lindex, rindex + 1).indices(utd.size()))
+            iterable = ((mindex, v9member.packed(base, ti, mindex)) for mindex in indices[::-1])
+            iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
+            listable = [(mid, mname, mindex, moffset, msize) for mindex, mid, mname, mtype, (moffset, msize), mtypeinfo, mcomment in iterable if mid not in specials]
+
+        # If our type is a union, then we only need the indices in reverse. This
+        # is because all deletions or modifications to a union are destructive.
+        else:
+            indices = sorted(selected, key=operator.itemgetter(0))
+            iterable = ((mindex, v9member.packed(base, ti, mindex)) for mindex, moffset, mid in indices[::-1])
+            iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
+            listable = [(mid, mname, mindex, moffset, msize) for mindex, mid, mname, mtype, (moffset, msize), mtypeinfo, mcomment in iterable if mid not in specials]
+
+            references = {}
+            for mid, _, _, _,_ in listable:
+                for ea, _, _ in interface.xref.to(mid, idaapi.XREF_ALL):
+                    references.setdefault(ea, []).append(mid)
+                continue
+
+            soff, eoff = 0, max(msize for _, _, _, _, msize in listable) if listable else 0
+
+        # Now we update our references with the member references.
+        references = {}
+        for mid, addresses in member_references.items():
+            [references.setdefault(ea, []).append(mid) for ea in addresses]
+        member_references.clear()
+
+        # Finally we are ready to iterate through the members from the type,
+        # remove each member, and add some space if it all necessary.
+        failed, count = {moffset for moffset in []}, 0
+        for mid, mname, mindex, moffset, msize in listable:
+            mkey = mindex if is_union else moffset - base
+            if mkey not in members:
+                continue
+
+            # Get the index of the member, a description, and then delete it.
+            location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
+            ok = ti.del_udm(mindex)
+
+            if ok != idaapi.TERR_OK:
+                errname, errdesc = v9member.format_error_typeinfo(ok)
+                description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+                logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove member \"{:s}\" ({:#x}) at {:s} of the {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, utils.string.escape(mname, '"'), mid, location_description, type_description, description))
+                ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
+
+            elif not is_union and v9members.has_offset(ti, moffset) and not(next(cls.at_offset(ti, moffset))[-1].is_gap()):
+                logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Member \"{:s}\" ({:#x}) at {:s} of {:s} was not removed.".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, utils.string.escape(mname, '"'), mid, location_description, type_description))
+                ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
+
+            # If we succeeded and the type is a union, then update the count.
+            elif is_union:
+                count += 1
+
+            # If successful, then we can try to shrink the structure type. The
+            # newer API, however, doesn't let you shrink the size of a gap
+            # directly. So, we scan forward until we get to a real member.
+            else:
+                index = mindex
+                while index < utd.size() and utd[index].is_gap():
+                    index += 1
+                logging.debug(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Adjusted index ({:d}) for reducing {:s} from member \"{:s}\" ({:#x}) at {:s} to index {:d}.".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, mindex, type_description, utils.string.escape(mname, '"'), mid, location_description, index))
+                ok = ti.expand_udt(index, -msize // 8)
+                count = count + 1 if ok == idaapi.TERR_OK else count
+
+            # If we couldn't shrink the structure, then log a warning.
+            if ok != idaapi.TERR_OK:
+                errname, errdesc = v9member.format_error_typeinfo(ok)
+                description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+                logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove space ({:d}) from {:s} after removing member \"{:s}\" ({:#x}) at {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, msize, type_description, utils.string.escape(mname, '"'), mid, location_description, description))
+                ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
+            continue
+
+        # If we didn't remove shit, but were supposed to then cry about it here.
+        if selected and not count:
+            bounds = interface.bounds_t(soff, eoff)
+            logging.fatal(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove {:d} member{:s} within the determined boundaries ({:s}) from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, len(selected), '' if len(selected) == 1 else 's', base + bounds, type_description, sid))
+            return []
+
+        # Despite removing some members, the disassembler has not yet updated
+        # their references since autoanalysis could be paused. So, we step the
+        # autoqueue for each captured reference.
+        if hasattr(idaapi, 'auto_make_step'):
+            [idaapi.auto_make_step(ea, idaapi.next_not_tail(ea)) for ea in references]
+
+        elif hasattr(idaapi, 'auto_wait_range'):
+            [idaapi.auto_wait_range(ea, idaapi.next_not_tail(ea)) for ea in references]
+
+        # If the number of selected elements matches our count of removed items,
+        # then we're good to go and can return the results to the caller.
+        if is_union:
+            iterable = (members[mindex] for mindex, moffset, mid in selected if mindex in members)
+        else:
+            iterable = (members[moffset] for mindex, moffset, mid in selected if moffset in members)
+
+        if len(selected) == count:
+            return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
+
+        # Gather all the members we removed so that we can figure out which
+        # removals were actually successful.
+        else:
+            expected = {mid : (mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable}
+
+        removed = {mid for mid in []}
+        for mindex, moffset, mid in selected:
+            mkey = mindex if is_union else moffset
+            if mkey not in members:
+                continue
+
+            _, mname, _, _, _ = members[mkey]
+
+            # Check if the member actually exists at the offset or index.
+            exists = v9members.has_index(ti, mindex) if is_union else v9members.has_offset(ti, moffset)
+            if exists:
+                location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(base + moffset)
+                logging.debug(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove member \"{:s}\" at {:s} with id ({:#x}) from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, utils.string.escape(mname, '"'), location_description, mid, type_description, sid))
+
+            # If it doesn't exist, then our removal was successful.
+            else:
+                removed.add(mid)
+            continue
+
+        # Now we're ready to return everything that we successfully removed. To
+        # be friendly, we also complain about the elements we could not remove.
+        logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove {:d} of {:s} from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, len(expected) - len(removed), "{:d} members".format(len(expected)) if len(expected) == 1 else "the expected {:d} members".format(len(expected)), type_description, sid))
+        iterable = (mindex for mindex, moffset, mid in selected if mid in removed) if is_union else (moffset for mindex, moffset, mid in selected if mid in removed)
+        iterable = (members[moffset_or_mindex] for moffset_or_mindex in iterable)
+        return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
 
     @classmethod
     def clear_slice(cls, type, slice, *offset):
