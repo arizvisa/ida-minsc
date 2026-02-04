@@ -2086,22 +2086,17 @@ class v9members(object):
         return
 
     @classmethod
-    def index(cls, type, udm):
-        '''Return the index of the member `udm` in the specified structure or union `type`.'''
+    def index(cls, type, offset):
+        '''Return the index of the member at the specified `offset` from the given structure or union `type`.'''
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        # FIXME: render the specified udm as a comprehensible string.
         if not (tinfo.is_struct() or union(tinfo)):
-            raise E.InvalidTypeOrValueError(u"{:s}.index({!s}, {!s}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), udm))
+            raise E.InvalidTypeOrValueError(u"{:s}.index({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), int(offset)))
         elif not tinfo.get_udt_details(utd):
-            raise E.DisassemblerError(u"{:s}.index({!s}, {!s}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), udm))
+            raise E.DisassemblerError(u"{:s}.index({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), int(offset)))
 
-        # If it's a union, then the offset is the index.
-        if union(tinfo):
-            return udm.offset
-
-        # Now we can use the member offset (bits) to ask the udt_type_data_t
-        # about the index. We simply use the offset to get the correct index.
-        mindex = utd.find_member(udm, idaapi.STRMEM_OFFSET)
+        # If it's a union, then the offset is the index. Otherwise, use the
+        # member offset with the `udt_type_data_t` to get the correct index.
+        mindex = int(offset) if union(tinfo) else utd.find_member(int(offset))
         if not (0 <= mindex < utd.size()):
             raise E.MemberNotFoundError(u"{:s}.index({!s}, {!s}) : Unable to find a member at the specified bit offset ({:#x}) of the given type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), udm, udm.offset, tinfo.get_tid()))
         return mindex
