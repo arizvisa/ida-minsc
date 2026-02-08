@@ -4798,9 +4798,13 @@ class address(object):
         is_struct = idaapi.is_struct if hasattr(idaapi, 'is_struct') else internal.utils.fcompose(functools.partial(operator.and_, idaapi.DT_TYPE), functools.partial(operator.eq, idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU))
 
         # First check if there's a structure/union at the specified address.
-        ea, info, flags = int(ea), idaapi.opinfo_t(), cls.flags(int(ea))
+        ea, flags = int(ea), cls.flags(int(ea))
         if not is_struct(flags):
             return idaapi.BADNODE
+        elif hasattr(idaapi, 'get_strid'):
+            return idaapi.get_strid(ea)
+        else:
+            info = idaapi.opinfo_t()
 
         # Grab the operand information (really operand 0), and return the type id.
         ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
