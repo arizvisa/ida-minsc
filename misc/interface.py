@@ -11647,7 +11647,7 @@ class xref(object):
     def typeinfo(cls, type):
         '''Yield each type referencing the specified `type` as a tuple composed of the offset and reference type.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
-        results, tid, owner = [], type.get_tid(), tinfo.copy(type)
+        results, tid, owner = [], tinfo.identifier(type), tinfo.copy(type)
 
         # Iterate through each reference to the type in order to determine what it was
         # actually applied to. If it's an identifier, then we need to figure out
