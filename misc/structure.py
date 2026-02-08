@@ -544,16 +544,16 @@ class v9member(object):
             if not tinfo.get_type_by_tid(mid):
                 raise E.MemberNotFoundError(u"{:s} : Unable to find the member with the specified identifier ({:#x}).".format(caller_format, mid))
             elif not (tinfo.is_struct() or union(tinfo)):
-                raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, tinfo.get_tid()))
+                raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, interface.tinfo.identifier(tinfo)))
             elif not tinfo.get_udt_details(utd):
-                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, tinfo.get_tid()))
+                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, interface.tinfo.identifier(tinfo)))
             else:
                 count = utd.size()
 
             # Use the member id to snag the correct member from the type.
             mindex = tinfo.get_udm_by_tid(udm, mid)
             if not (0 <= mindex < count):
-                raise E.MemberNotFoundError(u"{:s} : Unable to find the member with the given identifier ({:#x}) in the specified type ({:#x}).".format(caller_format, mid, tinfo.get_tid()))
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member with the given identifier ({:#x}) in the specified type ({:#x}).".format(caller_format, mid, interface.tinfo.identifier(tinfo)))
             return tinfo, utd, mindex, udm
 
         # Try using a type and its udm index.
@@ -565,20 +565,20 @@ class v9member(object):
 
             # Verify that the type is valid and get its details.
             if not (tinfo.is_struct() or union(tinfo)):
-                raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, tinfo.get_tid()))
+                raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, interface.tinfo.identifier(tinfo)))
             elif not tinfo.get_udt_details(utd):
-                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, tinfo.get_tid()))
+                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, interface.tinfo.identifier(tinfo)))
             else:
                 count = utd.size()
 
             # If the index is out-of-bounds, then abort.
             if not (0 <= mindex < count):
-                raise E.MemberNotFoundError(u"{:s} : Unable to find the member at the given index ({:d}) of the specified type ({:#x}).".format(caller_format, mindex, tinfo.get_tid()))
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member at the given index ({:d}) of the specified type ({:#x}).".format(caller_format, mindex, interface.tinfo.identifier(tinfo)))
 
             udm = udm_t()
             udm.offset = mindex
             if mindex != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
-                raise E.MemberNotFoundError(u"{:s} : Unable to find the member at the index {:d} of the specified type ({:#x}).".format(caller_format, mindex, tinfo.get_tid()))
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member at the index {:d} of the specified type ({:#x}).".format(caller_format, mindex, interface.tinfo.identifier(tinfo)))
             return tinfo, utd, mindex, udm
 
         # Try using a type and the offset for the member.
@@ -591,9 +591,9 @@ class v9member(object):
 
             # Verify the type we were given and use it to get its details.
             if not (tinfo.is_struct() or union(tinfo)):
-                raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, tinfo.get_tid()))
+                raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, interface.tinfo.identifier(tinfo)))
             elif not tinfo.get_udt_details(utd):
-                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, tinfo.get_tid()))
+                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, interface.tinfo.identifier(tinfo)))
             else:
                 count = utd.size()
 
@@ -601,12 +601,12 @@ class v9member(object):
             mindex = utd.find_member(udm, idaapi.STRMEM_AUTO)
             if not (0 <= mindex < count):
                 description = "index ({:d})".format(udm.offset) if union(tinfo) else "offset ({:#x})".format(udm.offset)
-                raise E.MemberNotFoundError(u"{:s} : Unable to find the member at the given {:s} of the specified type ({:#x}).".format(caller_format, description, tinfo.get_tid()))
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member at the given {:s} of the specified type ({:#x}).".format(caller_format, description, interface.tinfo.identifier(tinfo)))
 
             udm = udm_t()
             udm.offset = mindex
             if mindex != tinfo.find_udm(udm, idaapi.STRMEM_INDEX):
-                raise E.MemberNotFoundError(u"{:s} : Unable to find the member at index {:d} of the specified type ({:#x}).".format(caller_format, mindex, tinfo.get_tid()))
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member at index {:d} of the specified type ({:#x}).".format(caller_format, mindex, interface.tinfo.identifier(tinfo)))
             return tinfo, utd, mindex, udm
 
         # If we got a member_t of some sort, then use its id to get the member.
@@ -838,7 +838,7 @@ class v9member(object):
             tinfo = interface.tinfo.copy(type)
             if not tinfo.get_udt_details(utd):
                 caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'default_name'], args=["{:+#x}".format(moffset)])
-                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, offset, tinfo.get_tid()))
+                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, offset, interface.tinfo.identifier(tinfo)))
             udm, offset = None, abs(mindex) if union(tinfo) else int(moffset)
             mid, tname, mname = idaapi.BADNODE, tinfo.get_type_name(), None
 
@@ -858,7 +858,7 @@ class v9member(object):
 
             if not tinfo.get_udt_details(utd):
                 caller_format = cls.format_args(*args[:2], caller=[__name__, cls.__name__, 'default_name'], args=["{:+#x}".format(*args[2:])] if len(args) > 2 else [])
-                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, tinfo.get_tid()))
+                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, interface.tinfo.identifier(tinfo)))
 
             size = utd.size() if union(tinfo) else interface.tinfo.size(tinfo)
             offset = size if len(args) == 2 else int(args[-1])
@@ -1155,7 +1155,7 @@ class v9member(object):
         FF_STKVAR = idaapi.stkvar_flag() if hasattr(idaapi, 'stkvar_flag') else idaapi.stkvarflag()
 
         owner, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'references'])
-        oid, mid = owner.get_tid(), owner.get_udm_tid(mindex)
+        oid, mid = interface.tinfo.identifier(owner), owner.get_udm_tid(mindex)
         fn, is_union, is_frame = owner.get_frame_func() if hasattr(owner, 'get_frame_func') else idaapi.BADADDR, union(owner), frame(owner)
 
         # if the type belongs to a frame, then we need to specially handle it.
@@ -1184,7 +1184,7 @@ class v9member(object):
                     continue
 
                 # now we need to grab the identifiable information for each type.
-                mownerid = mowner.get_tid()
+                mownerid = interface.tinfo.identifier(mowner)
                 mrealoffset = 0 if union(mowner) else mudm.offset
                 memberid = mowner.get_udm_tid(mindex)
 
@@ -1198,7 +1198,7 @@ class v9member(object):
                     children.update(mcandidateid for mcandidateid, mcandidate in candidates if cls.contains(mcandidateid, mrealoffset))
 
                     iterable = ((cmember.type, (cowner, cudt, cindex, cmember)) for _, (cowner, cudt, cindex, cmember) in candidates)
-                    candidates = [(ctype.get_tid(), ctype) for ctype, packed in iterable if ctype.get_tid() != idaapi.BADADDR]
+                    candidates = [(interface.tinfo.identifier(ctype), ctype) for ctype, packed in iterable if interface.tinfo.identifier(ctype) != idaapi.BADADDR]
                     table.update((ctid, type) for ctid, packed in candidates)
                     work.update(ctid for ctid, _ in candidates)
 
@@ -1214,7 +1214,7 @@ class v9member(object):
 
         # okay, now we can convert this set into a set of structures and members to look for
         iterable = (cls.by(cid) for cid in children)
-        candidates = {id for id in itertools.chain(*([mowner.get_tid(), mowner.get_udm_tid(mindex)] for mowner, mudt, mindex, mudm in iterable))}
+        candidates = {id for id in itertools.chain(*([interface.tinfo.identifier(mowner), mowner.get_udm_tid(mindex)] for mowner, mudt, mindex, mudm in iterable))}
 
         # now figure out which operand has the structure member applied to it
         results = []
