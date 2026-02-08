@@ -7016,10 +7016,10 @@ class contiguous(object):
                 result.append(range.bounds(item).range())
 
             elif v9 and isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
-                result.append(internal.structure.new(item.owner.typeinfo.get_tid(), offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(item.typeinfo.get_tid(), offset))
+                result.append(internal.structure.new(tinfo.identifier(item.owner.typeinfo), offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(tinfo.identifier(item.typeinfo), offset))
             elif v9 and isinstance(item, internal.structure.member_t):
                 mowner, mindex, udm = internal.structure.v9members.by_identifier(item.parent.typeinfo, item.id)
-                result.append(internal.structure.new(mowner.get_tid(), offset - (0 if internal.structure.union(mowner) else udm.offset)).members[mindex])
+                result.append(internal.structure.new(tinfo.identifier(mowner), offset - (0 if internal.structure.union(mowner) else udm.offset)).members[mindex])
 
             elif not v9 and isinstance(item, (internal.structure.structure_t, idaapi.struc_t, internal.structure.members_t)):
                 result.append(internal.structure.new(item.owner.id, offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(item.id, offset))
@@ -7043,10 +7043,10 @@ class contiguous(object):
                 result.append(range.bounds(item).range())
 
             elif v9 and isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
-                result.append(internal.structure.new(item.owner.typeinfo.get_tid(), offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(item.typeinfo.get_tid(), offset))
+                result.append(internal.structure.new(tinfo.identifier(item.owner.typeinfo), offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(tinfo.identifier(item.typeinfo), offset))
             elif v9 and isinstance(item, internal.structure.member_t):
                 mowner, mindex, udm = internal.structure.v9members.by_identifier(item.parent.typeinfo, item.id)
-                result.append(internal.structure.new(mowner.get_tid(), offset - (0 if internal.structure.union(mowner) else udm.offset)).members[mindex])
+                result.append(internal.structure.new(tinfo.identifier(mowner), offset - (0 if internal.structure.union(mowner) else udm.offset)).members[mindex])
 
             elif not v9 and isinstance(item, (internal.structure.structure_t, idaapi.struc_t, internal.structure.members_t)):
                 result.append(internal.structure.new(item.owner.id, offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(item.id, offset))
