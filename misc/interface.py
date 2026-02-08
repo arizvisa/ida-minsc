@@ -720,7 +720,7 @@ class typemap(object):
         '''Convert the specified `type` into a pythonic type at the optional `offset`.'''
         ti, offset = idaapi.tinfo_t(), offset if offset is None else int(offset)
         if isinstance(type, idaapi.tinfo_t):
-            ti, sid = tinfo.copy(type), type.get_tid()
+            ti, sid = tinfo.copy(type), tinfo.identifier(type)
         elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
             ti, sid = ti, type
         else:
