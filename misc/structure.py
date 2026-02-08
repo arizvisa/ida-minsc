@@ -467,7 +467,7 @@ class xref(object):
         '''Yield each structure member or reference that uses the specified structure `type`.'''
         ti = idaapi.tinfo_t()
         if isinstance(type, idaapi.tinfo_t):
-            ti, sid = interface.tinfo.copy(type), type.get_tid()
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
         elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
             ti, sid = ti, type
         elif isinstance(type, structure_t):
