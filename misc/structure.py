@@ -190,7 +190,7 @@ class naming(object):
         '''Return the name that has been applied to the structure specified by `type`.'''
         ti = idaapi.tinfo_t()
         if isinstance(type, idaapi.tinfo_t):
-            ti, sid = interface.tinfo.copy(type), type.get_tid()
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
 
         # If our type is an identifier, then store and get the type from it.
         elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
@@ -222,7 +222,7 @@ class naming(object):
         '''Apply the specified `string` to the structure in `type` as its name.'''
         ti = idaapi.tinfo_t()
         if isinstance(type, idaapi.tinfo_t):
-            ti, sid = interface.tinfo.copy(type), type.get_tid()
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
 
         # If our type is an identifier, then store and get the type from it.
         elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
@@ -260,7 +260,7 @@ class naming(object):
         '''Remove the name from the structure specified by `type`.'''
         ti = idaapi.tinfo_t()
         if isinstance(type, idaapi.tinfo_t):
-            ti, sid = interface.tinfo.copy(type), type.get_tid()
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
         elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
             ti, sid = ti, type
         elif isinstance(type, structure_t):
@@ -322,7 +322,7 @@ class naming(object):
         '''Return the name of the netnode for the specified structure by `type`.'''
         ti = idaapi.tinfo_t()
         if isinstance(type, idaapi.tinfo_t):
-            ti, sid = interface.tinfo.copy(type), type.get_tid()
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
         elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
             ti, sid = ti, type
         elif isinstance(type, structure_t):
