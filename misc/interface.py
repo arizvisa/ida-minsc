@@ -5472,7 +5472,7 @@ class strpath(object):
             # next we need to figure out the member information.
             utd = idaapi.udt_type_data_t()
             if not ti.get_udt_details(utd):
-                raise internal.exceptions.DisassemblerError(u"{:s}.v9contains({!s}, {!s}, {:d}) : Unable to get the details for the type {:s}.".format(format_description, "{:#x}".format(ti.get_tid()), "{:#x}".format(mid) if node.identifier(mid) else "{:d}".format(mid), offset, tinfo.quoted(ti)))
+                raise internal.exceptions.DisassemblerError(u"{:s}.v9contains({!s}, {!s}, {:d}) : Unable to get the details for the type {:s}.".format(format_description, "{:#x}".format(tinfo.identifier(ti)), "{:#x}".format(mid) if node.identifier(mid) else "{:d}".format(mid), offset, tinfo.quoted(ti)))
 
             # collect the candidate members for the structure type or union.
             members = [mindex for mindex in builtins.range(utd.size())]
@@ -5514,11 +5514,11 @@ class strpath(object):
         '''This is a utility function that starts at the given sptr in `struc` and consumes either an `sptr`, `mptr`, or an `offset` while adding completed items via `Fcollect`.'''
         SF_UNION = getattr(idaapi, 'SF_UNION', 0x2)
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
-        format_description = "{:s}.collect({:#x}, result={!s})".format('.'.join([__name__, cls.__name__]), struc.get_tid() if isinstance(struc, idaapi.tinfo_t) else struc if isinstance(struc, internal.types.integer) else struc.id, Fcollect)
+        format_description = "{:s}.collect({:#x}, result={!s})".format('.'.join([__name__, cls.__name__]), tinfo.identifier(struc) if isinstance(struc, idaapi.tinfo_t) else struc if isinstance(struc, internal.types.integer) else struc.id, Fcollect)
 
         sptr = idaapi.tinfo_t()
         if isinstance(struc, idaapi.tinfo_t):
-            v9, sptr, sid = True, tinfo.copy(struc), struc.get_tid()
+            v9, sptr, sid = True, tinfo.copy(struc), tinfo.identifier(struc)
         elif isinstance(struc, internal.types.integer) and node.identifier(struc) and sptr.get_type_by_tid(struc):
             v9, sptr, sid = True, sptr, struc
         elif isinstance(struc, internal.types.integer):
@@ -5552,7 +5552,7 @@ class strpath(object):
                     ti = tinfo.copy(ti)
                 else:
                     raise internal.exceptions.InvalidTypeOrValueError(u"{:s} : Unable to find the type with the specified identifier ({:#x}).".format(format_description, sid))
-                sid, sname = ti.get_tid(), internal.utils.string.of(ti.get_type_name())
+                sid, sname = tinfo.identifier(ti), internal.utils.string.of(ti.get_type_name())
 
                 # and then we can figure out the member index from what we got.
                 utd = idaapi.udt_type_data_t()
@@ -5583,11 +5583,11 @@ class strpath(object):
                     continue
 
                 else:
-                    id, usertype = user.get_tid(), tinfo.copy(user)
+                    id, usertype = tinfo.identifier(user), tinfo.copy(user)
 
                 # next we need to distinguish what type of identifier we were
                 # given, either it's a structure or it's a member of one.
-                userstructureQ = id == usertype.get_tid()
+                userstructureQ = id == tinfo.identifier(usertype)
 
                 # if the given id correlates to the type that we received from
                 # the disassembler, then we were given the identifier to a
@@ -5597,7 +5597,7 @@ class strpath(object):
 
                 # if we were given a structure then check if the current member
                 # matches the structure that was selected by the user.
-                elif userstructureQ and id == udm.type.get_tid():
+                elif userstructureQ and id == tinfo.identifier(udm.type):
                     Fcollect((sid, mid, offset))
                     sid, mid, offset = id, None, 0
 
@@ -5609,7 +5609,7 @@ class strpath(object):
 
                     # if there wasn't a member assigned, and the user's parent
                     # is the same as our current type, then we can assign it.
-                    if udm is None and usertype.get_tid() == sid:
+                    if udm is None and tinfo.identifier(usertype) == sid:
                         mid = id
 
                     # if we'd already assigned the member and the user's parent
@@ -5628,14 +5628,14 @@ class strpath(object):
                         if uindex < 0:
                             raise internal.exceptions.DisassemblerError(u"{:s} : Unable to find the member for type \"{:s}\" at the specified offset ({:#x}).".format(format_description, internal.utils.string.escape(internal.utils.string.of(ti.get_type_name()), '"'), offset))
                         Fcollect((sid, ti.get_udm_tid(uindex), offset - (0 if ti.is_union() else udm.offset)))
-                        sid, mid, offset = usertype.get_tid(), user, 0
+                        sid, mid, offset = tinfo.identifier(usertype), user, 0
 
                     # if we got here, then our structure id doesn't match the
                     # member id, so add our current position and then transition
                     # into the new structure.
                     else:
                         Fcollect((sid, mid, offset))
-                        sid, mid, offset = usertype.get_tid(), user, 0
+                        sid, mid, offset = tinfo.identifier(usertype), user, 0
 
                 # if we hit this case, then we got a member that wasn't actually
                 # valid in the context of the structure, so we can just bail.
@@ -5788,7 +5788,7 @@ class strpath(object):
             # convert our fields into a tinfo_t that we can use.
             ti = idaapi.tinfo_t()
             if isinstance(sid, idaapi.tinfo_t):
-                ti, sid = tinfo.copy(sid), sid.get_tid()
+                ti, sid = tinfo.copy(sid), tinfo.identifier(sid)
             elif sid is None and tinfo.identifier(mid) and ti.get_udm_by_tid(mid) >= 0:
                 ti, sid = tinfo.copy(ti), idaapi.BADADDR
             elif sid is None:
@@ -5805,7 +5805,7 @@ class strpath(object):
             if not ti:
                 mindex = -1
             elif not ti.get_udt_details(utd):
-                raise internal.exceptions.DisassemblerError(u"{:s}.format({!s}, {!s}, {:d}) : Unable to get the details for the type {:s}.".format('.'.join([__name__, cls.__name__]), "{:#x}".format(ti.get_tid()), "{:#x}".format(mid) if node.identifier(mid) else "{:d}".format(mid), offset, tinfo.quoted(ti)))
+                raise internal.exceptions.DisassemblerError(u"{:s}.format({!s}, {!s}, {:d}) : Unable to get the details for the type {:s}.".format('.'.join([__name__, cls.__name__]), "{:#x}".format(tinfo.identifier(ti)), "{:#x}".format(mid) if node.identifier(mid) else "{:d}".format(mid), offset, tinfo.quoted(ti)))
             elif node.identifier(mid):
                 mindex = ti.get_udm_by_tid(udm_t(), mid)
             else:
@@ -5824,7 +5824,7 @@ class strpath(object):
             sname = internal.utils.string.of(ti.get_type_name())
             mname = internal.utils.string.of(udm.name)
             fullname = '.'.join([sname, mname])
-            return "{:s}({:#x}, {:#x}, \"{:s}\", {:s}={!s}{:s})".format(tinfo_description, ti.get_tid(), ti.get_udm_tid(mindex), internal.utils.string.escape(fullname, '"'), 'index' if ti.is_union() else 'offset', "{:d}".format(udm.offset) if ti.is_union() else "{:#x}".format(udm.offset), offset_description)
+            return "{:s}({:#x}, {:#x}, \"{:s}\", {:s}={!s}{:s})".format(tinfo_description, tinfo.identifier(ti), ti.get_udm_tid(mindex), internal.utils.string.escape(fullname, '"'), 'index' if ti.is_union() else 'offset', "{:d}".format(udm.offset) if ti.is_union() else "{:#x}".format(udm.offset), offset_description)
 
         # If we were given a member id, but no owning type then we figure it out
         # ourselves and then recurse with whatever it was we found.
@@ -5883,12 +5883,12 @@ class strpath(object):
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
 
         # Seed some variables that we'll use to emit some friendlier error messages.
-        count, position, sid = 0, 0, sptr.get_tid() if isinstance(sptr, idaapi.tinfo_t) else sptr if isinstance(sptr, internal.types.integer) else sptr.id
+        count, position, sid = 0, 0, tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr if isinstance(sptr, internal.types.integer) else sptr.id
         formatlog = functools.partial(u"{:s}.resolve(Fcollect={:s}, {:#x}, {:+#x}) : {:s}".format, '.'.join([__name__, cls.__name__]), '...', sid, offset)
 
         ti = idaapi.tinfo_t()
         if isinstance(sptr, idaapi.tinfo_t):
-            v9, ti, sid = True, tinfo.copy(sptr), sptr.get_tid()
+            v9, ti, sid = True, tinfo.copy(sptr), tinfo.identifier(sptr)
             description = "{:s} ({:#x}) of size ({:#x})".format('union' if ti.is_union() else 'structure', sid, 8 * tinfo.size(ti))
         elif isinstance(sptr, internal.types.integer) and node.identifier(sptr) and ti.get_type_by_tid(sptr):
             v9, ti, sid = True, ti, sptr
@@ -5910,7 +5910,7 @@ class strpath(object):
             # check if it's a tinfo_t or an identifer and assign it if so.
             stype = idaapi.tinfo_t()
             if v9 and isinstance(sptr, idaapi.tinfo_t):
-                stype, is_union, sid = tinfo.copy(sptr), sptr.is_union(), sptr.get_tid()
+                stype, is_union, sid = tinfo.copy(sptr), sptr.is_union(), tinfo.identifier(sptr)
             elif v9 and isinstance(sptr, internal.types.integer) and node.identifier(sptr) and stype.get_type_by_tid(sptr):
                 stype, is_union, sid = stype, stype.is_union(), sptr
             elif not v9 and hasattr(sptr, 'props'):
@@ -5974,7 +5974,7 @@ class strpath(object):
 
             # If we are processing local types, and the choice is a structure
             # then the caller is choosing to use the size.
-            elif v9 and choice not in {None, idaapi.BADADDR} and ctype.get_tid() == cid:
+            elif v9 and choice not in {None, idaapi.BADADDR} and tinfo.identifier(ctype) == cid:
                 mptr = mindex
                 break
 
@@ -6037,7 +6037,7 @@ class strpath(object):
 
                 # If we landed on a member using a type that does not have any
                 # members, then we can exit our loop with what we have.
-                if mtype.get_tid() == idaapi.BADADDR:
+                if tinfo.identifier(mtype) == idaapi.BADADDR:
                     break
 
                 # Now we can store the caller's choice but adjust it by the
@@ -6046,8 +6046,8 @@ class strpath(object):
                 Fcollect((stype, mptr, (offset - carry) + index * msize))
 
                 count, position = count + 1, position + (0 if stype.is_union() else udm.offset) + index * msize
-                sptr, offset = None if mtype.get_tid() == idaapi.BADADDR else mtype, bits
-                sid = mtype.get_tid()
+                sptr, offset = None if tinfo.identifier(mtype) == idaapi.BADADDR else mtype, bits
+                sid = tinfo.identifier(mtype)
 
             # Now that we determined the mptr for the user's choice, figure out the
             # member's total size and it's member size. From this we'll check if it's
@@ -6145,7 +6145,7 @@ class strpath(object):
                 # Start by converting the unpacked values into a tinfo_t that we
                 # will use to get the member and sizes to calculate the offset.
                 if isinstance(tid, idaapi.tinfo_t):
-                    ti, tid = tinfo.copy(tid), tid.get_tid()
+                    ti, tid = tinfo.copy(tid), tinfo.identifier(tid)
                 elif not isinstance(tid, internal.types.integer):
                     raise internal.exceptions.InvalidParameterError(u"{:s}.calculate({:d}, Fcollect={:s}) : Unable to determine the type and member using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), delta, '...', tid.__class__))
                 elif ti.get_type_by_tid(tid):
@@ -6170,7 +6170,7 @@ class strpath(object):
                 # calculate the current delta from whatever it is we got.
                 delta = sum([delta, 0 if any([ti.is_union(), udm is None]) else udm.offset, offset])
                 Fcollect((tid, ti.get_udm_tid(mindex), offset))
-                udm = None if udm is None or udm.type.get_tid() == idaapi.BADADDR else udm
+                udm = None if udm is None or tinfo.identifier(udm.type) == idaapi.BADADDR else udm
 
             # This is super simple as we only need to check if our sptr is a union. We
             # don't care about validating this path because someone else should've.
@@ -6202,11 +6202,11 @@ class strpath(object):
         for sptr, mptr, offset in suggestion:
             stype = idaapi.tinfo_t()
             if isinstance(sptr, idaapi.tinfo_t):
-                stype, sid = tinfo.copy(sptr), sptr.get_tid()
+                stype, sid = tinfo.copy(sptr), tinfo.identifier(sptr)
             elif isinstance(sptr, internal.types.integer) and node.identifier(sptr) and stype.get_type_by_tid(sptr):
                 stype, sid = stype, sptr
             elif isinstance(sptr, internal.types.none) and isinstance(mptr, internal.types.integer) and node.identifier(mptr) and stype.get_type_by_tid(mptr):
-                stype, sid = stype, stype.get_tid()
+                stype, sid = stype, tinfo.identifier(stype)
             elif hasattr(sptr, 'props'):
                 stype, sid = sptr, sptr.id
             else:
@@ -6222,11 +6222,11 @@ class strpath(object):
         while flailer:
             stype, iterable = idaapi.tinfo_t(), (mid for mid in candidates if node.identifier(mid))
             if isinstance(sptr, idaapi.tinfo_t):
-                stype, sid = tinfo.copy(sptr), sptr.get_tid()
+                stype, sid = tinfo.copy(sptr), tinfo.identifier(sptr)
             elif isinstance(sptr, internal.types.integer) and node.identifier(sptr) and stype.get_type_by_tid(sptr):
                 stype, sid = stype, sptr
             elif isinstance(sptr, internal.types.none) and any(node.identifier(mid) for mid in candidates) and stype.get_type_by_tid(next(iterable, idaapi.BADADDR)):
-                stype, sid = stype, stype.get_tid()
+                stype, sid = stype, tinfo.identifier(stype)
             elif hasattr(sptr, 'props'):
                 stype, sid = sptr, sptr.id
             else:
@@ -6267,7 +6267,7 @@ class strpath(object):
         # Start out by grabbing the first tid and converting it to an sptr before we start.
         ti = idaapi.tinfo_t()
         if v9 and isinstance(sid, idaapi.tinfo_t):
-            ti, sid, sptr = tinfo.copy(sid), sid.get_tid(), None
+            ti, sid, sptr = tinfo.copy(sid), tinfo.identifier(sid), None
         elif v9 and isinstance(sid, internal.types.integer) and node.identifier(sid) and ti.get_type_by_tid(sid):
             ti, sid, sptr = ti, sid, None
         elif v9:
@@ -6422,7 +6422,7 @@ class strpath(object):
 
         owner = idaapi.tinfo_t()
         if isinstance(struc, idaapi.tinfo_t):
-            v9, owner, sid = True, tinfo.copy(struc), struc.get_tid()
+            v9, owner, sid = True, tinfo.copy(struc), tinfo.identifier(struc)
         elif hasattr(struc, 'id'):
             v9, owner, sid = False, None, struc.id
         elif owner.get_type_by_tid(struc):
@@ -6449,7 +6449,7 @@ class strpath(object):
                     # Figure out what type we're currently referencing and grab
                     # the udm containing the list of members that we will use.
                     if isinstance(sptr, idaapi.tinfo_t):
-                        ok, ti, tid = True, tinfo.copy(sptr), sptr.get_tid()
+                        ok, ti, tid = True, tinfo.copy(sptr), tinfo.identifier(sptr)
                     elif isinstance(sptr, internal.types.integer):
                         ok, ti, tid = ti.get_type_by_tid(sptr), ti, sptr
                     else:
@@ -6485,7 +6485,7 @@ class strpath(object):
                     # member to our collection and move onto the next type.
                     else:
                         current = collector.send(mid)
-                        sptr, mptr = udm.type.get_tid(), mid
+                        sptr, mptr = tinfo.identifier(udm.type), mid
                     continue
 
                 # If our item is a structure or a member, then we need to convert
@@ -6549,7 +6549,7 @@ class strpath(object):
         # First figure out whether we're processing a structure or a local type.
         ti = idaapi.tinfo_t()
         if isinstance(struc, idaapi.tinfo_t):
-            v9, ti, sid = True, tinfo.copy(struc), struc.get_tid()
+            v9, ti, sid = True, tinfo.copy(struc), tinfo.identifier(struc)
         elif isinstance(struc, internal.types.integer) and node.identifier(struc) and ti.get_type_by_tid(struc):
             v9, ti, sid = True, ti, struc
         else:
@@ -6574,7 +6574,7 @@ class strpath(object):
             for index, (sptr, mptr, offset) in enumerate(suggestion):
                 mowner = idaapi.tinfo_t()
                 if isinstance(sptr, idaapi.tinfo_t):
-                    mowner, mownerid = tinfo.copy(sptr), sptr.get_tid()
+                    mowner, mownerid = tinfo.copy(sptr), tinfo.identifier(sptr)
                 elif isinstance(sptr, internal.types.integer) and node.identifier(sptr) and mowner.get_type_by_tid(sptr):
                     mowner, mownerid = mowner, sptr
                 elif not v9:
@@ -6782,7 +6782,7 @@ class strpath(object):
         '''Select the contiguous members of the structure `type` using the given `slice` and return a tuple containing the start offset, stop offset, and ordered list containing each member id or each size.'''
         ti = idaapi.tinfo_t()
         if isinstance(type, idaapi.tinfo_t):
-            ti, sid = tinfo.copy(type), type.get_tid()
+            ti, sid = tinfo.copy(type), tinfo.identifier(type)
         elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
             ti, sid = ti, type
         else:
