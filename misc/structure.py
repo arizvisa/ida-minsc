@@ -149,9 +149,13 @@ class address(object):
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         ea = interface.address.head(ea, warn=True)
 
-        info, flags = idaapi.opinfo_t(), cls.flags(ea)
+        flags = cls.flags(ea)
         if flags & idaapi.DT_TYPE != FF_STRUCT:
             raise E.MissingTypeOrAttribute(u"{:s}.structure({:#x}) : The type at specified address is not an FF_STRUCT({:#x}) and is instead {:#x}.".format('.'.join([__name__, cls.__name__]), ea, FF_STRUCT, flags & idaapi.DT_TYPE))
+        elif hasattr(idaapi, 'get_strid'):
+            return idaapi.get_strid(ea)
+        else:
+            info = idaapi.opinfo_t()
 
         ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
         if not ok:
