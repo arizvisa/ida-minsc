@@ -7622,8 +7622,27 @@ class tinfo(object):
     def size(cls, type, *variable):
         '''Return the size of the specified `type` as an integer or a pythonic atom if `variable` is true.'''
         realtype, size, [use_atom] = type.get_realtype(), type.get_size(), variable if variable else [False]
+
+        # If we not asking for a Python atom for representing the size, then we
+        # can just return the size as long as it's not a UDT type.
         if not use_atom:
+            if not type.is_udt():
+                return 0 if size in {0, idaapi.BADSIZE} else size
+
+            # Otherwise if it's a UDT type, then we need to get its details in
+            # order to figure out its alignment. If the UDT is empty and the
+            # size is the same as the effective alignment, then we return 0.
+            utd = idaapi.udt_type_data_t()
+            if not type.get_udt_details(utd):
+                raise internal.exceptions.DisassemblerError(u"{:s}.size({!s}{!s}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), tinfo.quoted(type), ", {!s}".format(*variable) if variable else ''))
+            elif type.is_empty_udt() and utd.effalign == size:
+                return 0
             return 0 if size in {0, idaapi.BADSIZE} else size
+
+        # The following conditionals will figure out what pythonic atom to
+        # return to the caller. If it's a void type, then return 0. Otherwise,
+        # return an Ellipsis if it's a variable-sized array. If neither, then
+        # just return the size as an integer.
         elif realtype in {idaapi.BT_VOID}:
             return 0
         elif type.is_array() and not type.get_array_nelems():
