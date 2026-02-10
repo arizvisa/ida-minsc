@@ -981,7 +981,7 @@ class v9member(object):
         caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'set_comment'], args=["{!r}".format(string), "{!s}".format(True if repeatable else False)])
         tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'set_comment'], args=["{!r}".format(string), "{!s}".format(True if repeatable else False)])
 
-        res, terr = utils.string.of(udm.cmt), tinfo.set_udm_cmt(mindex, utils.string.to(string), repeatable)
+        res, terr = utils.string.of(udm.cmt), tinfo.set_udm_cmt(mindex, utils.string.to(string), not repeatable)
         if terr != idaapi.TERR_OK:
             errname, errdesc = cls.format_error_typeinfo(terr)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
