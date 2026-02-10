@@ -948,8 +948,24 @@ class v9member(object):
     @classmethod
     def get_comment(cls, *args):
         '''Return the comment from the specified member as a string.'''
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_comment'])
-        return utils.string.of(udm.cmt)
+        if len(args) in {1, 2} and isinstance(args[0], internal.types.integer):
+            args, [repeatable] = args[:1], args[1:] or [None]
+        elif len(args) in {2, 3}:
+            args, [repeatable] = args[:2], args[2:] or [None]
+        else:
+            caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'get_comment'], args=[] if repeatable is None else ["{!s}".format(repeatable)])
+            raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
+
+        # Now we can grab the specified member and figure out what type of
+        # comment it is so that we can return the correct string.
+        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_comment'], args=[] if repeatable is None else ["{!s}".format(repeatable)])
+        if repeatable is None:
+            return utils.string.of(udm.cmt)
+        elif repeatable and not udm.is_regcmt():
+            return utils.string.of(udm.cmt)
+        elif not repeatable and udm.is_regcmt():
+            return utils.string.of(udm.cmt)
+        return utils.string.of('')
 
     @classmethod
     def set_comment(cls, *args):
