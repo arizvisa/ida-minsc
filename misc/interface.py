@@ -8990,6 +8990,9 @@ class tinfo(object):
 
             # if it's any other complex type, then we simply return an array
             # based on the largest integer factor of the udt alignment.
+            # FIXME: would it be better to figure out the size of the smallest
+            #        member in the structure so that we can return an array that
+            #        aligns with it properly?
             elif (base, flags) in {(idaapi.BT_COMPLEX, idaapi.BTMT_STRUCT), (idaapi.BT_COMPLEX, idaapi.BTMT_UNION)}:
                 utd = idaapi.udt_type_data_t()
                 if not ti.has_details():
