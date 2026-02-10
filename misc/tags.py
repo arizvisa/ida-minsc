@@ -1708,6 +1708,191 @@ class block(object):
         # handle ourselves.
         return address.remove(ea, key, none)
 
+class typeinfo(object):
+    """
+    This namespace handles the tags that belong to a local type and are
+    represented by the `idaapi.tinfo_t` class. It provides functions for both
+    reading and writing tags to the type. These tags aren't intended to be
+    used by a general query, but is instead used for filtering through a list of
+    types. There is support for implicit tags which are used to expose certain
+    characteristics about a defined local type. The tags that are currently
+    available are:
+
+        `__name__` - The name of the type, but only if it is listed in the type list.
+        `__sid__` - The identifier of the structure if one is available.
+        `__ea__` - The address of the function owning the frame type.
+        `__typeinfo__` - The type, but only if it was explicitly created or modified by the user.
+
+    The tags belonging to each type are not indexed by the plugin.
+    """
+
+    @classmethod
+    def get(cls, type):
+        '''Return a dictionary containing the tags for the specified `type`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+
+        # Get the parameter that we were given, convert it to a type, and
+        # extract its identifier.
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}({!r}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__, 'get']), type, type.__class__))
+
+        til, ordinal, name = interface.tinfo.library(ti), interface.tinfo.ordinal(ti), utils.string.of(internal.structure.naming.get(ti))
+        repeatable, is_frame = True, ti.is_frame() if hasattr(ti, 'is_frame') else False
+        is_choosable = hasattr(idaapi, 'is_type_choosable') and idaapi.is_type_choosable(til, ordinal)
+        type_description = 'frame' if is_frame else 'union' if internal.structure.union(ti) else 'structure'
+
+        # Grab both types of comments for the specified type, and then we can
+        # decode it. We also check for any duplicate keys and complain if found.
+        d1 = comment.decode(internal.structure.comment.get(ti, False))
+        d2 = comment.decode(internal.structure.comment.get(ti, True))
+        d1keys, d2keys = ({key for key in item} for item in [d1, d2])
+
+        if d1keys & d2keys:
+            logging.info(u"{:s}({:#x}) : The repeatable and non-repeatable comment for {:s} \"{:s}\" use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__, 'get']), sid, type_description, utils.string.escape(name, '"'), ', '.join(d1keys & d2keys), 'repeatable' if repeatable else 'non-repeatable'))
+
+        # Now we merge the dictionaries into one so that we can return it. Next
+        # we'll need to add any implicit tags that are related to the type.
+        res, order = {}, [d1, d2] if repeatable else [d2, d1]
+        for d in order:
+            res.update(d)
+
+        # If this type is auto-sync'd to a structure, then we can add an
+        # implicit variable referencing the structure id.
+        name = utils.string.of(internal.structure.naming.get(ti))
+        if hasattr(idaapi, 'is_autosync') and idaapi.is_autosync(name, ti):
+            res.setdefault('__sid__', sid)
+
+        # Here we use the tagindex to determine whether a specific type id has
+        # the implicit "__typeinfo__" tag applied to it. This is for tracking
+        # types created by the user from types created by the disassembler.
+        if '__typeinfo__' in internal.tags.reference.structure.get(sid):
+            ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, '', '')
+            res.setdefault('__typeinfo__', ti_s)
+
+        # If the type is a frame, then we don't need to set a name or anything,
+        # but we will need to assign the entrypoint address of the function.
+        if is_frame:
+            ea = ti.get_frame_func() if hasattr(ti, 'get_frame_func') else idaapi.BADADDR
+            ea != idaapi.BADADDR and res.setdefault('__ea__', ea)
+
+        # If this type is choosable or has a non-anonymous name, then add the
+        # name as the implicit "__name__" tag.
+        elif is_choosable:
+            res.setdefault('__name__', name)
+
+        elif hasattr(ti, 'is_anonymous_udt') and not ti.is_anonymous_udt():
+            res.setdefault('__name__', name)
+
+        # Now we can return our dictionary of tags as the result.
+        return res
+
+    @classmethod
+    def set(cls, type, key, value):
+        '''Set the tag specified by `key` to `value` for the specified `type`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+
+        # Convert the parameter into a type and grab its identifier so that we
+        # can assign a tag to its comments.
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}({!r}, {!r}, {!r}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__, 'set']), type, key, value, type.__class__))
+
+        # Guard against a null value being used for a tag.
+        if value is None:
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}, {!r}, {!s}) : Tried to set the tag named \"{:s}\" with an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__, 'set']), sid, key, value if value is None else "{!r}".format(value), utils.string.escape(key, '"'), value))
+
+        # All tags for a type are prioritized as a repeatable comment. Then we
+        # start by reading both comments to figure out what's being requested.
+        repeatable, is_frame = True, ti.is_frame() if hasattr(ti, 'is_frame') else False
+        type_description = 'frame' if is_frame else 'union' if internal.structure.union(ti) else 'structure'
+
+        comment_right = internal.structure.comment.get(ti, repeatable)
+        comment_wrong = internal.structure.comment.get(ti, not repeatable)
+
+        # Now we go ahead and decode both of the tag types while giving priority
+        # to the comment type specified by `repeatable`. If any duplicates were
+        # found, then we complain to the user about it.
+        state_right, state_wrong = map(comment.decode, [comment_right, comment_wrong])
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right or state_wrong, repeatable if state_right else not repeatable)
+
+        duplicates = {item for item in state_right} & {item for item in state_wrong}
+        if key in duplicates:
+            sometimes_name = utils.string.of(internal.structure.naming.get(ti))
+            logging.warning(u"{:s}({:#x}, {!r}, {!r}) : The repeatable and non-repeatable comment for {:s} {!s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__, 'set']), sid, key, value, type_description, "({:#x})".format(sid) if sometimes_name is None else "\"{:s}\"".format(utils.string.escape(sometimes_name, '"')), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+
+        # Now we just update the dictionary and then re-encode it into a comment
+        # that we apply to the specified type.
+        res, state[key] = state.get(key, None), value
+        try:
+            old = internal.structure.comment.set(ti, comment.encode(state), where)
+
+        except internal.exceptions.DisassemblerError:
+            sometimes_name = utils.string.of(internal.structure.naming.get(ti))
+            raise internal.exceptions.DisassemblerError(u"{:s}({:#x}, {!r}, {!r}) : Unable to update the {:s} comment for the {:s} {!s}.".format('.'.join([__name__, cls.__name__, 'set']), sid, key, value, 'repeatable' if where else 'non-repeatable', type_description, "({:#x})".format(sid) if sometimes_name is None else "\"{:s}\"".format(utils.string.escape(sometimes_name, '"'))))
+        return res
+
+    @classmethod
+    def remove(cls, type, key, none):
+        '''Remove the tag specified by `key` from the specified `type`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+
+        # Figure out what type is represented by the parameter and grab its
+        # information so that we can remove a tag from its comments.
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}({!r}, {!r}, {!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__, 'remove']), type, key, none if none is None else "{!r}".format(none), type.__class__))
+
+        # Guard against a non-null value being used for a tag.
+        if value is not None:
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}, {!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__, 'remove']), sid, key, none, utils.string.escape(key, '"'), none))
+
+        # First check if the key is one of the supported implicit tags. These
+        # cannot be modified since they only exist in special circumstances.
+        repeatable, is_frame = True, ti.is_frame() if hasattr(ti, 'is_frame') else False
+        type_description = 'frame' if is_frame else 'union' if internal.structure.union(ti) else 'structure'
+
+        comment_right = internal.structure.comment.get(ti, repeatable)
+        comment_wrong = internal.structure.comment.get(ti, not repeatable)
+
+        # Decode the tags from both comment types and test to figure out which
+        # comment type has the specified key encoded. If we couldn't find the
+        # key, then raise an exception since the tag doesn't exist.
+        state_right, state_wrong = map(comment.decode, [comment_right, comment_wrong])
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right or state_wrong, not repeatable if state_right else repeatable)
+
+        if key not in state:
+            sometimes_name = utils.string.of(internal.structure.naming.get(ti))
+            raise internal.exceptions.MissingTagError(u"{:s}({:#x}, {!r}, {!s}) : Unable to remove non-existing tag \"{:s}\" from the {:s} {!s}.".format('.'.join([__name__, cls.__name__, 'remove']), sid, key, none, utils.string.escape(key, '"'), type_description, "({:#x})".format(sid) if sometimes_name is None else "\"{:s}\"".format(utils.string.escape(sometimes_name, '"'))))
+
+        duplicates = {item for item in state_right} & {item for item in state_wrong}
+        if key in duplicates:
+            sometimes_name = utils.string.of(internal.structure.naming.get(ti))
+            logging.warning(u"{:s}({:#x}, {!r}, {!s}) : The repeatable and non-repeatable comment for {:s} {!s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__, 'remove']), sid, key, none, type_description, "({:#x})".format(sid) if sometimes_name is None else "\"{:s}\"".format(utils.string.escape(sometimes_name, '"')), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+
+        # Finally we can just pop the value out of the dictionary and re-encode
+        # everything back into the comment, and then return the old value.
+        res = state.pop(key)
+        try:
+            old = internal.structure.comment.set(ti, comment.encode(state), where)
+
+        except internal.exceptions.DisassemblerError:
+            sometimes_name = utils.string.of(internal.structure.naming.get(ti))
+            raise internal.exceptions.DisassemblerError(u"{:s}({:#x}, {!r}, {!s}) : Unable to update the {:s} comment for the {:s} {!s}.".format('.'.join([__name__, cls.__name__, 'remove']), sid, key, none, 'repeatable' if repeatable else 'non-repeatable', type_description, "({:#x})".format(sid) if sometimes_name is None else "\"{:s}\"".format(utils.string.escape(sometimes_name, '"'))))
+        return res
+
 class structure(object):
     """
     This namespace is responsible for the tags belonging to a structure,
