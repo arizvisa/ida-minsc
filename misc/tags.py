@@ -1893,6 +1893,183 @@ class typeinfo(object):
             raise internal.exceptions.DisassemblerError(u"{:s}({:#x}, {!r}, {!s}) : Unable to update the {:s} comment for the {:s} {!s}.".format('.'.join([__name__, cls.__name__, 'remove']), sid, key, none, 'repeatable' if repeatable else 'non-repeatable', type_description, "({:#x})".format(sid) if sometimes_name is None else "\"{:s}\"".format(utils.string.escape(sometimes_name, '"'))))
         return res
 
+class typeinfo_member(object):
+    """
+    This namespace handles tags belonging to a member for a local type. It is
+    represented in a number of ways using either an `idaapi.tinfo_t` class and a
+    member index, or a member identifier. Basically, the specification for a
+    member is based on the `internal.structure.v9member.by` function.
+
+    The namespace provides tools for both reading and writing tags to any of the
+    members associated with the type. Similar to the `typeinfo` namespace, there
+    is support for implicit tags which are used to expose specific attributes or
+    characteristics of the member to the user. These implicit tags are:
+
+        `__name__` - The name of the member, but only if the name is not the default.
+        `__typeinfo__` - The type information for the member if it exists.
+
+    The tags belonging to each type are not indexed by the plugin.
+    """
+    @classmethod
+    def get(cls, *args):
+        '''Return a dictionary containing the tags for the specified member.'''
+        tinfo, utd, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'get'])
+        mid, mfullname = tinfo.get_udm_tid(mindex), internal.structure.v9member.fullname(tinfo, mindex)
+        repeatable = True
+
+        # Grab the repeatable and non-repeatable comment.
+        d1 = comment.decode(utils.string.of(internal.structure.v9member.get_comment(tinfo, mindex, False)))
+        d2 = comment.decode(utils.string.of(internal.structure.v9member.get_comment(tinfo, mindex, True)))
+        d1keys, d2keys = ({key for key in item} for item in [d1, d2])
+
+        # If the same keys exist in either type of comment, then log that there
+        # are duplicates for both the repeatable and non-repeatable comments.
+        if d1keys & d2keys:
+            caller_format = internal.structure.v9member.format_args(*args, caller=[__name__, cls.__name__, 'get'])
+            logging.info(u"{:s} : The repeatable and non-repeatable comment for member \"{:s}\" ({:#x}) use the same tags ({!r}). Giving priority to the {:s} comment.".format(caller_format, utils.string.escape(utils.string.of(mfullname), '"'), mid, ', '.join(d1keys & d2keys), 'repeatable' if repeatable else 'non-repeatable'))
+
+        # Combine both dictionaries into a single one so we can add any of the
+        # implicit tags.
+        res = {}
+        [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
+
+        # Now we need to extract the name so that we can verify whether it has a
+        # custom name or not, and so we can use it to render the type.
+        idaname = utils.string.of(internal.structure.v9member.get_name(tinfo, mindex))
+        mname = utils.string.of(idaname)
+        mtype = interface.tinfo.copy(udm.type)
+
+        # Check if the member has a name and assign it as an implicit tag if so.
+        aname = mname if internal.structure.v9member.has_name(tinfo, mindex) else ''
+        if aname:
+            res.setdefault('__name__', aname)
+
+        # If the member is not a gap, or it is a basic type, then there is no
+        # type information associated with it.
+        has_typeinfo = False if udm.is_gap() or interface.tinfo.basic(mtype) else True
+        if has_typeinfo:
+            ti_s = idaapi.print_tinfo('', 0, 0, 0, mtype, utils.string.to(declaration.unmangled.parsable(aname) if aname else ''), '')
+            res.setdefault('__typeinfo__', ti_s)
+        return res
+
+    @classmethod
+    def set(cls, *args):
+        '''Set the tag specified by `key` to `value` for the specified member.'''
+        if len(args) == 3 and isinstance(args[0], internal.types.integer):
+            args, [key, value] = args[:1], args[1:]
+        elif len(args) == 4:
+            args, [key, value] = args[:2], args[2:]
+        else:
+            caller_format = internal.structure.v9member.format_unknown_args(*args, caller=[__name__, cls.__name__, 'set'])
+            raise internal.exceptions.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
+
+        # Guard against a null value being assigned. Afterwards, we can use the
+        # extracted arguments to get the specific member.
+        if value is None:
+            caller_format = internal.structure.v9member.format_args(*args, caller=[__name__, cls.__name__, 'set'], args=["{!r}".format(item) for item in [key, value]])
+            raise internal.exceptions.InvalidParameterError(u"{:s} : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format(caller_format, utils.string.escape(key, '"'), value))
+
+        tinfo, utd, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'get_type'], args=["{!r}".format(item) for item in [key, value]])
+        mid, mfullname = tinfo.get_udm_tid(mindex), internal.structure.v9member.fullname(tinfo, mindex)
+        repeatable = True
+
+        # Before modifying the comments, we need to check if the user is
+        # explicitly updating the implicit tags so we can assign a new value.
+        if key == '__name__':
+            tags, original = cls.get(*args), internal.structure.v9member.set_name(tinfo, mindex, value)
+            return tags.pop(key, None)
+
+        elif key == '__typeinfo__':
+            parsed = value if isinstance(value, idaapi.tinfo_t) else interface.tinfo.parse(None, value, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC) or interface.tinfo.parse(None, value, idaapi.PT_SIL)
+            _, mtype = ('', parsed) if isinstance(parsed, idaapi.tinfo_t) else parsed
+            tags, original = cls.get(mptr), internal.structure.v9member.set_typeinfo(tinfo, mindex, mtype)
+            return tags.pop(key, None)
+
+        # Now we need to grab both comment types so that we can figure out which
+        # one will contain the tag that we're modifying. Afterwards we decode
+        # both of them so that we can identify any duplicates.
+        comment_right = utils.string.of(internal.structure.v9member.get_comment(tinfo, mindex, repeatable))
+        comment_wrong = utils.string.of(internal.structure.v9member.get_comment(tinfo, mindex, not repeatable))
+
+        state_right, state_wrong = map(comment.decode, [comment_right, comment_wrong])
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right or state_wrong, not repeatable if state_right else repeatable)
+
+        duplicates = {item for item in state_right} & {item for item in state_wrong}
+        if key in duplicates:
+            caller_format = internal.structure.v9member.format_args(*args, caller=[__name__, cls.__name__, 'set'], args=["{!r}".format(item) for item in [key, value]])
+            logging.warning(u"{:s} : The repeatable and non-repeatable comment for member \"{:s}\" ({:#x}) use the same tags ({!s}). Giving priority to the {:s} comment.".format(caller_format, utils.string.escape(mfullname, '"'), mid, ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+
+        # Now we just need to modify the state with the new value and re-encode it.
+        res, state[key] = state.get(key, None), value
+        try:
+            old = internal.structure.v9member.set_comment(tinfo, mindex, utils.string.to(comment.encode(state)), where)
+        except internal.exceptions.DisassemblerError:
+            caller_format = internal.structure.v9member.format_args(*args, caller=[__name__, cls.__name__, 'set'], args=["{!r}".format(item) for item in [key, value]])
+            raise internal.exceptions.DisassemblerError(u"{:s} : Unable to update the {:s} comment for the member \"{:s}\" ({:#x}).".format(caller_format, 'repeatable' if where else 'non-repeatable', utils.string.escape(utils.string.of(mfullname), '"'), mid))
+        return res
+
+    @classmethod
+    def remove(cls, *args):
+        '''Remove the tag specified by `key` from the specified member.'''
+        if len(args) in {2, 3} and isinstance(args[0], internal.types.integer):
+            args, [key, none] = args[:1], args[1:] if len(args) == 3 else itertools.chain(args[1:], [None])
+        elif len(args) in {3, 4}:
+            args, [key, none] = args[:2], args[2:] if len(args) == 4 else itertools.chain(args[2:], [None])
+        else:
+            caller_format = internal.structure.v9member.format_unknown_args(*args, caller=[__name__, cls.__name__, 'remove'])
+            raise internal.exceptions.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
+
+        # Guard against a null value being assigned. Afterwards, we can use the
+        # extracted arguments to get the specific member.
+        if none is not None:
+            caller_format = internal.structure.v9member.format_args(*args, caller=[__name__, cls.__name__, 'remove'], args=["{!r}".format(key), "{!s}".format(none)])
+            raise internal.exceptions.InvalidParameterError(u"{:s} : Tried to remove the tag named \"{:s}\" with an unsupported type {!r}.".format(caller_format, utils.string.escape(key, '"'), none))
+
+        # Using the arguments, we can now get the specified member. First thing
+        # we do is check if the implicit tags are being explicitly modified.
+        tinfo, utd, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'remove'], args=["{!r}".format(key), "{!s}".format(none)])
+        mid, mfullname = tinfo.get_udm_tid(mindex), internal.structure.v9member.fullname(tinfo, mindex)
+        repeatable = True
+
+        if key == '__name__':
+            tags, original = cls.get(tinfo, mindex), internal.structure.v9member.remove_name(mptr)
+            return tags.pop(key, None)
+
+        elif key == '__typeinfo__':
+            tags, original = cls.get(tinfo, mindex), internal.structure.v9member.remove_typeinfo(mptr)
+            return tags.pop(key, None)
+
+        # Now we need to figure out whichever comment type contains the tag that
+        # we want to remove so we can extract them. Afterwards we decode the
+        # comment into a dictionary.
+        comment_right = utils.string.of(internal.structure.v9member.get_comment(tinfo, mindex, repeatable))
+        comment_wrong = utils.string.of(internal.structure.v9member.get_comment(tinfo, mindex, not repeatable))
+
+        state_right, state_wrong = map(comment.decode, [comment_right, comment_wrong])
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right or state_wrong, repeatable if state_right else not repeatable)
+
+        # If the given key is not assigned in the dictionary, then it's missing
+        # which requires us to bail using an exception. If there are any keys
+        # that are duplicates, then warn the user about both instances.
+        if key not in state:
+            caller_format = internal.structure.v9member.format_args(*args, caller=[__name__, cls.__name__, 'remove'], args=["{!r}".format(key), "{!s}".format(none)])
+            raise internal.exceptions.MissingTagError(u"{:s} : Unable to remove non-existing tag \"{:s}\" from the member \"{:s}\" ({:#x}).".format(caller_format, utils.string.escape(key, '"'), utils.string.escape(utils.string.of(mfullname), '"'), mid))
+
+        duplicates = {item for item in state_right} & {item for item in state_wrong}
+        if key in duplicates:
+            caller_format = internal.structure.v9member.format_args(*args, caller=[__name__, cls.__name__, 'remove'], args=["{!r}".format(key), "{!s}".format(none)])
+            logging.warning(u"{:s} : The repeatable and non-repeatable comment for member \"{:s}\" ({:#x}) use the same tags ({!r}). Giving priority to the {:s} comment.".format(caller_format, utils.string.escape(utils.string.of(mfullname), '"'), mid, ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+
+        # Now, all we have left to do is to remove the key from the dictionary
+        # and re-encode it back into the membner comment.
+        res = state.pop(key)
+        try:
+            old = internal.structure.v9member.set_comment(tinfo, mindex, utils.string.to(comment.encode(state)), where)
+        except internal.exceptions.DisassemblerError:
+            caller_format = internal.structure.v9member.format_args(*args, caller=[__name__, cls.__name__, 'remove'], args=["{!r}".format(key), "{!s}".format(none)])
+            raise internal.exceptions.DisassemblerError(u"{:s} : Unable to update the {:s} comment for the member \"{:s}\" ({:#x}).".format(caller_format, 'repeatable' if where else 'non-repeatable', utils.string.escape(utils.string.of(mfullname), '"'), mid))
+        return res
+
 class structure(object):
     """
     This namespace is responsible for the tags belonging to a structure,
