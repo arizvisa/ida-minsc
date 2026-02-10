@@ -941,9 +941,25 @@ class v9member(object):
         return res
 
     @classmethod
-    def remove_typeinfo(cls, mptr):
-        '''Remove the type information from the member specified by `mptr`.'''
-        raise NotImplementedError
+    def remove_typeinfo(cls, *args):
+        '''Remove the type information from the specified type member.'''
+        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'remove_typeinfo'])
+        caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'remove_typeinfo'])
+
+        # Now that we have the member, we need to extract its type and reduce it
+        # down to a disassembler native type. A native type has some different
+        # semantics compared to a compiler type.
+        ti = interface.tinfo.copy(udm.type)
+        reduced = interface.tinfo.reduce(ti)
+        mfullname, flags = cls.fullname(tinfo, mindex), 0
+
+        # Finally we can just apply the reduced type back to the member.
+        res, terr = interface.tinfo.copy(reduced), tinfo.set_udm_type(mindex, reduced, flags)
+        if terr != idaapi.TERR_OK:
+            errname, errdesc = cls.format_error_typeinfo(terr)
+            description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+            raise E.DisassemblerError(u"{:s} : Unable to remove the type {:s} from the {:s} member \"{:s}\" with type {:s} due to error {:s}.".format(caller_format, interface.tinfo.quoted(ti), 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(mfullname, '"'), interface.tinfo.quoted(reduced), description))
+        return res
 
     @classmethod
     def get_comment(cls, *args):
