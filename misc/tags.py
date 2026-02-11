@@ -2760,7 +2760,7 @@ class reference_v1(object):
         def erase(cls, sid):
             iterable = internal.tagindex.members.structure([sid])
             selected = [mid for mid, used in iterable]
-            return internal.tagindex.members.erase([sid], selected)
+            return internal.tagindex.members.erase(sid, selected)
 
 # Select the v0 frontend by default. This using the functionality provided
 # by the tagcache which has since been redesigned into the tagging index.
