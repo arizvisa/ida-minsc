@@ -13291,8 +13291,10 @@ class decode(object):
         # always partially decoded, but this flag determined whether we also
         # decode arrays partially and whether we trim incomplete fields when done.
         result, partial = {}, byteorder.get('partial', False)
-        for m in internal.structure.new(identifier, 0).members:
-            name, mptr, mtype, mdata = m.name, m.ptr, m.type, fields[m.name]
+        for sptr, mindex, mptr in internal.structure.members.iterate(identifier):
+            name = internal.structure.member.get_name(mptr)
+            mtype = internal.structure.member.get_type(mptr, mptr.soff)
+            mdata = fields[name]
             dtype, dsize = (mptr.flag & mask for mask in [typemap.FF_MASK, typemap.FF_MASKSIZE])
 
             # Get any information about the member in case we need to extract
