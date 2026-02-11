@@ -13173,33 +13173,89 @@ class decode(object):
         return result
 
     @classmethod
-    def fragment_bytes(cls, sptr, bytes):
-        '''Use the structure specified by `sptr` with the specified `bytes` to return a dictionary of the individual fields and the bytes that compose them.'''
+    def fragment_bytes(cls, type, bytes):
+        '''Use the specified structure `type` with the given `bytes` to return a dictionary of the individual fields and the bytes that compose them.'''
         SF_VAR, SF_UNION = getattr(idaapi, 'SF_VAR', 0x1), getattr(idaapi, 'SF_UNION', 0x2)
-        if sptr.props & SF_UNION:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fragment_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) is a `{:s}`.".format('.'.join([__name__, cls.__name__]), sptr.id, internal.utils.pycompat.fullname(sptr.__class__), sptr.id, 'SF_UNION'))
 
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = tinfo.copy(type), tinfo.identifier(type)
+        elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        elif isinstance(type, internal.types.integer):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.fragment_bytes({:#x}, ...) : Unable to determine the type for the specified identifier ({!r}).".format('.'.join([__name__, cls.__name__]), type, type))
+        else:
+            ti, sid = type.ptr if isinstance(type, internal.structure.structure_t) else type, type.id
+
+        # Verify that the type information we were given is not a union.
+        if isinstance(ti, idaapi.tinfo_t):
+            if internal.structure.union(ti):
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fragment_bytes({:#x}, ...) : The type for the requested identifier ({:#x}) is a {!s}.".format('.'.join([__name__, cls.__name__]), sid, sid, 'union'))
+            ti = ti
+
+        elif ti.props & SF_UNION:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fragment_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) is a `{:s}`.".format('.'.join([__name__, cls.__name__]), sid, internal.utils.pycompat.fullname(ti.__class__), sid, 'SF_UNION'))
+
+        # Now we iterate through each member using the member size to consume
+        # the bytes necessary to decode each member.
         offset, result, data = 0, {}, bytearray(bytes)
-        for m in internal.structure.new(sptr.id, 0).members:
-            name, mptr = m.name, m.ptr
-            left, right = 0 if sptr.props & SF_UNION else mptr.soff, mptr.eoff
+        if isinstance(ti, idaapi.tinfo_t):
+            for mtype, mindex, udm in internal.structure.v9members.iterate(ti):
+                mname = internal.utils.string.of(udm.name)
+                mbits = udm.size
+                mid = mtype.get_udm_tid(mindex)
+                left, right = 0 if internal.structure.union(ti) else udm.offset, udm.offset + udm.size
 
-            # First check our offset against the member boundaries in case there's an undefined
-            # field that contains unused data. If so, use the current offset as its key.
-            if offset < left:
-                result[offset], offset = data[offset : left], left
+                # Convert our bit sizes to bytes.
+                msize, mextra = divmod(mbits, 8)
+                msize = msize + 1 if mextra else msize
+                mleft, _ = divmod(left, 8)
+                mright, mextra  = divmod(right, 8)
+                mright = mright + 1 if mextra else mright
 
-            # If this is a variable-length structure and the size is 0, then we just stash everything.
-            if sptr.props & SF_VAR and left == right:
-                result[name] = data[left:]
+                # Check our offset against the member boundaries so that if
+                # there is unused data, we can skip over it.
+                if offset < mleft:
+                    result[offset], offset = data[offset : mleft], mleft
 
-            # Otherwise, we just grab the bounds that we know of and we can use it later.
-            else:
-                result[name] = data[left : right]
+                # If this is a variable-length type and the member size is 0,
+                # then we consume as much data as available for decoding it.
+                if ti.is_varstruct() and mleft == mright:
+                    result[mname] = data[mleft:]
 
-            if len(result[name]) < right - left:
-                logging.warning(u"{:s}.fragment_bytes({:#x}, ...) : Unable to read member ({:#x}) with the name \"{:s}\" at offset {:#x}..{:#x} of structure due to there being only {:+#x} byte{:s} worth of data available (expected {:+d} byte{:s} more).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, name, left, right, len(bytes), '' if len(bytes) == 1 else 's', right - len(bytes), '' if right - len(bytes) == 1 else 's'))
-            offset = right
+                # Otherwise, we just use the boundaries to select the bytes.
+                else:
+                    result[mname] = data[mleft : mright]
+
+                if len(result[mname]) < mright - mleft:
+                    logging.warning(u"{:s}.fragment_bytes({:#x}, ...) : Unable to read member ({:#x}) with the name \"{:s}\" at offset {:#x}..{:#x} of structure due to there being only {:+#x} byte{:s} worth of data available (expected {:+d} byte{:s} more).".format('.'.join([__name__, cls.__name__]), sid, mid, mname, mleft, mright, len(bytes), '' if len(bytes) == 1 else 's', right - len(bytes), '' if right - len(bytes) == 1 else 's'))
+                offset = mright
+            result = result
+
+        else:
+            for sptr, mindex, mptr in internal.structure.members.iterate(ti):
+                mname = internal.structure.member.get_name(mptr)
+                msize = internal.structure.member.size(mptr)
+                mid = mptr.id
+                left, right = 0 if sptr.props & SF_UNION else mptr.soff, mptr.eoff
+
+                # First check our offset against the member boundaries in case there's an undefined
+                # field that contains unused data. If so, use the current offset as its key.
+                if offset < left:
+                    result[offset], offset = data[offset : left], left
+
+                # If this is a variable-length structure and the size is 0, then we just stash everything.
+                if sptr.props & SF_VAR and left == right:
+                    result[mname] = data[left:]
+
+                # Otherwise, we just grab the bounds that we know of and we can use it later.
+                else:
+                    result[mname] = data[left : right]
+
+                if len(result[mname]) < right - left:
+                    logging.warning(u"{:s}.fragment_bytes({:#x}, ...) : Unable to read member ({:#x}) with the name \"{:s}\" at offset {:#x}..{:#x} of structure due to there being only {:+#x} byte{:s} worth of data available (expected {:+d} byte{:s} more).".format('.'.join([__name__, cls.__name__]), sid, mid, mname, left, right, len(bytes), '' if len(bytes) == 1 else 's', right - len(bytes), '' if right - len(bytes) == 1 else 's'))
+                offset = right
+            result = result
 
         # If there's any data that was left unused, then we end of the last member as the
         # key and store the rest of the data inside of it so that it's still usable.
