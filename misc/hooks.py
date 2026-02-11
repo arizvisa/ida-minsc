@@ -4299,7 +4299,7 @@ class localtypesmonitor_state(object):
             else:
                 mid = tinfo.get_udm_tid(mindex)
                 mcomment = utils.string.of(udm.cmt)
-                yield mindex, mid, mname, moffset, msize, interface.tinfo.copy(mtype), malign, mcomment
+                yield mindex, mid, mname, moffset, msize, interface.tinfo.copy(mtype), malign, (False if udm.is_regcmt() else True, mcomment)
             continue
         return
 
@@ -4330,7 +4330,8 @@ class localtypesmonitor_state(object):
         mid = tinfo.get_udm_tid(mindex)
         moffset, msize, malign = udm.offset, udm.size, udm.effalign
         mtype = interface.tinfo.concretize(udm.type)
-        return mindex, mid, moffset, msize, mtype, malign
+        mcomment = False if udm.is_regcmt() else True, utils.string.of(udm.cmt)
+        return mindex, mid, mname, moffset, msize, mtype, malign, mcomment
 
     @classmethod
     def get_member_by_bitoffset(cls, ordinal, bitoffset):
@@ -4822,7 +4823,7 @@ class localtypesmonitor_state(object):
 
                 # Process any comments by decoding them into tags that we can
                 # compare directly for changes.
-                olddecoded, newdecoded = (internal.comment.decode(comment) for comment in [oldcomment, newcomment])
+                olddecoded, newdecoded = (internal.comment.decode(comment) for _, comment in [oldcomment, newcomment])
                 oldtags, newtags = ({tag for tag in decoded} for decoded in [olddecoded, newdecoded])
                 if oldtags != newtags:
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its comment tags changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, oldtags, newtags))
@@ -4837,6 +4838,7 @@ class localtypesmonitor_state(object):
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, interface.tinfo.quoted(mtype)))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the alignment {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, malign))
 
+                mrepeatable, mcomment = mcomment
                 mtags = {tag for tag in internal.comment.decode(mcomment)}
                 mtags and logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the specified tags ({!s}).".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mtags))
 
@@ -4849,6 +4851,7 @@ class localtypesmonitor_state(object):
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, interface.tinfo.quoted(mtype)))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the alignment {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, malign))
 
+                mrepeatable, mcomment = mcomment
                 mtags = {tag for tag in internal.comment.decode(mcomment)}
                 mtags and logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the specified tags ({!s}).".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mtags))
             continue
@@ -5561,6 +5564,7 @@ class localtypesmonitor_84(object):
                 # The very last thing we need to do is to check the tags that
                 # have been encoded into the comments. We pretty much just hand
                 # this off to the "update_member_comments" classmethod.
+                oldcomment, newcomment = (mcomment for mrepeatable, mcomment in [oldcomment, newcomment])
                 oldtags, newtags = ({tag for tag in tags} for tags in map(internal.comment.decode, [oldcomment, newcomment]))
                 if oldtags != newtags:
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the comment tags for the member at index {:d} ({:#x}) of type {!s} ({:#x}) resulted in modifying the tags from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, sorted(oldtags), sorted(newtags)))
@@ -5584,7 +5588,7 @@ class localtypesmonitor_84(object):
             # A member was added, so we need to check if the field uses a
             # non-general type or a user-specified name to update its tags.
             elif new:
-                mindex, mid, mname, moffset, msize, mtype, malign, mcomment= new
+                mindex, mid, mname, moffset, msize, mtype, malign, mcomment = new
                 if mid == idaapi.BADADDR:
                     logging.error(u"{:s}.member_updater({:d}, {!s}, {!s}) : Unable to adjust the tags for the added member at index {:d} of type {!s} ({:#x}) due to its identifier ({:#x}) being invalid.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, parameter, sid, mid))
                     continue
