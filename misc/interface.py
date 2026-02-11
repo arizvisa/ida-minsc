@@ -13115,26 +13115,60 @@ class decode(object):
     }
 
     @classmethod
-    def union_bytes(cls, sptr, bytes):
-        '''Use the union specified by `sptr` with the specified `bytes` to return a dictionary of the individual fields and the bytes that compose them.'''
+    def union_bytes(cls, type, bytes):
+        '''Use the specified union `type` with the specified `bytes` to return a dictionary of the individual fields and the bytes that compose them.'''
         SF_VAR, SF_UNION = getattr(idaapi, 'SF_VAR', 0x1), getattr(idaapi, 'SF_UNION', 0x2)
-        if not (sptr.props & SF_UNION):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.union_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) is not a `{:s}`.".format('.'.join([__name__, cls.__name__]), sptr.id, internal.utils.pycompat.fullname(sptr.__class__), sptr.id, 'SF_UNION'))
+
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = tinfo.copy(type), tinfo.identifier(type)
+        elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        elif isinstance(type, internal.types.integer):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.union_bytes({:#x}, ...) : Unable to determine the type for the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type, type))
+        else:
+            ti, sid = type.ptr if isinstance(type, internal.structure.structure_t) else type, type.id
+
+        # Now go through and check whether the type information we were given
+        # actually belongs to a union.
+        if isinstance(ti, idaapi.tinfo_t):
+            if not internal.structure.union(ti):
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.union_bytes({:#x}, ...) : The type for the requested identifier ({:#x}) is not a {!s}.".format('.'.join([__name__, cls.__name__]), sid, sid, 'union'))
+            ti = ti
+
+        elif not (ti.props & SF_UNION):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.union_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) is not a `{:s}`.".format('.'.join([__name__, cls.__name__]), sid, internal.utils.pycompat.fullname(ti.__class__), sid, 'SF_UNION'))
 
         # Iterate through each union member and use their size to stash the
         # bytes that are neccessary for decoding each member. We assign the
         # entire bytes used for decoding to an empty member in case the user
         # has some need to want to access the decoded data themselves.
         result, data = {'': bytearray(bytes)}, bytearray(bytes)
-        for m in internal.structure.new(sptr.id, 0).members:
-            name, mptr, size = m.name, m.ptr, m.size
-            if len(data) < size:
-                logging.warning(u"{:s}.union_bytes({:#x}, ...) : Unable to read member ({:#x}) with the name \"{:s}\" at index {:d} of the union due to there being only {:+#x} byte{:s} worth of data available.".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, name, mptr.soff, len(bytes), '' if len(bytes) == 1 else 's'))
-            result[name] = data[:size]
+        if isinstance(ti, idaapi.tinfo_t):
+            for mtype, mindex, udm in internal.structure.v9members.iterate(ti):
+                mname = internal.utils.string.of(udm.name)
+                moffset, mbits = udm.offset, udm.size
+                mid = mtype.get_udm_tid(mindex)
+                msize, mextra = divmod(mbits, 8)
+                msize = msize + 1 if mextra else msize
+                if len(data) < msize:
+                    logging.warning(u"{:s}.union_bytes({:#x}, ...) : Unable to read member ({:#x}) with the name \"{:s}\" at index {:d} of the union due to there being only {:+#x} byte{:s} worth of data available.".format('.'.join([__name__, cls.__name__]), sid, mid, mname, mindex, len(bytes), '' if len(bytes) == 1 else 's'))
+                result[mname] = data[:msize]
+            result = result
+
+        else:
+            for sptr, mindex, mptr in internal.structure.members.iterate(ti):
+                mname = internal.structure.member.get_name(mptr)
+                msize = internal.structure.member.size(mptr)
+                mid, moffset = mptr.id, mptr.soff
+                if len(data) < msize:
+                    logging.warning(u"{:s}.union_bytes({:#x}, ...) : Unable to read member ({:#x}) with the name \"{:s}\" at index {:d} of the union due to there being only {:+#x} byte{:s} worth of data available.".format('.'.join([__name__, cls.__name__]), sid, mid, mname, moffset, len(bytes), '' if len(bytes) == 1 else 's'))
+                result[mname] = data[:msize]
+            result = result
 
         # Figure out if there was anything that we didn't decode and assign them
         # with the maximum offset in case the user wants to see what was missed.
-        maximum = max(len(item) for name, item in result.items() if name) if result else 0
+        maximum = max(len(item) for mname, item in result.items() if mname) if result else 0
         result.setdefault(maximum, data[maximum:]) if maximum <= len(data) else None
         return result
 
