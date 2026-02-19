@@ -6550,7 +6550,7 @@ class members(object):
             logging.fatal(u"{:s}.add({:#x}, {:s}, {!s}, {:s}{:s}) : Unable to apply the specified type to the new member \"{:s}\" at {:s} of the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, name_description, type_description, location_description, offset_description, utils.string.escape(newname, '"'), where, 'union' if is_union else 'frame' if is_frame else 'structure', sptr.id))
 
         elif res not in {idaapi.SMT_OK, idaapi.SMT_KEEP}:
-            error_name, error_description = cls.format_error_typeinfo(res)
+            error_name, error_description = member.format_error_typeinfo(res)
             logging.fatal(u"{:s}.add({:#x}, {:s}, {!s}, {:s}{:s}) : Unable to apply the specified type to the new member \"{:s}\" at {:s} of the specified {:s} ({:#x}) due to error {:s}{:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, name_description, type_description, location_description, offset_description, utils.string.escape("{!s}".format(tinfo), '"'), utils.string.escape(newname, '"'), where, 'union' if is_union else 'frame' if is_frame else 'structure', sptr.id, error_name or "code {:d}".format(res), " ({:s})".format(error_description) if error_description else ''))
 
         # Our work is done, we can log our small success and update the
