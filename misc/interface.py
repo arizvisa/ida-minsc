@@ -13614,30 +13614,32 @@ class name(object):
     def typename(cls, ordinal, library, name=None):
         '''Return a context manager that renames the type at the specified `ordinal` in `library` with a temporary `name` on entry and restores it on exit.'''
         Funique_name = internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}_{:x}".format, 'ti_unique', ordinal))
+        til = library if library else tinfo.library()
 
         # loop indefinitely until we get a name that is unique to the type library.
         temporary = name or Funique_name(hash("{:b}".format(ordinal)))
-        while not temporary or idaapi.get_type_ordinal(library, temporary):
+        while not temporary or idaapi.get_type_ordinal(til, temporary):
             temporary = Funique_name(temporary)
 
         # get the name and type by ordinal so that we can temporarily replace them.
-        original = idaapi.get_numbered_type_name(library, ordinal)
-        serialized = tinfo.get_numbered_type(library, ordinal)
+        original = internal.utils.string.of(idaapi.get_numbered_type_name(til, ordinal))
+        serialized = tinfo.get_numbered_type(til, ordinal)
 
         # if we were able to get the type, then replace it with our temporary name. if we
         # failed at either, then we assign an error code which will result in non-action.
-        res = idaapi.set_numbered_type(library, ordinal, idaapi.NTF_REPLACE | idaapi.NTF_SYMU, temporary, *serialized[:1]) if serialized else idaapi.TERR_SAVE
+        res = idaapi.set_numbered_type(til, ordinal, idaapi.NTF_REPLACE | idaapi.NTF_SYMU, internal.utils.string.to(temporary), *serialized) if serialized else idaapi.TERR_SAVE
         try:
             yield temporary if res == idaapi.TERR_OK else original
 
         finally:
-            res = idaapi.set_numbered_type(library, ordinal, idaapi.NTF_REPLACE | idaapi.NTF_SYMU, original, *serialized[:1]) if serialized else idaapi.TERR_OK
+            res = idaapi.set_numbered_type(til, ordinal, idaapi.NTF_REPLACE | idaapi.NTF_SYMU, internal.utils.string.to(original), *serialized) if serialized else idaapi.TERR_OK
 
         # if we couldn't reapply the type then this is critical and we can only log it.
         if res != idaapi.TERR_OK:
-            library_class = library.__class__
-            library_desc = "<{:s}; <{:s}>>".format('.'.join([library_class.__module__, library_class.__name__]), internal.utils.string.of(library.desc))
-            logging.fatal(u"{:s}.typename({:d}, {:s}{:s}) : Unable to restore the original name (\"{:s}\") to ordinal #{:d} from the \"{:s}\" library which is currently named \"{:s}\".".format('.'.join([__name__, cls.__name__]), ordinal, library_desc, '' if name is None else ", name=\"{:s}\"".format(name), internal.utils.string.escape(original, '"'), ordinal, internal.utils.string.of(library.desc), internal.utils.string.escape(temporary, '"')))
+            library_desc = tinfo.format_library(til)
+            errname, errdesc = tinfo.format_type_error(res)
+            description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+            logging.fatal(u"{:s}.typename({:d}, {:s}{:s}) : Unable to restore the original name (\"{:s}\") to ordinal #{:d} from the \"{:s}\" library which is currently named \"{:s}\" due to error {!s}.".format('.'.join([__name__, cls.__name__]), ordinal, library_desc, '' if name is None else ", name=\"{:s}\"".format(name), internal.utils.string.escape(original, '"'), ordinal, internal.utils.string.of(til.desc), internal.utils.string.escape(temporary, '"'), description))
         return
 
     @classmethod
