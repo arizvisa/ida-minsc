@@ -703,7 +703,7 @@ class v9member(object):
         # Now we can actually rename the member using v9's `tinfo_t.rename_udm`.
         terr = tinfo.rename_udm(mindex, ida_string, idaapi.ETF_FORCENAME)
         if terr != idaapi.TERR_OK:
-            errname, errdesc = cls.format_error_typeinfo(terr)
+            errname, errdesc = interface.tinfo.format_type_error(terr)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
             raise E.DisassemblerError(u"{:s} : Unable to assign the specified name \"{:s}\" to the {:s} member \"{:s}\" due to error {:s}.".format(caller_format, utils.string.escape(utils.string.of(ida_string), '"'), 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(fullname, '"'), description))
 
@@ -935,7 +935,7 @@ class v9member(object):
         # Now we can just use the parent type to change the member's type.
         res, terr = interface.tinfo.copy(udm.type), tinfo.set_udm_type(mindex, info, flags)
         if terr != idaapi.TERR_OK:
-            errname, errdesc = cls.format_error_typeinfo(terr)
+            errname, errdesc = interface.tinfo.format_type_error(terr)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
             raise E.DisassemblerError(u"{:s} : Unable to assign the specified type {:s} to the {:s} member \"{:s}\" due to error {:s}.".format(caller_format, interface.tinfo.quoted(info), 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(fullname, '"'), description))
         return res
@@ -956,7 +956,7 @@ class v9member(object):
         # Finally we can just apply the reduced type back to the member.
         res, terr = interface.tinfo.copy(reduced), tinfo.set_udm_type(mindex, reduced, flags)
         if terr != idaapi.TERR_OK:
-            errname, errdesc = cls.format_error_typeinfo(terr)
+            errname, errdesc = interface.tinfo.format_type_error(terr)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
             raise E.DisassemblerError(u"{:s} : Unable to remove the type {:s} from the {:s} member \"{:s}\" with type {:s} due to error {:s}.".format(caller_format, interface.tinfo.quoted(ti), 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(mfullname, '"'), interface.tinfo.quoted(reduced), description))
         return res
@@ -999,7 +999,7 @@ class v9member(object):
 
         res, terr = utils.string.of(udm.cmt), tinfo.set_udm_cmt(mindex, utils.string.to(string), not repeatable)
         if terr != idaapi.TERR_OK:
-            errname, errdesc = cls.format_error_typeinfo(terr)
+            errname, errdesc = interface.tinfo.format_type_error(terr)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
             raise E.DisassemblerError(u"{:s} : Unable to assign the specified comment {!r} to the {:s} member \"{:s}\" due to error {:s}.".format(caller_format, 'repeatable' if repeatable else 'regular', string, 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(fullname, '"'), description))
         return res
@@ -3205,7 +3205,7 @@ class v9members(object):
             ok = ti.del_udm(mindex)
 
             if ok != idaapi.TERR_OK:
-                errname, errdesc = v9member.format_error_typeinfo(ok)
+                errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                 logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove member \"{:s}\" ({:#x}) at {:s} of the {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, utils.string.escape(mname, '"'), mid, location_description, type_description, description))
                 ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
@@ -3231,7 +3231,7 @@ class v9members(object):
 
             # If we couldn't shrink the structure, then log a warning.
             if ok != idaapi.TERR_OK:
-                errname, errdesc = v9member.format_error_typeinfo(ok)
+                errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                 logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove space ({:d}) from {:s} after removing member \"{:s}\" ({:#x}) at {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, msize, type_description, utils.string.escape(mname, '"'), mid, location_description, description))
                 ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
@@ -3410,7 +3410,7 @@ class v9members(object):
             ok = ti.del_udm(mindex)
 
             if ok != idaapi.TERR_OK:
-                errname, errdesc = v9member.format_error_typeinfo(ok)
+                errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                 logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove member \"{:s}\" ({:#x}) at {:s} of the {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, utils.string.escape(mname, '"'), mid, location_description, type_description, description))
                 ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
@@ -3436,7 +3436,7 @@ class v9members(object):
 
             # If we couldn't shrink the structure, then log a warning.
             if ok != idaapi.TERR_OK:
-                errname, errdesc = v9member.format_error_typeinfo(ok)
+                errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                 logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove space ({:d}) from {:s} after removing member \"{:s}\" ({:#x}) at {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, msize, type_description, utils.string.escape(mname, '"'), mid, location_description, description))
                 ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
@@ -3582,7 +3582,7 @@ class v9members(object):
             ok = ti.del_udm(mindex)
 
             if ok != idaapi.TERR_OK:
-                errname, errdesc = v9member.format_error_typeinfo(ok)
+                errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                 logging.warning(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to clear member \"{:s}\" ({:#x}) at {:s} of the {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, utils.string.escape(mname, '"'), mid, location_description, type_description, description))
                 ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
@@ -3752,7 +3752,7 @@ class v9members(object):
             ok = ti.del_udm(mindex)
 
             if ok != idaapi.TERR_OK:
-                errname, errdesc = v9member.format_error_typeinfo(ok)
+                errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                 logging.warning(u"{:s}.clear_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to clear member \"{:s}\" ({:#x}) at {:s} of the {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, utils.string.escape(mname, '"'), mid, location_description, type_description, description))
                 ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
@@ -4334,12 +4334,12 @@ class v9members(object):
                 # somehow. We log a warning to avoid interrupting the removal of
                 # members from the current structure.
                 if ok != idaapi.TERR_OK and interface.tinfo.identifier(mowner) != sid:
-                    errname, errdesc = v9member.format_error_typeinfo(ok)
+                    errname, errdesc = interface.tinfo.format_type_error(ok)
                     description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                     logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : The {:s} owning the member ({:#x}) at {:s} that is attempting to be removed does not actually belong to us and may result in a fatal error.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, mid, "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + udm.offset)))
 
                 elif ok != idaapi.TERR_OK:
-                    errname, errdesc = v9member.format_error_typeinfo(ok)
+                    errname, errdesc = interface.tinfo.format_type_error(ok)
                     description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                     logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the {:s} member ({:#x}) at {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, mid, "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + udm.offset), description))
 
@@ -4355,7 +4355,7 @@ class v9members(object):
 
             ok = ti.del_udms(lindex, rindex)
             if ok != idaapi.TERR_OK:
-                errname, errdesc = v9member.format_error_typeinfo(ok)
+                errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                 raise E.DisassemblerError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the elements from offset {:+#x} (index {:d}) to offset {:+#x} (index {:d}) due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, 8 * left, lindex, 8 * right, rindex, '"', description))
 
@@ -4407,7 +4407,7 @@ class v9members(object):
         # Now we can go and do our resize of the structure type.
         ok = ti.expand_udt(mindex, delta) if 0 <= mindex < count and delta and left < size else idaapi.TERR_OK
         if ok != idaapi.TERR_OK:
-            errname, errdesc = v9member.format_error_typeinfo(ok)
+            errname, errdesc = interface.tinfo.format_type_error(ok)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
             raise E.DisassemblerError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to {:s} the size of the {:s} by {:d} byte{:s} at offset {:+#x} (index {:d}) due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, 'decrease' if delta < 0 else 'increase', type_description, abs(delta), '' if abs(delta) == 1 else 's', left, mindex, description))
 
@@ -4502,19 +4502,19 @@ class v9members(object):
             # Now we can go and update each of the available member fields.
             ok = ti.set_udm_type(mindex, tinfo) if tinfo else idaapi.TERR_OK
             if ok != idaapi.TERR_OK:
-                errname, errdesc = v9member.format_error_typeinfo(ok)
+                errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                 logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} type {!s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mid, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), type_description, sid, 'repeatable' if mcommenttype else 'non-repeatable', interface.tinfo.quoted(tinfo), description))
 
             ok = ti.set_udm_cmt(mindex, mcomment, mcommenttype) if mcomment else idaapi.TERR_OK
             if ok != idaapi.TERR_OK:
-                errname, errdesc = v9member.format_error_typeinfo(ok)
+                errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                 logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} comment \"{:s}\" due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mid, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), type_description, sid, 'repeatable' if mcommenttype else 'non-repeatable', utils.string.escape(mcomment, '"'), description))
 
             ok = ti.set_udm_repr(mindex, mrepr) if mrepr else idaapi.TERR_OK
             if ok != idaapi.TERR_OK:
-                errname, errdesc = v9member.format_error_typeinfo(ok)
+                errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                 raise E.NotImplementedError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} representation {!r} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mid, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), type_description, sid, 'repeatable' if mcommenttype else 'non-repeatable', mrepr, description))
             continue
