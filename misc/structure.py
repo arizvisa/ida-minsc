@@ -878,48 +878,6 @@ class v9member(object):
         return ti
 
     @classmethod
-    def format_error_typeinfo(cls, code):
-        '''Return the specified error `code` as a tuple composed of the error name and its description.'''
-        descriptions, names = {}, {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('TERR_')}
-        descriptions[idaapi.TERR_OK] = 'ok'
-        descriptions[idaapi.TERR_SAVE_ERROR] = 'failed to save'
-        descriptions[idaapi.TERR_SERIALIZE] = 'failed to serialize'
-        descriptions[idaapi.TERR_BAD_NAME] = 'name is not acceptable'
-        descriptions[idaapi.TERR_BAD_SYNC] = 'failed to synchronize with IDB'
-        descriptions[idaapi.TERR_BAD_ARG] = 'bad argument'
-        descriptions[idaapi.TERR_BAD_TYPE] = 'bad type'
-        descriptions[idaapi.TERR_BAD_SIZE] = 'bad size'
-        descriptions[idaapi.TERR_BAD_INDEX] = 'bad index'
-        descriptions[idaapi.TERR_BAD_ARRAY] = 'arrays are forbidden as function arguments'
-        descriptions[idaapi.TERR_BAD_BF] = 'bitfields are forbidden as function arguments'
-        descriptions[idaapi.TERR_BAD_OFFSET] = 'bad member offset'
-        descriptions[idaapi.TERR_BAD_UNIVAR] = 'unions cannot have variable sized members'
-        descriptions[idaapi.TERR_BAD_VARLAST] = 'variable sized member must be the last member in the structure'
-        descriptions[idaapi.TERR_OVERLAP] = 'the member overlaps with other members that cannot be deleted'
-        descriptions[idaapi.TERR_BAD_SUBTYPE] = 'recursive structure nesting is forbidden'
-        descriptions[idaapi.TERR_BAD_VALUE] = 'value is not acceptable'
-        descriptions[idaapi.TERR_NO_BMASK] = 'bitmask is not found'
-        descriptions[idaapi.TERR_BAD_BMASK] = 'Bad enum member mask. The specified mask should not intersect with any existing mask in the enum. Zero masks are prohibited too'
-        descriptions[idaapi.TERR_BAD_MSKVAL] = 'bad bmask and value combination'
-        descriptions[idaapi.TERR_BAD_REPR] = 'bad or incompatible field representation'
-        descriptions[idaapi.TERR_GRP_NOEMPTY] = 'could not delete group mask for not empty group'
-        descriptions[idaapi.TERR_DUPNAME] = 'duplicate name'
-        descriptions[idaapi.TERR_UNION_BF] = 'unions cannot have bitfields'
-        descriptions[idaapi.TERR_BAD_TAH] = 'bad bits in the type attributes (TAH bits)'
-        descriptions[idaapi.TERR_BAD_BASE] = 'bad base class'
-        descriptions[idaapi.TERR_BAD_GAP] = 'bad gap'
-        descriptions[idaapi.TERR_NESTED] = 'recursive structure nesting is forbidden'
-        descriptions[idaapi.TERR_NOT_COMPAT] = 'the new type is not compatible with the old type'
-        descriptions[idaapi.TERR_BAD_LAYOUT] = 'failed to calculate the structure/union layout'
-        descriptions[idaapi.TERR_BAD_GROUPS] = 'bad group sizes for bitmask enum'
-        descriptions[idaapi.TERR_BAD_SERIAL] = 'enum value has too many serials'
-        descriptions[idaapi.TERR_ALIEN_NAME] = 'enum member name is used in another enum'
-        descriptions[idaapi.TERR_STOCK] = 'stock type info cannot be modified'
-        descriptions[idaapi.TERR_ENUM_SIZE] = 'bad enum size'
-        descriptions[idaapi.TERR_NOT_IMPL] = 'not implemented'
-        return names.get(code, ''), descriptions.get(code, '')
-
-    @classmethod
     def set_typeinfo(cls, *args, flags=idaapi.ETF_COMPATIBLE):
         '''Apply the type information in `info` to the specified member using the given `flags`.'''
 
