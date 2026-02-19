@@ -703,7 +703,7 @@ class v9member(object):
         # Now we can actually rename the member using v9's `tinfo_t.rename_udm`.
         terr = tinfo.rename_udm(mindex, ida_string, idaapi.ETF_FORCENAME)
         if terr != idaapi.TERR_OK:
-            errname, errdesc = interface.tinfo.format_type_error(terr)
+            errname, errdesc = cls.format_error_typeinfo(terr)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
             raise E.DisassemblerError(u"{:s} : Unable to assign the specified name \"{:s}\" to the {:s} member \"{:s}\" due to error {:s}.".format(caller_format, utils.string.escape(utils.string.of(ida_string), '"'), 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(fullname, '"'), description))
 
