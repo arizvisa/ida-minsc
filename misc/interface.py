@@ -8194,11 +8194,48 @@ class tinfo(object):
     def format_type_error(cls, code):
         '''Return the specified error `code` as a tuple composed of the error name and its description.'''
         descriptions, names = {}, {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('TERR_')}
-        descriptions[idaapi.TERR_OK] = 'ok'
-        descriptions[idaapi.TERR_SAVE] = 'failed to save'
-        descriptions[idaapi.TERR_SERIALIZE] = 'failed to serialize'
-        descriptions[getattr(idaapi, 'TERR_TOOLONGNAME', getattr(idaapi, 'TERR_WRONGNAME', -3))] = 'name is too long' if hasattr(idaapi, 'TERR_TOOLONGNAME') else 'name is not acceptable'
-        descriptions[getattr(idaapi, 'TERR_BADSYNC', -4)] = 'failed to synchronize with IDB'
+        descriptions[idaapi.TERR_OK]            = 'ok'
+        descriptions[idaapi.TERR_SAVE_ERROR]    = 'failed to save'
+        descriptions[idaapi.TERR_SERIALIZE]     = 'failed to serialize'
+
+        namecode = getattr(idaapi, 'TERR_BAD_NAME', getattr(idaapi, 'TERR_TOOLONGNAME', getattr(idaapi, 'TERR_WRONGNAME', -3)))
+        descriptions[name] = 'name is too long' if hasattr(idaapi, 'TERR_TOOLONGNAME') else 'name is not acceptable'
+
+        badsynccode = getattr(idaapi, 'TERR_BAD_SYNC', getattr(idaapi, 'TERR_BADSYNC', -4))
+        descriptions[badsynccode] = 'failed to synchronize with IDB'
+
+        descriptions[getattr(idaapi, 'TERR_BAD_ARG', -5)]       = 'bad argument'
+        descriptions[getattr(idaapi, 'TERR_BAD_TYPE', -6)]      = 'bad type'
+        descriptions[getattr(idaapi, 'TERR_BAD_SIZE', -7)]      = 'bad size'
+        descriptions[getattr(idaapi, 'TERR_BAD_INDEX', -8)]     = 'bad index'
+        descriptions[getattr(idaapi, 'TERR_BAD_ARRAY', -9)]     = 'arrays are forbidden as function arguments'
+        descriptions[getattr(idaapi, 'TERR_BAD_BF', -10)]       = 'bitfields are forbidden as function arguments'
+        descriptions[getattr(idaapi, 'TERR_BAD_OFFSET', -11)]   = 'bad member offset'
+        descriptions[getattr(idaapi, 'TERR_BAD_UNIVAR', -12)]   = 'unions cannot have variable sized members'
+        descriptions[getattr(idaapi, 'TERR_BAD_VARLAST', -13)]  = 'variable sized member must be the last member in the structure'
+        descriptions[getattr(idaapi, 'TERR_OVERLAP', -14)]      = 'the member overlaps with other members that cannot be deleted'
+        descriptions[getattr(idaapi, 'TERR_BAD_SUBTYPE', -15)]  = 'recursive structure nesting is forbidden'
+        descriptions[getattr(idaapi, 'TERR_BAD_VALUE', -16)]    = 'value is not acceptable'
+        descriptions[getattr(idaapi, 'TERR_NO_BMASK', -17)]     = 'bitmask is not found'
+        descriptions[getattr(idaapi, 'TERR_BAD_BMASK', -18)]    = 'bad enum member mask. The specified mask should not intersect with any existing mask in the enum. Zero masks are prohibited too'
+        descriptions[getattr(idaapi, 'TERR_BAD_MSKVAL', -19)]   = 'bad bmask and value combination'
+        descriptions[getattr(idaapi, 'TERR_BAD_REPR', -20)]     = 'bad or incompatible field representation'
+        descriptions[getattr(idaapi, 'TERR_GRP_NOEMPTY', -21)]  = 'could not delete group mask for not empty group'
+        descriptions[getattr(idaapi, 'TERR_DUPNAME', -22)]      = 'duplicate name'
+        descriptions[getattr(idaapi, 'TERR_UNION_BF', -23)]     = 'unions cannot have bitfields'
+        descriptions[getattr(idaapi, 'TERR_BAD_TAH', -24)]      = 'bad bits in the type attributes (TAH bits)'
+        descriptions[getattr(idaapi, 'TERR_BAD_BASE', -25)]     = 'bad base class'
+        descriptions[getattr(idaapi, 'TERR_BAD_GAP', -26)]      = 'bad gap'
+        descriptions[getattr(idaapi, 'TERR_NESTED', -27)]       = 'recursive structure nesting is forbidden'
+        descriptions[getattr(idaapi, 'TERR_NOT_COMPAT', -28)]   = 'the new type is not compatible with the old type'
+        descriptions[getattr(idaapi, 'TERR_BAD_LAYOUT', -29)]   = 'failed to calculate the structure/union layout'
+        descriptions[getattr(idaapi, 'TERR_BAD_GROUPS', -30)]   = 'bad group sizes for bitmask enum'
+        descriptions[getattr(idaapi, 'TERR_BAD_SERIAL', -31)]   = 'enum value has too many serials'
+        descriptions[getattr(idaapi, 'TERR_ALIEN_NAME', -32)]   = 'enum member name is used in another enum'
+        descriptions[getattr(idaapi, 'TERR_STOCK', -33)]        = 'stock type info cannot be modified'
+        descriptions[getattr(idaapi, 'TERR_ENUM_SIZE', -34)]    = 'bad enum size'
+        descriptions[getattr(idaapi, 'TERR_NOT_IMPL', -35)]     = 'not implemented'
+
         return names.get(code, ''), descriptions.get(code, '')
 
     @classmethod
