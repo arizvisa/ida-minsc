@@ -13611,35 +13611,44 @@ class name(object):
 
     @classmethod
     @contextlib.contextmanager
-    def typename(cls, ordinal, library, name=None):
+    def typename(cls, ordinal, library=None, name=None):
         '''Return a context manager that renames the type at the specified `ordinal` in `library` with a temporary `name` on entry and restores it on exit.'''
         Funique_name = internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}_{:x}".format, 'ti_unique', ordinal))
         til = library if library else tinfo.library()
 
+        # if we got an identifier, then we need to convert it to an ordinal.
+        index = idaapi.get_tid_ordinal(ordinal) if hasattr(idaapi, 'get_tid_ordinal') and node.identifier(ordinal) else ordinal
+        ordinal_desc = "{:d}".format(ordinal) if index == ordinal else "{:#x}".format(ordinal)
+
         # loop indefinitely until we get a name that is unique to the type library.
-        temporary = name or Funique_name(hash("{:b}".format(ordinal)))
+        temporary = name or Funique_name(hash("{:b}".format(index)))
         while not temporary or idaapi.get_type_ordinal(til, temporary):
             temporary = Funique_name(temporary)
 
         # get the name and type by ordinal so that we can temporarily replace them.
-        original = internal.utils.string.of(idaapi.get_numbered_type_name(til, ordinal))
-        serialized = tinfo.get_numbered_type(til, ordinal)
+        if index > 0:
+            original = internal.utils.string.of(idaapi.get_numbered_type_name(til, index))
+            serialized = tinfo.get_numbered_type(til, index)
 
-        # if we were able to get the type, then replace it with our temporary name. if we
-        # failed at either, then we assign an error code which will result in non-action.
-        res = idaapi.set_numbered_type(til, ordinal, idaapi.NTF_REPLACE | idaapi.NTF_SYMU, internal.utils.string.to(temporary), *serialized) if serialized else idaapi.TERR_SAVE
+        else:
+            library_desc = tinfo.format_library(til)
+            raise internal.exceptions.LocalTypeNotFoundError(u"{:s}.typename({:d}, {:s}{:s}) : Unable to find the specified local type {:s} in the \"{:s}\" library.".format('.'.join([__name__, cls.__name__]), ordinal_desc, library_desc, '' if name is None else ", name=\"{:s}\"".format(name), "at ordinal #{:d}".format(index) if index == ordinal else "using the given identifier ({:#x}) at ordinal #{:d}".format(ordinal, index), internal.utils.string.of(til.desc)))
+
+        # if we got the type, then replace it with our temporary named one. if
+        # we failed, though, then we error out with an inaction code.
+        res = idaapi.set_numbered_type(til, index, idaapi.NTF_REPLACE | idaapi.NTF_SYMU, internal.utils.string.to(temporary), *serialized) if serialized else idaapi.TERR_SAVE
         try:
             yield temporary if res == idaapi.TERR_OK else original
 
         finally:
-            res = idaapi.set_numbered_type(til, ordinal, idaapi.NTF_REPLACE | idaapi.NTF_SYMU, internal.utils.string.to(original), *serialized) if serialized else idaapi.TERR_OK
+            res = idaapi.set_numbered_type(til, index, idaapi.NTF_REPLACE | idaapi.NTF_SYMU, internal.utils.string.to(original), *serialized) if serialized else idaapi.TERR_OK
 
         # if we couldn't reapply the type then this is critical and we can only log it.
         if res != idaapi.TERR_OK:
             library_desc = tinfo.format_library(til)
             errname, errdesc = tinfo.format_type_error(res)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
-            logging.fatal(u"{:s}.typename({:d}, {:s}{:s}) : Unable to restore the original name (\"{:s}\") to ordinal #{:d} from the \"{:s}\" library which is currently named \"{:s}\" due to error {!s}.".format('.'.join([__name__, cls.__name__]), ordinal, library_desc, '' if name is None else ", name=\"{:s}\"".format(name), internal.utils.string.escape(original, '"'), ordinal, internal.utils.string.of(til.desc), internal.utils.string.escape(temporary, '"'), description))
+            logging.fatal(u"{:s}.typename({:d}, {:s}{:s}) : Unable to restore the original name (\"{:s}\") from the temporary name (\"{:s}\") for ordinal #{:d} in the \"{:s}\" library due to error {!s}.".format('.'.join([__name__, cls.__name__]), ordinal, library_desc, '' if name is None else ", name=\"{:s}\"".format(name), internal.utils.string.escape(original, '"'), internal.utils.string.escape(temporary, '"'), index, internal.utils.string.of(til.desc), description))
         return
 
     @classmethod
