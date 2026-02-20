@@ -12927,6 +12927,60 @@ class decode(object):
         idaapi.FF_DOUBLE : 'd',
     }
 
+    # This is a similar map to the previous one, but it is for mapping a local
+    # type `idaapi.tinfo_t` into an array element size.
+    v9_integer_typecode = {
+        idaapi.BT_VOID | idaapi.BTMT_SIZE12:    internal.utils.get_array_typecode(1).upper(),
+        idaapi.BT_UNK  | idaapi.BTMT_SIZE12:    internal.utils.get_array_typecode(2).upper(),
+        idaapi.BT_VOID | idaapi.BTMT_SIZE48:    internal.utils.get_array_typecode(4).upper(),
+        idaapi.BT_UNK  | idaapi.BTMT_SIZE48:    internal.utils.get_array_typecode(8).upper(),
+        #idaapi.BT_VOID | idaapi.BTMT_SIZE128:   internal.utils.get_array_typecode(16).upper(),
+
+        # Character types
+        idaapi.BTMT_CHAR | idaapi.BT_INT8:      internal.utils.get_array_typecode(1).upper(),
+        idaapi.BTMT_CHAR | idaapi.BT_INT:      internal.utils.get_array_typecode(2).upper(),
+
+        # We explicitly check for these integer types
+        #idaapi.BT_INT: None,
+        #idaapi.BT_INT | idaapi.BTMT_SIGNED:                     None,
+        #idaapi.BT_INT | idaapi.BTMT_UNSIGNED:                   None,
+
+        # Integers of unknown signedness
+        idaapi.BT_INT8 | idaapi.BTMT_UNKSIGN:   internal.utils.get_array_typecode(1).upper(),
+        idaapi.BT_INT16 | idaapi.BTMT_UNKSIGN:  internal.utils.get_array_typecode(2).upper(),
+        idaapi.BT_INT32 | idaapi.BTMT_UNKSIGN:  internal.utils.get_array_typecode(4).upper(),
+        idaapi.BT_INT64 | idaapi.BTMT_UNKSIGN:  internal.utils.get_array_typecode(8).upper(),
+        #idaapi.BT_INT128 | idaapi.BTMT_UNKSIGN: internal.utils.get_array_typecode(16).upper(),
+
+        # Integers that are signed
+        idaapi.BT_INT8 | idaapi.BTMT_SIGNED:                    internal.utils.get_array_typecode(1).lower(),
+        idaapi.BT_INT16 | idaapi.BTMT_SIGNED:                   internal.utils.get_array_typecode(2).lower(),
+        idaapi.BT_INT32 | idaapi.BTMT_SIGNED:                   internal.utils.get_array_typecode(4).lower(),
+        idaapi.BT_INT64 | idaapi.BTMT_SIGNED:                   internal.utils.get_array_typecode(8).lower(),
+        #idaapi.BT_INT128 | idaapi.BTMT_SIGNED:                 internal.utils.get_array_typecode(16).lower(),
+
+        # Integers that are unsigned
+        idaapi.BT_INT8 | idaapi.BTMT_UNSIGNED:                    internal.utils.get_array_typecode(1).upper(),
+        idaapi.BT_INT16 | idaapi.BTMT_UNSIGNED:                   internal.utils.get_array_typecode(2).upper(),
+        idaapi.BT_INT32 | idaapi.BTMT_UNSIGNED:                   internal.utils.get_array_typecode(4).upper(),
+        idaapi.BT_INT64 | idaapi.BTMT_UNSIGNED:                   internal.utils.get_array_typecode(8).upper(),
+        #idaapi.BT_INT128 | idaapi.BTMT_UNSIGNED:                 internal.utils.get_array_typecode(16).upper(),
+
+        # Booleans
+        idaapi.BT_BOOL | idaapi.BTMT_BOOL1:   internal.utils.get_array_typecode(1).upper(),
+        idaapi.BT_BOOL | idaapi.BTMT_BOOL4:   internal.utils.get_array_typecode(4).upper(),
+
+        # We explicitly check for these boolean types
+        #idaapi.BT_BOOL | idaapi.BTMT_DEFBOOL: None,
+        #idaapi.BT_BOOL | idaapi.BTMT_BOOL2:   internal.utils.get_array_typecode(2).upper(),
+        #idaapi.BT_BOOL | idaapi.BTMT_BOOL8:   internal.utils.get_array_typecode(8).upper(),
+
+        # Floats
+        idaapi.BT_FLOAT | idaapi.BTMT_FLOAT: 'f',
+        idaapi.BT_FLOAT | idaapi.BTMT_DOUBLE: 'd',
+        #idaapi.BT_FLOAT | idaapi.BTMT_LNGDOUBLE: internal.utils.get_array_typecode(16).upper(), # XXX: unsupported
+    }
+
     # Some 32-bit versions of python might not have array.array('Q')
     # and some versions of IDA also might not have FF_QWORD..
     try:
@@ -12944,6 +12998,68 @@ class decode(object):
         idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD : 4,
         idaapi.FF_FLOAT : 4,
         idaapi.FF_DOUBLE : 8,
+    }
+
+    v9_length_table = {
+        idaapi.BT_VOID | idaapi.BTMT_SIZE12:    1,
+        idaapi.BT_UNK  | idaapi.BTMT_SIZE12:    2,
+        idaapi.BT_VOID | idaapi.BTMT_SIZE48:    4,
+        idaapi.BT_UNK  | idaapi.BTMT_SIZE48:    8,
+        idaapi.BT_VOID | idaapi.BTMT_SIZE128:   16,
+
+        # Character types
+        idaapi.BTMT_CHAR | idaapi.BT_INT8:      1,
+        idaapi.BTMT_CHAR | idaapi.BT_INT:      2,
+
+        # We explicitly check for these integer types
+        #idaapi.BT_INT:                                          None,
+        #idaapi.BT_INT | idaapi.BTMT_SIGNED:                     None,
+        #idaapi.BT_INT | idaapi.BTMT_UNSIGNED:                   None,
+
+        # Integers of unknown signedness
+        idaapi.BT_INT8 | idaapi.BTMT_UNKSIGN:    1,
+        idaapi.BT_INT16 | idaapi.BTMT_UNKSIGN:   2,
+        idaapi.BT_INT32 | idaapi.BTMT_UNKSIGN:   4,
+        idaapi.BT_INT64 | idaapi.BTMT_UNKSIGN:   8,
+        idaapi.BT_INT128 | idaapi.BTMT_UNKSIGN: 16,
+
+        # Signed integers
+        idaapi.BT_INT8 | idaapi.BTMT_SIGNED:  1,
+        idaapi.BT_INT16 | idaapi.BTMT_SIGNED: 2,
+        idaapi.BT_INT32 | idaapi.BTMT_SIGNED: 4,
+        idaapi.BT_INT64 | idaapi.BTMT_SIGNED: 8,
+        idaapi.BT_INT128 | idaapi.BTMT_SIGNED: 16,
+
+        # Unsigned integers
+        idaapi.BT_INT8 | idaapi.BTMT_UNSIGNED: 1,
+        idaapi.BT_INT16 | idaapi.BTMT_UNSIGNED: 2,
+        idaapi.BT_INT32 | idaapi.BTMT_UNSIGNED: 4,
+        idaapi.BT_INT64 | idaapi.BTMT_UNSIGNED: 8,
+        idaapi.BT_INT128 | idaapi.BTMT_UNSIGNED: 16,
+
+        # Booleans
+        idaapi.BT_BOOL | idaapi.BTMT_BOOL1:   1,
+        idaapi.BT_BOOL | idaapi.BTMT_BOOL4:   4,
+
+        # We explicitly check for these boolean types
+        #idaapi.BT_BOOL | idaapi.BTMT_DEFBOOL: None,
+        #idaapi.BT_BOOL | idaapi.BTMT_BOOL2:   2,
+        #idaapi.BT_BOOL | idaapi.BTMT_BOOL8:   8,
+
+        # Floats
+        idaapi.BT_FLOAT | idaapi.BTMT_FLOAT: 4,
+        idaapi.BT_FLOAT | idaapi.BTMT_DOUBLE: 8,
+        idaapi.BT_FLOAT | idaapi.BTMT_LNGDBL: 16,
+    }
+
+    # Set of integers that can have a signedness to it.
+    v9_integer_table = {
+        idaapi.BT_INT,
+        idaapi.BT_INT8,
+        idaapi.BT_INT16,
+        idaapi.BT_INT32,
+        idaapi.BT_INT64,
+        idaapi.BT_INT128,
     }
 
     # Define a temporary closure that will be used to update the length table
@@ -13051,7 +13167,54 @@ class decode(object):
     @classmethod
     def integers(cls, dtype, bytes, **byteorder):
         '''Decode `bytes` into an array of integers that are of the specified `dtype`.'''
+        masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
         order = cls.byteorder(**byteorder)
+
+        # If we were given a `tinfo_t` for the dtype, grab its identifier, and
+        # then figure out how we can decode it to return a list of integers.
+        if isinstance(dtype, idaapi.tinfo_t):
+            ti, sid = tinfo.copy(dtype), tinfo.identifier(dtype)
+            decl, size = ti.get_decltype(), tinfo.size(ti)
+            base, flags, modifiers = (decl & mask for mask in masks)
+
+            # If we don't have a typecode registers, then use the type length.
+            if not operator.contains(cls.v9_integer_typecode, base | flags):
+                decode = cls.float if ti.is_floating() else cls.signed if flags == idaapi.BTMT_SIGNED else cls.unsigned
+                items = cls.list(cls.v9_length_table[base | flags], bytes)
+                reordered = [item if order == 'big' else item[::-1] for item in items]
+                return [decode(item) for item in reordered]
+
+            # If the array's itemsize doesn't match our expected element size,
+            # then we warn the user about it and hijack the array decoding with
+            # our own determined unsigned length.
+            typecode = cls.v9_integer_typecode[base | flags]
+            cb, result = cls.v9_length_table[base | flags], _array.array(typecode)
+            if result.itemsize != cb:
+                element = result.itemsize
+
+                # Use the array element size to reconstruct the array.
+                try:
+                    result = _array.array(internal.utils.get_array_typecode(cb, 1))
+
+                # If we couldn't use the typecode from the element, then assume
+                # that each element are just individual bytes.
+                except ValueError:
+                    result = _array.array(internal.utils.get_array_typecode(1))
+                logging.warning(u"{:s}.integers({:#x}, {!s}) : Using a different element size ({:+d}) due to the size ({:+d}) detected for the type {!s} not matching the array item size ({:+d}).".format('.'.join([__name__, cls.__name__]), sid, '...', result.itemsize, cb, tinfo.quoted(ti), element))
+
+            # Verify the number of bytes being decoded corresponds to the length
+            # of each individual array element.
+            mask = result.itemsize - 1
+            if result.itemsize and len(bytes) % result.itemsize:
+                extra = len(bytes) & mask
+                logging.info(u"{:s}.integers({:#x}, {!s}) : The amount of data available ({:d}) for decoding is not a multiple of the element size ({:d}) and will result in discarding {:+d} byte{:s} when decoding.".format('.'.join([__name__, cls.__name__]), sid, '...', len(bytes), result.itemsize, extra, '' if extra == 1 else 's'))
+                bytes = bytes[:-extra] if extra else bytes
+
+            # Now we can use the given bytes to initialize the _array, flip it
+            # for the byteorder, and then we can return it to the user.
+            result.fromstring(builtins.bytes(bytes)) if sys.version_info.major < 3 else result.frombytes(bytes)
+            result if order == sys.byteorder else result.byteswap()
+            return result
 
         # If the dtype is not associated with a typecode supported by the _array
         # module, then we need to do the decoding ourselves. We start by figuring
@@ -13219,10 +13382,14 @@ class decode(object):
             ti, sid = tinfo.copy(type), tinfo.identifier(type)
         elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
             ti, sid = ti, type
+        elif isinstance(type, internal.structure.structure_t):
+            ti, sid = type.ptr, type.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            ti, sid = type, type.id
         elif isinstance(type, internal.types.integer):
-            raise internal.exceptions.InvalidParameterError(u"{:s}.fragment_bytes({:#x}, ...) : Unable to determine the type for the specified identifier ({!r}).".format('.'.join([__name__, cls.__name__]), type, type))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.fragment_bytes({:#x}, ...) : Unable to determine the type from the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type, type))
         else:
-            ti, sid = type.ptr if isinstance(type, internal.structure.structure_t) else type, type.id
+            raise internal.exceptions.InvalidParameterError(u"{:s}.fragment_bytes({!r}, ...) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
 
         # Verify that the type information we were given is not a union.
         if isinstance(ti, idaapi.tinfo_t):
@@ -13309,6 +13476,27 @@ class decode(object):
         if not sptr:
             raise internal.exceptions.StructureNotFoundError(u"{:s}.structure_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) was not found.".format('.'.join([__name__, cls.__name__]), sptr.id, internal.utils.pycompat.fullname(sptr.__class__), sptr.id))
         return cls.union_bytes(sptr, bytes) if sptr.props & SF_UNION else cls.fragment_bytes(sptr, bytes)
+
+    @classmethod
+    def typeinfo_bytes(cls, type, bytes):
+        '''Use the specified `type` with `bytes` to return a dictionary of the individual fields and the bytes that compose them.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = tinfo.copy(type), tinfo.identifier(type)
+        elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        elif isinstance(type, internal.structure.structure_t):
+            ti, sid = type.ptr, type.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            ti, sid = type, type.id
+        elif isinstance(type, internal.types.integer):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.typeinfo_bytes({:#x}, ...) : Unable to determine the type for the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type, type))
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.typeinfo_bytes({!r}, ...) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
+
+        if isinstance(ti, idaapi.tinfo_t):
+            return cls.fragment_bytes(ti, bytes)
+        return cls.structure_bytes(sid, bytes)
 
     @classmethod
     def structure(cls, identifier, fields, **byteorder):
@@ -13506,6 +13694,189 @@ class decode(object):
         # Otherwise, we can just decode everything using whatever flags we got for it.
         length = cls.length_table[dsize]
         return cls.integers(flags, bytes, order=order)
+
+    @classmethod
+    def v9structure(cls, identifier, fields, **byteorder):
+        '''Use the type specified by `identifier` with the bytes in `fields` to return a dictionary of the decoded fields.'''
+        ti, order = idaapi.tinfo_t(), cls.byteorder(**byteorder)
+        if isinstance(identifier, idaapi.tinfo_t):
+            ti, sid = tinfo.copy(identifier), tinfo.identifier(identifier)
+        elif isinstance(identifier, internal.types.integer) and node.identifier(identifier) and ti.get_type_by_tid(identifier):
+            ti, sid = ti, identifier
+        elif isinstance(identifier, internal.structure.structure_t):
+            ti, sid = identifier.ptr, identifier.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(identifier, idaapi.struc_t):
+            ti, sid = identifier, identifier.id
+        elif isinstance(identifier, internal.types.integer):
+            raise E.InvalidParameterError(u"{:s}.v9structure({:#x}, ...{:s}) : Unable to locate the type using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', identifier))
+        else:
+            raise E.InvalidParameterError(u"{:s}.v9structure({!r}, ...{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', identifier.__class__))
+
+        # Use the byte order to get a closure for the byte order by size.
+        Fordered = (lambda length, data: data) if order.lower() == 'big' else (lambda length, data: functools.reduce(operator.add, (item[::-1] for item in cls.list(length, data))) if data else data)
+
+        # Now we can start iterating through the members belonging to the type,
+        # and use the name to figure out what bytes that we will be decoding.
+        result, partial = {}, byteorder.get('partial', False)
+        for mowner, mindex, udm in internal.structure.v9members.iterate(ti):
+            mname = internal.utils.string.of(udm.name)
+            mtype, mdata = tinfo.copy(udm.type), fields[mname]
+
+            # Grab the base, flags, and modifiers from the member declaration.
+            masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
+            decl, size = mtype.get_decltype(), tinfo.size(mtype)
+            base, flags, modifiers = (decl & mask for mask in masks)
+
+            # If it's a structure and the size matches exactly, then we recurse
+            # so that we can nest a dictionary of the decoded type.
+            if (mtype.is_struct() or mtype.is_union()) and size == len(mdata):
+                data = cls.union_bytes(mtype, mdata) if mtype.is_union() else cls.fragment_bytes(mtype, mdata)
+                result[mname] = cls.v9structure(mtype, data, order=order)
+
+            # If it's a structure and the size differs, then this is probably a
+            # a variable-length structure. If it's not, we just decode it as an
+            # an array similar to the classmethod for older structure types.
+            elif (mtype.is_struct() or mtype.is_union()) and size != len(mdata):
+                if mtype.is_varstruct():
+                    data = cls.union_bytes(mtype, mdata) if mtype.is_union() else cls.fragment_bytes(mtype, mdata)
+                    decoded = cls.v9structure(mtype, data, order=order)
+
+                # Otherwise, take our element, slice up its data, and decode
+                # each element into a list that we can assign.
+                else:
+                    sliced = cls.list(size, mdata)
+                    available, used = len(mdata), sum(len(item) for item in sliced)
+                    if available != used:
+                        logging.warning(u"{:s}.v9structure({:#x}, ...{:s}) : The amount of data available ({:#x}) for decoding the \"{:s}\" member is not a multiple of the size ({:d}) of the member ({:#x}) and will result in ignoring {:+d} byte{:s} during decoding.".format('.'.join([__name__, cls.__name__]), sid, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', available, mname, size, ti.get_udm_tid(mindex), available - used, '' if available - used == 1 else 's'))
+                    iterable = cls.partial(size, mdata) if partial else sliced
+                    decoded = [cls.v9structure(mtype, cls.fragment_bytes(mtype, item), order=order, partial=partial) for item in iterable]
+
+                # Now we can assign our decoded structure to our results.
+                result[mname] = decoded
+
+            # If it's a floating-point type, then decode it as one using the
+            # size of the specified floating point type.
+            elif base == idaapi.BT_FLOAT:
+                length = cls.v9_length_table[base | flags]
+                result[mname] = cls.float(Fordered(length, mdata)) if length == len(mdata) else cls.integers(mtype, mdata, order=order) or bytes(mdata)
+
+            # If we have an integer typecode that we've stored, or one of the
+            # non-constant sized types then we can use that typecode first.
+            elif operator.contains(cls.v9_integer_typecode, base | flags) or base == idaapi.BT_INT or (base == idaapi.BT_BOOL and flags in {idaapi.BTMT_DEFBOOL, idaapi.BTMT_BOOL2, idaapi.BTMT_BOOL8}):
+                boolean = {32: 2, 64: 8}
+
+                # Figure out the dynamic sizes first if they were specified,
+                # otherwise we fall back to our table, and assume a boolean if
+                # it wasn't found in the table.
+                if base == idaapi.BT_INT:
+                    length = tinfo.size(idaapi.tinfo_t(base | flags | modifiers))
+                elif operator.contains(cls.v9_length_table, base | flags):
+                    length = cls.v9_length_table[base | flags]
+                else:   # base == BT_BOOL
+                    length = boolean.get(database.bits(), database.bits() // 8)
+
+                # If the length matches, then decode an individual integer.
+                if length == len(mdata):
+                    Fdecode = cls.signed if base in cls.v9_integer_table and flags == idaapi.BTMT_SIGNED else cls.unsigned
+                    decoded = Fdecode(Fordered(length, mdata))
+
+                # Otherwise, decode the whole thing as an array of integers.
+                else:
+                    decoded = cls.integers(mtype, mdata, order=order)
+
+                # Then we can assign our decoded value.
+                result[mname] = decoded
+
+            # If our type is an array, then we need to decode it using the array
+            # classmethod so that we can decode it properly.
+            elif base == idaapi.BT_ARRAY:
+                element, length = tinfo.array(mtype)
+                decoded = cls.v9array(element, mdata, order=order)
+                result[mname] = decoded
+
+            # If our type is a pointer, then we need to decode it as an array
+            # and then assign it to our decoded result.
+            elif base == idaapi.BT_PTR:
+                target = ti.get_pointed_object()
+                offsets = cls.v9array(target, mdata, order=order)
+                result[mname] = offsets if len(offsets) > 1 else offsets[0] if offsets else bytes(mdata)
+
+            # Otherwise, we fall back to just the raw data with the length.
+            else:
+                length = cls.v9_length_table[base | flags]
+                result[mname] = cls.unsigned(Fordered(length, mdata)) if length == len(mdata) else cls.integers(mptr.flag, mdata, order=order) or bytes(mdata)
+            continue
+
+        # Update our results with raw data if we haven't assigned a field yet.
+        result.update({key : fields[key] for key in fields if key not in result and fields[key]})
+        return result if partial else {key : value for key, value in result.items() if isinstance(key, internal.types.integer) or not isinstance(value, (bytes, bytearray))}
+
+    @classmethod
+    def v9array(cls, identifier, bytes, **byteorder):
+        '''Return the specified `bytes` as an array of the type specified by `identifier`.'''
+        ti, order = idaapi.tinfo_t(), cls.byteorder(**byteorder)
+        if isinstance(identifier, idaapi.tinfo_t):
+            ti, sid = tinfo.copy(identifier), tinfo.identifier(identifier)
+        elif isinstance(identifier, internal.types.integer) and node.identifier(identifier) and ti.get_type_by_tid(identifier):
+            ti, sid = ti, identifier
+        elif isinstance(identifier, internal.structure.structure_t):
+            ti, sid = identifier.ptr, identifier.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(identifier, idaapi.struc_t):
+            ti, sid = identifier, identifier.id
+        elif isinstance(identifier, internal.types.integer):
+            raise E.InvalidParameterError(u"{:s}.v9array({:#x}, ...{:s}) : Unable to locate the type using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', identifier))
+        else:
+            raise E.InvalidParameterError(u"{:s}.v9array({!r}, ...{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', identifier.__class__))
+
+        # If we were given an array type, then extract its element member type.
+        if ti.is_array():
+            melement, mcount = tinfo.array(ti)
+
+        # Otherwise, use the data available as the length of the array.
+        else:
+            mcount, extra = divmod(len(bytes), tinfo.size(ti))
+            melement, mcount = ti, 1 + mcount if extra else mcount
+
+        # First extract the array member element and number of elements from the
+        # specified type. Then grab the base, flags, and modifiers from it.
+        mtype, partial = melement, byteorder.get('partial', False)
+        msize = tinfo.size(melement)
+
+        masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
+        decl, size = mtype.get_decltype(), tinfo.size(mtype)
+        base, flags, modifiers = (decl & mask for mask in masks)
+
+        # Now that we can slice up the available bytes, start by checking if our
+        # array element type is a structure or a union and try decoding it.
+        if mtype.is_struct() or mtype.is_union():
+            sliced = cls.list(msize, bytes)
+            available, used = len(bytes), sum(len(item) for item in sliced)
+            if available != used:
+                logging.warning(u"{:s}.array({:#x}, ...{:s}) : The amount of data available ({:#x}) for decoding is not a multiple of the structure size ({:+#x}) and will result in discarding {:+d} byte{:s} when attempting to decode the array.".format('.'.join([__name__, cls.__name__]), sid, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', available, msize, available - used, '' if available - used == 1 else 's'))
+
+            # If we're decoding structures partially, then split up the bytes
+            # and use it to decode a list of structures.
+            iterable = cls.partial(msize, bytes) if partial else sliced
+            return [cls.v9structure(mtype, cls.typeinfo_bytes(mtype, item), order=order, partial=partial) for item in iterable]
+
+        # If the array element type is another array, then this array is nested.
+        elif mtype.is_array():
+            sliced = cls.partial(msize, bytes) if partial else cls.list(msize, bytes)
+            available, used = len(bytes), sum(len(item) for item in sliced)
+            if available != used:
+                logging.warning(u"{:s}.array({:#x}, ...{:s}) : The amount of data available ({:#x}) for decoding is not a multiple of the element size ({:+#x}) and will result in discarding {:+d} byte{:s} when attempting to decode the array.".format('.'.join([__name__, cls.__name__]), sid, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', available, msize, available - used, '' if available - used == 1 else 's'))
+            return [cls.v9array(mtype, item) for item in sliced]
+
+        # If we have the type inside our length table, then figure out the
+        # integer type from it and decode some bytes with it.
+        elif operator.contains(cls.v9_length_table, base | flags):
+            return cls.integers(mtype, bytes, order=order)
+
+        # Otherwise it's not an integer and we don't know how to process it. So,
+        # we use its size to slice up the array and return a list of the data.
+        logging.warning(u"{:s}.array({:#x}, ...{:s}) : Unable to determine the element decoding type for the specified array element {!s} with the given declaration ({:#x}) and flags ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', tinfo.quoted(mtype), base, flags))
+        sliced = cls.partial(msize, bytes) if partial else cls.list(msize, bytes)
+        return [item for item in sliced]
 
 class name(object):
     """
