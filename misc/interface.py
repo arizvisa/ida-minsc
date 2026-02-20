@@ -13177,8 +13177,42 @@ class decode(object):
             decl, size = ti.get_decltype(), tinfo.size(ti)
             base, flags, modifiers = (decl & mask for mask in masks)
 
+            # If the integer type is one of our automatically-sized ones, then
+            # we need to calculate the correct size ourselves.
+            if base == idaapi.BT_INT or (base == idaapi.BT_BOOL and flags in {idaapi.BTMT_DEFBOOL, idaapi.BTMT_BOOL2, idaapi.BTMT_BOOL8}):
+                boolean = {32: 2, 64: 8}
+
+                # Figure out the size of the type that we're supposed to use.
+                if base == idaapi.BT_INT:
+                    length = tinfo.size(idaapi.tinfo_t(base | flags | modifiers))
+                elif operator.contains(cls.v9_length_table, base | flags):
+                    length = cls.v9_length_table[base | flags]
+                else:   # base == idaapi.BT_BOOL:
+                    length = boolean.get(database.bits(), database.bits() // 8)
+
+                # Now we can slice our data and decode our integers from it.
+                decode = cls.signed if flags == idaapi.BTMT_SIGNED else cls.unsigned
+                items = cls.list(length, bytes)
+                reordered = [item if order == 'big' else item[::-1] for item in items]
+                return [decode(item) for item in reordered]
+
+            # If our integer type is one of the large integers, then we handle
+            # that here too.
+            elif (base, flags) == (idaapi.BT_VOID, idaapi.BTMT_SIZE128) or base == idaapi.BT_INT128:
+                length, _ = divmod(128, 8)
+
+                if base == idaapi.BT_INT128:
+                    decode = cls.signed if flags == idaapi.BTMT_SIGNED else cls.unsigned
+                else:
+                    decode = cls.unsigned
+
+                # All that is left to do is to slice our data and decode it.
+                items = cls.list(length, bytes)
+                reordered = [item if order == 'big' else item[::-1] for item in items]
+                return [decode(item) for item in reordered]
+
             # If we don't have a typecode registers, then use the type length.
-            if not operator.contains(cls.v9_integer_typecode, base | flags):
+            elif not operator.contains(cls.v9_integer_typecode, base | flags):
                 decode = cls.float if ti.is_floating() else cls.signed if flags == idaapi.BTMT_SIGNED else cls.unsigned
                 items = cls.list(cls.v9_length_table[base | flags], bytes)
                 reordered = [item if order == 'big' else item[::-1] for item in items]
