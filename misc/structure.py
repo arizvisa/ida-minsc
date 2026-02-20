@@ -66,6 +66,11 @@ def union(type):
     '''Return whether the structure in `type` is defined as a union.'''
     if isinstance(type, idaapi.tinfo_t):
         return type.is_union()
+    elif isinstance(type, types.integer):
+        sptr = idaapi.get_struc(type)
+        if sptr is None:
+            raise E.StructureNotFoundError(u"{:s}.union({:#x}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, type, type))
+        type = idaapi.get_struc(type)
     SF_UNION = getattr(idaapi, 'SF_UNION', 0x2)
     return True if type.props & SF_UNION else False
 
