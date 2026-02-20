@@ -13469,12 +13469,25 @@ class decode(object):
 
     @classmethod
     def structure_bytes(cls, identifier, bytes):
-        '''Use the structure specified by `identifier` with the specified `bytes` to return a dictionary of the individual fields and the bytes that compose them.'''
-        SF_VAR, SF_UNION = getattr(idaapi, 'SF_VAR', 0x1), getattr(idaapi, 'SF_UNION', 0x2)
+        '''Use the type specified by `identifier` with the specified `bytes` to return a dictionary of the individual fields and the bytes that compose them.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(identifier, idaapi.tinfo_t):
+            ti, sid = tinfo.copy(identifier), tinfo.identifier(identifier)
+        elif isinstance(identifier, internal.types.integer) and node.identifier(identifier) and ti.get_type_by_tid(identifier):
+            ti, sid = ti, identifier
+        elif isinstance(identifier, internal.structure.structure_t):
+            ti, sid = identifier.ptr, identifier.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(identifier, idaapi.struc_t):
+            ti, sid = identifier, identifier.id
+        elif isinstance(identifier, internal.types.integer):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.structure_bytes({:#x}, ...) : Unable to determine the type for the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), identifier, identifier))
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.structure_bytes({!r}, ...) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), identifier, identifier.__class__))
 
-        sptr = idaapi.get_struc(identifier)
+        sptr = idaapi.get_struc(sid)
         if not sptr:
-            raise internal.exceptions.StructureNotFoundError(u"{:s}.structure_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) was not found.".format('.'.join([__name__, cls.__name__]), sptr.id, internal.utils.pycompat.fullname(sptr.__class__), sptr.id))
+            raise internal.exceptions.StructureNotFoundError(u"{:s}.structure_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) was not found.".format('.'.join([__name__, cls.__name__]), sid, internal.utils.pycompat.fullname(sptr.__class__), sid))
+        SF_VAR, SF_UNION = getattr(idaapi, 'SF_VAR', 0x1), getattr(idaapi, 'SF_UNION', 0x2)
         return cls.union_bytes(sptr, bytes) if sptr.props & SF_UNION else cls.fragment_bytes(sptr, bytes)
 
     @classmethod
