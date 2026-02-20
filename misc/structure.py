@@ -78,6 +78,11 @@ def frame(type):
     '''Return whether the structure in `type` belongs to a function as a frame.'''
     if isinstance(type, idaapi.tinfo_t):
         return False if idaapi.__version__ < 8.5 else type.is_frame()
+    elif isinstance(type, types.integer):
+        sptr = idaapi.get_struc(type)
+        if sptr is None:
+            raise E.StructureNotFoundError(u"{:s}.frame({:#x}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, type, type))
+        type = idaapi.get_struc(type)
     SF_FRAME = getattr(idaapi, 'SF_FRAME', 0x40)
     return True if type.props & SF_FRAME else False
 
