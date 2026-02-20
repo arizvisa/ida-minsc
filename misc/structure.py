@@ -4889,6 +4889,7 @@ class members(object):
     @classmethod
     def by_index(cls, sptr, index):
         '''Return the member at the specified `index` of the structure identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
         if not(0 <= index < sptr.memqty):
             is_union, sid = union(sptr), sptr.id if isinstance(sptr, idaapi.struc_t) else sptr
             raise E.MemberNotFoundError(u"{:s}.by_index({:#x}, {:d}) : Unable to find a member at the specified index ({:d}) of the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, index, index, 'union' if is_union else 'frame' if frame(sptr) else 'structure', sid))
