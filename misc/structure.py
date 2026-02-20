@@ -2709,21 +2709,94 @@ class v9members(object):
     def in_offset(cls, type, offset):
         '''Yield the members at the given `offset` of the specified union `type`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
-        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
 
+        tinfo, utd = idaapi.tinfo_t(), idaapi.udt_type_data_t()
+        if isinstance(type, idaapi.tinfo_t):
+            tinfo, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, internal.types.integer) and interface.node.identifier(type) and tinfo.get_type_by_tid(type):
+            tinfo, sid = tinfo, type
+        elif isinstance(type, structure_t) and tinfo.get_type_by_tid(type.id):
+            tinfo, sid = tinfo, type.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t) and tinfo.get_type_by_tid(type.id):
+            tinfo, sid = tinfo, type.id
+        elif isinstance(type, internal.types.integer):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.in_offset({:#x}, {:+#x}) : Unable to determine the type from the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type, offset, type))
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.in_offset({!r}, {:+#x}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, offset, type.__class__))
+
+        # Try and get the structure/union details if it actually is one.
         if not (tinfo.is_struct() or union(tinfo)):
-            raise E.InvalidTypeOrValueError(u"{:s}.in_offset({!s}, {:+#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+            raise E.InvalidTypeOrValueError(u"{:s}.in_offset({:#x}, {:+#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), sid, offset))
         elif not tinfo.get_udt_details(utd):
-            raise E.DisassemblerError(u"{:s}.in_offset({!s}, {:+#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+            raise E.DisassemblerError(u"{:s}.in_offset({:#x}, {:+#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), sid, offset))
         else:
             realoffset = int(offset)
 
-        # Start out by grabbing the structure dimensions and type.
+        # Start out by grabbing the structure dimensions, type, and other stuff.
         bits, key, count = 8 * utd.total_size, udm_t(), utd.size()
-        key.offset, is_union, is_variable = realoffset, union(tinfo), tinfo.is_varstruct()
+        key.offset, is_union, is_variable, is_frame = realoffset, union(tinfo), tinfo.is_varstruct(), tinfo.is_frame() if hasattr(tinfo, 'is_frame') else False
 
-        # FIXME: this is incomplete
-        raise NotImplementedError
+        type_description = 'frame' if is_frame else 'union' if is_union else 'structure'
+        candidates = [(ti, mindex, udm) for ti, mindex, udm in cls.at_offset(tinfo, offset)]
+        if len(candidates) > 1:
+            iterable = (v9member.fullname(ti, mindex) for ti, mindex, _ in candidates)
+            logging.warning(u"{:s}.in_offset({:#x}, {:+#x}) : The specified offset ({:#x}) is currently occupied by more than one member ({:s}).".format('.'.join([__name__, cls.__name__]), sid, offset, offset, ', '.join(iterable)))
+
+        # Iterate through the candidates and select the best order.
+        selected = []
+        for ti, mindex, udm in cls.at_offset(tinfo, offset):
+            candidate = ti, mindex, udm
+            realoffset = offset - (0 if union(ti) else udm.offset)
+            mtype, msize = interface.tinfo.copy(udm.type), udm.size
+
+            # If our member is an array, then we need to check if our offset
+            # points to the beginning of one of its members.
+            if mtype.is_array():
+                melement, mcount = interface.tinfo.array(mtype)
+            else:
+                melement, mcount = mtype, 1
+
+            # Take the realoffset and use it to figure out where in the element
+            # the realoffset is actually pointing at.
+            index, inexactness = divmod(realoffset, 8 * interface.tinfo.size(melement))
+
+            # Now we check if it's a basic type to prioritize it high.
+            if interface.tinfo.basic(melement):
+                priority = -2 if msize == 8 * interface.tinfo.size(melement) and not inexactness else -1 if not inexactness else 0
+
+            # If it's a structure, then set a value that can be scaled.
+            elif melement.is_struct() or union(melement):
+                priority = -3 if msize == 8 * interface.tinfo.size(melement) and not inexactness else -2 if not inexactness else -1
+
+            # Otherwise, this is unknown which we give the very last priority.
+            else:
+                priority = 3 if msize == melement and not inexactness else 4 if not inexactness else 5
+
+            # If we found a structure, then bump its priority if the realoffset
+            # points directly to one of its members.
+            udm = udm_t()
+            udm.offset = realoffset
+            mchild = mtype.find_udm(udm, idaapi.STRMEM_OFFSET) if mtype.is_struct() or mtype.is_union() else -1
+
+            if mtype.is_struct() or mtype.is_union():
+                moffset = realoffset - (0 if union(mtype) else udm.offset)
+                index, inexactness = v9member.at(mtype, mchild, moffset)
+                priority *= 3 if 0 <= mchild and not moffset and not inexactness else 2 if 0 <= mchild and not inexactness else 1
+
+            # Now we add the member to the heap and continue onto the next one.
+            heapq.heappush(selected, (priority, candidate))
+
+        # Log the order of the members that were prioritized to allow for
+        # debugging in case the logic for this is all wrong.
+        ordered = [candidate for priority, candidate in heapq.nsmallest(len(selected), selected)]
+        iterable = ((ti, mindex, v9member.fullname(ti, mindex)) for ti, mindex, udm in ordered)
+        messages = (u"[{:d}] {:s} {:#x}{:+#x}".format(1 + index, fullname, 0 if union(ti) else udm.offset, udm.offset + udm.size) for index, (ti, mindex, fullname) in enumerate(iterable))
+        [ logging.info(msg) for msg in messages ]
+
+        # That's it, so we can just yield our candidates and hope for the best.
+        for ti, mindex, udm in ordered:
+            yield ti, mindex, udm
+        return
 
     @classmethod
     def at_bounds(cls, type, start, stop):
