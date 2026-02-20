@@ -4736,6 +4736,24 @@ class members(object):
         return 0 <= realoffset < size
 
     @classmethod
+    def has_identifier(cls, sptr, identifier):
+        '''Return whether the member with the specified `identifier` belongs to the structure identified `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        result = idaapi.get_member_by_id(identifier)
+
+        # If we couldn't find the structure, then there is no way for the
+        # structure to contain the specified member identifier.
+        if not sptr:
+            return False
+
+        elif not result:
+            raise E.MemberNotFoundError(u"{:s}.by_identifier({!s}, {:#x}) : Unable to locate the member using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(sptr.id), identifier, identifier))
+
+        # Unpack the result and check the identifier of the owning structure.
+        mptr, fullname, sptr_ = result
+        return sptr_.id == sptr.id
+
+    @classmethod
     def has_name(cls, sptr, name):
         '''Return whether a member with the specified `name` exists within the structure identified by `sptr`.'''
         sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
