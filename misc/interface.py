@@ -13801,6 +13801,73 @@ class decode(object):
                 # Now we can assign our decoded structure to our results.
                 result[mname] = decoded
 
+            # If the member is a string-literal, then grab its `value_repr_t` so
+            # that we can decode the string correctly.
+            elif hasattr(udm, 'repr') and udm.repr.is_strlit():
+                width, length, _, _ = string.unpack(udm.repr.strtype)
+                #codec = string.codec(width, encoding)
+                #Fdecode = internal.utils.fidentity if codec is None else functools.partial(codec.decode, errors='replace')
+                ldata, strdata = bytes[:length], bytes[length:]
+                prefix, decoded = cls.unsigned(Fordered(length, ldata)), cls.string(width, strdata, order=order)
+                if length and prefix != len(decoded):
+                    logging.warning(u"{:s}.v9structure({:#x}, ...{:s}) : The string that was decoded had a length ({:d}) that did not match the length stored as the prefix ({:d}).".format('.'.join([__name__, cls.__name__]), sid, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', length, prefix))
+                result[mname] = decoded
+
+            # If the member is a reference via a pointer, then we collect
+            # everything as a list of integers and then convert each element
+            # into a useful database address.
+            elif hasattr(udm, 'repr') and udm.repr.is_offset():
+                length, items = cls.v9_length_table[base | flags], cls.integers(mtype, bytes, order=order)
+
+                # Dictionary for looking up pointer size by the reference type.
+                rilength = {idaapi.REF_OFF8: 1, idaapi.REF_OFF16: 2, idaapi.REF_OFF32: 4, idaapi.REF_OFF64: 8}
+
+                # FIXME: It would be nice to add support for all the other
+                #        reference types here, but I don't know the correct way
+                #        to do this. So, we only handle REF_OFF8, REF_OFF16,
+                #        REF_OFF32, or REF_OFF64.
+
+                ritype, riflags = udm.repr.ri.flags & idaapi.REFINFO_TYPE, udm.repr.ri.flags
+
+                # FIXME: I'm not sure that I'm processing these flags above
+                #        correctly, since we're not supporting things like
+                #        REFINFO_SELFREF or REFINFO_NOBASE.
+
+                # If the reference info is signed then convert our items to fit
+                # within the type size.
+                if riflags & idaapi.REFINFO_SIGNEDOP and ritype in {idaapi.REF_OFF8, idaapi.REF_OFF16, idaapi.REF_OFF32, idaapi.REF_OFF64}:
+                    mask = pow(2, 8 * length) - 1
+                    signed = (idaapi.as_signed(item, 8 * length) for item in items)
+                    clamped = (item if item < 0 else item & mask for item in signed)
+
+                # If it's unsigned, then we figure out which mask to use so that
+                # we can apply it to each decoded integer.
+                elif ritype in {idaapi.REF_OFF8, idaapi.REF_OFF16, idaapi.REF_OFF32, idaapi.REF_OFF64}:
+                    mask = pow(2, 8 * rilength[ritype]) - 1
+                    clamped = (item & mask for item in items)
+
+                # Otherwise, Clamp the unsigned form to the reference type.
+                else:
+                    mask = pow(2, 8 * length) - 1
+                    clamped = (item & mask for item in items)
+
+                # Figure out which base to use for calculating the refinfo_t. If
+                # it's invalid and REFINFO_RVAOFF is set then use the imagebase.
+                refbase = 0 if info.ri.base == idaapi.BADADDR else info.ri.base
+                ribase = database.imagebase() if not refbase and riflags & idaapi.REFINFO_RVAOFF else refbase
+
+                # XXX: The following is commented because the REFINFO_SUBTRACT
+                #      flag doesn't affect the displayed target at all.
+
+                # Figure out whether we add or subtract the base from the target.
+                # op = functools.partial(operator.sub, ribase) if riflags & idaapi.REFINFO_SUBTRACT and ribase == info.ri.base else functools.partial(operator.add, ribase)
+
+                # Finally we just translate each item using the reference info
+                # with the delta, and then we can assign the result.
+                op = functools.partial(operator.add, ribase)
+                translated = [op(item + info.ri.tdelta) for item in clamped]
+                result[mname] = [ea for ea in translated] if mtype.is_array() else translated[0]
+
             # If it's a floating-point type, then decode it as one using the
             # size of the specified floating point type.
             elif base == idaapi.BT_FLOAT:
@@ -13918,6 +13985,37 @@ class decode(object):
         # integer type from it and decode some bytes with it.
         elif operator.contains(cls.v9_length_table, base | flags):
             return cls.integers(mtype, bytes, order=order)
+
+        # If our type is a pointer, then we need to slice up the bytes and
+        # return each element as an integer.
+        elif mtype.is_ptr():
+            ptd = idaapi.ptr_type_data_t()
+            if not mtype.get_ptr_details(ptd):
+                raise internal.exceptions.DisassemblerError(u"{:s}.array({:#x}, ...{:s}) : Unable to get the pointer type data for the specified type {!s}.".format('.'.join([__name__, cls.__name__]), sid, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', tinfo.quoted(mtype)))
+
+            # Create a table that maps the number of bits to a native type.
+            btlookup = {
+                0:      idaapi.BT_VOID | idaapi.BTMT_SIZE0,
+                8:      idaapi.BT_VOID | idaapi.BTMT_SIZE12,
+                16:     idaapi.BT_UNK | idaapi.BTMT_SIZE12,
+                32:     idaapi.BT_VOID | idaapi.BTMT_SIZE48,
+                64:     idaapi.BT_UNK | idaapi.BTMT_SIZE48,
+                128:    idaapi.BT_VOID | idaapi.BTMT_SIZE128,
+            }
+
+            # Figure out the size of the pointer so that we can figure out the
+            # type used for decoding each individual element.
+            tah = ptd.taptr_bits & idaapi.TAH_ALL
+            bits = 32 if tah == idaapi.TAPTR_PTR32 else 64 if tah == idaapi.TAPTR_PTR64 else database.bits()
+
+            # If we don't support this pointer size, then fall back to just
+            # slicing up the number of bytes according to the pointer size.
+            if bits not in btlookup:
+                return cls.partial(msize, bytes) if partial else cls.list(msize, bytes)
+
+            # Otherwise, we have a type to use and decode it as a list of ints.
+            etype = idaapi.tinfo_t(btlookup[bits])
+            return cls.integers(etype, bytes, order=order)
 
         # Otherwise it's not an integer and we don't know how to process it. So,
         # we use its size to slice up the array and return a list of the data.
