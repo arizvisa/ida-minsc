@@ -1938,6 +1938,30 @@ class v9members(object):
     an integer for its index, and the ``idaapi.udm_t`` which contains a copy of
     the member's information.
     """
+
+    @classmethod
+    def count(cls, type):
+        '''Return the number of members for the specified `type`.'''
+        tinfo, utd = idaapi.tinfo_t(), idaapi.udt_type_data_t()
+        if isinstance(type, idaapi.tinfo_t):
+            tinfo, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, internal.types.integer) and interface.node.identifier(type) and tinfo.get_type_by_tid(type):
+            tinfo, sid = tinfo, type
+        elif isinstance(type, structure_t) and tinfo.get_type_by_tid(type.id):
+            tinfo, sid = tinfo, type.id
+        elif isinstance(type, internal.types.integer):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.count({:#x}) : Unable to determine the type from the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type, type))
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.count({!r}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
+
+        # Get the structure/union details if the type has them, and return the
+        # size. Otherwise, raise an exception that we couldn't get them.
+        if not (tinfo.is_struct() or union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.count({:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), sid))
+        elif tinfo.get_udt_details(utd):
+            return utd.size()
+        raise E.DisassemblerError(u"{:s}.count({:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), sid))
+
     @classmethod
     def by(cls, *args, **caller):
         '''Internal function that gets information about a member given an id or a type and an index.'''
