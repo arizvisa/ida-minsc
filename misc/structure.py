@@ -6714,30 +6714,35 @@ class structure_t(object):
     @utils.multicase()
     def tag(self):
         '''Return a dictionary of the tags associated with the structure.'''
-        return internal.tags.structure.get(self.ptr)
+        sptr = self.ptr
+        return internal.tags.structure.get(sptr)
     @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key')
     def tag(self, key):
         '''Return the tag identified by `key` for the structure.'''
-        res = internal.tags.structure.get(self.ptr)
+        sptr = self.ptr
+        res = internal.tags.structure.get(sptr)
         if key in res:
             return res[key]
         cls = self.__class__
-        raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, utils.string.escape(key, '"'), utils.string.repr(self.name)))
+        raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the structure {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, key, utils.string.escape(key, '"'), utils.string.repr(self.name)))
     @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the structure.'''
-        return internal.tags.structure.set(self.ptr, key, value)
+        sptr = self.ptr
+        return internal.tags.structure.set(sptr, key, value)
     @utils.multicase(key=types.string, none=types.none)
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Remove the tag identified by `key` from the structure.'''
-        return internal.tags.structure.remove(self.ptr, key, none)
+        sptr = self.ptr
+        return internal.tags.structure.remove(sptr, key, none)
 
     def destroy(self):
         '''Remove the structure from the database.'''
-        return idaapi.del_struc(self.ptr)
+        sptr = self.ptr
+        return idaapi.del_struc(sptr)
 
     def field(self, offset):
         '''Return the member at the specified offset.'''
@@ -6749,16 +6754,16 @@ class structure_t(object):
 
     def contains(self, offset):
         '''Return whether the specified `offset` is contained by the structure.'''
-        res, cb = self.members.baseoffset, idaapi.get_struc_size(self.ptr)
+        res, cb = self.members.baseoffset, idaapi.get_struc_size(self.id)
         return res <= offset < res + cb
 
     def refs(self):
         '''Return the operand references from the database that reference this structure or its members.'''
-        return members.references(self.ptr)
+        return members.references(self.id)
 
     def up(self):
         '''Return the structure members or references in the database that use this structure.'''
-        result, sptr = [], self.ptr
+        result, sid = [], self.ptr
         result.extend(xref.structure(sptr))
         return result
 
@@ -6844,6 +6849,9 @@ class structure_t(object):
     @utils.string.decorate_arguments('string')
     def name(self, string):
         '''Set the name of the structure to `string`.'''
+        sptr = self.ptr
+
+        # flatten a tuple into a single string.
         if isinstance(string, types.ordered):
             string = interface.tuplename(*string)
 
@@ -6854,16 +6862,16 @@ class structure_t(object):
         res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
         if ida_string and ida_string != res:
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).name({!r}) : Stripping invalid chars from structure name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
+            logging.info(u"{:s}({:#x}).name({!r}) : Stripping invalid chars from structure name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
 
         # now we can set the name of the structure, and verify that the name was
         # assigned properly.
-        oldname = naming.set(self, ida_string)
-        assigned = naming.get(self) or ''
+        oldname = naming.set(sptr, ida_string)
+        assigned = naming.get(sptr) or ''
         if utils.string.of(assigned) != utils.string.of(ida_string):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).name({!r}) : The name ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
+            logging.info(u"{:s}({:#x}).name({!r}) : The name ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), sptr.id, string, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
         return assigned
 
     @property
@@ -6875,16 +6883,17 @@ class structure_t(object):
     @utils.string.decorate_arguments('value')
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment for the structure to `value`.'''
-        ok = comment.set(self, value, repeatable) if value else comment.remove(self, repeatable)
+        sid, sptr = self.id, self.ptr
+        ok = comment.set(sptr, value, repeatable) if value else comment.remove(sptr, repeatable)
         if not ok:
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
+            raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure {:s}.".format('.'.join([__name__, cls.__name__]), sid, repeatable, utils.string.repr(self.name)))
 
         # verify that the comment was actually assigned
-        assigned = comment.get(self, repeatable)
+        assigned = comment.get(sptr, repeatable)
         if utils.string.of(assigned) != utils.string.of(value or ''):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment(..., repeatable={!s}) : The comment ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(utils.string.of(assigned)), utils.string.repr(value or '')))
+            logging.info(u"{:s}({:#x}).comment(..., repeatable={!s}) : The comment ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), sid, repeatable, utils.string.repr(utils.string.of(assigned)), utils.string.repr(value or '')))
         return assigned
 
     @property
@@ -6915,19 +6924,25 @@ class structure_t(object):
     @property
     def size(self):
         '''Return the size of the structure.'''
-        return idaapi.get_struc_size(self.ptr)
+        return idaapi.get_struc_size(self.id)
     @size.setter
     def size(self, size):
         '''Expand the structure to the new `size` that is specified.'''
-        res = idaapi.get_struc_size(self.ptr)
-        if not idaapi.expand_struc(self.ptr, 0, size - res, True):
+        sid = self.id
+        sptr = idaapi.get_struc(sid)
+        if not sptr:
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).size({:+d}) : Unable to resize structure \"{:s}\" from {:#x} bytes to {:#x} bytes.".format('.'.join([__name__, cls.__name__]), self.id, size, utils.string.escape(self.name, '"'), res, size))
+            raise E.StructureNotFoundError(u"{:s}({:#x}).size({:+d}) : Unable to find a structure using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, size, sid))
 
-        res = idaapi.get_struc_size(self.ptr)
+        res = idaapi.get_struc_size(sptr)
+        if not idaapi.expand_struc(sptr, 0, size - res, True):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).size({:+d}) : Unable to resize structure \"{:s}\" from {:#x} bytes to {:#x} bytes.".format('.'.join([__name__, cls.__name__]), sid, size, utils.string.escape(self.name, '"'), res, size))
+
+        res = idaapi.get_struc_size(sptr)
         if res != size:
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).size({:+d}) : The size that was assigned to the structure ({:+d}) does not match what was requested ({:+d}).".format('.'.join([__name__, cls.__name__]), self.id, size, res, size))
+            logging.info(u"{:s}({:#x}).size({:+d}) : The size that was assigned to the structure ({:+d}) does not match what was requested ({:+d}).".format('.'.join([__name__, cls.__name__]), sid, size, res, size))
         return res
 
     @property
@@ -6946,14 +6961,23 @@ class structure_t(object):
     @index.setter
     def index(self, index):
         '''Set the index of the structure to `idx`.'''
-        res = idaapi.get_struc_idx(self.id)
-        if not idaapi.set_struc_idx(self.ptr, index):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).index({:+d}) : Unable to modify the index of structure \"{:s}\" from {:d} to index {:d}.".format('.'.join([__name__, cls.__name__]), self.id, index, utils.string.escape(self.name, '"'), res, index))
+        sid = self.id
 
-        res = idaapi.get_struc_idx(self.id)
+        # first we need a `struc_t` for `idaapi.set_struc_idx`.
+        sptr = idaapi.get_struc(sid)
+        if not sptr:
+            cls = self.__class__
+            raise E.StructureNotFoundError(u"{:s}({:#x}).index({:+d}) : Unable to find a structure using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, index, sid))
+
+        # now we can change the index for the structure.
+        res = idaapi.get_struc_idx(sptr.id)
+        if not idaapi.set_struc_idx(sptr, index):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).index({:+d}) : Unable to modify the index of structure \"{:s}\" from {:d} to index {:d}.".format('.'.join([__name__, cls.__name__]), sid, index, utils.string.escape(self.name, '"'), res, index))
+
+        res = idaapi.get_struc_idx(sptr.id)
         if res != index:
-            logging.info(u"{:s}({:#x}).index({:+d}) : The index that the structure was moved to ({:#x}) does not match what was requested ({:d}).".format('.'.join([__name__, cls.__name__]), self.id, index, res, index))
+            logging.info(u"{:s}({:#x}).index({:+d}) : The index that the structure was moved to ({:#x}) does not match what was requested ({:d}).".format('.'.join([__name__, cls.__name__]), sid, index, res, index))
         return res
     @property
     def ordinal(self):
@@ -6996,8 +7020,8 @@ class structure_t(object):
 
     @property
     def realbounds(self):
-        sptr = self.ptr
-        return interface.bounds_t(0, idaapi.get_struc_size(self.ptr))
+        sid = self.id
+        return interface.bounds_t(0, idaapi.get_struc_size(sid))
 
     @property
     def bounds(self):
@@ -7008,19 +7032,19 @@ class structure_t(object):
     @property
     def location(self):
         '''Return the location of the entire structure.'''
-        sptr, offset = self.ptr, self.members.baseoffset
-        return interface.location_t(offset, idaapi.get_struc_size(sptr))
+        sid, offset = self.id, self.members.baseoffset
+        return interface.location_t(offset, idaapi.get_struc_size(sid))
 
     ### Private methods
     def __str__(self):
         '''Render the current structure in a readable format.'''
-        sptr, name, offset, size, comment, tag = self.ptr, self.name, self.offset, self.size, self.comment or '', self.tag()
-        return "<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if union(sptr) else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+        sid, name, offset, size, comment, tag = self.id, self.name, self.offset, self.size, self.comment or '', self.tag()
+        return "<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if union(sid) else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
     def __unicode__(self):
         '''Render the current structure in a readable format.'''
-        sptr, name, offset, size, comment, tag = self.ptr, self.name, self.offset, self.size, self.comment or '', self.tag()
-        return u"<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if union(sptr) else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+        sid, name, offset, size, comment, tag = self.id, self.name, self.offset, self.size, self.comment or '', self.tag()
+        return u"<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if union(sid) else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
     def __repr__(self):
         return u"{!s}".format(self)
@@ -7042,10 +7066,8 @@ class structure_t(object):
         return not self.__eq__(other)
 
     def __eq__(self, other):
-        if isinstance(other, idaapi.struc_t):
-            return self.ptr.id == other.id
-        elif isinstance(other, structure_t):
-            return self.ptr.id == other.ptr.id
+        if isinstance(other, (idaapi.struc_t, structure_t)):
+            return self.id == other.id
         return False
 
     ## Serialization
@@ -7132,7 +7154,7 @@ class structure_t(object):
 
     ## operators
     def __operator__(self, operation, other):
-        cls, sptr, offset = self.__class__, self.ptr, self.members.baseoffset
+        cls, sid, offset = self.__class__, self.id, self.members.baseoffset
         if isinstance(other, types.integer):
             res = operation(offset, other)
         elif isinstance(other, member_t):
@@ -7142,8 +7164,8 @@ class structure_t(object):
         elif hasattr(other, '__int__'):
             res = operation(offset, int(other))
         else:
-            raise TypeError(u"{:s}({:#x}).__operator__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sptr.id, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
-        return cls(sptr, offset=res)
+            raise TypeError(u"{:s}({:#x}).__operator__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sid, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
+        return cls(sid, offset=res)
 
     # general arithmetic (adjusts base offset)
     def __add__(self, other):
@@ -7162,24 +7184,24 @@ class structure_t(object):
     # repetition and multiplication
     def __mul__(self, count):
         '''Return a list of structures with each member arranged contiguously as an array of `count` elements.'''
-        cls, sptr = self.__class__, self.ptr
+        cls, sid = self.__class__, self.id
         if not isinstance(count, types.integer):
             other, operation = count, operator.mul
-            raise TypeError(u"{:s}({:#x}).__mul__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sptr.id, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
+            raise TypeError(u"{:s}({:#x}).__mul__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sid, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
 
         offset, size = self.members.baseoffset, self.size
         start, stop = sorted([size * count, 0])
-        return [ cls(sptr, offset=offset + relative) for relative in range(start, stop, size) ]
+        return [ cls(sid, offset=offset + relative) for relative in range(start, stop, size) ]
 
     def __pow__(self, index):
         '''Return an instance of the structure with its offset adjusted similar to an array element at the specified `index`.'''
-        cls, sptr = self.__class__, self.ptr
+        cls, sid = self.__class__, self.id
         if not isinstance(index, (types.integer, types.float)):
             other, operation = index, operator.pow
-            raise TypeError(u"{:s}({:#x}).__pow__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sptr.id, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
+            raise TypeError(u"{:s}({:#x}).__pow__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sid, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
 
         offset, relative = self.members.baseoffset, math.trunc(self.size * index)
-        return cls(sptr, offset=offset + relative)
+        return cls(sid, offset=offset + relative)
 
     def __lshift__(self, count):
         '''Return an instance of the structure shifted `count` times to a lower address.'''
@@ -7202,18 +7224,18 @@ class structure_t(object):
     # operations
     def __abs__(self):
         '''Return an instance of the structure without an offset.'''
-        cls, sptr = self.__class__, self.ptr
-        return cls(sptr)
+        cls, sid = self.__class__, self.id
+        return cls(sid)
     def __neg__(self):
         '''Return an instance of the structure with its offset negated.'''
-        cls, sptr, offset = self.__class__, self.ptr, self.members.baseoffset
-        return cls(sptr, -offset)
+        cls, sid, offset = self.__class__, self.id, self.members.baseoffset
+        return cls(sid, -offset)
     def __invert__(self):
         '''Return an instance of the structure with its offset inverted.'''
-        cls, sptr = self.__class__, self.ptr
+        cls, sid = self.__class__, self.id
         offset, size = self.members.baseoffset, self.size
         res = offset + size
-        return cls(sptr, -res)
+        return cls(sid, -res)
 
 class member_t(object):
     """
