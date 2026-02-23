@@ -5250,10 +5250,11 @@ class members(object):
     def references(cls, sptr):
         '''Return the structure members and operand references that reference the structure identified by `sptr`.'''
         Fnetnode = getattr(idaapi, 'ea2node', utils.fidentity)
+        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr
 
         # First collect all of our identifiers referenced by this structure,
         # whilst making sure to include all the members too.
-        iterable = itertools.chain([sptr.id], (mptr.id for sptr, mindex, mptr in cls.iterate(sptr)))
+        iterable = itertools.chain([sptr.id], (mptr.id for sptr, mindex, mptr in cls.iterate(sid)))
         identifiers = {identifier for identifier in iterable}
 
         # Now we need to iterate through all of our members and grab all references to
