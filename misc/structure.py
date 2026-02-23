@@ -4632,6 +4632,15 @@ class members(object):
     """
 
     @classmethod
+    def count(cls, sptr):
+        '''Return the number of members belonging to the structure specified by `sptr`.'''
+        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr
+        res = idaapi.get_struc(sid)
+        if not res:
+            raise E.StructureNotFoundError(u"{:s}.count({!s}) : Unable to find a structure for the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(sid), sid))
+        return res.memqty
+
+    @classmethod
     def iterate(cls, sptr, *slice):
         '''Yield each member specified by `slice` from the structure identified by `sptr`.'''
         sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
