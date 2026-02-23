@@ -218,6 +218,11 @@ class naming(object):
         elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
             ti, sid = type, type.id
 
+        # If we have a `struc_t`, but the previous identifier check didn't
+        # return anything, then this must be a frame being specified by id.
+        elif hasattr(idaapi, 'get_struc') and isinstance(type, types.integer) and interface.node.identifier(type):
+            ti, sid = idaapi.get_struc(type), type
+
         # Otherwise, throw up an exception and bail.
         else:
             raise E.InvalidParameterError(u"{:s}.get({!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
@@ -250,6 +255,11 @@ class naming(object):
         elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
             ti, sid = type, type.id
 
+        # If we couldn't fetch the type by its identifier, and we're using the
+        # older disassembler api, then the identifier might be for a frame.
+        elif hasattr(idaapi, 'get_struc') and isinstance(type, types.integer) and interface.node.identifier(type):
+            ti, sid = idaapi.get_struc(type), type
+
         # Otherwise, throw up the invalid parameter exception and bail.
         else:
             raise E.InvalidParameterError(u"{:s}.set({!s}, {!r}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, string, type.__class__))
@@ -281,6 +291,8 @@ class naming(object):
             ti, sid = type.ptr, type.id
         elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
             ti, sid = type, type.id
+        elif hasattr(idaapi, 'get_struc') and isinstance(type, types.integer) and interface.node.identifier(type):
+            ti, sid = idaapi.get_struc(type), type
         else:
             raise E.InvalidParameterError(u"{:s}.remove({!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
 
