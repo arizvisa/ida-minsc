@@ -36,6 +36,7 @@ frozenset = frozenset
 dictionary = dict
 ordered = tuple, list
 unordered = ordered, set, frozenset
+range = list if __import__('sys').version_info.major < 3 else range
 
 type = type
 object = object
