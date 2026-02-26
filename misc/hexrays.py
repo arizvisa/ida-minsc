@@ -800,6 +800,8 @@ class variables(object):
             [func, arg] = args
             if isinstance(arg, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
                 locator = variable.get_locator(arg)
+            elif isinstance(arg, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t, ida_hexrays_types.stkvar_ref_t)):
+                return cls.by(arg)
             elif isinstance(arg, types.string):
                 locator = cls.by_string(func, arg)
             elif isinstance(arg, (idaapi.member_t, internal.structure.member_t)):
