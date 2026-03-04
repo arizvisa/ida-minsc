@@ -1536,7 +1536,7 @@ class member(object):
         return names.get(code, ''), descriptions.get(code, '')
 
     @classmethod
-    def set_typeinfo(cls, mptr, info, flags=idaapi.SET_MEMTI_COMPATIBLE):
+    def set_typeinfo(cls, mptr, info, flags=getattr(idaapi, 'SET_MEMTI_COMPATIBLE', 0x0002)):
         '''Apply the type information in `info` to the member specified by `mptr` using the given `flags`.'''
         if not isinstance(info, (idaapi.tinfo_t, types.string)):
             raise E.InvalidParameterError(u"{:s}.set_typeinfo({:#x}, {!s}) : Unable to assign an unsupported type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), mptr.id, info if info is None else utils.string.repr(info), info.__class__))
