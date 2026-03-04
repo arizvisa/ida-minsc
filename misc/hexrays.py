@@ -662,11 +662,17 @@ class ida_hexrays_types(object):
     )
 
     # types that can get us to a variable locator.
-    hexrays_var_types = (
-        lvar_locator_t, lvar_t,
-        var_ref_t, lvar_ref_t, stkvar_ref_t,
-        idaapi.member_t, internal.structure.member_t,
-    )
+    hexrays_var_types = tuple(itertools.chain(
+        [
+            lvar_locator_t, lvar_t,
+            var_ref_t, lvar_ref_t, stkvar_ref_t,
+        ],
+
+        # structure member types which can be used to select a frame variable by
+        # its frame member. later versions of the disassembler deprecate the
+        # older structure api, so we only add `idaapi.member_t` if it exists.
+        [idaapi.member_t, internal.structure.member_t] if hasattr(idaapi, 'member_t') else [internal.structure.member_t],
+    ))
 
     # types that can get us to a variable locator if given with a function.
     hexrays_funcvar_types = tuple(itertools.chain(hexrays_var_types, [
