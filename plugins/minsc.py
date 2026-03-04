@@ -884,18 +884,25 @@ def finders():
     log = logging.getLogger(__name__)
     documentation = 'This is a ctypes-library to the shared object that is used by the IDA SDK.'
 
+    # First we grab the version since we haven't patched it into the `idaapi`
+    # module yet. Then we use the version to determine if there's a difference
+    # between 32-bit and 64-bit so that we can assign the correct suffix.
+    version_major, version_minor, version_float = host_version()
+    suffix64 = '64' if version_float < 9.0 else ''
+    suffix = '' if idaapi.BADADDR < 0x100000000 else suffix64
+
     # IDA's native lower-level api
     if sys.platform in {'darwin'}:
-        yield internal_object('ida', library, idaapi.idadir("libida{:s}.dylib".format('' if idaapi.BADADDR < 0x100000000 else '64')), __name__='IDA', __doc__=documentation)
+        yield internal_object('ida', library, idaapi.idadir("libida{:s}.dylib".format(suffix)), __name__='IDA', __doc__=documentation)
 
     elif sys.platform in {'linux', 'linux2'}:
-        yield internal_object('ida', library, idaapi.idadir("libida{:s}.so".format('' if idaapi.BADADDR < 0x100000000 else '64')), __name__='IDA', __doc__=documentation)
+        yield internal_object('ida', library, idaapi.idadir("libida{:s}.so".format(suffix)), __name__='IDA', __doc__=documentation)
 
     elif sys.platform in {'win32'}:
         if os.path.exists(idaapi.idadir('ida.wll')):
             yield internal_object('ida', library, idaapi.idadir('ida.wll'), __name__='IDA', __doc__=documentation)
         else:
-            yield internal_object('ida', library, idaapi.idadir("ida{:s}.dll".format('' if idaapi.BADADDR < 0x100000000 else '64')), __name__='IDA', __doc__=documentation)
+            yield internal_object('ida', library, idaapi.idadir("ida{:s}.dll".format(suffix)), __name__='IDA', __doc__=documentation)
 
     else:
         log.warning("{:s} : Unable to load IDA's native api via ctypes. Ignoring...".format(__name__))
