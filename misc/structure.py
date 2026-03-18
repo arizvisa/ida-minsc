@@ -5054,6 +5054,7 @@ class members(object):
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
         FF_MASKSIZE = idaapi.as_uint32(idaapi.DT_TYPE)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
         candidates = [(sptr, mindex, mptr) for sptr, mindex, mptr in cls.at_offset(sptr, offset)]
 
         # XXX: We do special handling for unions so that we prioritize members that start
