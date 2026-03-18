@@ -1390,6 +1390,7 @@ class member(object):
         '''Return the default name for the member given by `mptr` belonging to the structure `sptr` at the given `offset` if provided.'''
         fmtVar, fmtArg, fmtField = (fmt.format for fmt in ["var_{:X}", "arg_{:X}", "field_{:X}"])
         fmtSpecial_s, fmtSpecial_r = (utils.fconstant(format) for format in [' s', ' r'])
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
 
         # To process the frame, we first need the address of the function
         # to get the func_t and the actual member offset to calculate with.
