@@ -1088,7 +1088,7 @@ class counted(schema):
         # first we get the reference count, its key usage, and overall usage.
         count = cls.getcount(node, key, position, tag)
         used = cls.getusage(node, key, tag)
-        res = suptools.bigint(node, key, tag=tag)
+        res = suptools.bigint(node, key, tag)
 
         # if the tag already exists in the key mask, we don't need to do anything.
         if res & bit:
@@ -1106,7 +1106,7 @@ class counted(schema):
 
             elif not(used & bit) and not cls.setusage(node, key, used | bit, tag):
                 logging.info(u"{:s}.increment({:#x}, {:#x}, {!s}, {:#x}) : Rolling back the reference count at {:#x} to its previous value ({:d}).".format('.'.join([__name__, cls.__name__]), node, key, "{!r}".format(name), tag, key, count))
-                if not suptools.setcount(node, key, position, count, tag):
+                if not suptools.setcount(node, key, position, count, tag=tag):
                     logging.error(u"{:s}.increment({:#x}, {:#x}, {!s}, {:#x}) : Unable to roll back the reference count at {:#x} to its previous value ({:d}).".format('.'.join([__name__, cls.__name__]), node, key, "{!r}".format(name), tag, key, count))
                 raise exceptions.DisassemblerError(u"{:s}.increment({:#x}, {:#x}, {!s}, {:#x}) : Unable to update the usage mask ({:d}) in the current netnode ({:#x}) with the specified tag ({!s}).".format('.'.join([__name__, cls.__name__]), node, key, "{!r}".format(name), tag, count, node, "{!r}".format(name)))
 
@@ -1280,34 +1280,34 @@ class globals(counted):
     def getusage(cls, node, key, *tag, **kwargs):
         '''Return the usage mask containing tags used by the globals.'''
         node = cls.node()
-        return super(globals, cls).getusage(node, cls.NSUP_TAGNAME_USAGE, cls.statstag)
+        return super(globals, cls).getusage(node, cls.NSUP_TAGNAME_USAGE, tag=cls.statstag)
 
     @classmethod
     def usage(cls):
         '''Return the usage mask for all the tags applied to the globals in the database.'''
         node = cls.node()
-        return super(globals, cls).getusage(node, cls.NSUP_TAGNAME_USAGE, cls.statstag)
+        return super(globals, cls).getusage(node, cls.NSUP_TAGNAME_USAGE, tag=cls.statstag)
 
     @classmethod
     def setusage(cls, node, key, used, *tag, **kwargs):
         '''Set the usage mask for the function `func` to the integer in `used`.'''
         node = cls.node()
-        return super(globals, cls).setusage(node, cls.NSUP_TAGNAME_USAGE, used, cls.statstag)
+        return super(globals, cls).setusage(node, cls.NSUP_TAGNAME_USAGE, used, tag=cls.statstag)
 
     @classmethod
     def hascount(cls, node, key, position, *tag, **kwargs):
         '''Return whether the reference count at the specified `key` exists for the tag at `position` of the netnode specified by `node`.'''
-        return super(globals, cls).hascount(node, key, position, cls.counttag)
+        return super(globals, cls).hascount(node, key, position, tag=cls.counttag)
 
     @classmethod
     def getcount(cls, node, key, position, *tag, **kwargs):
         '''Return the reference count at the specified `key` for the tag at `position` of the netnode specified by `node`.'''
-        return super(globals, cls).getcount(node, key, position, cls.counttag)
+        return super(globals, cls).getcount(node, key, position, tag=cls.counttag)
 
     @classmethod
     def setcount(cls, node, key, position, count, *tag, **kwargs):
         '''Set the reference count at the specified `key` for the tag at `position` of the netnode specified by `node` to `count`.'''
-        return super(globals, cls).setcount(node, key, position, count, cls.counttag)
+        return super(globals, cls).setcount(node, key, position, count, tag=cls.counttag)
 
     @classmethod
     def increment(cls, ea, name):
@@ -1381,7 +1381,7 @@ class globals(counted):
     def repr(cls, *pattern):
         '''Display the contents of the index containing information about the globals from the database.'''
         Fmatch = re.compile(fnmatch.translate(*pattern), re.IGNORECASE).match if pattern else utils.fconstant(True)
-        used = cls.getusage(cls.node(), cls.NSUP_TAGNAME_USAGE, cls.statstag)
+        used = cls.getusage(cls.node(), cls.NSUP_TAGNAME_USAGE, tag=cls.statstag)
         names = tags.names(used)
         items = [(ea, integer) for ea, integer in cls.iterate() if Fmatch("{:#x}".format(ea))]
 
@@ -1459,29 +1459,29 @@ class contents(counted):
     @classmethod
     def hascount(cls, node, key, position, *tag, **kwargs):
         '''Return whether the reference count at the specified `key` exists for the tag at `position` of the netnode specified by `node`.'''
-        return super(contents, cls).hascount(node, key, position, cls.counttag)
+        return super(contents, cls).hascount(node, key, position, tag=cls.counttag)
 
     @classmethod
     def getcount(cls, node, key, position, *tag, **kwargs):
         '''Return the reference count at the specified `key` for the tag at `position` of the netnode specified by `node`.'''
-        return super(contents, cls).getcount(node, key, position, cls.counttag)
+        return super(contents, cls).getcount(node, key, position, tag=cls.counttag)
 
     @classmethod
     def setcount(cls, node, key, position, count, *tag, **kwargs):
         '''Set the reference count at the specified `key` for the tag at `position` of the netnode specified by `node` to `count`.'''
-        return super(contents, cls).setcount(node, key, position, count, cls.counttag)
+        return super(contents, cls).setcount(node, key, position, count, tag=cls.counttag)
 
     @classmethod
     def getusage(cls, node, key, tag):
         '''Return the usage mask for the function `key` from the current netnode.'''
         node = cls.node()
-        return super(contents, cls).getusage(node, key, cls.usagetag)
+        return super(contents, cls).getusage(node, key, tag=cls.usagetag)
 
     @classmethod
     def setusage(cls, node, key, used, tag):
         '''Set the usage mask for the function `key` in the current netnode to the integer in `used`.'''
         node = cls.node()
-        return super(contents, cls).setusage(node, key, used, cls.usagetag)
+        return super(contents, cls).setusage(node, key, used, tag=cls.usagetag)
 
     ### regular methods
 
@@ -1774,7 +1774,7 @@ class contents(counted):
     def usage(cls, func):
         '''Return the usage mask containing tags used in the contents for the function `func`.'''
         node, key = cls.node(), idaapi.ea2node(func)
-        return cls.getusage(node, key, cls.usagetag)
+        return cls.getusage(node, key, tag=cls.usagetag)
 
     @classmethod
     def forward(cls, *ea):
@@ -1829,7 +1829,7 @@ class contents(counted):
             logging.error(u"{:s}.erase({!s}, {:#x}, {:#x}) : Unable to remove the reference count for the specified tag ({:d}) from netnode {:#x}.".format('.'.join([__name__, cls.__name__]), parameter, start, stop, position, key))
 
         # Grab the usage for the function and remove it if it actually exists.
-        usage = cls.getusage(node, key, cls.usagetag)
+        usage = cls.getusage(node, key, tag=cls.usagetag)
         if netnode.sup.has(node, key, tag=cls.usagetag) and not(netnode.sup.remove(node, key, tag=cls.usagetag)):
             logging.error(u"{:s}.erase_usage({!s}) : Unable to remove the usage mask for the function at {:#x} from netnode {:#x}.".format('.'.join([__name__, cls.__name__]), parameter, address, node))
         return usage
@@ -1987,35 +1987,35 @@ class members(counted):
         '''Return whether the reference count in the member `mid` exists for the tag at `position` of the netnode specified by `node`.'''
         sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
         countnode, counttag = netnode.get(sptr.id), cls.counttag
-        return super(members, cls).hascount(countnode, mid, position, counttag)
+        return super(members, cls).hascount(countnode, mid, position, tag=counttag)
 
     @classmethod
     def getcount(cls, node, mid, position, *tag):
         '''Return the reference count for the tag at `position` in the member `mid` of the netnode specified by `node`.'''
         sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
         countnode, counttag = netnode.get(sptr.id), cls.counttag
-        return super(members, cls).getcount(countnode, mid, position, counttag)
+        return super(members, cls).getcount(countnode, mid, position, tag=counttag)
 
     @classmethod
     def setcount(cls, node, mid, position, count, *tag):
         '''Set the reference count for the tag at `position` in the member `mid` of the netnode specified by `node` to `count`.'''
         sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
         countnode, counttag = netnode.get(sptr.id), cls.counttag
-        return super(members, cls).setcount(countnode, mid, position, count, counttag)
+        return super(members, cls).setcount(countnode, mid, position, count, tag=counttag)
 
     @classmethod
     def getusage(cls, node, mid, tag):
         '''Return the usage mask for the tags used by the members of structure owning the member `mid`.'''
         sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
         usagenode, usagetag = cls.node(), cls.usagetag
-        return super(members, cls).getusage(usagenode, sptr.id, usagetag)
+        return super(members, cls).getusage(usagenode, sptr.id, tag=usagetag)
 
     @classmethod
     def setusage(cls, node, mid, used, tag):
         '''Set the usage mask for the tags used by the members of structure owning the member `mid` to the integer in `used`.'''
         sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
         usagenode, usagetag = cls.node(), cls.usagetag
-        return super(members, cls).setusage(usagenode, sptr.id, used, usagetag)
+        return super(members, cls).setusage(usagenode, sptr.id, used, tag=usagetag)
 
     ## regular methods that we only override to hide any arguments that we can
     ## figure out by ourselves.
@@ -2046,8 +2046,8 @@ class members(counted):
     def usage(cls, sid):
         '''Return the usage mask containing tags used by the members of structure `sid`.'''
         if internal.structure.has(sid):
-           return super(members, cls).getusage(cls.node(), sid, cls.usagetag)
-        return cls.getusage(cls.node(), sid, cls.usagetag)
+           return super(members, cls).getusage(cls.node(), sid, tag=cls.usagetag)
+        return cls.getusage(cls.node(), sid, tag=cls.usagetag)
 
     @classmethod
     def forward(cls, *mid):
@@ -2108,20 +2108,20 @@ class members(counted):
         [mids] = mids if mids else [[item for item, _ in cls.structure(sid)]]
         iterable = [mids] if isinstance(mids, types.integer) else mids
         selected = {mid : suptools.bigint(node, mid, cls.membertag) for mid in iterable}
-        usage = super(members, cls).getusage(node, sid, cls.usagetag)
+        usage = super(members, cls).getusage(node, sid, tag=cls.usagetag)
 
         removed = {mid for mid in []}
         for mid, used in selected.items():
             for position in tags.explode(used):
                 bit, clear = pow(2, position), ~pow(2, position)
-                count = super(members, cls).getcount(countnode, mid, position, counttag)
-                super(members, cls).setcount(countnode, mid, position, max(0, count - 1), counttag)
+                count = super(members, cls).getcount(countnode, mid, position, tag=counttag)
+                super(members, cls).setcount(countnode, mid, position, max(0, count - 1), tag=counttag)
                 if not(count > 1):
                     usage &= clear
                 tags.decrement(position)
             removed.add(mid) if used else removed
             suptools.setbigint(node, mid, 0, cls.membertag)
-        super(members, cls).setusage(node, sid, usage, cls.usagetag)
+        super(members, cls).setusage(node, sid, usage, tag=cls.usagetag)
         return sorted(removed)
 
     @classmethod
@@ -2429,33 +2429,33 @@ class hexfunction(counted):
         '''Return whether the reference count at the specified `key` exists for the tag at `position` of the netnode specified by `node`.'''
         ea, itp = cls.decode_preciser(key)
         countnode = interface.range.start(interface.function.by(ea))
-        return super(hexfunction, cls).hascount(countnode, key, position, cls.counttag)
+        return super(hexfunction, cls).hascount(countnode, key, position, tag=cls.counttag)
 
     @classmethod
     def getcount(cls, node, key, position, *tag, **kwargs):
         '''Return the reference count at the specified `key` for the tag at `position` of the netnode specified by `node`.'''
         ea, itp = cls.decode_preciser(key)
         countnode = interface.range.start(interface.function.by(ea))
-        return super(hexfunction, cls).getcount(countnode, key, position, cls.counttag)
+        return super(hexfunction, cls).getcount(countnode, key, position, tag=cls.counttag)
 
     @classmethod
     def setcount(cls, node, key, position, count, *tag, **kwargs):
         '''Set the reference count at the specified `key` for the tag at `position` of the netnode specified by `node` to `count`.'''
         ea, itp = cls.decode_preciser(key)
         countnode = interface.range.start(interface.function.by(ea))
-        return super(hexfunction, cls).setcount(countnode, key, position, count, cls.counttag)
+        return super(hexfunction, cls).setcount(countnode, key, position, count, tag=cls.counttag)
 
     @classmethod
     def getusage(cls, node, key, *tag, **kwargs):
         '''Set the usage mask for the function `func` to the integer in `used`.'''
         usagenode = cls.node()
-        return super(hexfunction, cls).getusage(usagenode, key, cls.usagetag)
+        return super(hexfunction, cls).getusage(usagenode, key, tag=cls.usagetag)
 
     @classmethod
     def setusage(cls, node, key, used, *tag, **kwargs):
         '''Set the usage mask for the function `func` to the integer in `used`.'''
         usagenode = cls.node()
-        return super(hexfunction, cls).setusage(usagenode, key, used, cls.usagetag)
+        return super(hexfunction, cls).setusage(usagenode, key, used, tag=cls.usagetag)
 
     # back to our regularly scheduled program..
     @classmethod
@@ -2469,7 +2469,7 @@ class hexfunction(counted):
     def usage(cls, func):
         '''Return the usage mask containing tags used in the contents for the function `func`.'''
         node, key = cls.node(), idaapi.ea2node(func)
-        return cls.getusage(node, key, cls.usagetag)
+        return cls.getusage(node, key, tag=cls.usagetag)
 
     @classmethod
     def adjust(cls, func, key, name, adjustment):
@@ -2533,7 +2533,7 @@ class hexfunction(counted):
                 logging.info(u"{:s}.adjust({!s}, {!s}, {!s}, {:+d}) : Rolling back the usage mask and reference count for the preciser {!s} to its previous number of bits ({:d}) and value ({:d}).".format('.'.join([__name__, cls.__name__]), func_descr, key_descr, "{!r}".format(name), adjustment, key_descr, bits, count))
                 if not cls.setcount(countnode, key, position, count, tag=cls.counttag):
                     logging.error(u"{:s}.adjust({!s}, {!s}, {!s}, {:+d}) : Unable to roll back the reference count for the preciser {!s} in netnode {:#x} to its previous value ({:d}).".format('.'.join([__name__, cls.__name__]), func_descr, key_descr, "{!r}".format(name), adjustment, key_descr, countnode, count))
-                elif not cls.setusage(usagenode, fnkey, usage, cls.usagetag):
+                elif not cls.setusage(usagenode, fnkey, usage, tag=cls.usagetag):
                     logging.error(u"{:s}.adjust({!s}, {!s}, {!s}, {:+d}) : Unable to roll back the usage mask for the preciser {!s} in netnode {:#x} to its previous number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), func_descr, key_descr, "{!r}".format(name), adjustment, key_descr, usagenode, bits))
                 tagcount.throw(E)
 
