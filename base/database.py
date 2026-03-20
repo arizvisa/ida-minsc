@@ -6258,7 +6258,7 @@ class types(object):
     @classmethod
     def set(cls, ordinal, info, library):
         '''Assign the type in `info` to the given `ordinal` of a specified type `library`.'''
-        res = cls.for_ordinal(ordinal, library)
+        res = interface.tinfo.for_ordinal(ordinal, library)
         if not res:
             raise E.ItemNotFoundError(u"{:s}.set({:d}, {!r}, {:s}) : No inforatmion was found in the type library for the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, "{!s}".format(info), interface.tinfo.format_library(library), ordinal))
 
