@@ -2053,7 +2053,7 @@ class members(counted):
     def forward(cls, *mid):
         '''Yield the member id and mask for each tagged member in order starting at the member id in `mid` (if given).'''
         node = cls.node()
-        for mid, integer in super(members, cls).forward(node, *mid, cls.membertag):
+        for mid, integer in super(members, cls).forward(node, *mid, tag=cls.membertag):
             yield mid, integer
         return
 
@@ -2061,7 +2061,7 @@ class members(counted):
     def backward(cls, *mid):
         '''Yield the member id and mask for each tagged member in reverse order starting at the member id in `mid` (if given).'''
         node = cls.node()
-        for mid, integer in super(members, cls).backward(node, *mid, cls.membertag):
+        for mid, integer in super(members, cls).backward(node, *mid, tag=cls.membertag):
             yield mid, integer
         return
 
