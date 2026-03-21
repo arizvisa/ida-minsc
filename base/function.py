@@ -3396,17 +3396,26 @@ class type(object):
         rt, ea = interface.addressOfRuntimeOrStatic(func)
 
         # If the type is not a function type whatsoever, then bail.
-        if not any([info.is_func(), info.is_funcptr()]):
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Refusing to apply a non-function type ({!r}) to the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), 'address' if rt else 'function', ea))
+        if not any([info.is_func(), info.is_funcptr(), info.is_ptr()]):
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Refusing to apply a non-function type ({!s}) to the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), interface.tinfo.quoted(info), 'address' if rt else 'function', ea))
 
-        # If we're being used against an export, then we need to make sure that
-        # our type is a function pointer and we need to promote it if not.
-        ti = interface.function.pointer(info) if rt else info
+        # If we're being used against a runtime-linked adress, then we need to
+        # make sure that our type is a function pointer and we need to decay it
+        # if isn't. If it's being applied to code, and our type is a function
+        # pointer then we need to dereference to reify it before we can apply it
+        # as a prototype to the given function.
+        ti = interface.function.pointer(info) if rt else interface.function.nonpointer(info) if info.is_ptr() else info
         if rt and ti is None:
-            raise E.DisassemblerError(u"{:s}({:#x}, {!r}) : Unable to promote type to a pointer as required when applying a function type to a runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), ea))
+            raise E.DisassemblerError(u"{:s}({:#x}, {!r}) : Unable to decay type to a function pointer as required when applying a prototype to a runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), ea))
+
+        elif rt and ti is not info:
+            logging.warning(u"{:s}({:#x}, {!r}) : Decayed given prototype to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(ti), ea))
+
+        elif ti is None:
+            raise E.DisassemblerError(u"{:s}({:#x}, {!r}) : Unable to reify function pointer to a prototype as required when applying it to a compiler-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), ea))
 
         elif ti is not info:
-            logging.warning(u"{:s}({:#x}, {!r}) : Promoted type ({!r}) to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(info), "{!s}".format(ti), ea))
+            logging.warning(u"{:s}({:#x}, {!r}) : Reified given function pointer to a prototype ({!r}) due to the address ({:#x}) being compiler-linked.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(ti), ea))
 
         # and then we just need to apply the type to the given address.
         result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, ti, *flags)
@@ -3437,17 +3446,25 @@ class type(object):
         if not ti:
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Unable to parse the provided string \"{!s}\" as a properly named function prototype.".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(info, '"')))
 
-        elif not any([ti.is_func(), ti.is_funcptr()]):
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Refusing to apply a non-prototype (\"{!s}\") to the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(info, '"'), 'address' if rt else 'function', ea))
+        elif not any([ti.is_func(), ti.is_funcptr(), ti.is_ptr()]):
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Refusing to apply a non-prototype ({!s}) to the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, interface.tinfo.quoted(info), 'address' if rt else 'function', ea))
 
-        # Otherwise, the type is valid and we only need to figure
-        # out if it needs to be promoted to a pointer or not.
-        newti = interface.function.pointer(ti) if rt else ti
+        # Otherwise, the type is valid and we only need to figure out if it
+        # needs to be decayed in to a pointer or not. If the address is not a
+        # runtime-linked address, but our type is a function pointer then we
+        # need to reify it to a prototype before we applying to the address.
+        newti = interface.function.pointer(ti) if rt else interface.function.nonpointer(ti) if ti.is_ptr() else ti
         if rt and not newti:
-            raise E.DisassemblerError(u"{:s}({:#x}, {!r}) : Unable to promote type to a pointer as required when applying a function type to a runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, ea))
+            raise E.DisassemblerError(u"{:s}({:#x}, {!r}) : Unable to decay type to a pointer as required when applying a prototype to a runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, ea))
+
+        elif rt and newti is not ti:
+            logging.warning(u"{:s}({:#x}, {!r}) : Decayed given prototype to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('.'.join([__name__, cls.__name__]), ea, info, "{!s}".format(newti), ea))
+
+        elif not newti:
+            raise E.DisassemblerError(u"{:s}({:#x}, {!r}) : Unable to reify function pointer to a prototype as required when applying it to a compiler-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, ea))
 
         elif newti is not ti:
-            logging.warning(u"{:s}({:#x}, {!r}) : Promoting type \"{:s}\" to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(ti, '"'), "{!s}".format(newti), ea))
+            logging.warning(u"{:s}({:#x}, {!r}) : Reified given function pointer to a prototype ({!r}) due to the address ({:#x}) being compiler-linked.".format('.'.join([__name__, cls.__name__]), ea, info, "{!s}".format(newti), ea))
 
         # Now we re-render the type into a string in case we couldn't apply it.
         rendered = idaapi.print_tinfo('', 0, 0, 0, newti, utils.string.to(parsedname) if parsedname else utils.string.to(realname), '')
