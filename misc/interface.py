@@ -12369,6 +12369,22 @@ class function(object):
         return cls.pointer(info.get_pointed_object())
 
     @classmethod
+    def nonpointer(cls, info):
+        '''Reify the type information specified as `info` to a function prototype if possible and necessary.'''
+        ti = info
+
+        # Continuously reify the type until we get to its target, a non-pointer.
+        while ti.is_ptr():
+            ti = ti.get_pointed_object()
+
+        # If we got to a function pointer, then we can just return it as-is.
+        if ti.is_funcptr():
+            return tinfo.concretize(ti.get_pointed_object())
+        elif ti.is_func():
+            return ti
+        return None
+
+    @classmethod
     def apply_typeinfo(cls, ea, info, *flags):
         '''Apply the type information in `info` to the function at the address `ea` with the given `flags`'''
         _, fn = addressOfRuntimeOrStatic(ea)
