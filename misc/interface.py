@@ -12348,15 +12348,25 @@ class function(object):
 
     @classmethod
     def pointer(cls, info):
-        '''Promote the type information specified as `info` to a function pointer if necessary.'''
-        if any([info.is_ptr(), info.is_func()]):
+        '''Decay the prototype information specified as `info` to a function pointer if necessary.'''
+        ti, pi = idaapi.tinfo_t(), idaapi.ptr_type_data_t()
+
+        # If it's a prototype (not a pointer), then create a pointer to it.
+        if info.is_func():
+            pi.obj_type = info
+            return tinfo.concretize(ti) if ti.create_ptr(pi) else None
+
+        # If it has no details, then we don't know what this type is.
+        elif not info.has_details():
+            return None
+
+        # We were given the expected function pointer and we can just return it.
+        elif info.is_funcptr():
             return info
 
-        # If it's not a pointer then we need to promote it.
-        ti = idaapi.tinfo_t()
-        pi = idaapi.ptr_type_data_t()
-        pi.obj_type = info
-        return ti if ti.create_ptr(pi) else None
+        # Otherwise, this pointer does not point to a function prototype. If it
+        # does not, then we recurse until we actually get to one.
+        return cls.pointer(info.get_pointed_object())
 
     @classmethod
     def apply_typeinfo(cls, ea, info, *flags):
