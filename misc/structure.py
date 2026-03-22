@@ -7863,19 +7863,23 @@ class members_t(object):
         return [member for member in self.iterate(*string, **type)]
 
     @utils.multicase(string=(types.string, types.ordered))
-    @utils.string.decorate_arguments('string', 'suffix')
-    def list(self, string, *suffix):
+    @utils.string.decorate_arguments('string', 'suffix', 'regex', 'iregex', 'name', 'like', 'fullname', 'comment', 'comments')
+    def list(self, string, *suffix, **type):
         '''List any members that match the glob in `string`.'''
         res = string if isinstance(string, types.ordered) else (string,)
-        return self.list(like=interface.tuplename(*itertools.chain(res, suffix)))
+        type['like'] = interface.tuplename(*itertools.chain(res, suffix))
+        return self.list(**type)
     @utils.multicase(bounds=interface.bounds_t)
-    def list(self, bounds):
+    @utils.string.decorate_arguments('regex', 'iregex', 'name', 'like', 'fullname', 'comment', 'comments')
+    def list(self, bounds, **type):
         '''List any members that overlap the given `bounds`.'''
-        return self.list(predicate=operator.truth, bounds=bounds)
+        type['bounds'] = bounds
+        return self.list(**type)
     @utils.multicase(location=interface.location_t)
-    def list(self, location):
+    def list(self, location, **type):
         '''List any members that overlap the specified `location`.'''
-        return self.list(predicate=operator.truth, location=location)
+        type['location'] = location
+        return self.list(**type)
     @utils.multicase()
     @utils.string.decorate_arguments('regex', 'iregex', 'name', 'like', 'fullname', 'comment', 'comments')
     def list(self, **type):
