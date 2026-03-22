@@ -568,18 +568,21 @@ class functions(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def iterate(cls, name):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def iterate(cls, name, **type):
         '''Iterate through the functions from the database that match the glob specified by `name`.'''
-        return cls.iterate(like=name)
+        type['like'] = name
+        return cls.iterate(**type)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
-    def iterate(cls, bounds):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def iterate(cls, bounds, **type):
         '''Iterate through the functions from the database within the given `bounds`.'''
-        return cls.iterate(predicate=operator.truth, bounds=bounds)
+        type['bounds'] = bounds
+        return cls.iterate(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
     def iterate(cls, **type):
         '''Iterate through the functions from the database that match the keywords specified by `type`.'''
         iterable = (ui.navigation.procedure(ea) for ea in interface.function.iterate())
@@ -589,18 +592,21 @@ class functions(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def list(cls, name):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def list(cls, name, **type):
         '''List the functions from the database that match the glob specified by `name`.'''
-        return cls.list(like=name)
+        type['like'] = name
+        return cls.list(**type)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
-    def list(cls, bounds):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def list(cls, bounds, **type):
         '''List the functions from the database within the given `bounds`.'''
-        return cls.list(predicate=operator.truth, bounds=bounds)
+        type['bounds'] = bounds
+        return cls.list(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
     def list(cls, **type):
         '''List the functions from the database that match the keywords specified by `type`.'''
         get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
@@ -708,13 +714,14 @@ class functions(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def search(cls, name):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def search(cls, name, **type):
         '''Search through the functions within the database and return the first result that matches the glob specified by `name`.'''
-        return cls.search(like=name)
+        type['like'] = name
+        return cls.search(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
     def search(cls, **type):
         '''Search through the functions within the database and return the first result matching the keywords specified by `type`.'''
         query_s = utils.string.kwargs(type)
@@ -766,26 +773,28 @@ class segments(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def list(cls, name):
+    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex', 'identifier')
+    def list(cls, name, **type):
         '''List the segments within the database that match the glob specified by `name`.'''
-        return cls.list(like=name)
+        type['like'] = name
+        return segment.list(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex', 'identifier')
     def list(cls, **type):
         '''List the segments within the database that match the keywords specified by `type`.'''
         return segment.list(**type)
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def iterate(cls, name):
+    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex', 'identifier')
+    def iterate(cls, name, **type):
         '''Yield the boundary of each segment within the database that match the glob specified by `name`.'''
-        return cls.iterate(like=name)
+        type['like'] = name
+        return cls.iterate(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex', 'identifier')
     def iterate(cls, **type):
         '''Yield the boundary of each segment within the database the match the keywords specified by `type`.'''
         for item in segment.__iterate__(**type):
@@ -794,13 +803,14 @@ class segments(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def search(cls, name):
+    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex', 'identifier')
+    def search(cls, name, **type):
         '''Search through the segments that match the glob `name` and return the first result.'''
-        return cls.search(like=name)
+        type['like'] = name
+        return cls.search(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex', 'identifier')
     def search(cls, **type):
         '''Search through the segments within the database and return the first result matching the keywords specified by `type`.'''
         return segment.search(**type)
@@ -1041,16 +1051,19 @@ class names(object):
 
     @utils.multicase(string=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('string')
-    def __iterate__(cls, string):
-        return cls.__iterate__(like=string)
+    @utils.string.decorate_arguments('string', 'name', 'like', 'iregex', 'unmangled', 'demangled', 'mangled', 'decorated')
+    def __iterate__(cls, string, **type):
+        type['like'] = string
+        return cls.__iterate__(**type)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
-    def __iterate__(cls, bounds):
-        return cls.__iterate__(predicate=operator.truth, bounds=bounds)
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'unmangled', 'demangled', 'mangled', 'decorated')
+    def __iterate__(cls, bounds, **type):
+        type['bounds'] = bounds
+        return cls.__iterate__(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'unmangled', 'demangled', 'mangled', 'decorated')
     def __iterate__(cls, **type):
         iterable = (idx for idx in builtins.range(idaapi.get_nlist_size()))
         # XXX: it seems that there's a weird situation where a name can exist at
@@ -1066,18 +1079,21 @@ class names(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def iterate(cls, name):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'unmangled', 'demangled', 'mangled', 'decorated')
+    def iterate(cls, name, **type):
         '''Iterate through the names from the database that match the glob specified by `name`.'''
-        return cls.iterate(like=name)
+        type['like'] = name
+        return cls.iterate(**type)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
-    def iterate(cls, bounds):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'unmangled', 'demangled', 'mangled', 'decorated')
+    def iterate(cls, bounds, **type):
         '''Iterate through the names from the database that match the glob specified by `name`.'''
-        return cls.iterate(predicate=operator.truth, bounds=bounds)
+        type['bounds'] = bounds
+        return cls.iterate(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'unmangled', 'demangled', 'mangled', 'decorated')
     def iterate(cls, **type):
         '''Iterate through the names from the database that match the keywords specified by `type`.'''
         for idx in cls.__iterate__(**type):
@@ -1087,18 +1103,21 @@ class names(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def list(cls, name):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'unmangled', 'demangled', 'mangled', 'decorated')
+    def list(cls, name, **type):
         '''List the names from the database that match the glob specified by `name`.'''
-        return cls.list(like=name)
+        type['like'] = name
+        return cls.list(**type)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
-    def list(cls, bounds):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'unmangled', 'demangled', 'mangled', 'decorated')
+    def list(cls, bounds, **type):
         '''List the names from the database within the given `bounds`.'''
-        return cls.list(predicate=operator.truth, bounds=bounds)
+        type['bounds'] = bounds
+        return cls.list(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'unmangled', 'demangled', 'mangled', 'decorated')
     def list(cls, **type):
         '''List the names from the database that match the keywords specified by `type`.'''
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
@@ -1141,13 +1160,14 @@ class names(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def search(cls, name):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'unmangled', 'demangled', 'mangled', 'decorated')
+    def search(cls, name, **type):
         '''Search through the names within the database that match the glob `name` and return the first result.'''
-        return cls.search(like=name)
+        type['like'] = name
+        return cls.search(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'unmangled', 'demangled', 'mangled', 'decorated')
     def search(cls, **type):
         '''Search through the names within the database and return the first result matching the keywords specified by `type`.'''
         MNG_LONG_FORM = getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
@@ -1904,12 +1924,13 @@ class exports(object):
 
     @utils.multicase(string=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('string')
-    def __iterate__(cls, string):
-        return cls.__iterate__(like=string)
+    @utils.string.decorate_arguments('string', 'name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def __iterate__(cls, string, **type):
+        type['like'] = string
+        return cls.__iterate__(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
     def __iterate__(cls, **type):
         listable = [packed for packed in interface.entries.iterate()]
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
@@ -1965,27 +1986,37 @@ class exports(object):
         if ea == idaapi.BADADDR:
             raise E.ItemNotFoundError(u"{:s}.by_ordinal({:d}) : No entry point was found with the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
         return ea
+    @utils.multicase(string=internal.types.string)
+    @classmethod
+    @utils.string.decorate_arguments('string', 'name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def by(cls, string, **type):
+        '''Return the address of the first entry point that matches the glob specified in `string`.'''
+        type['like'] = string
+        return cls.search(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
     def by(cls, **type):
         '''Return the address of the first entry point that matches the keywords specified by `type`.'''
         return cls.search(**type)
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def iterate(cls, name):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def iterate(cls, name, **type):
         '''Iterate through the entry points from the database that match the glob specified by `name`.'''
-        return cls.iterate(like=name)
+        type['like'] = name
+        return cls.iterate(**type)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
-    def iterate(cls, bounds):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def iterate(cls, bounds, **type):
         '''Iterate through the entry points from the database within the given `bounds`.'''
-        return cls.iterate(predicate=operator.truth, bounds=bounds)
+        type['bounds'] = bounds
+        return cls.iterate(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
     def iterate(cls, **type):
         '''Iterate through the entry points from the database that match the keywords specified by `type`.'''
         for index, address, name, ordinal in cls.__iterate__(**type):
@@ -2061,18 +2092,21 @@ class exports(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def list(cls, name):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def list(cls, name, **type):
         '''List the entry points from the database that match the glob `name`.'''
-        return cls.list(like=name)
+        type['like'] = name
+        return cls.list(**type)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
-    def list(cls, bounds):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def list(cls, bounds, **type):
         '''List the entry points from the database within the given `bounds`.'''
-        return cls.list(like=name)
+        type['bounds'] = bounds
+        return cls.list(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
     def list(cls, **type):
         '''List the entry points from the database that match the keywords specified by `type`.'''
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
@@ -2125,13 +2159,14 @@ class exports(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def search(cls, name):
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def search(cls, name, **type):
         '''Search through the entry points within the database that match the glob `name` and return the first result.'''
-        return cls.search(like=name)
+        type['like'] = name
+        return cls.search(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
     def search(cls, **type):
         '''Search through the entry points within the database and return the first result matching the keywords specified by `type`.'''
         query_s = utils.string.kwargs(type)
@@ -2422,18 +2457,21 @@ class imports(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def iterate(cls, name):
+    @utils.string.decorate_arguments('name', 'fullname', 'like', 'module', 'iregex', 'regex', 'unmangled', 'demangled', 'mangled', 'decorated')
+    def iterate(cls, name, **type):
         '''Iterate through the imports from the database that match the glob specified by `name`.'''
-        return cls.iterate(like=name)
+        type['like'] = name
+        return cls.iterate(**type)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
-    def iterate(cls, bounds):
+    @utils.string.decorate_arguments('name', 'fullname', 'like', 'module', 'iregex', 'regex', 'unmangled', 'demangled', 'mangled', 'decorated')
+    def iterate(cls, bounds, **type):
         '''Iterate through the imports from the database that are contained within the given `bounds`.'''
-        return cls.iterate(predicate=operator.truth, bounds=bounds)
+        type['bounds'] = bounds
+        return cls.iterate(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'fullname', 'like', 'module', 'iregex', 'regex', 'unmangled', 'demangled', 'mangled', 'decorated')
     def iterate(cls, **type):
         '''Iterate through the imports from the database that match the keywords specified by `type`.'''
         iterable = cls.__iterate__()
@@ -2537,20 +2575,23 @@ class imports(object):
         settable = {item for item in iterable if item}
         return [utils.string.of(item) for item in settable]
 
-    @utils.multicase(symbol=internal.types.string)
+    @utils.multicase(fullname=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('symbol')
-    def list(cls, symbol):
-        '''List the imports from the database that match the glob specified by `symbol`.'''
-        return cls.list(fullname=symbol)
+    @utils.string.decorate_arguments('name', 'fullname', 'like', 'module', 'iregex', 'regex', 'unmangled', 'demangled', 'mangled', 'decorated')
+    def list(cls, fullname, **type):
+        '''List the imports from the database that match the glob specified by `fullname`.'''
+        type['fullname'] = fullname
+        return cls.list(**type)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
-    def list(cls, bounds):
+    @utils.string.decorate_arguments('name', 'fullname', 'like', 'module', 'iregex', 'regex', 'unmangled', 'demangled', 'mangled', 'decorated')
+    def list(cls, bounds, **type):
         '''List the imports from the database within the given `bounds`.'''
-        return cls.list(predicate=operator.truth, bounds=bounds)
+        type['bounds'] = bounds
+        return cls.list(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'fullname', 'like', 'module', 'iregex', 'regex', 'unmangled', 'demangled', 'mangled', 'decorated')
     def list(cls, **type):
         '''List the imports from the database that match the keywords specified by `type`.'''
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
@@ -2617,13 +2658,14 @@ class imports(object):
 
     @utils.multicase(fullname=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('fullname')
-    def search(cls, fullname):
+    @utils.string.decorate_arguments('name', 'fullname', 'like', 'module', 'iregex', 'regex', 'unmangled', 'demangled', 'mangled', 'decorated')
+    def search(cls, fullname, **type):
         '''Search through the imports within the database that match the glob specified by `fullname`.'''
-        return cls.search(predicate=operator.truth, fullname=fullname)
+        type['fullname'] = fullname
+        return cls.search(**type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'fullname', 'like', 'module', 'iregex', 'regex', 'unmangled', 'demangled', 'mangled', 'decorated')
     def search(cls, **type):
         '''Search through the imports within the database and return the first result matching the keywords specified by `type`.'''
         query_s = utils.string.kwargs(type)
@@ -5620,27 +5662,27 @@ class types(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
+    @utils.string.decorate_arguments('name', 'like', 'definition', 'iregex', 'regex')
     def iterate(cls, name, **type):
         '''Iterate through the types within the current type library that match the glob specified by `name`.'''
         type['like'] = name
         return cls.iterate(interface.tinfo.library(), **type)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
-    @utils.string.decorate_arguments('name')
+    @utils.string.decorate_arguments('name', 'like', 'definition', 'iregex', 'regex')
     def iterate(cls, name, library, **type):
         '''Iterate through the types within a type `library` that match the glob specified by `name`.'''
         type['like'] = name
         return cls.iterate(library, **type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'definition', 'iregex', 'regex')
     def iterate(cls, **type):
         '''Iterate through the types within the current type library that match the keywords specified by `type`.'''
         return cls.iterate(interface.tinfo.library(), **type)
     @utils.multicase(library=idaapi.til_t)
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'definition', 'iregex', 'regex')
     def iterate(cls, library, **type):
         '''Iterate through the types in a type `library` that match the keywords specified by `type`.'''
         iterable = ((ordinal, name, ti) for ordinal, name, ti in interface.tinfo.iterate(library) if ti and not ti.empty())
@@ -5656,27 +5698,27 @@ class types(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
+    @utils.string.decorate_arguments('name', 'like', 'definition', 'iregex', 'regex')
     def search(cls, name, **type):
         '''Search through the types within the current type library that match the glob `name` and return the first result.'''
         type['like'] = name
         return cls.search(interface.tinfo.library(), **type)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
-    @utils.string.decorate_arguments('name')
+    @utils.string.decorate_arguments('name', 'like', 'definition', 'iregex', 'regex')
     def search(cls, name, library, **type):
         '''Search through the types in a type `library` that match the glob `name` and return the first result.'''
         type['like'] = name
         return cls.search(library, **type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'definition', 'iregex', 'regex')
     def search(cls, **type):
         '''Search through the types in the current type library that match the keywords specified by `type`.'''
         return cls.search(interface.tinfo.library(), **type)
     @utils.multicase(library=idaapi.til_t)
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'definition', 'iregex', 'regex')
     def search(cls, library, **type):
         '''Search through the types in a type `library` that match the keywords specified by `type`.'''
         query_s = utils.string.kwargs(type)
@@ -5696,27 +5738,27 @@ class types(object):
 
     @utils.multicase(name=internal.types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
+    @utils.string.decorate_arguments('name', 'like', 'definition', 'iregex', 'regex')
     def list(cls, name, **type):
         '''List the types within the current type library that match the glob specified by `name`.'''
         type['like'] = name
         return cls.list(interface.tinfo.library(), **type)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
-    @utils.string.decorate_arguments('name')
+    @utils.string.decorate_arguments('name', 'like', 'definition', 'iregex', 'regex')
     def list(cls, name, library, **type):
         '''List the types within a type `library` that match the glob specified by `name`.'''
         type['like'] = name
         return cls.list(library, **type)
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'definition', 'iregex', 'regex')
     def list(cls, **type):
         '''List the types within the current type library that match the keywords specified by `type`.'''
         return cls.list(interface.tinfo.library(), **type)
     @utils.multicase(library=idaapi.til_t)
     @classmethod
-    @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
+    @utils.string.decorate_arguments('name', 'like', 'definition', 'iregex', 'regex')
     def list(cls, library, **type):
         '''List the types within a type `library` that match the keywords specified by `type`.'''
         iterable = ((ordinal, name, ti) for ordinal, name, ti in interface.tinfo.iterate(library) if ti and not ti.empty())
