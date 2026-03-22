@@ -43,7 +43,8 @@ import idaapi, internal
 from internal import utils, interface, types, exceptions as E
 logging = logging.getLogger(__name__)
 
-## enumerating
+# FIXME: there is definitely availability for adding more matchers. we haven't
+#        implemented any of them because filtering segments is not that useful.
 __matcher__ = utils.matcher()
 __matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of)
 __matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of)
@@ -65,12 +66,13 @@ else:
     __matcher__.boolean('lt', operator.gt, 'start_ea')
 __matcher__.predicate('predicate'), __matcher__.predicate('pred')
 
+## enumerating
 @utils.multicase(string=types.string)
-@utils.string.decorate_arguments('string')
-def __iterate__(string):
+@utils.string.decorate_arguments('string', 'iregex', 'regex', 'like', 'name')
+def __iterate__(string, **type):
     '''Iterate through each segment whose name matches the glob specified by `string`.'''
-    string = interface.tuplename(*fullname)
-    return __iterate__(like=string)
+    type['like'] = string
+    return __iterate__(**type)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def __iterate__(**type):
@@ -85,10 +87,11 @@ def __iterate__(**type):
     for item in iterable: yield item
 
 @utils.multicase(string=types.string)
-@utils.string.decorate_arguments('string')
-def list(string):
+@utils.string.decorate_arguments('string', 'iregex', 'regex', 'like', 'name')
+def list(string, **type):
     '''List all of the segments whose name matches the glob specified by `string`.'''
-    return list(like=string)
+    type['like'] = string
+    return list(**type)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def list(**type):
@@ -221,12 +224,12 @@ def by(**type):
     return res
 
 @utils.multicase(name=types.string)
-@utils.string.decorate_arguments('name', 'suffix')
-def search(name, *suffix):
+@utils.string.decorate_arguments('name', 'suffix', 'regex', 'iregex', 'like')
+def search(name, *suffix, **type):
     '''Search through all the segments and return the first one matching the glob `name`.'''
     res = (name,) + suffix
-    string = interface.tuplename(*res)
-    return by(like=string)
+    type['like'] = interface.tuplename(*res)
+    return by(**type)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def search(**type):
@@ -673,4 +676,3 @@ export = utils.alias(save)
 
 #res = idaapi.add_segment_translation(ea, selector)
 #res = idaapi.del_segment_translation(ea)
-
