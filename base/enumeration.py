@@ -609,10 +609,10 @@ class members(object):
         return
 
     @utils.multicase(enum=(types.integer, types.string, types.tuple))
-    def __new__(cls, enum, **type):
+    def __new__(cls, enum, *args, **type):
         '''Return a list of the identifiers for each member associated with the enumeration `enum`.'''
         eid = by(enum)
-        return [mid for mid in cls.iterate(eid, **type)]
+        return [mid for mid in cls.iterate(eid, *args, **type)]
 
     @utils.multicase(enum=(types.integer, types.string, types.tuple), name=types.string)
     @classmethod
@@ -878,13 +878,21 @@ class members(object):
 
     @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'comment', 'comments')
     def iterate(cls, enum, **type):
-        '''Iterate through all ids of each member associated with the enumeration `enum`.'''
+        '''Yield the id for each member associated with the enumeration `enum`.'''
         eid = by(enum)
         iterable = cls.__iterate__(eid)
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
             iterable = cls.__members_matcher.match(key, value, iterable)
         for item in iterable: yield item
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), name=types.string)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'comment', 'comments')
+    def iterate(cls, enum, name, **type):
+        '''Yield the id for each of the members from the enumeration `enum` that match the glob specified by `name`.'''
+        type['like'] = name
+        return cls.iterate(enum, **type)
 
     @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
@@ -913,6 +921,12 @@ class members(object):
             cmt = member.comment(eid, mid, repeatable=True) or member.comment(eid, mid, repeatable=False)
             six.print_(u"{:<{:d}s} {:<{:d}s} {:#0{:d}x}".format("[{:d}]".format(i), maxindex, member.name(mid), maxname, member.value(mid), maxvalue) + (u" // {:s}".format(cmt) if cmt else u''))
         return
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), name=types.string)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'comment', 'comments')
+    def list(cls, enum, name, **type):
+        type['like'] = name
+        return cls.list(enum, **type)
 
 class member(object):
     """
