@@ -1115,22 +1115,30 @@ class address(object):
         elif key == '__typeinfo__':
             return cls.set_typeinfo(ea, value)
 
-        # If we're within a function, then we also need to determine whether it's a
-        # runtime-linked address or not. This is because if it's a runtime-linked
-        # address then a repeatable comment is used. Otherwise we encode the tags
-        # within a non-repeatable comment.
+        # If we're within a function, then we will need to later determine
+        # whether it's runtime-linked or not in order to distinguish whether a
+        # repeatable or non-repeatable comment is used.
         try:
             func = interface.function.by(ea)
-            rt, _ = interface.addressOfRuntimeOrStatic(ea if func is None else func)
 
-        # If the address was not within a function, then set the necessary variables
-        # so that a repeatable comment is used.
+        # If the address was not within a function, then assign an empty value
+        # as our function location.
         except LookupError:
-            rt, func = False, None
+            func = None
+
+        # Now we figure out whether the address is runtime-linked or not. This
+        # will be used to determine the type of comment that will be used. If
+        # in a function and the address is runtime-linked, then the disassembler
+        # created a function with the comment stored as a repeatable comment.
+        address = ea if func is None else func
+        if interface.function.has(address):
+            rt, _ = interface.addressOfRuntimeOrStatic(address)
+        else:
+            rt, _ = False, ()
 
         # If we're outside a function or pointing to a runtime-linked address, then
         # we use a repeatable comment. Anything else means a non-repeatable comment.
-        repeatable = False if func and interface.function.has(ea) and not rt else True
+        repeatable = False if func and interface.function.has(address) and not rt else True
 
         # Go ahead and decode the tags that are written to all 3 comment types. This
         # way we can search them for the correct one that the user is trying to modify.
@@ -1138,13 +1146,17 @@ class address(object):
         state_wrong = comment.decode(utils.string.of(idaapi.get_cmt(ea, not repeatable)))
         state_runtime = comment.decode(utils.string.of(idaapi.get_func_cmt(func, True))) if func else {}
 
-        # Now we just need to figure out which one of the dictionaries that we decoded
-        # contains the key that the user is trying to modify. We need to specially
-        # handle the case where the address is actually referring to a runtime address.
-        if rt:
-            rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, True)
+        # Now we just need to figure out which one of the dictionaries that we
+        # decoded contains the key that the user is trying to modify. We need to
+        # specially handle the case where the address is actually referring to a
+        # runtime address because the disassembler can create a function there
+        # requiring us to use the repeatable function comment (state_runtime) or
+        # the non-repeatable address comment (state_wrong).
+        if func and rt:
+            rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, repeatable) if state_runtime else (False, state_wrong, not repeatable)
+
         else:
-            state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
+            rt, state, where = (False, state_correct, repeatable) if key in state_correct else (False, state_wrong, not repeatable) if key in state_wrong else (False, state_correct, repeatable) if state_correct else (False, state_wrong, not repeatable)
 
         # If the key was not in any of the encoded dictionaries, then we need to
         # update the reference count in the tag cache. If the address is a runtime
@@ -1494,7 +1506,7 @@ class function(object):
         # we can simply use a repeatable comment because we're a function.
         state_correct = comment.decode(utils.string.of(idaapi.get_func_cmt(fn, True))), True
         state_wrong = comment.decode(utils.string.of(idaapi.get_func_cmt(fn, False))), False
-        state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
+        state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct if state_correct[0] else state_wrong
 
         # Grab the previous value from the correct dictionary, and update it with
         # the new value that was given to us.
@@ -1992,7 +2004,7 @@ class typeinfo_member(object):
         comment_wrong = utils.string.of(internal.structure.v9member.get_comment(tinfo, mindex, not repeatable))
 
         state_right, state_wrong = map(comment.decode, [comment_right, comment_wrong])
-        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right or state_wrong, not repeatable if state_right else repeatable)
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right or state_wrong, repeatable if state_right else not repeatable)
 
         duplicates = {item for item in state_right} & {item for item in state_wrong}
         if key in duplicates:
@@ -2151,7 +2163,7 @@ class structure(object):
         # "repeatable" variable toggles which comment to give priority. We explicitly
         # check the "wrong" place but fall back to the "right" one.
         state_right, state_wrong = map(comment.decode, [comment_right, comment_wrong])
-        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right, repeatable)
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right or state_wrong, repeatable)
 
         # If there were any duplicate keys in any of the dicts, then warn the user about it.
         duplicates = {item for item in state_right} & {item for item in state_wrong}
@@ -2327,7 +2339,7 @@ class member(object):
         # that the user is attempting to modify. The "repeatable" variable is used
         # to toggle which comment gets priority which modifying the member's tags.
         state_right, state_wrong = map(comment.decode, [comment_right, comment_wrong])
-        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right, repeatable)
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right or state_wrong, repeatable)
 
         # Check if the key is a dupe so that we can warn the user about it.
         duplicates = {item for item in state_right} & {item for item in state_wrong}
