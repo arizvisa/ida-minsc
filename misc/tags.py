@@ -824,10 +824,10 @@ class select_v1(object):
     navigation = __import__('ui').navigation
 
     @classmethod
-    def database(cls, *args):
+    def database(cls, *args, **kwargs):
         '''Query the globals in the database and yield a tuple containing its address and all of the `required` tags with any `included` ones.'''
-        selection = True if any(args) else False
-        for ea, used in query_v1.globals(*args):
+        selection = True if any([args, kwargs]) else False
+        for ea, used in query_v1.globals(*args, **kwargs):
             is_function = interface.function.has(cls.navigation.set(ea))
             Ftag = function.get if is_function else address.get
             tags, owners = Ftag(ea), {f for f in interface.function.owners(ea)} if is_function else {ea}
@@ -843,10 +843,10 @@ class select_v1(object):
         return
 
     @classmethod
-    def contents(cls, *args):
+    def contents(cls, *args, **kwargs):
         '''Query the contents of each function and yield a tuple containing its address and a set of the matching `required` tags with any `included` ones.'''
-        selection = True if any(args) else False
-        for ea, used in query_v1.contents(*args):
+        selection = True if any([args, kwargs]) else False
+        for ea, used in query_v1.contents(*args, **kwargs):
             is_function = interface.function.has(cls.navigation.procedure(ea))
             owners = {f for f in interface.function.owners(ea)} if is_function else {ea}
             explicit = {key for key in used if key and not key.startswith('__')}
@@ -860,10 +860,10 @@ class select_v1(object):
         return
 
     @classmethod
-    def function(cls, func, *args):
+    def function(cls, func, *args, **kwargs):
         '''Query the contents of the function `func` and yield a tuple containing each address and all of the `required` tags with any `included` ones.'''
-        selection = True if any(args) else False
-        for ea, used in query_v1.function(func, *args):
+        selection = True if any([args, kwargs]) else False
+        for ea, used in query_v1.function(func, *args, **kwargs):
             tags = address.get(cls.navigation.analyze(ea))
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
@@ -875,10 +875,10 @@ class select_v1(object):
         return
 
     @classmethod
-    def structures(cls, *args):
+    def structures(cls, *args, **kwargs):
         '''Query the structures in the database and yield a tuple containing each structure and all of the `required` tags with any `included` ones.'''
-        selection = True if any(args) else False
-        for sid, used in query_v1.structures(*args):
+        selection = True if any([args, kwargs]) else False
+        for sid, used in query_v1.structures(*args, **kwargs):
             tags = structure.get(sid)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
@@ -890,13 +890,13 @@ class select_v1(object):
         return
 
     @classmethod
-    def owners(cls, *args):
+    def owners(cls, *args, **kwargs):
         '''Query the members in the database and yield a tuple containing the owning structure for the member and a set of the matching `required` tags with any `included` ones.'''
-        selection = True if any(args) else False
+        selection = True if any([args, kwargs]) else False
 
         # FIXME: we should be using an offset other than 0 if the structure
         #        being yielded belongs to a frame.
-        for sid, used in query_v1.owners(*args):
+        for sid, used in query_v1.owners(*args, **kwargs):
             explicit = {key for key in used if key and not key.startswith('__')}
             if selection:
                 yield internal.structure.new(sid, 0), used
@@ -906,15 +906,15 @@ class select_v1(object):
         return
 
     @classmethod
-    def members(cls, *args):
+    def members(cls, *args, **kwargs):
         '''Query the members in the database and yield a tuple containing the member and a set of the matching `required` tags with any `included` ones.'''
-        cache, selection = {}, True if any(args) else False
+        cache, selection = {}, True if any([args, kwargs]) else False
 
         # Go through each member from our query, and use it to get the structure
         # that owns it. We can then instantiate a `structure_t`. We cache the
         # result from this in case more than one member from the structure is
         # being yielded.
-        for mid, used in query_v1.members(*args):
+        for mid, used in query_v1.members(*args, **kwargs):
             mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
 
             # FIXME: we should be using an offset other than 0 if the owner of the
@@ -932,10 +932,10 @@ class select_v1(object):
         return
 
     @classmethod
-    def structure(cls, sid, *args):
+    def structure(cls, sid, *args, **kwargs):
         '''Query the members of the structure `sid` and yield a tuple containing each member and all of the `required` tags with any `included` ones.'''
-        selection, cache = True if any(args) else False, {}
-        for mid, used in query_v1.structure(sid, *args):
+        selection, cache = True if any([args, kwargs]) else False, {}
+        for mid, used in query_v1.structure(sid, *args, **kwargs):
             tags = member.get(mid)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
@@ -949,10 +949,10 @@ class select_v1(object):
         return
 
     @classmethod
-    def blocks(cls, func, *args):
+    def blocks(cls, func, *args, **kwargs):
         '''Query the basic blocks of the func `func` and yield a tuple containing each block and all of the `required` tags with any `included` ones.'''
-        selection, cache = True if any(args) else False, {}
-        for bb, used in query_v1.blocks(func, *args):
+        selection, cache = True if any([args, kwargs]) else False, {}
+        for bb, used in query_v1.blocks(func, *args, **kwargs):
             tags = block.get(bb)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
