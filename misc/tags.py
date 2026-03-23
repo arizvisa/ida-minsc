@@ -366,16 +366,16 @@ class select_v0(object):
     """
 
     @classmethod
-    def database(cls, *args):
+    def database(cls, *args, **kwargs):
         '''Query the globals in the database and yield a tuple containing its address and all of the `required` tags with any `included` ones.'''
-        if args:
-            for pair in query_v0.globals(*args):
+        if args or kwargs:
+            for pair in query_v0.globals(*args, **kwargs):
                 yield pair
             return
 
         # Nothing specific was queried, so just yield all tags that are
         # available while making sure to exclude any implicit ones.
-        for ea, res in query_v0.globals(*args):
+        for ea, res in query_v0.globals(*args, **kwargs):
             explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
             if explicit:
                 yield ea, explicit
@@ -383,16 +383,16 @@ class select_v0(object):
         return
 
     @classmethod
-    def contents(cls, *args):
+    def contents(cls, *args, **kwargs):
         '''Query the contents of each function and yield a tuple containing its address and a set of the matching `required` tags with any `included` ones.'''
-        if args:
-            for pair in query_v0.contents(*args):
+        if args or kwargs:
+            for pair in query_v0.contents(*args, **kwargs):
                 yield pair
             return
 
         # No specific tags were selected, so just yield all tagnames that are
         # available while being sure to exclude the empty and any implicit tags.
-        for ea, res in query_v0.contents(*args):
+        for ea, res in query_v0.contents(*args, **kwargs):
             explicit = {tag for tag in res if tag and not tag.startswith('__')}
             if explicit:
                 yield ea, explicit
@@ -400,16 +400,16 @@ class select_v0(object):
         return
 
     @classmethod
-    def function(cls, func, *args):
+    def function(cls, func, *args, **kwargs):
         '''Query the contents of the function `func` and yield a tuple containing each address and all of the `required` tags with any `included` ones.'''
-        if args:
-            for pair in query_v0.function(func, *args):
+        if args or kwargs:
+            for pair in query_v0.function(func, *args, **kwargs):
                 yield pair
             return
 
         # If nothing specific was selected, then yield all tags that are not the
         # empty tag or are an implicit tag that is dunder-prefixed.
-        for ea, res in query_v0.function(func, *args):
+        for ea, res in query_v0.function(func, *args, **kwargs):
             explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
             if explicit:
                 yield ea, explicit
@@ -417,10 +417,10 @@ class select_v0(object):
         return
 
     @classmethod
-    def structures(cls, *args):
+    def structures(cls, *args, **kwargs):
         '''Query the structures in the database and yield a tuple containing each structure and all of the `required` tags with any `included` ones.'''
-        if args:
-            for sid, res in query_v0.structures(*args):
+        if args or kwargs:
+            for sid, res in query_v0.structures(*args, **kwargs):
                 item = internal.structure.new(sid, 0)
                 yield item, res
             return
@@ -428,7 +428,7 @@ class select_v0(object):
         # If nothing specified to filter the tags, then we need to filter the
         # empty tag and any dunder-prefixed tags from our query. We also need to
         # convert the structure id into an `internal.structure.structure_t`.
-        for sid, res in query_v0.structures(*args):
+        for sid, res in query_v0.structures(*args, **kwargs):
             explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
             if explicit:
                 yield internal.structure.new(sid, 0), explicit
@@ -436,7 +436,7 @@ class select_v0(object):
         return
 
     @classmethod
-    def structure(cls, sid, *args):
+    def structure(cls, sid, *args, **kwargs):
         '''Query the members of the structure `sid` from the database and yield a tuple containing all the chosen tags.'''
 
         # If we were given a structure_t or members_t, then preserve them and
@@ -452,15 +452,15 @@ class select_v0(object):
         # If we were given some args to use for selecting certain tags, then we
         # can just trust our query and only need to convert its member id
         # into one of our `internal.structure.member_t` types.
-        if args:
-            for mid, res in query_v0.structure(sptr.id, *args):
+        if args or kwargs:
+            for mid, res in query_v0.structure(sptr.id, *args, **kwargs):
                 mowner, mindex, mptr = internal.structure.members.by_identifier(sptr, mid)
                 yield internal.structure.member_t(owner, mindex), res
             return
 
         # Otherwise we're being asked to yield everything but the empty tag and
         # any implicit tags. We also convert the member id into a `member_t`.
-        for mid, res in query_v0.structure(sptr.id, *args):
+        for mid, res in query_v0.structure(sptr.id, *args, **kwargs):
             mowner, mindex, mptr = internal.structure.members.by_identifier(sptr, mid)
             explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
             if explicit:
@@ -469,14 +469,14 @@ class select_v0(object):
         return
 
     @classmethod
-    def owners(cls, *args):
+    def owners(cls, *args, **kwargs):
         '''Query the members in the database and yield a tuple containing the owning structure and a set of the matching `required` tags with any `included` ones.'''
         cache = {}
 
         # If we were given some tags to select with, then we can just trust
         # whatever the query gives us whilst still yielding a `member_t`.
-        if args:
-            for sid, res in query_v0.owners(*args):
+        if args or kwargs:
+            for sid, res in query_v0.owners(*args, **kwargs):
                 owner = cache[sid] if sid in cache else cache.setdefault(sid, internal.structure.new(sid, 0))
                 yield owner, res
             return
@@ -486,7 +486,7 @@ class select_v0(object):
 
         # We weren't given any tags, meaning we are being asked to yield all of
         # them. So we filter out the empty tag and any implicit tags by default.
-        for sid, res in query_v0.owners(*args):
+        for sid, res in query_v0.owners(*args, **kwargs):
             explicit = {tag for tag in res if tag and not tag.startswith('__')}
             if explicit:
                 owner = cache[sid] if sid in cache else cache.setdefault(sid, internal.structure.new(sid, 0))
@@ -495,15 +495,15 @@ class select_v0(object):
         return
 
     @classmethod
-    def members(cls, *args):
+    def members(cls, *args, **kwargs):
         '''Query the members in the database and yield a tuple containing the member and all of the `required` tags with any `included` ones.'''
         cache = {}
 
         # If we were given some tags to select the members with, then we can
         # just return whatever the query gives us. We only need to convert the
         # member id to an actual member that can be returned.
-        if args:
-            for mid, res in query_v0.members(*args):
+        if args or kwargs:
+            for mid, res in query_v0.members(*args, **kwargs):
                 mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
 
                 # FIXME: we should be detecting the frame base offset for the owner
@@ -516,7 +516,7 @@ class select_v0(object):
 
         # If no tags were provided, then we're supposed to yield all of them.
         # Still, be filter out the empty tag along with any implicit ones.
-        for mid, res in query_v0.members(*args):
+        for mid, res in query_v0.members(*args, **kwargs):
             mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
 
             # FIXME: we should be detecting the frame base offset for the owner
@@ -529,16 +529,16 @@ class select_v0(object):
         return
 
     @classmethod
-    def blocks(cls, func, *args):
+    def blocks(cls, func, *args, **kwargs):
         '''Query the basic blocks of the func `func` and yield a tuple containing each block and all of the `required` tags with any `included` ones.'''
-        if args:
-            for bb, res in query_v0.blocks(func, *args):
+        if args or kwargs:
+            for bb, res in query_v0.blocks(func, *args, **kwargs):
                 yield bb, res
             return
 
         # If we weren't asked to select anything specifically, then we yield
         # everything but the empty tag and any implicit tags.
-        for bb, res in query_v0.blocks(func, *args):
+        for bb, res in query_v0.blocks(func, *args, **kwargs):
             explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
             if explicit:
                 yield bb, explicit
