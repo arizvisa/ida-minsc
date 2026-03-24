@@ -465,6 +465,8 @@ class type(object):
         > old = segment.type.loader(ea, True)
         > boolean = segment.type.header(ea)
         > old = segment.type.header(ea, True)
+        > boolean = segment.type.visibility(ea)
+        > old = segment.type.visibility(ea, False)
 
     """
     @utils.multicase()
@@ -574,6 +576,39 @@ class type(object):
         '''Set the header flag for the specified `segment` to `boolean`.'''
         res, ok = segment.is_header_segm(), segment.set_header_segm(True if boolean else False)
         return res
+
+    @utils.multicase()
+    @classmethod
+    def visible(cls):
+        '''Return whether the current segment is visible.'''
+        seg = ui.current.segment()
+        return seg.is_visible_segm()
+    @utils.multicase(segment=(types.integer, types.string, interface.bounds_t))
+    @classmethod
+    @utils.string.decorate_arguments('segment')
+    def visible(cls, segment):
+        '''Return whether the specified `segment` is visible.'''
+        seg = by(segment)
+        return seg.is_visible_segm()
+    @utils.multicase(segment=idaapi.segment_t)
+    @classmethod
+    def visible(cls, segment):
+        '''Return whether the specified `segment` is visible.'''
+        return segment.is_visible_segm()
+    @utils.multicase(segment=(types.integer, types.string, interface.bounds_t))
+    @classmethod
+    @utils.string.decorate_arguments('segment')
+    def visible(cls, segment, boolean):
+        '''Set the visibility flag for the specified `segment` to `boolean`.'''
+        seg = by(segment)
+        return cls.visible(seg, boolean)
+    @utils.multicase(segment=idaapi.segment_t)
+    @classmethod
+    def visible(cls, segment, boolean):
+        '''Set the visibility flag for the specified `segment` to `boolean`.'''
+        res, ok = segment.is_visible_segm(), segment.set_visible_segm(True if boolean else False)
+        return res
+    visibility = utils.alias(visible, 'type')
 
 @utils.multicase()
 def permissions():
