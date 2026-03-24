@@ -6622,6 +6622,11 @@ class types(object):
     def pointer(cls, info, size, attributes, **fields):
         '''Return a pointer of `size` bytes that references the type specified by `info` and includes any extended `attributes`.'''
         pi = idaapi.ptr_type_data_t()
+
+        exponent = math.log(size if size else interface.database.bits(), 2)
+        if math.trunc(exponent) != exponent:
+            raise E.InvalidParameterError(u"{:s}.pointer({!s}, {:d}, {:#x}{:s}) : Unable to create a pointer of the specified size ({:d}) due to it not being a power of 2.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(info), size, taptr_bits, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', '' if len(missing) == 1 else 's', size))
+
         pi.obj_type = info
         pi.based_ptr_size = size
         pi.taptr_bits = taptr_bits = attributes if isinstance(attributes, internal.types.integer) else interface.tinfo.pointer_attributes(attributes)
