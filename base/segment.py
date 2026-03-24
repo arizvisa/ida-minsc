@@ -514,6 +514,37 @@ def permissions(segment, permissions):
     return res
 perms = utils.alias(permissions)
 
+@utils.multicase()
+def bitness():
+    '''Return the number of segment addressing bits for the current segment.'''
+    seg = ui.current.segment()
+    return bitness(seg)
+@utils.multicase(segment=idaapi.segment_t)
+def bitness(segment):
+    '''Return the number of segment addressing bits for the specified `segment`.'''
+    bits = segment.bitness
+    lookup = {0: 16, 1: 32, 2: 64}
+    if bits not in lookup:
+        description = "{:s}".format(interface.range.bounds(segment))
+        raise E.DisassemblerError(u"{:s}.bitness({:s}) : Unable to determine the number of segment addressing bits for the specified segment from the integer ({:d}).".format(__name__, description, bits))
+    return lookup[bits]
+@utils.multicase(segment=idaapi.segment_t, bits=types.integer)
+def bitness(segment, bits):
+    '''Set the number of segment addressing bits for the specified `segment` to `bits` (16, 32, or 64).'''
+    lookup, inverted = {0: 16, 1: 32, 2: 64}, {16: 0, 32: 1, 64: 2}
+    if bits not in inverted:
+        description = "{:s}".format(interface.range.bounds(segment))
+        raise E.InvalidParameterError(u"{:s}.bitness({:s}, {:d}) : Unable to set the number of segment addressing bits for the specified segment to an unsupported value ({:d}).".format(__name__, description, bits, bits))
+    res = segment.bitness
+    if res not in lookup:
+        description = "{:s}".format(interface.range.bounds(segment))
+        raise E.InvalidTypeOrValueError(u"{:s}.bitness({:s}, {:d}) : Unable to determine the number of segment addressing bits for the specified segment from the integer ({:d}).".format(__name__, description, bits, res))
+    if not idaapi.set_segm_addressing(segment, inverted[bits]):
+        description = "{:s}".format(interface.range.bounds(segment))
+        raise E.DisassemblerError(u"{:s}.bitness({:s}, {:d}) : Unable to update the number of segment addressing bits for the specified segment to {:d}.".format(__name__, description, bits, bits))
+    return lookup[res]
+bits = utils.alias(bitness)
+
 ## functions
 @utils.string.decorate_arguments('filename')
 def load(filename, ea, size=None, offset=0, **kwds):
