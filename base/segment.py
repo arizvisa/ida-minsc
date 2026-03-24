@@ -460,7 +460,7 @@ class type(object):
 
         > type = segment.type(ea)
         > type = segment.type('.text')
-        > boolean = segment.type(ea, idaapi.SEG_XTRN)
+        > old = segment.type(ea, idaapi.SEG_XTRN)
 
     """
     @utils.multicase()
@@ -492,11 +492,20 @@ class type(object):
     def __new__(cls, segment):
         '''Return the type of the ``idaapi.segment_t`` specified by `segment`.'''
         return segment.type
-    @utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t), segtype=types.integer)
+    @utils.multicase(segment=(types.integer, types.string, interface.bounds_t), type=types.integer)
     @utils.string.decorate_arguments('segment')
-    def __new__(cls, segment, segtype):
-        '''Return whether the given `segment` is of the provided `segtype`.'''
-        return cls(segment) == segtype
+    def __new__(cls, segment, type):
+        '''Set the type for the specified `segment` to `type`.'''
+        seg = by(segment)
+        return cls(segment, type)
+    @utils.multicase(segment=idaapi.segment_t, type=types.integer)
+    def __new__(cls, segment, type):
+        '''Set the type for the specified `segment` to `type`.'''
+        res, segment.type = segment.type, type
+        if not segment.update():
+            description = "{:s}".format(interface.range.bounds(segment))
+            raise E.DisassemblerError(u"{:s}({:s}, {:d}) : Unable to update the segment type for the specified segment to {:d}.".format(__name__, description, code, code))
+        return res
 
 @utils.multicase()
 def permissions():
