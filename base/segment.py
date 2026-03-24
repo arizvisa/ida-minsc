@@ -449,33 +449,49 @@ def contains(segment, ea):
     '''Returns true if the address `ea` is contained within the ``idaapi.segment_t`` specified by `segment`.'''
     return interface.range.within(ea, segment)
 
-@utils.multicase()
-def type():
-    '''Return the type of the current segment.'''
-    return type(ui.current.segment())
-@utils.multicase(ea=types.integer)
-def type(ea):
-    '''Return the type of the segment containing the address `ea`.'''
-    result = idaapi.segtype(ea)
-    left, right = interface.address.bounds()
-    if result == idaapi.SEG_UNDF and not (left <= ea < right):
-        description, results = "{:#x}<>{:#x}".format(left, right), {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('SEG_')}
-        logging.warning(u"{:s}.type({:#x}) : Returning {:s}({:d}) for the segment type due to the given address ({:#x}) not being within the boundaries of the database ({:s}).".format(__name__, ea, results[result], result, ea, description))
-    return result
-@utils.multicase(name=types.string)
-@utils.string.decorate_arguments('name', 'suffix')
-def type(name, *suffix):
-    '''Return the type of the segment with the specified `name`.'''
-    seg = by_name(name, *suffix)
-    return type(seg)
-@utils.multicase(segment=idaapi.segment_t)
-def type(segment):
-    '''Return the type of the ``idaapi.segment_t`` specified by `segment`.'''
-    return segment.type
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t), segtype=types.integer)
-def type(segment, segtype):
-    '''Return whether the given `segment` is of the provided `segtype`.'''
-    return type(segment) == segtype
+class type(object):
+    """
+    This namespace is used for getting and setting information about the type of
+    a segment as specified in the "type" property of the segment. Some of the
+    other functions within the namespace can also be used to get information
+    about the abstract type of the segment.
+
+    Some examples of using the functions in this namespace are::
+
+        > type = segment.type(ea)
+        > type = segment.type('.text')
+        > boolean = segment.type(ea, idaapi.SEG_XTRN)
+
+    """
+    @utils.multicase()
+    def __new__(cls):
+        '''Return the type of the current segment.'''
+        seg = ui.current.segment()
+        return cls(seg)
+    @utils.multicase(ea=types.integer)
+    def __new__(cls, ea):
+        '''Return the type of the segment containing the address `ea`.'''
+        result = idaapi.segtype(ea)
+        left, right = interface.address.bounds()
+        if result == idaapi.SEG_UNDF and not (left <= ea < right):
+            description, results = "{:#x}<>{:#x}".format(left, right), {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('SEG_')}
+            logging.warning(u"{:s}({:#x}) : Returning {:s}({:d}) for the segment type due to the given address ({:#x}) not being within the boundaries of the database ({:s}).".format(__name__, ea, results[result], result, ea, description))
+        return result
+    @utils.multicase(name=types.string)
+    @utils.string.decorate_arguments('name', 'suffix')
+    def __new__(cls, name, *suffix):
+        '''Return the type of the segment with the specified `name`.'''
+        seg = by_name(name, *suffix)
+        return cls(seg)
+    @utils.multicase(segment=idaapi.segment_t)
+    def __new__(cls, segment):
+        '''Return the type of the ``idaapi.segment_t`` specified by `segment`.'''
+        return segment.type
+    @utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t), segtype=types.integer)
+    @utils.string.decorate_arguments('segment')
+    def __new__(cls, segment, segtype):
+        '''Return whether the given `segment` is of the provided `segtype`.'''
+        return cls(segment) == segtype
 
 @utils.multicase()
 def permissions():
