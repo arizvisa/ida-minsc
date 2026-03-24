@@ -469,6 +469,8 @@ class type(object):
         > old = segment.type.visibility(ea, False)
         > boolean = segment.type.hidden(ea)
         > old = segment.type.hidden(ea, False)
+        > boolean = segment.type.debugger(ea)
+        > old = segment.type.debugger(ea, False)
 
     """
     @utils.multicase()
@@ -644,6 +646,39 @@ class type(object):
         res, ok = segment.is_hidden_segtype(), segment.set_hidden_segtype(True if boolean else False)
         return res
     hide = utils.alias(hidden, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def debugger(cls):
+        '''Return whether the current segment was created for the debugger.'''
+        seg = ui.current.segment()
+        return cls.debugger(seg)
+    @utils.multicase(segment=(types.integer, types.string, interface.bounds_t))
+    @classmethod
+    @utils.string.decorate_arguments('segment')
+    def debugger(cls, segment):
+        '''Return whether the specified `segment` was created for the debugger.'''
+        seg = by(segment)
+        return cls.debugger(seg)
+    @utils.multicase(segment=idaapi.segment_t)
+    @classmethod
+    def debugger(cls, segment):
+        '''Return whether the specified `segment` was created for the debugger.'''
+        return True if segment.flags & idaapi.SFL_DEBUG else False
+    @utils.multicase(segment=(types.integer, types.string, interface.bounds_t))
+    @classmethod
+    @utils.string.decorate_arguments('segment')
+    def debugger(cls, segment, boolean):
+        '''Set the debugger flag for the specified `segment` to `boolean`.'''
+        seg = by(segment)
+        return cls.debugger(seg, boolean)
+    @utils.multicase(segment=idaapi.segment_t)
+    @classmethod
+    def debugger(cls, segment, boolean):
+        '''Set the debugger flag for the specified `segment` to `boolean`.'''
+        res, ok = segment.flags & idaapi.SFL_DEBUG, segment.set_debugger_segm(True if boolean else False)
+        return True if res else False
+    debug = debugging = utils.alias(debugger, 'type')
 
 @utils.multicase()
 def permissions():
