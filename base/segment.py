@@ -550,8 +550,7 @@ def new(offset, size, name, **kwds):
     if seg is not None:
         raise E.DuplicateItemError(u"{:s}.new({:#x}, {:+#x}, \"{:s}\"{:s}) : A segment with the specified name (\"{:s}\") already exists.".format(__name__, offset, size, utils.string.escape(name, '"'), u", {:s}".format(utils.string.kwargs(kwds)) if kwds else '', utils.string.escape(name, '"')))
 
-    # FIXME: use disassembler default bit length instead of 32
-    bits = kwds.get( 'bits', 32 if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits())
+    bits = kwds.get('bits', interface.database.bits() if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits())
 
     ## create a selector with the requested origin
     if bits == 16:
@@ -593,9 +592,9 @@ def new(offset, size, name, **kwds):
 
     # assign the rest of the necessary attributes
     seg.sel = sel
-    seg.bitness = {16:0,32:1,64:2}[bits]
-    seg.comb = kwds.get('comb', idaapi.scPub)       # public
-    seg.align = kwds.get('align', idaapi.saRelByte)  # paragraphs
+    seg.bitness = {16:0, 32:1, 64:2}[bits]
+    seg.comb = kwds.get('comb', idaapi.scPub)   # public
+    seg.align = kwds.get('align', idaapi.saAbs) # absolute address
 
     # now we can add our segment_t to the database
     res = utils.string.to(name)
