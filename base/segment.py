@@ -545,6 +545,25 @@ def bitness(segment, bits):
     return lookup[res]
 bits = utils.alias(bitness)
 
+@utils.multicase()
+def combination():
+    '''Return the segment combination code for the current segment.'''
+    seg = ui.current.segment()
+    return combination(seg)
+@utils.multicase(segment=idaapi.segment_t)
+def combination(segment):
+    '''Return the segment combination code for the specified `segment`.'''
+    return segment.comb
+@utils.multicase(segment=idaapi.segment_t, code=types.integer)
+def combination(segment, code):
+    '''Set the segment combination code for the specified `segment` to `code`.'''
+    res, segment.comb = segment.comb, code
+    if not segment.update():
+        description = "{:s}".format(interface.range.bounds(segment))
+        raise E.DisassemblerError(u"{:s}.combination({:s}, {:d}) : Unable to update the segment combination code for the specified segment to {:d}.".format(__name__, description, code, code))
+    return res
+comb = utils.alias(combination)
+
 ## functions
 @utils.string.decorate_arguments('filename')
 def load(filename, ea, size=None, offset=0, **kwds):
