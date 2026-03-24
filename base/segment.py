@@ -477,6 +477,43 @@ def type(segment, segtype):
     '''Return whether the given `segment` is of the provided `segtype`.'''
     return type(segment) == segtype
 
+@utils.multicase()
+def permissions():
+    '''Return the permissions for the current `segment`.'''
+    seg = ui.current.segment()
+    return permissions(seg)
+@utils.multicase(segment=idaapi.segment_t)
+def permissions(segment):
+    '''Return the permissions for the specified `segment`.'''
+    res = segment.perm
+    invert = {1: 'x', 2: 'w', 4: 'r'}
+    x = [res & bit for bit in invert]
+    iterable = builtins.map(invert.get, (res & bit for bit in invert))
+    return str().join(sorted(filter(None, iterable)))
+@utils.multicase(segment=idaapi.segment_t, flags=(types.string, types.unordered))
+def permissions(segment, flags):
+    '''Set the permissions for the specified `segment` to the given `flags`.'''
+    lookup = {
+        'r': idaapi.SEGPERM_READ,
+        'w': idaapi.SEGPERM_WRITE,
+        'x': idaapi.SEGPERM_EXEC,
+        idaapi.SEGPERM_READ: idaapi.SEGPERM_READ,
+        idaapi.SEGPERM_WRITE: idaapi.SEGPERM_WRITE,
+        idaapi.SEGPERM_EXEC: idaapi.SEGPERM_EXEC,
+    }
+    new = functools.reduce(operator.or_, builtins.map(lookup.get, {flag for flag in flags}), 0)
+    old = permissions(segment, new)
+    return permissions(segment)
+@utils.multicase(segment=idaapi.segment_t, permissions=types.integer)
+def permissions(segment, permissions):
+    '''Set the permissions for the specified `segment` to `permissions`.'''
+    res, segment.perm = segment.perm, permissions
+    if not segment.update():
+        description = "{:s}".format(interface.range.bounds(segment))
+        raise E.DisassemblerError(u"{:s}.permissions({:s}, {:#x}) : Unable to update the permissions for the specified segment to {:#x}.".format(__name__, description, permissions, segment.perm))
+    return res
+perms = utils.alias(permissions)
+
 ## functions
 @utils.string.decorate_arguments('filename')
 def load(filename, ea, size=None, offset=0, **kwds):
