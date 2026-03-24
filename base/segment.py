@@ -463,6 +463,8 @@ class type(object):
         > old = segment.type(ea, idaapi.SEG_XTRN)
         > boolean = segment.type.loader(ea)
         > old = segment.type.loader(ea, True)
+        > boolean = segment.type.header(ea)
+        > old = segment.type.header(ea, True)
 
     """
     @utils.multicase()
@@ -539,6 +541,38 @@ class type(object):
     def loader(cls, segment, boolean):
         '''Set the loader flag for the specified `segment` to `boolean`.'''
         res, ok = segment.is_loader_segm(), segment.set_loader_segm(True if boolean else False)
+        return res
+
+    @utils.multicase()
+    @classmethod
+    def header(cls):
+        '''Return whether the current segment belongs to a header.'''
+        seg = ui.current.segment()
+        return seg.is_header_segm()
+    @utils.multicase(segment=(types.integer, types.string, interface.bounds_t))
+    @classmethod
+    @utils.string.decorate_arguments('segment')
+    def header(cls, segment):
+        '''Return whether the specified `segment` belongs to a header.'''
+        seg = by(segment)
+        return seg.is_header_segm()
+    @utils.multicase(segment=idaapi.segment_t)
+    @classmethod
+    def header(cls, segment):
+        '''Return whether the specified `segment` belongs to a header.'''
+        return segment.is_header_segm()
+    @utils.multicase(segment=(types.integer, types.string, interface.bounds_t))
+    @classmethod
+    @utils.string.decorate_arguments('segment')
+    def header(cls, segment, boolean):
+        '''Set the header flag for the specified `segment` to `boolean`.'''
+        seg = by(segment)
+        return cls.header(seg, boolean)
+    @utils.multicase(segment=idaapi.segment_t)
+    @classmethod
+    def header(cls, segment, boolean):
+        '''Set the header flag for the specified `segment` to `boolean`.'''
+        res, ok = segment.is_header_segm(), segment.set_header_segm(True if boolean else False)
         return res
 
 @utils.multicase()
