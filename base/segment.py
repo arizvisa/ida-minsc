@@ -461,6 +461,8 @@ class type(object):
         > type = segment.type(ea)
         > type = segment.type('.text')
         > old = segment.type(ea, idaapi.SEG_XTRN)
+        > boolean = segment.type.loader(ea)
+        > old = segment.type.loader(ea, True)
 
     """
     @utils.multicase()
@@ -505,6 +507,38 @@ class type(object):
         if not segment.update():
             description = "{:s}".format(interface.range.bounds(segment))
             raise E.DisassemblerError(u"{:s}({:s}, {:d}) : Unable to update the segment type for the specified segment to {:d}.".format(__name__, description, code, code))
+        return res
+
+    @utils.multicase()
+    @classmethod
+    def loader(cls):
+        '''Return whether the current segment was created by the loader.'''
+        seg = ui.current.segment()
+        return seg.is_loader_segm()
+    @utils.multicase(segment=(types.integer, types.string, interface.bounds_t))
+    @classmethod
+    @utils.string.decorate_arguments('segment')
+    def loader(cls, segment):
+        '''Return whether the specified `segment` was created by the loader.'''
+        seg = by(segment)
+        return seg.is_loader_segm()
+    @utils.multicase(segment=idaapi.segment_t)
+    @classmethod
+    def loader(cls, segment):
+        '''Return whether the specified `segment` was created by the loader.'''
+        return segment.is_loader_segm()
+    @utils.multicase(segment=(types.integer, types.string, interface.bounds_t))
+    @classmethod
+    @utils.string.decorate_arguments('segment')
+    def loader(cls, segment, boolean):
+        '''Set the loader flag for the specified `segment` to `boolean`.'''
+        seg = by(segment)
+        return cls.loader(seg, boolean)
+    @utils.multicase(segment=idaapi.segment_t)
+    @classmethod
+    def loader(cls, segment, boolean):
+        '''Set the loader flag for the specified `segment` to `boolean`.'''
+        res, ok = segment.is_loader_segm(), segment.set_loader_segm(True if boolean else False)
         return res
 
 @utils.multicase()
