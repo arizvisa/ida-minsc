@@ -7814,6 +7814,7 @@ class members_t(object):
         `gt` - Filter the structure members for any after the specified offset (exclusive)
         `less` or `le` - Filter the structure members for any before the specified offset (inclusive)
         `lt` - Filter the structure members for any before the specified offset (exclusive)
+        `size` - Filter the structure members for any of the specified size(s)
         `member` - Filter the structure members by their ``member_t`` or a list of ``member_t``
         `structures` or `struc` - Filter the structure members that use or reference the given structures
         `referenced` - Filter the structure members that are referenced by code in the database
@@ -8281,6 +8282,7 @@ class members_t(object):
     __members_matcher.alias('lvars', 'locals'), __members_matcher.alias('variables', 'locals'),
     __members_matcher.mapping('referenced', operator.truth, 'ptr', member.has_references, bool)
     __members_matcher.predicate('predicate'), __members_matcher.predicate('pred')
+    __members_matcher.combinator('size', utils.fcondition(utils.finstance(types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fcompose(types.set, utils.fpartial(utils.fpartial, operator.contains))), member.size)
 
     @utils.multicase(tag=types.string)
     @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
