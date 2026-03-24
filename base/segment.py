@@ -477,6 +477,11 @@ class type(object):
             description, results = "{:#x}<>{:#x}".format(left, right), {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('SEG_')}
             logging.warning(u"{:s}({:#x}) : Returning {:s}({:d}) for the segment type due to the given address ({:#x}) not being within the boundaries of the database ({:s}).".format(__name__, ea, results[result], result, ea, description))
         return result
+    @utils.multicase(bounds=interface.bounds_t)
+    def __new__(cls, bounds):
+        '''Return the type of the segment containing the specified `bounds`.'''
+        ea, _ = bounds
+        return cls(ea)
     @utils.multicase(name=types.string)
     @utils.string.decorate_arguments('name', 'suffix')
     def __new__(cls, name, *suffix):
