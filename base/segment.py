@@ -467,6 +467,8 @@ class type(object):
         > old = segment.type.header(ea, True)
         > boolean = segment.type.visibility(ea)
         > old = segment.type.visibility(ea, False)
+        > boolean = segment.type.hidden(ea)
+        > old = segment.type.hidden(ea, False)
 
     """
     @utils.multicase()
@@ -609,6 +611,39 @@ class type(object):
         res, ok = segment.is_visible_segm(), segment.set_visible_segm(True if boolean else False)
         return res
     visibility = utils.alias(visible, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def hidden(cls):
+        '''Return whether type of the current segment is hidden.'''
+        seg = ui.current.segment()
+        return seg.is_hidden_segtype()
+    @utils.multicase(segment=(types.integer, types.string, interface.bounds_t))
+    @classmethod
+    @utils.string.decorate_arguments('segment')
+    def hidden(cls, segment):
+        '''Return whether type of the specified `segment` is hidden.'''
+        seg = by(segment)
+        return seg.is_hidden_segtype()
+    @utils.multicase(segment=idaapi.segment_t)
+    @classmethod
+    def hidden(cls, segment):
+        '''Return whether type of the specified `segment` is hidden.'''
+        return segment.is_hidden_segtype()
+    @utils.multicase(segment=(types.integer, types.string, interface.bounds_t))
+    @classmethod
+    @utils.string.decorate_arguments('segment')
+    def hidden(cls, segment, boolean):
+        '''Mark the type of the specified `segment` as hidden depending on the value of `boolean`.'''
+        seg = by(segment)
+        return cls.hidden(seg, boolean)
+    @utils.multicase(segment=idaapi.segment_t)
+    @classmethod
+    def hidden(cls, segment, boolean):
+        '''Mark the type of the specified `segment` as hidden depending on the value of `boolean`.'''
+        res, ok = segment.is_hidden_segtype(), segment.set_hidden_segtype(True if boolean else False)
+        return res
+    hide = utils.alias(hidden, 'type')
 
 @utils.multicase()
 def permissions():
