@@ -6601,6 +6601,11 @@ class types(object):
     def pointer(cls, type, size):
         '''Return a pointer of `size` bytes that references the specified `type`.'''
         return cls.pointer(type, size, 0)
+    @utils.multicase(attributes=(internal.types.string, internal.types.unordered))
+    @classmethod
+    def pointer(cls, target, attributes, **fields):
+        '''Return a pointer that references the specified `target` type and includes any extended attributes.'''
+        return cls.pointer(target, 0, attributes, **fields)
     @utils.multicase(structure=(internal.types.integer, idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), size=internal.types.integer, attributes=(internal.types.integer, internal.types.string, internal.types.unordered))
     @classmethod
     def pointer(cls, structure, size, attributes, **fields):
@@ -6623,10 +6628,34 @@ class types(object):
         '''Return a pointer of `size` bytes that references the type specified by `info` and includes any extended `attributes`.'''
         pi = idaapi.ptr_type_data_t()
 
+        # Check the pointer size to ensure that it is a power of 2.
         exponent = math.log(size if size else interface.database.bits(), 2)
         if math.trunc(exponent) != exponent:
             raise E.InvalidParameterError(u"{:s}.pointer({!s}, {:d}, {:#x}{:s}) : Unable to create a pointer of the specified size ({:d}) due to it not being a power of 2.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(info), size, taptr_bits, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', '' if len(missing) == 1 else 's', size))
 
+        # If any type-specific attributes were specified, then pull them out of
+        # the attributes and assign them to variables that we will use later to
+        # modify the result pointer type.
+        attributes = attributes if isinstance(attributes, (internal.types.integer, internal.types.unordered)) else {attributes}
+        if isinstance(attributes, internal.types.unordered):
+            keywords = {'const', 'constant'}
+            iterable = (attribute for attribute in keywords if attribute in attributes)
+            attribute = builtins.next(iterable, None)
+            constant = attribute or ''
+            [attributes.discard(keyword) for keyword in keywords]
+
+            keywords = {'volatile'}
+            iterable = (attribute for attribute in keywords if attribute in attributes)
+            attribute = builtins.next(iterable, None)
+            volatile = attribute or ''
+            [attributes.discard(keyword) for keyword in keywords]
+
+        # Otherwise, none of the type-specific attributes were specified.
+        else:
+            constant = volatile = ''
+
+        # Now we can update the `idaapi.ptr_type_data_t` instance with the
+        # values that we determined from the parameters.
         pi.obj_type = info
         pi.based_ptr_size = size
         pi.taptr_bits = taptr_bits = attributes if isinstance(attributes, internal.types.integer) else interface.tinfo.pointer_attributes(attributes)
@@ -6642,6 +6671,13 @@ class types(object):
         if not ti.create_ptr(pi):
             attributes_description = " using the given attributes ({:#x})".format(taptr_bits) if taptr_bits else ''
             raise E.DisassemblerError(u"{:s}.pointer(\"{:s}\", {:d}, {:#x}{:s}) : Unable to create a pointer{:s} for the specifed type \"{:s}\".".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, taptr_bits, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', attributes_description, utils.string.escape("{!s}".format(info), '"')))
+
+        # If any type-specific attributes were specified, then apply those too
+        # before concretizing the result and returning it to the caller.
+        if constant:
+            ti = interface.tinfo.constant(ti)
+        if volatile:
+            ti = interface.tinfo.volatile(ti)
         return interface.tinfo.concretize(ti)
 
     @utils.multicase(info=idaapi.tinfo_t)
