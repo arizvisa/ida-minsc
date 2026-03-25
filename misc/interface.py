@@ -9273,6 +9273,20 @@ class tinfo(object):
         escaped = internal.utils.string.escape(string, '"')
         return "\"{:s}\"".format(escaped)
 
+    @classmethod
+    def constant(cls, type, boolean=True):
+        '''Return the specified `type` with its "const" attribute set or cleared depending on the given `boolean`.'''
+        res = cls.copy(type)
+        res.set_const() if boolean else res.clr_const()
+        return cls.concretize(res)
+
+    @classmethod
+    def volatile(cls, type, boolean=True):
+        '''Return the specified `type` with its "volatile" attribute set or cleared depending on the given `boolean`.'''
+        res = cls.copy(type)
+        res.set_volatile() if boolean else res.clr_volatile()
+        return cls.concretize(res)
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = (("{:x}".format(abs(int(item))) if isinstance(item, internal.types.integer) or hasattr(item, '__int__') else item) for item in names)
