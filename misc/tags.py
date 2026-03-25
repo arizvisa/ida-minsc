@@ -1030,9 +1030,29 @@ class address(object):
         # it's actually special in that we need to demangle it for the real name.
         aname = interface.name.get(ea)
         mangled_t = interface.name.mangled(ea, aname)
+
+        # If we found a name and it is mangled for code or data, then we use the
+        # declaration module to clean up any extraneous characters. If an
+        # exception is raised during this process, then we fall back to the
+        # unmangled name for the address.
         if aname and mangled_t in {idaapi.FF_CODE, idaapi.FF_DATA}:
-            parsed = declaration.symbol(aname) if mangled_t == idaapi.FF_DATA else declaration.function(aname)
-            realname = declaration.unmangled.parsable(parsed.string)
+            try:
+                parsed = declaration.symbol(aname) if mangled_t == idaapi.FF_DATA else declaration.function(aname)
+                string = parsed.string
+
+            # If we encountered a formatting error while using the declaration
+            # module, take the name we already have, and make it parsable.
+            except internal.exceptions.InvalidFormatError:
+                string = aname or ''
+
+            # Next we will use the declaration module to convert any invalid
+            # characters, spaces, templates, backticks, and the like into a
+            # string that the disassembler won't complain about when it gets
+            # parsed. If the string is empty, then use the original name.
+            try: realname = declaration.unmangled.parsable(string) or declaration.unmangled.parsable(aname) or aname
+            except internal.exceptions.InvalidFormatError: realname = aname or ''
+
+        # We can use the original unmangled name for the address as-is.
         else:
             realname = aname or ''
 
