@@ -6771,6 +6771,41 @@ class types(object):
         return res
     typeref = utils.alias(typedef, 'types')
 
+    @utils.multicase(info=(idaapi.tinfo_t, internal.types.string))
+    @classmethod
+    def constant(cls, info):
+        '''Return the type specified by `info` as a new type with its "const" flag set.'''
+        ti = info if isinstance(info, idaapi.tinfo_t) else interface.tinfo.parse(interface.tinfo.library(), info, idaapi.PT_SIL)
+        if ti is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.constant({!r}) : Unable to parse the string \"{!s}\" into a valid type.".format('.'.join([__name__, cls.__name__]), info, utils.string.escape(info, '"')))
+        return interface.tinfo.constant(ti)
+    @utils.multicase(info=(idaapi.tinfo_t, internal.types.string))
+    @classmethod
+    def constant(cls, info, boolean):
+        '''Return the type specified by `info` as a new type with its "const" flag set or cleared depending on the given `boolean`.'''
+        ti = info if isinstance(info, idaapi.tinfo_t) else interface.tinfo.parse(interface.tinfo.library(), info, idaapi.PT_SIL)
+        if ti is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.constant({!r}, {!s}) : Unable to parse the string \"{!s}\" into a valid type.".format('.'.join([__name__, cls.__name__]), info, True if boolean else False, utils.string.escape(info, '"')))
+        return interface.tinfo.constant(ti, True if boolean else False)
+    const = utils.alias(constant, 'types')
+
+    @utils.multicase(info=(idaapi.tinfo_t, internal.types.string))
+    @classmethod
+    def volatile(cls, info):
+        '''Return the type specified by `info` as a new type with its "volatile" flag set.'''
+        ti = info if isinstance(info, idaapi.tinfo_t) else interface.tinfo.parse(interface.tinfo.library(), info, idaapi.PT_SIL)
+        if ti is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.volatile({!r}) : Unable to parse the string \"{!s}\" into a valid type.".format('.'.join([__name__, cls.__name__]), info, utils.string.escape(info, '"')))
+        return interface.tinfo.volatile(ti)
+    @utils.multicase(info=(idaapi.tinfo_t, internal.types.string))
+    @classmethod
+    def volatile(cls, info, boolean):
+        '''Return the type specified by `info` as a new type with its "volatile" flag set or cleared depending on the given `boolean`.'''
+        ti = info if isinstance(info, idaapi.tinfo_t) else interface.tinfo.parse(interface.tinfo.library(), info, idaapi.PT_SIL)
+        if ti is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.volatile({!r}, {!s}) : Unable to parse the string \"{!s}\" into a valid type.".format('.'.join([__name__, cls.__name__]), info, True if boolean else False, utils.string.escape(info, '"')))
+        return interface.tinfo.volatile(ti, True if boolean else False)
+
 class xref(object):
     """
     This namespace is for navigating the cross-references (xrefs)
