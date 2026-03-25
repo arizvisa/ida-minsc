@@ -246,8 +246,10 @@ class extract(object):
         left, right = range if isinstance(range, tuple) else (0, len(string))
         original = string[left : right]
         start, stop = (len(original) - len(F(*whitespace)) for F in [original.lstrip, original.rstrip])
-        assert(all(string[left : right] in whitespace for left, right in segments[:start]))
-        assert(all(string[left : right] in whitespace for left, right in segments[-stop:]) if stop else True)
+        if not(all(string[left : right] in whitespace for left, right in segments[:start])):
+            raise internal.exceptions.InvalidFormatError(u"{:s}.trimmed({!r}, {!s}, {!r}, whitespace={!r}) : Error occurred due to stripping non-whitespace characters from the beginning of the given string.".format('.'.join([__name__, cls.__name__]), string, "{:d}..{:d}".format(*range), segments, whitespace))
+        if stop and not(all(string[left : right] in whitespace for left, right in segments[-stop:])):
+            raise internal.exceptions.InvalidFormatError(u"{:s}.trimmed({!r}, {!s}, {!r}, whitespace={!r}) : Error occurred due to stripping non-whitespace characters from the end of the given string.".format('.'.join([__name__, cls.__name__]), string, "{:d}..{:d}".format(*range), segments, whitespace))
         if all(len(original) > item for item in [start, stop]):
             return (left + start, right - stop), segments[+start : -stop] if stop else segments[start:]
         bounds = (left, right - stop) if len(original) <= stop else (left + start, right)
@@ -257,7 +259,10 @@ class extract(object):
     def parameters(cls, tree, string, range=None, assertion={'()', '<>', '{}'}, delimiter={','}):
         '''Use the given `tree` to yield a token for each item within the given `range` of `string` that is separated by `delimiter` and wrapped by `assertion`.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
-        assert(string[start:][:+1] + string[:stop][-1:] in assertion if assertion else True), string[start:][:+1] + string[:stop][-1:]
+        if assertion and not(string[start:][:+1] + string[:stop][-1:] in assertion):
+            sortable = sorted(assertion)
+            raise internal.exceptions.InvalidFormatError(u"{:s}.parameters({!r}, {!r}, {!s}, assertion={!r}, delimiter={!r}) : Error verifying parameters \"{:s}\" due to them not being surrounded by group{:s} {!s}.".format('.'.join([__name__, cls.__name__]), tree, string, "{:d}..{:d}".format(*range) if range else range, assertion, delimiter, utils.string.escape(string[start : stop], '"'), '' if len(sortable) == 1 else 's', ', '.join(itertools.chain(map("\"{:s}\"".format, sortable[:-1]), ["or \"{:s}\"".format(*sortable[-1:])])) if len(sortable) > 1 else "\"{:s\"".format(*sortable)))
+
         adjustment, listable = 1 if assertion else 0, [(segment, items) for segment, items in token.split(string, range, tree[start], delimiter)]
 
         # start at the first list item and adjust the segment past the first
@@ -273,7 +278,8 @@ class extract(object):
         while len(listable) > 1:
             segment, items = listable.pop(0)
             yield segment, items
-        assert(len(listable) <= 1), listable
+        if not(len(listable) <= 1):
+            raise internal.exceptions.InvalidFormatError(u"{:s}.parameters({!r}, {!r}, {!s}, assertion={!r}, delimiter={!r}) : Unable to consume the parameters from the given string as only 0 or 1 parameter was expected to be remaining.".format('.'.join([__name__, cls.__name__]), tree, string, "{:d}..{:d}".format(*range) if range else range, assertion, delimiter))
 
         # the very last item should contain the closing parenthese..
         # hence, we need to adjust the segment we yield to cull it.
@@ -336,7 +342,8 @@ class extract(object):
 
         # now the last segment of our declaration should be our parameters.
         parameters_range = stop, _ = left, right = segments.pop() if segments else (len(string), len(string))
-        assert(string[left : left + 1] + string[right - 1 : right] == '()'), string[left : right]
+        if not(string[left : left + 1] + string[right - 1 : right] == '()'):
+            raise internal.exceptions.InvalidFormatError(u"{:s}.prototype({!r}, {!r}, {!s}) : The parameters expected at the end of the specified string ({!r}) are not parenthesized.".format('.'.join([__name__, cls.__name__]), tree, string, "{:d}..{:d}".format(*range) if range else range, string[left : right]))
 
         # XXX: we're using a hack to deal with "`adjustor(x)' ", due to not being in
         # a demangled name. we can just pop the last segment (with the " ") to deal.
@@ -558,12 +565,14 @@ class extract(object):
         # first we need to find the parameters.
         iterable = (1 + index for index, (left, right) in enumerate(segments[::-1]) if string[left] + string[left : right][-1] == '()')
         parameters_index = next(iterable)
-        assert(all(string[left : right] in ignored for left, right in segments[-parameters_index:][1:]))
+        if not(all(string[left : right] in ignored for left, right in segments[-parameters_index:][1:])):
+            raise internal.exceptions.InvalidFormatError(u"{:s}.function_pointer({!r}, {!s}, {!r}) : An error occurred while scanning the parameters due to the string containing non-whitespace characters at its end.".format('.'.join([__name__, cls.__name__]), string, "{:d}..{:d}".format(*range) if range else range))
 
         # then we continue to find the convention, pointer, and name. if we couldn't
         # find another pair of parentheses, then this is a functor and has no convention.
         pointer_index = next(iterable, parameters_index)
-        assert(all(string[left : right] in ignored for left, right in segments[-pointer_index : -parameters_index:][1:]))
+        if not(all(string[left : right] in ignored for left, right in segments[-pointer_index : -parameters_index:][1:])):
+            raise internal.exceptions.InvalidFormatError(u"{:s}.function_pointer({!r}, {!s}, {!r}) : An error occurred while scanning the specified string for its pointer due to the string containing non-whitespace characters before the parameters.".format('.'.join([__name__, cls.__name__]), string, "{:d}..{:d}".format(*range) if range else range))
 
         # next we need to skip any whitespace to find the range of the result.
         result_segments, (stop, _) = segments[:-pointer_index], segments[-pointer_index]
@@ -582,7 +591,9 @@ class extract(object):
     def function_pointer_convention(cls, string, range, segments, assertion={'()'}, symbols={'*', '&'}, whitespace={' '}):
         '''Use the given `range` on both `string` and `segments` to return a tuple containing the calling convention, the segments of each symbol, and the tokens that compose the name.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
-        assert(string[start:][:+1] + string[:stop][-1:] in assertion if assertion else True), string[start:][:+1] + string[:stop][-1:]
+        if assertion and not(string[start:][:+1] + string[:stop][-1:] in assertion):
+            sortable = sorted(assertion)
+            raise internal.exceptions.InvalidFormatError(u"{:s}.function_pointer_convention({!r}, {!s}, {!r}, assertion={!r}, symbols={!r}, whitespace={!r}) : Error verifying function pointer convention \"{:s}\" due to it not being surrounded by group{:s} {!s}.".format('.'.join([__name__, cls.__name__]), string, "{:d}..{:d}".format(*range) if range else range, segments, assertion, symbols, whitespace, utils.string.escape(string[start : stop], '"'), '' if len(sortable) == 1 else 's', ', '.join(itertools.chain(map("\"{:s}\"".format, sortable[:-1]), ["or \"{:s}\"".format(*sortable[-1:])])) if len(sortable) > 1 else "\"{:s\"".format(*sortable)))
         adjustment, ignored, spaces = 1 if assertion else 0, {item for item in symbols} | whitespace | {''}, whitespace | {''}
 
         # now we can shrink our range excluding the parentheses, and then extract
@@ -693,7 +704,8 @@ class nested(object):
         position, result = start or 0, []
         for skip, index, size in augment:
             position += skip
-            assert(position == index), (position, index)
+            if not(position == index):
+                raise IndexError(u"{:s}.unaugment({:d}, {!r}) : The calculated position ({:d}) does not correspond to the key index ({:d}) from the augmented segments.".format('.'.join([__name__, cls.__name__]), start, augment, position, index))
             result.append((position, position + size))
             position += size
         return (start or 0, position), result
@@ -888,7 +900,8 @@ class nested(object):
     def segments(cls, range, segments=None):
         '''Yield each segment within the given `range` using the points defined by `segments`.'''
         start, stop = range
-        assert(start <= stop), (start, stop)
+        if not(start <= stop):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.segments({!s}, {!s}) : An invalid range {!s} was specified as a parameter.".format('.'.join([__name__, cls.__name__]), "{:d}..{:d}".format(*range), "{!s}".format(segments or []), "{:d}..{:d}".format(*range)))
         for item in segments or []:
             point, _ = item
             point = max(point, start)
@@ -905,7 +918,8 @@ class nested(object):
     def split(cls, string, range, segments, tokens={}):
         '''Use the `range` and `segments` associated with `string` to yield each selection that is delimited by any of the given `tokens`.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
-        assert(start <= stop), (start, stop)
+        if not(start <= stop):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.split({!r}, {!s}, {!s}, tokens={!r}) : An invalid range {!s} was specified as a parameter.".format('.'.join([__name__, cls.__name__]), string, "{:d}..{:d}".format(*range), "{!s}".format(segments or []), tokens, "{:d}..{:d}".format(*range)))
         result = []
         for item in segments:
             left, right = item
@@ -947,7 +961,7 @@ class token(nested):
         '''Return a list of ranges, a tree, and a list of tuples for the errors when parsing the given `tokens` out of `string`.'''
         groups = {length: [{token for token in group} for group in zip(*pairs)] for length, pairs in itertools.groupby(sorted(tokens, key=len), len)}
         layer, [capture], (open, close) = (groups.pop(length, length * [()]) for length in range(3))
-        assert(not groups), groups
+        assert(not groups), u"{:s}.parse({!r}, {!r}) : Unexpected error while processing the specified token groups ({!r}) prior to parsing the given string.".format('.'.join([__name__, cls.__name__]), string, tokens, groups)
 
         # We first need a stack that will store the index of the beginning of
         # each pair. We also store two tables for tracking mismatches. One tracks
@@ -1212,7 +1226,8 @@ class unmangled(object):
     @classmethod
     def parsable(cls, string):
         '''Transform the given `string` to the required characters for it to be parseable without complaints.'''
-        string = cls.scope(string)
+        original = string
+        string = cls.scope(original)
 
         # first check if there's any unmangled characters within our symbol. if there aren't any, then
         # we explicitly check for any constructors/destructors and replace it if it matches the typename.
@@ -1252,7 +1267,8 @@ class unmangled(object):
         string, type = cls.variable(string.replace(',', '_')) if ' ' in string else (string, '')
 
         # that should be it and all we need to do is replace all spaces with underscores.
-        assert(not any(string.count(character) for character in "<>`'()")), string
+        if any(string.count(character) for character in "<>`'()"):
+            raise internal.exceptions.InvalidFormatError(u"{:s}.parsable({!r}) : An unexpected error occurred due to discovering an invalid character ({!s}) that should have been removed from the current string \"{:s}\".".format('.'.join([__name__, cls.__name__]), original, "\"{:s}\"".format("<>`'()"), utils.string.escape(string, '"')))
         return cls.parsable('_'.join(string.split(' ')))
 
     @classmethod
@@ -1261,7 +1277,9 @@ class unmangled(object):
         if any(character in string for character in '()'):
             left, right = nested.last(string, '()')
             type_and_pointer, parameters, qualifier = string[:left], string[left : right], string[right:]
-            assert(parameters), parameters
+
+            if not(parameters):
+                raise internal.exceptions.InvalidFormatError(u"{:s}.__strip_function_type({!r}) : Unable to find any parenthesized parameters in the given string.".format('.'.join([__name__, cls.__name__]), string))
 
             # go through all of the parameters separated by a ',' to strip out qualifiers and types.
             parameters = [item.replace(' ', '').replace(' *', '_ptr') for item in cls.parameters(parameters[+1 : -1])]
@@ -1281,7 +1299,7 @@ class unmangled(object):
     @classmethod
     def __strip_templates(cls, string):
         '''Internal coroutine that will strip out the different parts of a template definition.'''
-        string = string
+        start = string = string
         while True:
             string = (yield string)
             if not string:
@@ -1292,7 +1310,8 @@ class unmangled(object):
                 continue
 
             # first we'll trim out the '<>' from the entire component
-            assert(string[0], string[-1]) == ('<', '>'), string
+            if not (string[0], string[-1]) == ('<', '>'):
+                raise internal.exceptions.InvalidFormatError(u"{:s}.__strip_templates({!r}) : Unable to find any angled brackets for specifying templates in the current string ({!r}).".format('.'.join([__name__, cls.__name__]), start, string))
             trimmed = string[+1 : -1]
 
             # go through all parts separated by a "," to strip out any qualifiers,
@@ -1714,7 +1733,7 @@ class mangled(object):
         attempt = encoded if self.type(encoded) == self.MANGLED_UNKNOWN else self.decode(encoded, self.__required_flags | mask)
         if not attempt:
             cls = self.__class__
-            raise internal.exceptions.DisassemblerError(u"{:s}(\"{:s}\", {:#x}{:s}) : Unable to demangle the specified symbol (type {:d}) using the disassembler.".format('.'.join([__name__, cls.__name__]), utils.string.escape(symbol, '"'), mask, '' if Ftransform is None else utils.string.kwargs({'Ftransform': utils.pycompat.fullname(Ftransform)}), self.type(symbol)))
+            raise internal.exceptions.InvalidFormatError(u"{:s}(\"{:s}\", {:#x}{:s}) : Unable to demangle the specified symbol (type {:d}) using the disassembler.".format('.'.join([__name__, cls.__name__]), utils.string.escape(symbol, '"'), mask, '' if Ftransform is None else utils.string.kwargs({'Ftransform': utils.pycompat.fullname(Ftransform)}), self.type(symbol)))
         decoded = self.__extract_specifiers__(self.__extract_scope_(attempt))
         transformed = Ftransform(decoded) if Ftransform else decoded
         self.__decoded = transformed
@@ -1890,7 +1909,7 @@ class function(mangled):
             logging.info(u"{:s}(\"{:s}\") : Unable to demangle symbol using {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), utils.string.escape(mangled, '"'), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), name_flags, 2 + 8))
             just_name = self.__init__guess_name(mangled, self.__flags)
         if not just_name:
-            raise internal.exceptions.AssertionError(u"{:s}(\"{:s}\") : Unable to parse out the name from the demangled symbol returned by {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), utils.string.escape(mangled, '"'), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), self.__flags, 2 + 8))
+            raise internal.exceptions.InvalidFormatError(u"{:s}(\"{:s}\") : Unable to parse out the name from the demangled symbol returned by {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), utils.string.escape(mangled, '"'), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), self.__flags, 2 + 8))
         operator_string = 'operator'
         result = just_name.rfind(operator_string)
         index = result if result >= 0 else len(just_name)
@@ -1973,7 +1992,7 @@ class function(mangled):
         decoded = self.decode(mangled, flags)
         if not decoded:
             cls = self.__class__
-            raise internal.exceptions.DisassemblerError(u"{:s}(\"{:s}\", {:#x}) : Unable to demangle the specified symbol (type {:d}) using the disassembler.".format('.'.join([__name__, cls.__name__]), utils.string.escape(mangled, '"'), flags, self.type(mangled)))
+            raise internal.exceptions.InvalidFormatError(u"{:s}(\"{:s}\", {:#x}) : Unable to demangle the specified symbol (type {:d}) using the disassembler.".format('.'.join([__name__, cls.__name__]), utils.string.escape(mangled, '"'), flags, self.type(mangled)))
 
         # We pre-parse all of the tokens, just so we can pass the tree directly
         # to extract.prototype and assume that it correctly figured out the name.
@@ -2006,7 +2025,9 @@ class function(mangled):
         # by "<>". Once we confirm that, then we can check to see if it's an error operator.
         iterable = ((index, reversed[left : right]) for index, (left, right) in enumerate(rtree.get(None, [])))
         index = next((1 + index for index, rstring in iterable if rstring[-1:] + rstring[:1] == '<>'), 0)
-        assert(index), decoded
+        if not(index):
+            cls = self.__class__
+            raise internal.exceptions.InvalidFormatError(u"{:s}.__init__busted_operator({!r}) : Unable to find a type specifier bounded with angle brackets at the end of the given string.".format('.'.join([__name__, cls.__name__]), decoded))
         rsegments = rtree[None][:index]
 
         # If we didn't find an error point within the tree, then we know that our operator
@@ -2035,7 +2056,9 @@ class function(mangled):
         # if we found some double-quotes, then we'll just use "{}" to nest the type.
         if operator_length:
             left = string.rindex(dquote_string)
-            assert(left >= 0), string
+            if not(left >= 0):
+                cls = self.__class__
+                raise internal.exceptions.InvalidFormatError(u"{:s}.__clean_quotes({:d}, {!r}) : Unable to find the double-quote operator ({:s}) in the given decoded string.".format('.'.join([__name__, cls.__name__]), operator_length, string, dquote_string))
             middle, right = left + len(dquote_string), left + operator_length
             return string[:left] + 'operator""{' + string[middle : right] + '}' + string[right:]
 
@@ -2049,8 +2072,12 @@ class function(mangled):
         '''Return a transformed `string` with its unbalanced symbols replaced using `operator_length` and a dictionary of `replacements`.'''
         keyword = 'operator'
         left = string.rindex(keyword)
-        assert(left >= 0), string
-        assert(string[max(0, left - 1) : left + len(keyword)] in {':operator', ' operator', 'operator'}), string
+        if not(left >= 0):
+            cls = self.__class__
+            raise internal.exceptions.InvalidFormatError(u"{:s}.__clean_unbalanced({:d}, {!r}, {!r}) : Unable to find the index of keyword \"{:s}\" at the end of the decoded string.".format('.'.join([__name__, cls.__name__]), operator_length, replacements, string, keyword))
+        elif not (string[max(0, left - 1) : left + len(keyword)] in {':operator', ' operator', 'operator'}):
+            cls = self.__class__
+            raise internal.exceptions.InvalidFormatError(u"{:s}.__clean_unbalanced({:d}, {!r}, {!r}) : Unable to find a valid operator ({!s}) at the end of the decoded string.".format('.'.join([__name__, cls.__name__]), operator_length, replacements, string, ', '.join("\"{:s}\"".format(utils.string.escape(keyword, '"')) for keyword in sorted({':operator', ' operator', 'operator'}))))
         right = left + operator_length
         return string[:left] + replacements[string[left : right]] + string[right:]
 
@@ -2067,8 +2094,12 @@ class function(mangled):
     def __clean_qualified_operator(self, operator_length, string):
         keyword = 'operator'
         left = string.rindex(keyword)
-        assert(left >= 0), string
-        assert(string[max(0, left - 1) : left + len(keyword)] in {':operator', ' operator', 'operator'}), string
+        if not(left >= 0):
+            cls = self.__class__
+            raise internal.exceptions.InvalidFormatError(u"{:s}.__clean_qualified_operator({:d}, {!r}) : Unable to find the index of keyword \"{:s}\" at the end of the decoded string.".format('.'.join([__name__, cls.__name__]), operator_length, string, keyword))
+        elif not(string[max(0, left - 1) : left + len(keyword)] in {':operator', ' operator', 'operator'}):
+            cls = self.__class__
+            raise internal.exceptions.InvalidFormatError(u"{:s}.__clean_qualified_operator({:d}, {!r}) : Unable to find a valid operator ({!s}) at the end of the decoded string.".format('.'.join([__name__, cls.__name__]), operator_length, string, ', '.join("\"{:s}\"".format(utils.string.escape(keyword, '"')) for keyword in sorted({':operator', ' operator', 'operator'}))))
 
         # We probably should walk backwards and tally up the qualifiers, but it's
         # easier to transform the entire operator with braces and eat the cost later.
@@ -2078,21 +2109,31 @@ class function(mangled):
     def __guess_qualified_operator(self, operator_name, string):
         keyword = 'operator'
         start = string.rindex(keyword)
-        assert(start >= 0), string
-        assert(string[max(0, start - 1) : start + len(keyword)] in {':operator', ' operator', 'operator'}), string
+        if not(start >= 0):
+            cls = self.__class__
+            raise internal.exceptions.InvalidFormatError(u"{:s}.__guess_qualified_operator({!r}, {!r}) : Unable to find the index of keyword \"{:s}\" at the end of the decoded string.".format('.'.join([__name__, cls.__name__]), operator_name, string, keyword))
+        elif not(string[max(0, start - 1) : start + len(keyword)] in {':operator', ' operator', 'operator'}):
+            cls = self.__class__
+            raise internal.exceptions.InvalidFormatError(u"{:s}.__guess_qualified_operator({!r}, {!r}) : Unable to find a valid operator ({!s}) at the end of the decoded string.".format('.'.join([__name__, cls.__name__]), operator_name, string, ', '.join("\"{:s}\"".format(utils.string.escape(keyword, '"')) for keyword in sorted({':operator', ' operator', 'operator'}))))
 
         # FIXME: This is pretty inefficient since we're doing this twice, and we
         #        essentially repeat the exact same logic later for a third time.
         height, _, errors = token.parse(operator_name, self.tokens)
-        assert(not(errors)), operator_name
+        if errors:
+            cls = self.__class__
+            raise internal.exceptions.InvalidFormatError(u"{:s}.__guess_qualified_operator({!r}, {!r}) : Error encountered while trying to parse the operator name ({!r}) with the given tokens ({:s}).".format('.'.join([__name__, cls.__name__]), operator_name, string, operator_name, ', '.join("\"{:s}\"".format(utils.string.escape(token, '"')) for token in sorted(self.tokens))))
         count = sum(1 for index, segment in height if index == 0)
 
         height, _, errors = token.parse(string, self.tokens)
-        assert(not(errors)), string
+        if errors:
+            cls = self.__class__
+            raise internal.exceptions.InvalidFormatError(u"{:s}.__guess_qualified_operator({!r}, {!r}) : Error encountered while trying to parse the specified string with the given tokens ({:s}).".format('.'.join([__name__, cls.__name__]), operator_name, string, ', '.join("\"{:s}\"".format(utils.string.escape(token, '"')) for token in sorted(self.tokens))))
         filtered_heights = [segment for index, segment in height if index == 0]
         point, right = filtered_heights.pop()
         parameters = string[point : right]
-        assert(parameters[:1] + parameters[-1:] in {'()'}), string
+        if not(parameters[:1] + parameters[-1:] in {'()'}):
+            cls = self.__class__
+            raise internal.exceptions.InvalidFormatError(u"{:s}.__guess_qualified_operator({!r}, {!r}) : Error encountered while extracing the  parameters found in \"{:s}\" due to them not being parenthesized.".format('.'.join([__name__, cls.__name__]), operator_name, string, utils.string.escape(parameters, '"'),))
 
         target = string[start + len(keyword) + 1 : point]
         return string[:start] + "operator{{{:s}}}".format(target) + string[point:]
@@ -2222,7 +2263,9 @@ class function(mangled):
             beginning, selected_operator = extract.ending(self.string, (start, stop), adjusted, delimiters={'::'})
             (_, point), newsegments = beginning
             left, right = newsegments.pop() if newsegments else (start, start)
-            assert(self.string[left : right] in {'::', ''}), [self.string[left : right] for left, right in token.segments(*prototype_name)]
+            if not(self.string[left : right] in {'::', ''}):
+                cls, tokenized = self.__class__, [self.string[left : right] for left, right in token.segments(*prototype_name)]
+                raise internal.exceptions.InvalidFormatError(u"{:s}.details() : Unable to find a valid delimiter ({!s}) in the selected segment {!s} ({!r}) of the tokenized string \"{:s}\".".format('.'.join([__name__, cls.__name__]), ', '.join(map("\"{:s}\"".format, ['::', ''])), "{:d}..{:d}".format(left, right), self.string[left : right], utils.string.escape(self.string, '"')))
 
             object = declaration_with_qualifiers(self.__tree__, self.string, (start, left), newsegments)
             return object, selected_operator
@@ -2304,7 +2347,9 @@ class function(mangled):
         elif self.__operator:
             [(_, stop), (point, right)] = segments[-2:] if len(segments) > 1 else [(start, start)] + segments[-1:]
             contents, ignored = self.string[point : right], {' ', ''}
-            assert(contents[:1] + contents[-1:] == '{}'), contents
+            if not(contents[:1] + contents[-1:] == '{}'):
+                cls = self.__class__
+                raise internal.exceptions.InvalidFormatError(u"{:s}.details() : Error while trying to extract the details out of the selected braces {!s} ({!r}) of the tokenized string \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{:d}..{:d}".format(point, right), contents, utils.string.escape(self.string, '"')))
             target = declaration_with_qualifiers(self.__tree__, self.string, (point + 1, right - 1), self.__tree__.get(point, []))
             object, selected = guess_declaration(segments, 1)
             return operator_name, object, target
@@ -2317,7 +2362,9 @@ class function(mangled):
         # If we have an operator, but it's only non-nested tokens, then there's no details.
         # FIXME: we're explicitly testing for "` (" operators here, which have details.
         elif operator_name:
-            assert(operator_name[:1] + operator_name[-1:] in {"`'", "` "}), operator_name
+            if not(operator_name[:1] + operator_name[-1:] in {"`'", "` "}):
+                cls = self.__class__
+                raise internal.exceptions.InvalidFormatError(u"{:s}.details() : Unable to verify the backticked operator name \"{:s}\" due to it not being surrounded with a valid pair ({!s}) from the tokenized string \"{:s}\".".format('.'.join([__name__, cls.__name__]), operator_name, ', '.join(map("\"{:s}\"".format, ["`'", "` "])), utils.string.escape(self.string, '"')))
             ignored, (start, stop) = {' '}, segments[-1] if segments else (stop, stop)
             nested = self.__tree__.get(start, [])
 
@@ -2335,7 +2382,9 @@ class function(mangled):
             # But if there are nested tokens, then we're likely braced and containing a type.
             (left, right) = nested[-1]
             brace = self.string[left : right]
-            assert(brace[:1] + brace[-1:] in {'()', '{}', "`'", '[]'})
+            if not(brace[:1] + brace[-1:] in {'()', '{}', "`'", '[]'}):
+                cls = self.__class__
+                raise internal.exceptions.InvalidFormatError(u"{:s}.details() : Unable to verify the braced token \"{:s}\" due to it not being surrounded with a valid pair ({!s}) `from the tokenized string \"{:s}\".".format('.'.join([__name__, cls.__name__]), operator_name, ', '.join(map("\"{:s}\"".format, ["()", "{}", "`'", "[]"])), utils.string.escape(self.string, '"')))
 
             # FIXME: These are some terrible hacks that are probably incredibly unnecessary as
             #        I'm pretty certain that the `extract` namespace has a way to do this properly.
@@ -2439,7 +2488,7 @@ class symbol(mangled):
         # meanings. This only happens with the "`'" segments and always ends in "''".
         just_name = self.decode(mangled, name_flags)
         if not just_name:
-            raise internal.exceptions.AssertionError(u"{:s}(\"{:s}\") : Unable to parse out the name from the demangled symbol returned by {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), utils.string.escape(mangled, '"'), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), self.__flags, 2 + 8))
+            raise internal.exceptions.InvalidFormatError(u"{:s}(\"{:s}\") : Unable to parse out the name from the demangled symbol returned by {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), utils.string.escape(mangled, '"'), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), self.__flags, 2 + 8))
 
         order, tree, errors = token.parse(just_name, self.tokens)
 
@@ -2618,7 +2667,9 @@ class name_component(selection):
         (start, stop), segments = self.__selection__
         candidate = (left, right) = segments[-1] if len(segments) else (stop, stop)
         string = self.__string__[left : right]
-        assert(operator.eq(*candidate) or string[:1] + string[-1:] in {'<>', "`'", "{}"}), string
+        if not(operator.eq(*candidate) or string[:1] + string[-1:] in {'<>', "`'", "{}"}):
+            cls, sortable = self.__class__, sorted({'<>', "`'", "{}"})
+            raise internal.exceptions.InvalidFormatError(u"{:s}.__correct_selection() : Error trying to correct the selection {!s} due to it not surrounded by group{:s} {!s}.".format('.'.join([__name__, cls.__name__]), "{:d}..{:d}".format(*candidate) if left != right else "{:d}".format(left), '' if len(sortable) == 1 else 's', ', '.join(itertools.chain(map("\"{:s}\"".format, sortable[:-1]), ["or \"{:s}\"".format(*sortable[-1:])])) if len(sortable) > 1 else "\"{:s\"".format(*sortable)))
         if len(segments) > 1:
             cls = self.__class__
             (left, right), parameters = extract.trimmed(self.__string__, (start, left), segments[-1:])
@@ -2901,8 +2952,10 @@ class parseable(object):
         # otherwise we just assume it's a string for the purposes of testing.
         else:
             order, tree, errors = token.parse(string, function.tokens)
+            if errors:
+                cls = self.__class__
+                raise internal.exceptions.InvalidFormatError(u"{:s}({!r}, {!r}) : An error occurred while trying to process the duplicates from parsing the specified string.".format('.'.join([__name__, cls.__name__]), string, mappings))
             duplicates = token.duplicates(string, order)
-            assert(not(errors)), errors
             self.__string__, self.__tree__, self.__duplicates__ = string, tree, duplicates
 
         # now we can identify the unique segments from our duplicates. this should
@@ -2951,7 +3004,6 @@ class parseable(object):
         # indices for the fastpath, and return the transformed substring.
         elif substring in cache:
             transformed = cache[substring]
-            #print(['sendsub', substring, transformed])
             iterable = (segment for depth, segment in self.__duplicates__.get(index, []))
             [table.setdefault(left, transformed) for left, right in iterable]
             return cache[substring]
@@ -2959,12 +3011,10 @@ class parseable(object):
         # otherwise we check if we have an index for the string inside
         # the tree and figure out how we'll need to process/transform it.
         elif index in self.__tree__:
-            #print(['sendproc', index, substring])
             cache[substring] = transformed = self.process_branch(index, substring)
             return transformed
 
         # there's nothing we can do with this string, so return it untransformed.
-        #print(['notrans', index, substring])
         return substring
 
     def __process_augmented(self, augmented, substring, separators={','}):
@@ -2998,23 +3048,25 @@ class parseable(object):
 
     def process_nopair(self, index, substring, separators={','}):
         '''Process the uncuddled `substring` at the specified `index` split by the tokens in `separators`.'''
-        assert(index in self.__tree__)
+        if not(index in self.__tree__):
+            cls = self.__class__
+            raise internal.exceptions.InvalidParameterError(u"{:s}.process_nopair({:d}, {!r}, separators={!r}) : The specified index ({:d}) was not found in the tree for the currently parsed string.".format('.'.join([__name__, cls.__name__]), index, substring, separators, index))
         augmented = token.augment(index, self.__tree__[index])
 
         joined = self.__cache__[substring] if substring in self.__cache__ else ','.join(self.__cache__.get(item, item) for item in self.__process_augmented(augmented, substring, separators=separators))
-        #print(['cached', substring, joined])
         return self.__cache__.setdefault(substring, joined)
 
     def process_pair(self, index, substring, separators):
         '''Process the cuddled `substring` at the specified `index` split by the tokens in `separators`.'''
-        assert(index in self.__tree__)
+        if not(index in self.__tree__):
+            cls = self.__class__
+            raise internal.exceptions.InvalidParameterError(u"{:s}.process_pair({:d}, {!r}, separators={!r}) : The specified index ({:d}) was not found in the tree for the currently parsed string.".format('.'.join([__name__, cls.__name__]), index, substring, separators, index))
         augmented = token.augment(index, self.__tree__[index])
         pairs, stripped, uncuddled = self.__uncuddle_augmented_string(substring, augmented)
 
         # Once the characters cuddling the substring have been removed, update the
         # cache with the transformed string so we can avoid processing it again.
         transformed = self.__cache__[stripped] if stripped in self.__cache__ else ','.join(self.__cache__.get(item, item) for item in self.__process_augmented(uncuddled, stripped, separators=separators))
-        #print(['uncuddle', pairs, substring, stripped, transformed])
         self.__cache__[substring] = transformed = pairs[0] + transformed + pairs[-1]
         return transformed
 
