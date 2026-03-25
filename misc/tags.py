@@ -1030,14 +1030,20 @@ class address(object):
         # it's actually special in that we need to demangle it for the real name.
         aname = interface.name.get(ea)
         if aname and interface.name.mangled(ea, aname) != idaapi.FF_UNK:
-            realname = utils.string.of(idaapi.demangle_name(utils.string.to(aname), MNG_NODEFINIT|MNG_NOPTRTYP) or aname)
+            #realname = utils.string.of(idaapi.demangle_name(utils.string.to(aname), MNG_NODEFINIT|MNG_NOPTRTYP) or aname)
+            #parsed = declaration.symbol(aname)
+            #realname = declaration.unmangled.parsable(parsed.string)
+            realname = declaration.unmangled.parsable(aname)
         else:
             realname = aname or ''
 
         # Add any of the implicit tags for the specified address to our results.
-        if aname and interface.address.flags(ea, idaapi.FF_NAME): res.setdefault('__name__', realname)
-        if comment.extra.has_prefix(ea): res.setdefault('__extra_prefix__', comment.extra.get_prefix(ea))
-        if comment.extra.has_suffix(ea): res.setdefault('__extra_suffix__', comment.extra.get_suffix(ea))
+        if aname and interface.address.flags(ea, idaapi.FF_NAME):
+            res.setdefault('__name__', realname)
+        if comment.extra.has_prefix(ea):
+            res.setdefault('__extra_prefix__', comment.extra.get_prefix(ea))
+        if comment.extra.has_suffix(ea):
+            res.setdefault('__extra_suffix__', comment.extra.get_suffix(ea))
 
         # If there was some type information associated with the address, then
         # we need its name so that we can format it and add it as an implicit tag.
@@ -1047,8 +1053,7 @@ class address(object):
 
                 # We need the name to be parseable and IDA just doesn't give a fuck if it outputs
                 # something non-parseable. So we simply fix that here and render the typeinfo.
-                validname = declaration.unmangled.parsable(realname)
-                ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
+                ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
 
                 # Add it to our dictionary that we return to the user.
                 res.setdefault('__typeinfo__', ti_s)
@@ -1410,13 +1415,16 @@ class function(object):
         # Collect all of the naming information for the function.
         fname, mangled = interface.function.name(ea), utils.string.of(idaapi.get_func_name(ea))
         if fname and interface.name.mangled(ea, mangled) != idaapi.FF_UNK:
-            realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP) or fname)
+            #realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP) or fname)
+            parsed = declaration.function(mangled)
+            realname = declaration.unmangled.parsable(parsed.string)
         else:
             realname = fname or ''
 
         # Add any of the implicit tags for the given function into our results.
         fname = fname
-        if fname and interface.address.flags(interface.range.start(fn), idaapi.FF_NAME): res.setdefault('__name__', realname)
+        if fname and interface.address.flags(interface.range.start(fn), idaapi.FF_NAME):
+            res.setdefault('__name__', realname)
 
         # For the function's type information within the implicit "__typeinfo__"
         # tag, we'll need to extract the prototype and the function's name. This
@@ -1427,8 +1435,7 @@ class function(object):
 
                 # We need this name to be parseable and (of course) IDA doesn't
                 # give a fuck whether its output is parseable by its own parser.
-                validname = declaration.unmangled.parsable(realname)
-                fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
+                fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
                 res.setdefault('__typeinfo__', fprototype)
 
         # If an exception was raised, then we're using an older version of IDA and we
