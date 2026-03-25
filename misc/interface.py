@@ -8976,9 +8976,9 @@ class tinfo(object):
         normalized = [(item.lower() if isinstance(item, internal.types.string) else item) for item in attributes]
         unique = {cls._pointer_attributes.get(attribute, attribute) for attribute in normalized}
         if any(integer not in cls._pointer_attributes for integer in unique):
-            iterable = (item for item in res if item not in cls._pointer_attributes)
+            iterable = (item for item in unique if item not in cls._pointer_attributes)
             invalid = [("{:#x}".format(item) if isinstance(item, internal.types.integer) else "{!r}".format(item)) for item in iterable]
-            raise internal.exceptions.InvalidParameterError(u"{:s}.pointer_attributes({!r}) : Unable to determine the pointer attributes for {:d} of the {:d} suggested values ({!r}).".format('.'.join([__name__, cls.__name__]), attributes, len(invalid), len(unique), invalid))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.pointer_attributes({!r}) : Unable to determine the pointer attributes for {:d} of the {:d} suggested values ({!s}).".format('.'.join([__name__, cls.__name__]), attributes, len(invalid), len(unique), ', '.join(invalid)))
 
         # Reduce all of the items we were given into something for ptr_type_data_t.taptr_bits.
         return functools.reduce(operator.or_, unique, idaapi.TAH_HASATTRS if any(unique) else 0)
