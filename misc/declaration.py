@@ -754,7 +754,7 @@ class nested(object):
 
     @classmethod
     def process(cls, callable, string, augmented, index=None):
-        '''Process the nested contents of `string` using the given `allable` and the sizes specified by the tree in `augmented`.'''
+        '''Process the nested contents of `string` using the given `callable` and the sizes specified by the tree in `augmented`.'''
         result, position = [], 0
         for skip, key, size in augmented.get(index, []):
             skipped, position = string[position : position + skip], position + skip
