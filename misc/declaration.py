@@ -1229,7 +1229,7 @@ class unmangled(object):
         # remove all stupid keywords and then parse our string to figure out where a templates might be at.
         string = cls.keyword(string)
         order, tree, _ = nested.parse(string, ['<>'])
-        _, stop = order[-1] if order else (0, len(string.strip()[:-1]))
+        depth, (_, stop) = order[-1] if order else (0, (0, len(string.strip()[:-1])))
 
         # if there's a closing-parenthesis within the last slice, then we need to strip out some parameters.
         # FIXME: it is because of this that function names might not be unique. it'll probably be better to
@@ -1240,7 +1240,7 @@ class unmangled(object):
 
         # now we can use strip_templates to strip out any and all templates depth-first.
         stripper = cls.__strip_templates(string)
-        string = nested.process(stripper.send, next(stripper), {index : nested.augment(segments) for index, segments in tree.items()})
+        string = nested.process(stripper.send, next(stripper), {index : nested.augment(index, segments) for index, segments in tree.items()})
 
         # if there's any other parentheses in the string, then they're unbalanced and need filtering.
         anti_parenthesis = {character : '_' for character in '()'}
