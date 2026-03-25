@@ -2441,13 +2441,75 @@ class symbol(mangled):
         if not just_name:
             raise internal.exceptions.AssertionError(u"{:s}(\"{:s}\") : Unable to parse out the name from the demangled symbol returned by {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), utils.string.escape(mangled, '"'), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), self.__flags, 2 + 8))
 
+        order, tree, errors = token.parse(just_name, self.tokens)
+
+        # First check if the symbol includes a braced specifier at its ending.
+        lastsegment = tree[None][-1] if tree.get(None) else (len(just_name), len(just_name))
+        last = operator.getitem(just_name, slice(*lastsegment))
+        if last[:1] + last[-1:] == '{}':
+            declaration_and_name, brace_suffix = extract.braces(just_name, None, tree[None])
+
+        else:
+            declaration_and_name  = (0, len(just_name)), tree[None]
+            brace_suffix = (len(just_name), len(just_name))
+
+        # Transform the brace suffix length so that can be used to slice off the
+        # braced elements from the decoded string.
+        brace_length = len(just_name) - brace_suffix[0]
+        Fbraced_transform = functools.partial(self.__transform_brace, brace_length)
+
+        # Now we extract the last name component if it has one. This way if it
+        # is backticked, we could transform it.
+        _, lastsegment = extract.ending(just_name, *declaration_and_name, delimiters={'::'})
+        last = just_name[slice(*lastsegment[0])]
+        transformed = self._declaration_backticks.get(last, last)
+        Fbackticked_transform = functools.partial(self.__transform_backtick, brace_length, last, transformed)
+
+        # If our unmangled symbol has a braced specifier at its end and it
+        # contains a backticked string that can be transformed, then we need to
+        # apply both transformations starting with the backticked one first, and
+        # then finishing with the braced name for the suffix.
+        if brace_length and last != transformed:
+            Ftransform = utils.fcompose(Fbackticked_transform, Fbraced_transform)
+        elif last != transformed:
+            Ftransform = Fbackticked_transform
+        elif brace_length:
+            Ftransform = Fbraced_transform
+        else:
+            Ftransform = utils.fidentity
+
         # That should be all of the special cases, so now we just
         # need to decode the mangled symbol and parse it.
-        decoded, order, tree, errors = self.__init_mangled__(mangled, self.__flags)
+        decoded, order, tree, errors = self.__init_mangled__(mangled, self.__flags, Ftransform=Ftransform)
+        if errors:
+            cls = self.__class__
+            logging.warning(u"{:s}(\"{:s}\") : Unable to parse the mangled string \"{:s}\" after it was decoded to \"{:s}\".".format('.'.join([__name__, cls.__name__]), utils.string.escape(mangled, '"'), utils.string.escape(mangled, '"'), utils.string.escape(decoded, '"')))
 
         # Check if the unmangled string is braced, and cache its range so that
-        # it can be explored.
+        # it can be explored by the instantiator.
         self.__declaration_and_name, self.__brace_suffix = extract.braces(decoded, None, tree[None])
+
+    def __transform_backtick(self, bracelength, keyword, replacement, string):
+        '''Replace the trailing keyword with the given `replacement` string.'''
+        remaining, ignored = (string[:-bracelength], string[-bracelength:]) if bracelength else (string, '')
+        point = remaining.rindex(keyword)
+        return remaining[:point] + replacement + remaining[point + len(keyword):] + ignored
+
+    def __transform_brace(self, bracelength, string):
+        '''Transform a braced suffix to a string for a symbol name.'''
+        remaining, braced = string[:-bracelength], string[-bracelength:]
+
+        # FIXME: using the dollar-sign suffix for the specified implementation
+        #        should be done exclusively by the unmangled.parsable function.
+        if braced.startswith('{for `'):
+            start, stop = len('{for `'), -len("'}")
+            return remaining + '$' + braced[start : stop]
+
+        # FIXME: if there are other brace types, then we need to handle them.
+        elif braced.startswith('{'):
+            return string
+
+        return string
 
     @property
     def __declaration_components(self):
