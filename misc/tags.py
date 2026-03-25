@@ -1029,11 +1029,10 @@ class address(object):
         # First thing we need to figure out is whether the name exists and if
         # it's actually special in that we need to demangle it for the real name.
         aname = interface.name.get(ea)
-        if aname and interface.name.mangled(ea, aname) != idaapi.FF_UNK:
-            #realname = utils.string.of(idaapi.demangle_name(utils.string.to(aname), MNG_NODEFINIT|MNG_NOPTRTYP) or aname)
-            #parsed = declaration.symbol(aname)
-            #realname = declaration.unmangled.parsable(parsed.string)
-            realname = declaration.unmangled.parsable(aname)
+        mangled_t = interface.name.mangled(ea, aname)
+        if aname and mangled_t in {idaapi.FF_CODE, idaapi.FF_DATA}:
+            parsed = declaration.symbol(aname) if mangled_t == idaapi.FF_DATA else declaration.function(aname)
+            realname = declaration.unmangled.parsable(parsed.string)
         else:
             realname = aname or ''
 
@@ -1414,9 +1413,13 @@ class function(object):
 
         # Collect all of the naming information for the function.
         fname, mangled = interface.function.name(ea), utils.string.of(idaapi.get_func_name(ea))
-        if fname and interface.name.mangled(ea, mangled) != idaapi.FF_UNK:
-            #realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP) or fname)
+        mangled_t = interface.name.mangled(ea, mangled)
+        if fname and mangled_t == idaapi.FF_CODE:
             parsed = declaration.function(mangled)
+            realname = declaration.unmangled.parsable(parsed.string)
+        elif fname and mangled_t == idaapi.FF_DATA:
+            logging.warning(u"{:s}.tag({:#x}) : An unexpected type {:s} was detected for the mangled function name belonging to the function at address {:#x}.".format('function', ea, 'FF_DATA', ea))
+            parsed = declaration.symbol(mangled)
             realname = declaration.unmangled.parsable(parsed.string)
         else:
             realname = fname or ''
