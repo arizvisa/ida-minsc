@@ -1431,16 +1431,35 @@ class function(object):
         res = {}
         [ res.update(d) for d in ([d1, d2] if repeatable else [d2, d1]) ]
 
-        # Collect all of the naming information for the function.
+        # Collect all of the naming information for the function, and figure
+        # out whether the function name is mangled and for what type.
         fname, mangled = interface.function.name(ea), utils.string.of(idaapi.get_func_name(ea))
         mangled_t = interface.name.mangled(ea, mangled)
-        if fname and mangled_t == idaapi.FF_CODE:
-            parsed = declaration.function(mangled)
-            realname = declaration.unmangled.parsable(parsed.string)
-        elif fname and mangled_t == idaapi.FF_DATA:
-            logging.warning(u"{:s}.tag({:#x}) : An unexpected type {:s} was detected for the mangled function name belonging to the function at address {:#x}.".format('function', ea, 'FF_DATA', ea))
-            parsed = declaration.symbol(mangled)
-            realname = declaration.unmangled.parsable(parsed.string)
+
+        # If we found that the name is mangled for code or data, then we just
+        # use the declaration module to clean up into something that excludes
+        # any extraneous characters. If the name is mangled for data, then we
+        # also log a warning since this namespace is strictly for functions.
+        if fname and mangled_t in {idaapi.FF_CODE, idaapi.FF_DATA}:
+            try:
+                if mangled_t == idaapi.FF_DATA:
+                    logging.warning(u"{:s}.tag({:#x}) : An unexpected type {:s} was detected for the mangled function name belonging to the function at address {:#x}.".format('function', ea, 'FF_DATA', ea))
+                parsed = declaration.function(mangled) if mangled_t == idaapi.FF_CODE else declaration.symbol(mangled)
+                string = parsed.string
+
+            # If a formatting error occurred, then use the original name that we
+            # had received, but convert it into something that is parsable.
+            except internal.exceptions.InvalidFormatError:
+                string = mangled or fname or ''
+
+            # Finally we use the declaration module to convert any characters
+            # not parsable by the disassembler into a string that can actually
+            # be parsed by the disassembler without errors. If we get an empty
+            # string, then use the original function name.
+            try: realname = declaration.unmangled.parsable(string) or declaration.unmangled.parsable(mangled) or mangled
+            except internal.exceptions.InvalidFormatError: realname = mangled
+
+        # Not mangled, so we can actually use the function name as-is.
         else:
             realname = fname or ''
 
