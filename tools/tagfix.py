@@ -1,12 +1,11 @@
 """
 Tagfix module
 
-This module is provided to a user to allow one to rebuild the
-cache that is built when a database is finished processing. If
-the cache is corrupted through some means, this module can be
-used to rebuild the tag-cache by manually scanning the currently
-defined tags and resetting its references in order to allow one
-to query again.
+This module is provided to a user to allow one to rebuild the cache that is
+built when a database is finished processing. If the cache is corrupted through
+some means, this module can be used to rebuild the tag-cache by manually
+scanning the currently defined tags and resetting its references in order to
+allow one to query again.
 
 To manually rebuild the cache for the database, use the following::
 
@@ -16,6 +15,39 @@ Likewise to rebuild the cache for just the globals or the contents::
 
     > tools.tagfix.globals()
     > tools.tagfix.contents()
+
+If upgrading from the old tagging cache (v0) to the more recent tagindex (v1),
+the following function can be used::
+
+    > tools.tagfix.upgrade_v1()
+
+Similarly, to upgrade just the globals, contents, structures, or members::
+
+    > tools.tagfix.upgrade_globals_v1()
+    > tools.tagfix.upgrade_functions_v1()
+    > tools.tagfix.upgrade_structures_v1()
+    > tools.tagfix.upgrade_members_v1()
+
+If, for some reason, the tagging data stored in the database needs to be
+removed, some of the functions within this module can be used with either tag
+type. It is worth noting that erasure of the tags associated with structures and
+their members is not yet implemented. Still, the following functions can be used
+for erasing tags::
+
+    > tools.tagfix.erase()
+    > tools.tagfix.erase_globals()
+    > tools.tagfix.erase_contents()
+
+The following functions are deprecated as a result of the implementation of the
+tag index (v1) supersedes the tag cache (v0). Still, they can be used to verify
+that the tags stored in tag cache (v0) are correct. It is worth noting that
+verification of tags associated with structures and members is not implemented
+due to them not being supported by the tag cache (v0). These functions are as
+follows::
+
+    > tools.tagfix.verify_v0()
+    > tools.tagfix.verify_globals_v0()
+    > tools.tagfix.verify_contents_v0()
 
 """
 
@@ -617,9 +649,15 @@ def upgrade_v1():
 
 class relocate_schema_v1(object):
     """
-    This namespace is an intermediary that was used to migrate tags from the
-    tagindex while in a development state to the final tagging index where each
-    table is consolidated within the same netnode.
+    This namespace contains internal-only functionality that was used to migrate
+    tags from the tag index (v1) while it was still in a development state. The
+    intention of this is to migrate tags from different netnodes into the final
+    implementation of the tagging index where each table is consolidated within
+    the same netnode.
+
+    It is internal-only and only intended to be used during situations where
+    interacting with the individual parts is necessary. Such as for
+    data-recovery, or experimentation with the tagging index.
     """
 
     class definitions(object):
@@ -915,6 +953,7 @@ class relocate_schema_v1(object):
 
     @classmethod
     def migrate(cls):
+        '''Migrate all of the available tables into their final state.'''
         schemata = [
             (cls.definitions.tags, internal.tagindex.tags),
             (cls.definitions.globals, internal.tagindex.globals),
@@ -937,6 +976,7 @@ class relocate_schema_v1(object):
 
     @classmethod
     def erase(cls):
+        '''Erase the contents of the schema.'''
         schemata = [
             cls.definitions.tags, cls.definitions.globals,
             cls.definitions.contents, cls.definitions.members,
@@ -956,6 +996,7 @@ class relocate_schema_v1(object):
         return results
 
     def __new__(cls):
+        '''Migrate to the new schema, and erase the old one.'''
         migrated, removed = cls.migrate(), cls.erase()
         return len(migrated), len(removed)
 
