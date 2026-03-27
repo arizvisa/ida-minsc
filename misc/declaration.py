@@ -1095,8 +1095,17 @@ class unmangled(object):
     # pre-calculate the prefixes and suffixes that we'll use to trim and match each component
     _declaration_prefix_suffix = {item[:1] : item[-1:] for item in _declaration_rules}
 
+    # scopes
+    _declaration_scopes = { 'private: ', 'protected: ', 'public: ' , '[thunk]: ', '[thunk]:private: ', '[thunk]:protected: ', '[thunk]:public: ' }
+
     # random keywords that aren't worth anything other than unnecessary whitespace (really).
     _declaration_keywords = {'enum ', 'struct ', 'union ', 'class ', 'const ', 'volatile '}
+
+    # the scopes from `_declaration_scopes` should already be processed prior
+    # to filtering out keywords, but the disassembler's demangler can leave
+    # them within a backticked template parameter. so, to avoid the situation
+    # where a scope is inside a template, we ensure its removed as a keyword.
+    _declaration_keywords |= _declaration_scopes
 
     # operators
     _declaration_operators = {
@@ -1151,9 +1160,6 @@ class unmangled(object):
         'operator|=':           'bor_assign',
         'operator^=':           'bxor_assign',
     }
-
-    # scopes
-    _declaration_scopes = { 'private: ', 'protected: ', 'public: ' , '[thunk]: ', '[thunk]:private: ', '[thunk]:protected: ', '[thunk]:public: ' }
 
     @classmethod
     def keyword(cls, string):
@@ -1210,11 +1216,11 @@ class unmangled(object):
     @classmethod
     def parameters(cls, string):
         '''Parse a comma-separated `string` containing function parameters or template specifiers and return them as a list.'''
-        _, tree, _ = token.parse(string, ['()', '<>', ','])
+        _, tree, _ = token.parse(string, ['()', '<>', ',', "`'"])
         indices = [start for start, stop in tree.get(None, []) if stop - start == 1][::-1]
 
         # Gather all of the ranges for each parameter inside the "," characters.
-        result, left, right = [], 1 if string[:1] in '()<>' else 0, len(string)
+        result, left, right = [], 1 if string[:1] in "()<>`'" else 0, len(string)
         for index in indices[::-1]:
             _, left = result.append((left, index)), index + 1
         result.append((left, len(string)))
