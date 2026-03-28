@@ -1070,10 +1070,11 @@ class address(object):
             if interface.address.has_typeinfo(ea):
                 typeinfo = interface.address.typeinfo(ea)
                 ti = interface.tinfo.lower_function_type(typeinfo) if typeinfo.is_func() or typeinfo.is_funcptr() else typeinfo
+                validname = interface.name.typename(realname)
 
                 # We need the name to be parseable and IDA just doesn't give a fuck if it outputs
                 # something non-parseable. So we simply fix that here and render the typeinfo.
-                ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
+                ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
 
                 # Add it to our dictionary that we return to the user.
                 res.setdefault('__typeinfo__', ti_s)
@@ -1476,10 +1477,11 @@ class function(object):
             if interface.function.has_typeinfo(fn):
                 typeinfo = interface.function.typeinfo(fn)
                 ti = interface.tinfo.lower_function_type(typeinfo) if typeinfo.is_func() or typeinfo.is_funcptr() else typeinfo
+                validname = interface.name.typename(realname)
 
                 # We need this name to be parseable and (of course) IDA doesn't
                 # give a fuck whether its output is parseable by its own parser.
-                fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
+                fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
                 res.setdefault('__typeinfo__', fprototype)
 
         # If an exception was raised, then we're using an older version of IDA and we
@@ -2011,7 +2013,9 @@ class typeinfo_member(object):
         # type information associated with it.
         has_typeinfo = False if udm.is_gap() or interface.tinfo.basic(mtype) else True
         if has_typeinfo:
-            ti_s = idaapi.print_tinfo('', 0, 0, 0, mtype, utils.string.to(declaration.unmangled.parsable(aname) if aname else ''), '')
+            realname = aname or ''
+            validname = interface.name.member(realname) if realname else ''
+            ti_s = idaapi.print_tinfo('', 0, 0, 0, mtype, utils.string.to(validname), '')
             res.setdefault('__typeinfo__', ti_s)
         return res
 
@@ -2358,7 +2362,9 @@ class member(object):
         # be rendered. Hopefully it's not mangled in some way that will need
         # consideration if it's reapplied by the user.
         if ok and has_typeinfo:
-            ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(declaration.unmangled.parsable(aname) if aname else ''), '')
+            realname = aname or ''
+            validname = interface.name.member(realname) if realname else ''
+            ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
             res.setdefault('__typeinfo__', ti_s)
         return res
 
