@@ -14353,7 +14353,7 @@ class name(object):
         ida_string = internal.utils.string.to(string or u'')
 
         # validate the name that we're going to apply.
-        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
+        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.VNT_IDENT, idaapi.SN_IDBENC)
         if ida_string and ida_string != res:
             logging.info(u"{:s}.name({:#x}, \"{:s}\", {:#x}) : Stripping invalid chars from specified name resulted in \"{:s}\".".format('database', ea, internal.utils.string.escape(string, '"'), flags, internal.utils.string.escape(internal.utils.string.of(res), '"')))
             ida_string = res
