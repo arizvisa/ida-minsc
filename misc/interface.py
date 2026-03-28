@@ -5618,7 +5618,7 @@ class strpath(object):
 
                     # if we'd already assigned the member and the user's parent
                     # is the same as our current structure, log a warning.
-                    elif usertype.get_udm_tid(user_mindex) == sid:
+                    elif tinfo.member_identifier(usertype, user_mindex) == sid:
                         logging.warning(u"{:s} : Overwriting member \"{:s}\" ({:#x}) of collected results with \"{:s}\" ({:#x}) due to it belonging to the current \"{:s}\" ({:#x}).".format(format_description, internal.utils.string.escape('.'.join(map(internal.utils.string.of, [sname, udm.name])), '"'), mid, internal.utils.string.escape(internal.utils.string.of(expected.get_type_name()), '"'), id, internal.utils.string.escape(internal.utils.string.of(ti.get_type_name())), sid))
                         mid = id
 
@@ -5631,7 +5631,7 @@ class strpath(object):
                         uindex = ti.find_udm(udm, idaapi.STRMEM_OFFSET)
                         if uindex < 0:
                             raise internal.exceptions.DisassemblerError(u"{:s} : Unable to find the member for type \"{:s}\" at the specified offset ({:#x}).".format(format_description, internal.utils.string.escape(internal.utils.string.of(ti.get_type_name()), '"'), offset))
-                        Fcollect((sid, ti.get_udm_tid(uindex), offset - (0 if ti.is_union() else udm.offset)))
+                        Fcollect((sid, tinfo.member_identifier(ti, uindex), offset - (0 if ti.is_union() else udm.offset)))
                         sid, mid, offset = tinfo.identifier(usertype), user, 0
 
                     # if we got here, then our structure id doesn't match the
@@ -5828,7 +5828,7 @@ class strpath(object):
             sname = internal.utils.string.of(ti.get_type_name())
             mname = internal.utils.string.of(udm.name)
             fullname = '.'.join([sname, mname])
-            return "{:s}({:#x}, {:#x}, \"{:s}\", {:s}={!s}{:s})".format(tinfo_description, tinfo.identifier(ti), ti.get_udm_tid(mindex), internal.utils.string.escape(fullname, '"'), 'index' if ti.is_union() else 'offset', "{:d}".format(udm.offset) if ti.is_union() else "{:#x}".format(udm.offset), offset_description)
+            return "{:s}({:#x}, {:#x}, \"{:s}\", {:s}={!s}{:s})".format(tinfo_description, tinfo.identifier(ti), tinfo.member_identifier(ti, mindex), internal.utils.string.escape(fullname, '"'), 'index' if ti.is_union() else 'offset', "{:d}".format(udm.offset) if ti.is_union() else "{:#x}".format(udm.offset), offset_description)
 
         # If we were given a member id, but no owning type then we figure it out
         # ourselves and then recurse with whatever it was we found.
@@ -5948,7 +5948,7 @@ class strpath(object):
                 elif v9 and isinstance(choice, internal.types.integer) and node.identifier(choice):
                     mindex, cid, udm = stype.get_udm_by_tid(udm, choice), choice, udm
                 elif v9 and 0 <= choice < utd.size():
-                    mindex, cid, udm = choice, stype.get_udm_tid(choice), utd[choice]
+                    mindex, cid, udm = choice, tinfo.member_identifier(stype, choice), utd[choice]
                 elif hasattr(choice, 'id'):
                     mindex, cid, udm = -1, choice.id, None
                 else:
@@ -5998,7 +5998,7 @@ class strpath(object):
             # results we've been aggregating in order to determine what happened.
             elif v9:
                 description = 'union' if stype.is_union() else "{:+#x} structure".format(tinfo.size(stype))
-                message = "no valid candidates being chosen ({:s})".format(', '.join(map("{:#x}".format, (stype.get_udm_tid(mptr) for mptr in candidates)))) if choice is None else "an invalid candidate ({:s}) being chosen".format("{:#x}".format(cid) if hasattr(choice, 'id') else "{!r}".format(choice))
+                message = "no valid candidates being chosen ({:s})".format(', '.join(map("{:#x}".format, (tinfo.member_identifier(stype, mptr) for mptr in candidates)))) if choice is None else "an invalid candidate ({:s}) being chosen".format("{:#x}".format(cid) if hasattr(choice, 'id') else "{!r}".format(choice))
                 raise internal.exceptions.MemberNotFoundError(formatlog(u"Path terminated at item {:d} (offset {:#x}{:+#x}) of {:s} ({:#x}) due to {:s}.".format(count, position, offset, description, sid, message)))
 
             else:
@@ -6173,7 +6173,7 @@ class strpath(object):
                 # Now we should have the type and its member so we can finally
                 # calculate the current delta from whatever it is we got.
                 delta = sum([delta, 0 if any([ti.is_union(), udm is None]) else udm.offset, offset])
-                Fcollect((tid, ti.get_udm_tid(mindex), offset))
+                Fcollect((tid, tinfo.member_identifier(ti, mindex), offset))
                 udm = None if udm is None or tinfo.identifier(udm.type) == idaapi.BADADDR else udm
 
             # This is super simple as we only need to check if our sptr is a union. We
@@ -6470,11 +6470,11 @@ class strpath(object):
                     if isinstance(item, internal.types.integer) and node.identifier(item):
                         mindex, mid, udm = ti.get_udm_by_tid(udm, item), item, udm
                     elif isinstance(item, internal.types.integer):
-                        mindex, mid, udm = item, ti.get_udm_tid(item) if utd_index else idaapi.BADADDR, utd[item] if utd_index else None
+                        mindex, mid, udm = item, tinfo.member_identifier(ti, item) if utd_index else idaapi.BADADDR, utd[item] if utd_index else None
                     elif isinstance(item, internal.types.string):
                         udm.name = internal.utils.string.to(item)
                         mindex = ti.find_udm(udm, idaapi.STRMEM_NAME)
-                        mid = ti.get_udm_tid(mindex) if 0 <= mindex < utd.size() else idaapi.BADADDR
+                        mid = tinfo.member_identifier(ti, mindex) if 0 <= mindex < utd.size() else idaapi.BADADDR
                     else:
                         mindex, mid, udm = -1, idaapi.BADADDR, None
                         sptr, mptr = collector.send(item), mid
@@ -6809,7 +6809,7 @@ class strpath(object):
         if ti.is_union():
             results = [members[index] for index in indices]
             sizes = [utd[mindex].size for mindex in results]
-            return min(sizes), max(sizes), [(utd[mindex].offset, ti.get_udm_tid(mindex)) for mindex in results]
+            return min(sizes), max(sizes), [(utd[mindex].offset, tinfo.member_identifier(ti, mindex)) for mindex in results]
 
         # Add all the points and segments found within the type.
         iterable = itertools.chain(*((utd[mindex].offset, utd[mindex].offset + utd[mindex].size) for mindex in members))
@@ -6861,13 +6861,13 @@ class strpath(object):
 
         # The very last thing we need to do is to iterate through each point to
         # yield each member once along with any holes.
-        offset, result, available = point, [], {ti.get_udm_tid(mindex) for mindex in selected}
+        offset, result, available = point, [], {tinfo.member_identifier(ti, mindex) for mindex in selected}
         for point in points[start : stop]:
             if offset < point:
                 result.append((offset, point - offset))
             mindex = segments.get(point, -1)
             mexists = 0 <= mindex < utd.size()
-            mid = ti.get_udm_tid(mindex) if mexists else idaapi.BADADDR
+            mid = tinfo.member_identifier(ti, mindex) if mexists else idaapi.BADADDR
             if mexists and mid in available:
                 result.append((point, mid)), available.remove(mid)
             offset = utd[mindex].offset + utd[mindex].size if mexists else point
@@ -13421,7 +13421,7 @@ class decode(object):
             for mtype, mindex, udm in internal.structure.v9members.iterate(ti):
                 mname = internal.utils.string.of(udm.name)
                 moffset, mbits = udm.offset, udm.size
-                mid = mtype.get_udm_tid(mindex)
+                mid = tinfo.member_identifier(mtype, mindex)
                 msize, mextra = divmod(mbits, 8)
                 msize = msize + 1 if mextra else msize
                 if len(data) < msize:
@@ -13480,7 +13480,7 @@ class decode(object):
             for mtype, mindex, udm in internal.structure.v9members.iterate(ti):
                 mname = internal.utils.string.of(udm.name)
                 mbits = udm.size
-                mid = mtype.get_udm_tid(mindex)
+                mid = tinfo.member_identifier(mtype, mindex)
                 left, right = 0 if internal.structure.union(ti) else udm.offset, udm.offset + udm.size
 
                 # Convert our bit sizes to bytes.
@@ -13833,7 +13833,7 @@ class decode(object):
                     sliced = cls.list(size, mdata)
                     available, used = len(mdata), sum(len(item) for item in sliced)
                     if available != used:
-                        logging.warning(u"{:s}.v9structure({:#x}, ...{:s}) : The amount of data available ({:#x}) for decoding the \"{:s}\" member is not a multiple of the size ({:d}) of the member ({:#x}) and will result in ignoring {:+d} byte{:s} during decoding.".format('.'.join([__name__, cls.__name__]), sid, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', available, mname, size, ti.get_udm_tid(mindex), available - used, '' if available - used == 1 else 's'))
+                        logging.warning(u"{:s}.v9structure({:#x}, ...{:s}) : The amount of data available ({:#x}) for decoding the \"{:s}\" member is not a multiple of the size ({:d}) of the member ({:#x}) and will result in ignoring {:+d} byte{:s} during decoding.".format('.'.join([__name__, cls.__name__]), sid, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', available, mname, size, tinfo.member_identifier(ti, mindex), available - used, '' if available - used == 1 else 's'))
                     iterable = cls.partial(size, mdata) if partial else sliced
                     decoded = [cls.v9structure(mtype, cls.fragment_bytes(mtype, item), order=order, partial=partial) for item in iterable]
 
