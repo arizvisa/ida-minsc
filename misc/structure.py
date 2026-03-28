@@ -635,7 +635,7 @@ class v9member(object):
     def has_name(cls, *args):
         '''Return whether the name of the specified member is user-defined.'''
         tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'has_name'])
-        mid, name = tinfo.get_udm_tid(mindex), utils.string.of(udm.name)
+        mid, name = interface.tinfo.member_identifier(tinfo, mindex), utils.string.of(udm.name)
 
         # If the member is a gap (v9 api), then we act as if there's no name
         # applied. This is different from the disassembler, because in the v9
@@ -705,7 +705,7 @@ class v9member(object):
         fullname = '.'.join(map(utils.string.of, [tname, mname]))
 
         # Extract the string from the specified parameters.
-        mid, res = tinfo.get_udm_tid(mindex), args[-1]
+        mid, res = interface.tinfo.member_identifier(tinfo, mindex), args[-1]
         string = interface.tuplename(*res) if isinstance(res, types.ordered) else res
         caller_format = cls.format_args(*args[:-1], caller=[__name__, cls.__name__, 'set_name'], args=["{!r}".format(string)])
 
@@ -738,7 +738,7 @@ class v9member(object):
     def remove_name(cls, *args):
         '''Reset the name for the specified member specified by `mid` and return the original name.'''
         tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'remove_name'])
-        mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), udm.name
+        mid, tname, mname = interface.tinfo.member_identifier(tinfo, mindex), tinfo.get_type_name(), udm.name
         fullname = '.'.join(map(utils.string.of, [tname, mname]))
         default = cls.default_name(mid, udm.offset)
         return cls.set_name(mid, default)
@@ -786,12 +786,12 @@ class v9member(object):
         # an offset, then cull it out since the member index was specified.
         elif (len(args) == 1 and isinstance(args[0], types.integer) and interface.node.identifier(args[0])) or (len(args) == 2 and isinstance(args[0], idaapi.tinfo_t)):
             tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'default_name'])
-            mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), utils.string.of(udm.name)
+            mid, tname, mname = interface.tinfo.member_identifier(tinfo, mindex), tinfo.get_type_name(), utils.string.of(udm.name)
             offset, _ = divmod(udm.offset, 8) if udm else mindex if union(tinfo) else (tinfo.get_size(), 0)
 
         elif (len(args) == 2 and isinstance(args[0], types.integer) and interface.node.identifier(args[0])) or (len(args) == 3 and isinstance(args[0], idaapi.tinfo_t)):
             tinfo, utd, mindex, udm = v9members.by(*args[:-1], caller=[__name__, cls.__name__, 'default_name'], args=["{:#x}".format(*args[-1:])])
-            mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), utils.string.of(udm.name)
+            mid, tname, mname = interface.tinfo.member_identifier(tinfo, mindex), tinfo.get_type_name(), utils.string.of(udm.name)
             [offset] = args[-1:]
 
         else:
@@ -1036,7 +1036,7 @@ class v9member(object):
     def packed(cls, offset, *args):
         '''Pack the information about the specified member with its structure at the specified `offset` into a tuple in case it is to be removed.'''
         tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'packed'])
-        mid = tinfo.get_udm_tid(mindex)
+        mid = interface.tinfo.member_identifier(tinfo, mindex)
         name = utils.string.of(udm.name)
         mtype = interface.tinfo.copy(udm.type)
         moffset = int(offset) if union(tinfo) else int(offset) + udm.offset
@@ -1050,7 +1050,7 @@ class v9member(object):
     def has_references(cls, *args):
         '''Return whether the specified member is referenced by an address within the database.'''
         tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'has_references'])
-        mid = tinfo.get_udm_tid(mindex)
+        mid = interface.tinfo.member_identifier(tinfo, mindex)
         iterable = (ea for ea, iscode, xtype in interface.xref.to(mid, idaapi.XREF_ALL))
         return next((True for ea in iterable if not interface.node.identifier(ea)), False)
 
@@ -1063,7 +1063,7 @@ class v9member(object):
         FF_STKVAR = idaapi.stkvar_flag() if hasattr(idaapi, 'stkvar_flag') else idaapi.stkvarflag()
 
         owner, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'references'])
-        oid, mid = interface.tinfo.identifier(owner), owner.get_udm_tid(mindex)
+        oid, mid = interface.tinfo.identifier(owner), interface.tinfo.member_identifier(owner, mindex)
         fn, is_union, is_frame = owner.get_frame_func() if hasattr(owner, 'get_frame_func') else idaapi.BADADDR, union(owner), frame(owner)
 
         # if the type belongs to a frame, then we need to specially handle it.
@@ -1094,14 +1094,14 @@ class v9member(object):
                 # now we need to grab the identifiable information for each type.
                 mownerid = interface.tinfo.identifier(mowner)
                 mrealoffset = 0 if union(mowner) else mudm.offset
-                memberid = mowner.get_udm_tid(mindex)
+                memberid = interface.tinfo.member_identifier(mowner, mindex)
 
                 table[mownerid] = mowner
                 table[memberid] = item
 
                 # if it's a union, then we update our working queue.
                 if union(mowner):
-                    candidates = [(mowner.get_udm_tid(index), (mowner, utd, index, utd[index])) for index in range(mudt.size())]
+                    candidates = [(interface.tinfo.member_identifier(mowner, index), (mowner, utd, index, utd[index])) for index in range(mudt.size())]
                     table.update((mcandidateid, mcandidate) for mcandidateid, mcandidate in candidates if mcandidateid != idaapi.BADADDR)
                     children.update(mcandidateid for mcandidateid, mcandidate in candidates if cls.contains(mcandidateid, mrealoffset))
 
@@ -1122,7 +1122,7 @@ class v9member(object):
 
         # okay, now we can convert this set into a set of structures and members to look for
         iterable = (v9members.by(cid) for cid in children)
-        candidates = {id for id in itertools.chain(*([interface.tinfo.identifier(mowner), mowner.get_udm_tid(mindex)] for mowner, mudt, mindex, mudm in iterable))}
+        candidates = {id for id in itertools.chain(*([interface.tinfo.identifier(mowner), interface.tinfo.member_identifier(mowner, mindex)] for mowner, mudt, mindex, mudm in iterable))}
 
         # now figure out which operand has the structure member applied to it
         results = []
@@ -2543,7 +2543,7 @@ class v9members(object):
         '''Return the member with the given `identifier` belonging to the specified structure or union `type`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        identifier = tinfo.get_udm_tid(cls.index(tinfo, identifier)) if isinstance(identifier, udm_t) else int(identifier)
+        identifier = interface.tinfo.member_identifier(tinfo, cls.index(tinfo, identifier)) if isinstance(identifier, udm_t) else int(identifier)
 
         if not (tinfo.is_struct() or union(tinfo)):
             raise E.InvalidTypeOrValueError(u"{:s}.by_identifier({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier))
@@ -3039,7 +3039,7 @@ class v9members(object):
             raise E.InvalidParameterError(u"{:s}.references({!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(type)))
 
         # Collect each identifier referenced by this structure.
-        iterable = itertools.chain([sid], [tinfo.get_udm_tid(mindex) for tinfo, mindex, udm in cls.iterate(ti)])
+        iterable = itertools.chain([sid], [interface.tinfo.member_identifier(tinfo, mindex) for tinfo, mindex, udm in cls.iterate(ti)])
         identifiers = {identifier for identifier in iterable}
 
         # Iterate through them and gather each of their references.
@@ -3111,8 +3111,8 @@ class v9members(object):
         If a closure is passed as the `filter` parameter, then use the function to filter the chosen candidates during descent.
         """
         base, selected = 0, [packed for packed in cls.at_offset(type, int(offset))]
-        candidates = [ti.get_udm_tid(mindex) for ti, mindex, udm in selected]
-        table = {ti.get_udm_tid(mindex) : index for index, (ti, mindex, udm) in enumerate(selected)}
+        candidates = [interface.tinfo.member_identifier(ti, mindex) for ti, mindex, udm in selected]
+        table = {interface.tinfo.member_identifier(ti, mindex) : index for index, (ti, mindex, udm) in enumerate(selected)}
 
         # Filter our candidates and begin traversing through them.
         count, [F] = 0, filter if filter else [lambda stype, items: items]
@@ -3165,7 +3165,7 @@ class v9members(object):
             # Adjust for the next iteration, and descend into the structure for the selected member.
             sptr, base = mtype, base + res + moffset
             selected = [packed for packed in cls.at_offset(mtype, offset)]
-            table = {mowner.get_udm_tid(mindex) : index for index, (mowner, mindex, udm) in enumerate(selected)}
+            table = {interface.tinfo.member_identifier(mowner, mindex) : index for index, (mowner, mindex, udm) in enumerate(selected)}
             candidates = [mid for mid in table]
             filtered = F(sptr, candidates) if len(candidates) > 1 else candidates
 
@@ -3224,14 +3224,14 @@ class v9members(object):
 
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
         iterable = (next(v9members.at_offset(ti, moffset)) for moffset in iterable if v9members.has_offset(ti, moffset))
-        specials = {mowner.get_udm_tid(mindex) for mowner, _, mindex, _ in iterable}
+        specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, _, mindex, _ in iterable}
 
         # We now need to collect the members matching the specified slice so
         # that we can stash them for returning later.
         selected, lindex, rindex, members, member_references = [], utd.size(), 0, {}, {}
         for mowner, mindex, udm in cls.iterate(ti, slice):
             lindex, rindex = min(mindex, lindex), max(mindex, rindex)
-            mid = mowner.get_udm_tid(mindex)
+            mid = interface.tinfo.member_identifier(mowner, mindex)
 
             # Gather the references for the member so we know the addresses that
             # need to be updated after the removal.
@@ -3246,7 +3246,7 @@ class v9members(object):
         # Due to the members being shifted after a removed member, we need to
         # gather all the references other than the ones we already got.
         for mowner, mindex, udm in cls.iterate(ti, builtins.slice(lindex, None)):
-            mid = mowner.get_udm_tid(mindex)
+            mid = interface.tinfo.member_identifier(mowner, mindex)
             if mid in member_references:
                 continue
 
@@ -3404,14 +3404,14 @@ class v9members(object):
 
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
         iterable = (next(v9members.at_offset(ti, moffset)) for moffset in iterable if v9members.has_offset(ti, moffset))
-        specials = {mowner.get_udm_tid(mindex) for mowner, _, mindex, _ in iterable}
+        specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, _, mindex, _ in iterable}
 
         # We now need to collect the members matching the specified slice so
         # that we can stash them for returning later.
         selected, lindex, rindex, members, member_references = [], utd.size(), 0, {}, {}
         for mowner, mindex, udm in cls.at_bounds(ti, start - base, stop - base):
             lindex, rindex = min(mindex, lindex), max(mindex, rindex)
-            mid = mowner.get_udm_tid(mindex)
+            mid = interface.tinfo.member_identifier(mowner, mindex)
 
             # Gather the references for the member so we know the addresses that
             # need to be updated after the removal.
@@ -3429,7 +3429,7 @@ class v9members(object):
         if not union(ti):
             references = {}
             for mowner, mindex, udm in cls.iterate(ti, slice(rindex, None)):
-                mid = mowner.get_udm_tid(mindex)
+                mid = interface.tinfo.member_identifier(mowner, mindex)
                 for ea, _, _ in interface.xref.to(mid, idaapi.XREF_ALL):
                     references.setdefault(ea, []).append(mid)
                 continue
@@ -3611,14 +3611,14 @@ class v9members(object):
         # Now we can go through and gather the identifiers for each member.
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
         iterable = (next(v9members.at_offset(ti, moffset)) for moffset in iterable if v9members.has_offset(ti, moffset))
-        specials = {mowner.get_udm_tid(mindex) for mowner, _, mindex, _ in iterable}
+        specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, _, mindex, _ in iterable}
 
         # Before clearing things, we stash them and gather the references for
         # each member so that we can update things and return the result later.
         selected, lindex, rindex, members, member_references = [], utd.size(), 0, {}, {}
         for mowner, mindex, udm in cls.iterate(ti, slice):
             lindex, rindex = min(mindex, lindex), max(mindex, rindex)
-            mid = mowner.get_udm_tid(mindex)
+            mid = interface.tinfo.member_identifier(mowner, mindex)
 
             # Gather the references for the member so we know the addresses that
             # need to be updated after clearing it.
@@ -3762,14 +3762,14 @@ class v9members(object):
 
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
         iterable = (next(v9members.at_offset(ti, moffset)) for moffset in iterable if v9members.has_offset(ti, moffset))
-        specials = {mowner.get_udm_tid(mindex) for mowner, _, mindex, _ in iterable}
+        specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, _, mindex, _ in iterable}
 
         # Select the members from the type that are within the specified
         # boundaries and gather their references.
         selected, lindex, rindex, members, member_references = [], utd.size(), 0, {}, {}
         for mowner, mindex, udm in cls.at_bounds(ti, start - base, stop - base):
             lindex, rindex = min(mindex, lindex), max(mindex, rindex)
-            mid = mowner.get_udm_tid(mindex)
+            mid = interface.tinfo.member_identifier(mowner, mindex)
 
             # Grab the member references so that we know the addresses to update
             # later after we clear the members.
@@ -3940,7 +3940,7 @@ class v9members(object):
         # contiguous. So we can simply include the index and return it.
         if union(ti):
             sizes = [udm.size for _, udm in selected]
-            iterable = ((udm.offset, ti.get_udm_tid(mindex)) for mindex, udm in selected)
+            iterable = ((udm.offset, interface.tinfo.member_identifier(ti, mindex)) for mindex, udm in selected)
             if sizes:
                 return min(sizes), max(sizes), [(moffset, mid) for moffset, mid in iterable]
             return 0, 0, []
@@ -4068,7 +4068,7 @@ class v9members(object):
         # Last thing to do is to iterate through each point to yield each member and
         # any holes. Each member should only be yielded once, so we track that too.
         offset, result, iterable = point, [], ((mindex, udm) for mindex, udm in selected) if withgaps else ((mindex, udm) for mindex, udm in selected if not udm.is_gap())
-        available = {mindex : ti.get_udm_tid(mindex) for mindex, _ in iterable}
+        available = {mindex : interface.tinfo.member_identifier(ti, mindex) for mindex, _ in iterable}
         for point in points[start : stop]:
             if offset < point:
                 result.append((offset, point - offset))
@@ -4140,10 +4140,10 @@ class v9members(object):
         # Now that we were given a slice and we've fetched the relevant members,
         # check each to see if it's special and raise an error if so.
         Fis_special_member = (lambda mid, udm: udm.is_special_member()) if hasattr(udm_t, 'is_special_member') else (lambda mid, udm: idaapi.is_special_member(mid))
-        iterable = ((mindex, ti.get_udm_tid(mindex)) for mindex in range(count))
+        iterable = ((mindex, interface.tinfo.member_identifier(ti, mindex)) for mindex in range(count))
         specials = {mid for mindex, mid in iterable if Fis_special_member(mid, utd[mindex])}
         if specials and any(mid in specials for _, mid in selected if interface.node.identifier(mid)):
-            midx = next(mindex for mindex in range(count) if ti.get_udm_tid(mindex) in specials)
+            midx = next(mindex for mindex in range(count) if interface.tinfo.member_identifier(ti, mindex) in specials)
             mname = v9member.get_name(ti, midx)
             raise E.InvalidParameterError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to replace the special member \"{:s}\" at index {:d} of the {:s} belonging to function {:#x}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mname, midx, type_description, ea))
 
@@ -4383,18 +4383,18 @@ class v9members(object):
                 mowner, mindex, udm = v9members.by_identifier(mowner, item.id)
                 new_descr = "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset)
                 old_descr = "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + udm.offset // 8)
-                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Using alternative name \"{:s}\" for new member ({!s}) at {:s} of {:s} ({:#x}) as the member ({:#x}) at {:s} is currently using the requested name \"{:s}\".".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, utils.string.escape(newname, '"'), utils.pycompat.fullname(member_t), new_descr, type_description, interface.tinfo.identifier(mowner), mowner.get_udm_tid(mindex), old_descr, utils.string.escape(oldname, '"')))
+                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Using alternative name \"{:s}\" for new member ({!s}) at {:s} of {:s} ({:#x}) as the member ({:#x}) at {:s} is currently using the requested name \"{:s}\".".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, utils.string.escape(newname, '"'), utils.pycompat.fullname(member_t), new_descr, type_description, interface.tinfo.identifier(mowner), interface.tinfo.member_identifier(mowner, mindex), old_descr, utils.string.escape(oldname, '"')))
 
             elif isinstance(item, (idaapi.tinfo_t, types.string)):
                 mowner, mindex, conflict = v9members.by_name(ti, utils.string.to(oldname))
                 new_descr = "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset)
-                old_descr = "member ({:#x}) at {:s} is currently using the requested name \"{:s}\"".format(mowner.get_udm_tid(mindex), "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + conflict.offset // 8), utils.string.escape(oldname, '"')) if conflict else "original name \"{:s}\" is currenty being used".format(utils.string.escape(oldname, '"'))
+                old_descr = "member ({:#x}) at {:s} is currently using the requested name \"{:s}\"".format(interface.tinfo.member_identifier(mowner, mindex), "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + conflict.offset // 8), utils.string.escape(oldname, '"')) if conflict else "original name \"{:s}\" is currenty being used".format(utils.string.escape(oldname, '"'))
                 logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Using alternative name \"{:s}\" for new member ({!s}) at {:s} of {:s} ({:#x}) as the {:s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, utils.string.escape(newname, '"'), utils.pycompat.fullname(idaapi.tinfo_t), new_descr, type_description, sid, old_descr))
 
             elif not isinstance(item, types.integer):
                 mowner, mindex, conflict = v9members.by_name(ti, utils.string.to(oldname))
                 new_descr = "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset)
-                old_descr = "member ({:#x}) at {:s} is currently using the requested name \"{:s}\"".format(mowner.get_udm_tid(mindex), "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + conflict.offset), utils.string.escape(oldname, '"')) if conflict else "original name \"{:s}\" is currenty being used".format(utils.string.escape(oldname, '"'))
+                old_descr = "member ({:#x}) at {:s} is currently using the requested name \"{:s}\"".format(interface.tinfo.member_identifier(mowner, mindex), "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + conflict.offset), utils.string.escape(oldname, '"')) if conflict else "original name \"{:s}\" is currenty being used".format(utils.string.escape(oldname, '"'))
                 logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Using alternative name \"{:s}\" for new member ({:s}) at {:s} of {:s} ({:#x}) as the {:s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, utils.string.escape(newname, '"'), 'integer', new_descr, type_description, sid, old_descr))
             continue
 
@@ -4550,11 +4550,11 @@ class v9members(object):
             # Otherwise, we need to use the member index to get its identifier.
             if union(ti) and v9members.has_index(ti, offset - deleted):
                 _, index, _ = v9members.by_index(ti, offset - deleted)
-                results.append((offset, item, packed, ti.get_udm_tid(index)))
+                results.append((offset, item, packed, interface.tinfo.member_identifier(ti, index)))
 
             elif v9members.has_offset(ti, 8 * offset):
                 _, index, _ = next(v9members.at_offset(ti, 8 * offset))
-                results.append((8 * offset, item, packed, ti.get_udm_tid(index)))
+                results.append((8 * offset, item, packed, interface.tinfo.member_identifier(ti, index)))
 
             else:
                 logging.error(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Error ({:d}) adding member at {:s} of {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, err, "index {:d}".format(offset - count) if union(ti) else "offset {:+#x}".format(base + 8 * offset), type_description, sid))
