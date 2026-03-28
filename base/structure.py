@@ -508,8 +508,8 @@ def name(id, string, *suffix):
     # convert the specified string into a form that IDA can handle
     ida_string = utils.string.to(string)
 
-    # validate the name
-    res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
+    # validate the name of the structure as an identifier.
+    res = interface.name.identifier(ida_string[:])
     if ida_string and ida_string != res:
         logging.info(u"{:s}.name({:d}, {!r}) : Stripping invalid chars from the structure name \"{:s}\" resulted in \"{:s}\".".format(__name__, id, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
         ida_string = res
