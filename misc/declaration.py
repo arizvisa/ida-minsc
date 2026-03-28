@@ -1195,7 +1195,12 @@ class unmangled(object):
     def variable(cls, string):
         '''Return the name and type specifier of the variable declaration in `string`.'''
         Fvalidate = idaapi.validate_name2 if idaapi.__version__ < 7.0 else utils.frpartial(idaapi.validate_name, idaapi.VNT_TYPE, idaapi.SN_IDBENC)
-        ignored = {character for character in "~'`<>"}
+        ignored = {character for character in "~'`<>{}"}
+
+        # Replace any whitespace at the beginning with underscores since there
+        # needs to be at least one character representing the variable name.
+        stripped = string.rstrip()
+        string = stripped + '_' * (len(string) - len(stripped))
 
         # Use validate_name (in a very inefficient way) until we encounter an index to stop at.
         name, reversed = utils.string.to('_'), utils.string.to(string[::-1])
