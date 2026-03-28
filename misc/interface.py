@@ -14142,9 +14142,19 @@ class name(object):
     @classmethod
     def typename(cls, name, *suffix):
         '''Transform the given `name` to the required characters for a type and return it.'''
-        fullname = internal.utils.string.to(tuplename(name, *suffix) or '_')
+        packedname = internal.utils.string.to(tuplename(name, *suffix) or '_')
 
-        # After packing the parameters into a name, use `validate_name` to
+        # After packing the parameters into a name, we need to check the tail
+        # character in order to detect trailing "@" characters and replace them
+        # with underscores. For some reason, the disassembler considers the
+        # trailing "@" characters as a valid type name despite being unparsable
+        # by the type system. This is quite possibly a disassembler bug.
+        # FIXME: If this bug ever gets reported and fixed, we should be able to
+        #        conditionally exclude this workaround on those versions.
+        stripped = packedname.rstrip('@') if packedname.endswith('@') else packedname
+        fullname = packedname if stripped == packedname else stripped + '_' * ( len(packedname) - len(stripped))
+
+        # After stripping the trailing "@" characters, use `validate_name` to
         # remove characters that aren't supported in a type. If the result is
         # validated, then we're good to go and can return it.
         validtypename = idaapi.validate_name2(fullname) if idaapi.__version__ < 7.0 else idaapi.validate_name(fullname, idaapi.VNT_TYPE, idaapi.SN_IDBENC)
