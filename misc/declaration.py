@@ -1194,7 +1194,7 @@ class unmangled(object):
     @classmethod
     def variable(cls, string):
         '''Return the name and type specifier of the variable declaration in `string`.'''
-        Fvalidate = idaapi.validate_name2 if idaapi.__version__ < 7.0 else utils.frpartial(idaapi.validate_name, idaapi.SN_IDBENC)
+        Fvalidate = idaapi.validate_name2 if idaapi.__version__ < 7.0 else utils.frpartial(idaapi.validate_name, idaapi.VNT_IDENT, idaapi.SN_IDBENC)
 
         # Use validate_name (in a very inefficient way) until we encounter an index to stop at.
         name, reversed = utils.string.to('_'), utils.string.to(string[::-1])
