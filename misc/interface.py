@@ -14121,29 +14121,80 @@ class name(object):
     def identifier(cls, name, *suffix):
         '''Transform the given `name` to the required characters for an identifier and return it.'''
         fullname = tuplename(name, *suffix) or '_'
-        validated = idaapi.validate_name2(internal.utils.string.to(fullname)) if idaapi.__version__ < 7.0 else idaapi.validate_name(internal.utils.string.to(fullname), idaapi.SN_IDBENC)
-        return internal.utils.string.of(validated)
+
+        # First validate the name as an identifier. If it worked, then we should
+        # be good and can just return the validated name.
+        validated = idaapi.validate_name2(internal.utils.string.to(fullname)) if idaapi.__version__ < 7.0 else idaapi.validate_name(internal.utils.string.to(fullname), idaapi.VNT_IDENT, idaapi.SN_IDBENC)
+        if validated and idaapi.is_ident(validated):
+            return internal.utils.string.of(validated)
+
+        # Otherwise, we go through each of the characters and replace ones that
+        # cannot be in an identifier with an underscore returning it if it
+        # validated with `is_ident`.
+        res = str().join(fullname[index : index + 1] if idaapi.is_ident('_' + fullname[index : index + 1]) else '_' for index in builtins.range(len(fullname)))
+        if idaapi.is_ident(res):
+            return internal.utils.string.of(res)
+
+        # If we couldn't validate the result as an identifier, then there's
+        # probably a segment of characters causing it to fail. We should fix it
+        # ourselves, but we instead log a warning about it since we can't fail.
+        return internal.utils.string.of(res)
 
     @classmethod
     def typename(cls, name, *suffix):
         '''Transform the given `name` to the required characters for a type and return it.'''
         fullname = internal.utils.string.to(tuplename(name, *suffix) or '_')
-        validated = idaapi.validate_name2(fullname) if idaapi.__version__ < 7.0 else idaapi.validate_name(fullname, idaapi.SN_IDBENC)
-        if validated:
-            return internal.utils.string.of(validated)
 
-        # If the name could not be validated, then we need to manually fix the name because we
-        # need to always return something. We test the characters individually since testing
-        # slices of the string and leaning on is_valid_typename would pretty much be factorial time.
-        res = ''.join(fullname[index : index + 1] if idaapi.is_valid_typename('_' + fullname[index : index + 1]) else '_' for index in builtins.range(len(fullname)))
+        # After packing the parameters into a name, use `validate_name` to
+        # remove characters that aren't supported in a type. If the result is
+        # validated, then we're good to go and can return it.
+        validtypename = idaapi.validate_name2(fullname) if idaapi.__version__ < 7.0 else idaapi.validate_name(fullname, idaapi.VNT_TYPE, idaapi.SN_IDBENC)
+        if validtypename and idaapi.is_valid_typename(validtypename) and idaapi.is_ident(validtypename):
+            return internal.utils.string.of(validtypename)
+
+        # Next we use `validate_name` to remove all characters that cannot be
+        # used in an identifier. This should result in stripping out anything
+        # like template characters or backticks from the full name.
+        valididentifier = idaapi.validate_name2(validtypename) if idaapi.__version__ < 7.0 else idaapi.validate_name(validtypename, idaapi.VNT_IDENT, idaapi.SN_IDBENC)
+        if valididentifier and idaapi.is_ident(valididentifier):
+            return internal.utils.string.of(valididentifier)
+
+        # If the name could not be validated, then we need to manually fix the
+        # name because we need to always return something. We test the
+        # characters individually since testing slices of the string and
+        # leaning on is_valid_typename would pretty much be factorial time.
+        res = str().join(fullname[index : index + 1] if idaapi.is_valid_typename('_' + fullname[index : index + 1]) and idaapi.is_ident('_' + fullname[index : index + 1]) else '_' for index in builtins.range(len(fullname)))
+
+        # If the typename is valid, then we can return it. Otherwise, we should
+        # really be fixing the string ourselves. Instead, we log a warning
+        # explaining the issue, and then return whatever it is we have.
+        if idaapi.is_valid_typename(res) and idaapi.is_ident(res):
+            return internal.utils.string.of(res)
         return internal.utils.string.of(res)
 
     @classmethod
     def member(cls, name, *suffix):
         '''Transform the given `name` to the required characters for a member and return it.'''
         fullname = tuplename(name, *suffix) or '_'
-        validated = idaapi.validate_name2(internal.utils.string.to(fullname)) if idaapi.__version__ < 7.0 else idaapi.validate_name(internal.utils.string.to(fullname), idaapi.SN_IDBENC)
-        return internal.utils.string.of(validated)
+
+        # Use the `validate_name` api to strip out invalid characters from the
+        # name that was packed with the parameters. If the validated name is a
+        # valid identifier, then we're good and can return the result.
+        validated = idaapi.validate_name2(internal.utils.string.to(fullname)) if idaapi.__version__ < 7.0 else idaapi.validate_name(internal.utils.string.to(fullname), idaapi.VNT_UDTMEM, idaapi.SN_IDBENC)
+        if validated and idaapi.is_ident(validated):
+            return internal.utils.string.of(validated)
+
+        # If we were unable to validate the name into an identifier, then we go
+        # through each individual character replacing ones that can't be used
+        # for an identifier with an underscore.
+        res = str().join(fullname[index : index + 1] if idaapi.is_ident('_' + fullname[index : index + 1]) else '_' for index in builtins.range(len(fullname)))
+        if idaapi.is_ident(res):
+            return internal.utils.string.of(res)
+
+        # If that didn't work, and we didn't get an identifier then we should
+        # attempt to strip out the invalid characters ourselves. Instead of
+        # this, though, we log a warning and return what we have.
+        return internal.utils.string.of(res)
 
     @classmethod
     @internal.utils.string.decorate_arguments('string')
