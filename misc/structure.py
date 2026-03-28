@@ -715,9 +715,10 @@ class v9member(object):
             mdescr = "index ({:d})".format(udm.offset) if union(tinfo) else "offset ({:#x})".format(udm.offset)
             logging.warning(u"{:s} : Modifying the name for the special member \"{:s}\" at {:s} will unfortunately demote its special properties.".format(caller_format, utils.string.escape(utils.string.of(fullname), '"'), mdescr))
 
-        # Validate the name using the constraints for a netnode name.
+        # Modify the characters in the name so that they correspond to the
+        # character set that is available for a structure/union member.
         ida_string = utils.string.to(string)
-        res = idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
+        res = interface.name.member(ida_string[:])
         if ida_string and ida_string != res:
             logging.info(u"{:s} : Stripping invalid characters from desired {:s} member name \"{:s}\" resulted in \"{:s}\".".format(caller_format, 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
@@ -1343,7 +1344,7 @@ class member(object):
         ida_string = utils.string.to(string)
 
         # validate the name using the constraints for a netnode name.
-        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
+        res = interface.name.member(ida_string[:])
         if ida_string and ida_string != res:
             logging.info(u"{:s}.set_name({:#x}, {!r}) : Stripping invalid characters from desired {:s} member name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, string, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
@@ -6861,7 +6862,7 @@ class structure_t(object):
         ida_string = utils.string.to(string)
 
         # validate the name
-        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
+        res = interface.name.identifier(ida_string[:])
         if ida_string and ida_string != res:
             cls = self.__class__
             logging.info(u"{:s}({:#x}).name({!r}) : Stripping invalid chars from structure name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
