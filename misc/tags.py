@@ -1979,7 +1979,7 @@ class typeinfo_member(object):
     def get(cls, *args):
         '''Return a dictionary containing the tags for the specified member.'''
         tinfo, utd, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'get'])
-        mid, mfullname = tinfo.get_udm_tid(mindex), internal.structure.v9member.fullname(tinfo, mindex)
+        mid, mfullname = interface.tinfo.member_identifier(tinfo, mindex), internal.structure.v9member.fullname(tinfo, mindex)
         repeatable = True
 
         # Grab the repeatable and non-repeatable comment.
@@ -2037,7 +2037,7 @@ class typeinfo_member(object):
             raise internal.exceptions.InvalidParameterError(u"{:s} : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format(caller_format, utils.string.escape(key, '"'), value))
 
         tinfo, utd, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'get_type'], args=["{!r}".format(item) for item in [key, value]])
-        mid, mfullname = tinfo.get_udm_tid(mindex), internal.structure.v9member.fullname(tinfo, mindex)
+        mid, mfullname = interface.tinfo.member_identifier(tinfo, mindex), internal.structure.v9member.fullname(tinfo, mindex)
         repeatable = True
 
         # Before modifying the comments, we need to check if the user is
@@ -2095,7 +2095,7 @@ class typeinfo_member(object):
         # Using the arguments, we can now get the specified member. First thing
         # we do is check if the implicit tags are being explicitly modified.
         tinfo, utd, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'remove'], args=["{!r}".format(key), "{!s}".format(none)])
-        mid, mfullname = tinfo.get_udm_tid(mindex), internal.structure.v9member.fullname(tinfo, mindex)
+        mid, mfullname = interface.tinfo.member_identifier(tinfo, mindex), internal.structure.v9member.fullname(tinfo, mindex)
         repeatable = True
 
         if key == '__name__':
