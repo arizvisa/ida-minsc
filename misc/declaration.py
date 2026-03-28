@@ -1194,14 +1194,18 @@ class unmangled(object):
     @classmethod
     def variable(cls, string):
         '''Return the name and type specifier of the variable declaration in `string`.'''
-        Fvalidate = idaapi.validate_name2 if idaapi.__version__ < 7.0 else utils.frpartial(idaapi.validate_name, idaapi.VNT_IDENT, idaapi.SN_IDBENC)
+        Fvalidate = idaapi.validate_name2 if idaapi.__version__ < 7.0 else utils.frpartial(idaapi.validate_name, idaapi.VNT_TYPE, idaapi.SN_IDBENC)
+        ignored = {character for character in "~'`<>"}
 
         # Use validate_name (in a very inefficient way) until we encounter an index to stop at.
         name, reversed = utils.string.to('_'), utils.string.to(string[::-1])
         for index, _ in enumerate(reversed):
             name += reversed[index : index + 1]
-            if Fvalidate(name) != name:
+            validated = Fvalidate(name)
+            if validated != name and name[-1] not in ignored:
                 break
+            elif validated != name:
+                name = name[:-1] + '_'
             continue
 
         # If we completed processing the entire string, then the string is not a declaration
@@ -1210,8 +1214,8 @@ class unmangled(object):
             return string, ''
 
         # Now we can slice our variable name out, and use its length to slice out the type.
-        variable_name = string[-len(reversed[:index]):] if index > 1 else ''
-        return variable_name, string[:-len(variable_name)] if len(variable_name) else string
+        variable_name = string[-len(reversed[:index]):] if index > 0 else ''
+        return Fvalidate(variable_name), string[:-len(variable_name)] if len(variable_name) else string
 
     @classmethod
     def parameters(cls, string):
