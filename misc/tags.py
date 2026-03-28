@@ -1068,7 +1068,8 @@ class address(object):
         # we need its name so that we can format it and add it as an implicit tag.
         try:
             if interface.address.has_typeinfo(ea):
-                ti = interface.address.typeinfo(ea)
+                typeinfo = interface.address.typeinfo(ea)
+                ti = interface.tinfo.lower_function_type(typeinfo) if typeinfo.is_func() or typeinfo.is_funcptr() else typeinfo
 
                 # We need the name to be parseable and IDA just doesn't give a fuck if it outputs
                 # something non-parseable. So we simply fix that here and render the typeinfo.
@@ -1473,7 +1474,8 @@ class function(object):
         # is so that we can use the name to emit a proper function prototype.
         try:
             if interface.function.has_typeinfo(fn):
-                ti = interface.function.typeinfo(fn)
+                typeinfo = interface.function.typeinfo(fn)
+                ti = interface.tinfo.lower_function_type(typeinfo) if typeinfo.is_func() or typeinfo.is_funcptr() else typeinfo
 
                 # We need this name to be parseable and (of course) IDA doesn't
                 # give a fuck whether its output is parseable by its own parser.
