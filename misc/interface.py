@@ -8505,11 +8505,7 @@ class tinfo(object):
     @classmethod
     def lower_function_type(cls, type):
         '''If the given `type` has the high-level attribute (``idaapi.BFA_HIGH``), correct the types it depends on and return its lowered type.'''
-        if type.is_correct() and not type.is_high_func():
-            return type
-
-        # We can only handle function pointers here.
-        if not any([type.is_func(), type.is_funcptr()]):
+        if type.is_correct() and not any([type.is_func(), type.is_funcptr()]):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.lower_function_type(\"{:s}\") : The specified type information ({!r}) is not a function and cannot be lowered.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{!s}".format(type)))
 
         # Create a table used to determine the string template that
@@ -8524,7 +8520,10 @@ class tinfo(object):
         # function, and add any partial and undefined types types to it.
         library, results = cls.library(type), []
         for _, item, _ in cls.function(type):
-            if item.is_correct():
+            if item.is_func() and item.is_high_func():
+                item = cls.lower_function_type(item)
+
+            elif item.is_correct():
                 continue
 
             # Make sure it's not a pointer so that we can add its contents.
