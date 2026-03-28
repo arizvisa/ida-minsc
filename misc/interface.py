@@ -8527,7 +8527,7 @@ class tinfo(object):
             if item.is_correct():
                 continue
 
-            # Make sure itś not a pointer so that we can add its contents.
+            # Make sure it's not a pointer so that we can add its contents.
             item = cls.resolve(item) if item.is_ptr() else item
 
             # Our type should have a name of some sort for the specific condition we're testing for.
@@ -14125,7 +14125,7 @@ class name(object):
         return internal.utils.string.of(validated)
 
     @classmethod
-    def type(cls, name, *suffix):
+    def typename(cls, name, *suffix):
         '''Transform the given `name` to the required characters for a type and return it.'''
         fullname = internal.utils.string.to(tuplename(name, *suffix) or '_')
         validated = idaapi.validate_name2(fullname) if idaapi.__version__ < 7.0 else idaapi.validate_name(fullname, idaapi.SN_IDBENC)
@@ -14167,7 +14167,7 @@ class name(object):
 
     @classmethod
     @contextlib.contextmanager
-    def typename(cls, ordinal, library=None, name=None):
+    def type(cls, ordinal, library=None, name=None):
         '''Return a context manager that renames the type at the specified `ordinal` in `library` with a temporary `name` on entry and restores it on exit.'''
         Funique_name = internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}_{:x}".format, 'ti_unique', ordinal))
         til = library if library else tinfo.library()
@@ -14188,7 +14188,7 @@ class name(object):
 
         else:
             library_desc = tinfo.format_library(til)
-            raise internal.exceptions.LocalTypeNotFoundError(u"{:s}.typename({:d}, {:s}{:s}) : Unable to find the specified local type {:s} in the \"{:s}\" library.".format('.'.join([__name__, cls.__name__]), ordinal_desc, library_desc, '' if name is None else ", name=\"{:s}\"".format(name), "at ordinal #{:d}".format(index) if index == ordinal else "using the given identifier ({:#x}) at ordinal #{:d}".format(ordinal, index), internal.utils.string.of(til.desc)))
+            raise internal.exceptions.LocalTypeNotFoundError(u"{:s}.type({:d}, {:s}{:s}) : Unable to find the specified local type {:s} in the \"{:s}\" library.".format('.'.join([__name__, cls.__name__]), ordinal_desc, library_desc, '' if name is None else ", name=\"{:s}\"".format(name), "at ordinal #{:d}".format(index) if index == ordinal else "using the given identifier ({:#x}) at ordinal #{:d}".format(ordinal, index), internal.utils.string.of(til.desc)))
 
         # if we got the type, then replace it with our temporary named one. if
         # we failed, though, then we error out with an inaction code.
@@ -14204,7 +14204,7 @@ class name(object):
             library_desc = tinfo.format_library(til)
             errname, errdesc = tinfo.format_type_error(res)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
-            logging.fatal(u"{:s}.typename({:d}, {:s}{:s}) : Unable to restore the original name (\"{:s}\") from the temporary name (\"{:s}\") for ordinal #{:d} in the \"{:s}\" library due to error {!s}.".format('.'.join([__name__, cls.__name__]), ordinal, library_desc, '' if name is None else ", name=\"{:s}\"".format(name), internal.utils.string.escape(original, '"'), internal.utils.string.escape(temporary, '"'), index, internal.utils.string.of(til.desc), description))
+            logging.fatal(u"{:s}.type({:d}, {:s}{:s}) : Unable to restore the original name (\"{:s}\") from the temporary name (\"{:s}\") for ordinal #{:d} in the \"{:s}\" library due to error {!s}.".format('.'.join([__name__, cls.__name__]), ordinal, library_desc, '' if name is None else ", name=\"{:s}\"".format(name), internal.utils.string.escape(original, '"'), internal.utils.string.escape(temporary, '"'), index, internal.utils.string.of(til.desc), description))
         return
 
     @classmethod
