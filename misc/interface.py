@@ -9338,6 +9338,33 @@ class tinfo(object):
         res.set_volatile() if boolean else res.clr_volatile()
         return cls.concretize(res)
 
+    @classmethod
+    def modifiers(cls, type, *mask_and_modifiers):
+        '''Set the `modifiers` selected by `mask` for the specified `type` and return the new modified type.'''
+        res = cls.copy(type)
+        if not mask_and_modifiers:
+            return res.get_decltype() & idaapi.TYPE_MODIF_MASK
+
+        # assign a dictionary that is responsible for mapping the modifiers to
+        # the correct method that can be used to modify the type.
+        modifier_methods = {
+            idaapi.BTM_CONST: [operator.methodcaller(attribute) for attribute in ['clr_const', 'set_const']],
+            idaapi.BTM_VOLATILE: [operator.methodcaller(attribute) for attribute in ['clr_volatile', 'set_volatile']],
+        }
+
+        # now we can unpack the parameters, and process our type's modifiers for
+        # the ones that are set in the mask.
+        [mask, modifiers] = mask_and_modifiers
+
+        for flag in modifier_methods:
+            [Fclear_modifier, Fset_modifier] = modifier_methods[flag]
+            if mask & flag and modifiers & flag:
+                Fset_modifier(res)
+            elif mask & flag:
+                Fclear_modifier(res)
+            continue
+        return res
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = (("{:x}".format(abs(int(item))) if isinstance(item, internal.types.integer) or hasattr(item, '__int__') else item) for item in names)
