@@ -4510,12 +4510,13 @@ class type(object):
             # Now we should able to resize our details, and then update them with our input.
             ftd.resize(len(types))
             for index, item in enumerate(types):
-                aname, ainfo = item if isinstance(item, internal.types.tuple) else ('', item)
+                oldname, oldtype, _, oldcmt = results[index] if index < len(results) else ('', idaapi.tinfo_t(), None, '')
+                aname, ainfo = item if isinstance(item, internal.types.tuple) else (oldname, item)
                 atype = ainfo if isinstance(ainfo, idaapi.tinfo_t) else interface.tinfo.parse(None, ainfo, idaapi.PT_SIL)
                 if not atype:
                     ea, description = func if isinstance(func, internal.types.integer) else interface.range.start(func), ["{!s}".format(item) for item in types]
                     raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Unable to parse the string \"{:s}\" specified for index {:d} of the parameters into a valid type.".format('.'.join([__name__, 'type', cls.__name__]), ea, description, utils.string.escape("{!s}".format(item), '"'), index))
-                ftd[index].name, ftd[index].type = utils.string.to(aname), atype
+                ftd[index].name, ftd[index].type, ftd[index].cmt = utils.string.to(aname), atype, utils.string.to(oldcmt)
             updater.send(ftd), updater.close()
 
             # The very last thing we need to do is to return our results. Even though we collected
@@ -4539,12 +4540,13 @@ class type(object):
             # Now we should able to resize the details, and update them with our input.
             ftd.resize(len(types))
             for index, item in enumerate(types):
-                aname, ainfo = item if isinstance(item, internal.types.tuple) else ('', item)
+                oldname, oldtype, _, oldcmt = results[index] if index < len(results) else ('', idaapi.tinfo_t(), None, '')
+                aname, ainfo = item if isinstance(item, internal.types.tuple) else (oldname, item)
                 atype = ainfo if isinstance(ainfo, idaapi.tinfo_t) else interface.tinfo.parse(None, ainfo, idaapi.PT_SIL)
                 if not atype:
                     description = ["{!s}".format(item) for item in types]
                     raise E.InvalidTypeOrValueError(u"{:s}({!r}, {!r}) : Unable to parse the string \"{:s}\" specified for index {:d} of the parameters into a valid type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), description, utils.string.escape("{!s}".format(item), '"'), index))
-                ftd[index].name, ftd[index].type = utils.string.to(aname), atype
+                ftd[index].name, ftd[index].type, ftd[index].cmt = utils.string.to(aname), atype, utils.string.to(oldcmt)
 
             # We should be good and only need to send things back to the updater.
             try:
