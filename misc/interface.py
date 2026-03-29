@@ -13873,9 +13873,9 @@ class decode(object):
         elif hasattr(idaapi, 'struc_t') and isinstance(identifier, idaapi.struc_t):
             ti, sid = identifier, identifier.id
         elif isinstance(identifier, internal.types.integer):
-            raise E.InvalidParameterError(u"{:s}.v9structure({:#x}, ...{:s}) : Unable to locate the type using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', identifier))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.v9structure({:#x}, ...{:s}) : Unable to locate the type using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', identifier))
         else:
-            raise E.InvalidParameterError(u"{:s}.v9structure({!r}, ...{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', identifier.__class__))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.v9structure({!r}, ...{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', identifier.__class__))
 
         # Use the byte order to get a closure for the byte order by size.
         Fordered = (lambda length, data: data) if order.lower() == 'big' else (lambda length, data: functools.reduce(operator.add, (item[::-1] for item in cls.list(length, data))) if data else data)
@@ -14056,9 +14056,9 @@ class decode(object):
         elif hasattr(idaapi, 'struc_t') and isinstance(identifier, idaapi.struc_t):
             ti, sid = identifier, identifier.id
         elif isinstance(identifier, internal.types.integer):
-            raise E.InvalidParameterError(u"{:s}.v9array({:#x}, ...{:s}) : Unable to locate the type using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', identifier))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.v9array({:#x}, ...{:s}) : Unable to locate the type using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', identifier))
         else:
-            raise E.InvalidParameterError(u"{:s}.v9array({!r}, ...{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', identifier.__class__))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.v9array({!r}, ...{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', identifier.__class__))
 
         # If we were given an array type, then extract its element member type.
         if ti.is_array():
