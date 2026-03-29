@@ -8743,6 +8743,58 @@ class tinfo(object):
         return cls.get(til, type, fields, cmt, fields_cmt, sclass) if ok else None
 
     @classmethod
+    def at_identifier(cls, identifier, *library):
+        '''Return the type associated with the specified `identifier` from the given type `library`.'''
+        ti, [til] = idaapi.tinfo_t(), library if library else [cls.library()]
+        if isinstance(identifier, idaapi.tinfo_t):
+            ordinal = cls.ordinal(identifier)
+            serialized = cls.get_numbered_type(til, ordinal) if ordinal else identifier.serialize()
+            return cls.get(til, *serialized)
+
+        elif hasattr(idaapi, 'get_struc') and isinstance(identifier, internal.types.integer) and idaapi.get_struc(identifier):
+            sptr = idaapi.get_struc(identifier)
+            stype = address.typeinfo(sptr.id)
+            ordinal = cls.ordinal(stype)
+            serialized = cls.get_numbered_type(til, ordinal) if ordinal else stype.serialize()
+            return cls.get(til, *serialized)
+
+        elif hasattr(idaapi, 'get_member_by_id') and isinstance(identifier, internal.types.integer) and idaapi.get_member_by_id(identifier):
+            (sptr, mindex, mptr) = internal.structure.members.by_identifier(None, identifier)
+            mtype = internal.structure.member.get_typeinfo(mptr)
+            ordinal = cls.ordinal(mtype)
+            serialized = cls.get_numbered_type(til, ordinal) if ordinal else mtype.serialize()
+            return cls.get(til, *serialized)
+
+        elif isinstance(identifier, internal.types.integer) and ti.get_type_by_tid(identifier):
+            ordinal = cls.ordinal(ti)
+            serialized = cls.get_numbered_type(til, ordinal) if ordinal else ti.serialize()
+            return cls.get(til, *serialized)
+
+        elif hasattr(idaapi, 'struc_t') and isinstance(identifier, (internal.structure.structure_t, idaapi.struc_t)):
+            sptr = identifier if isinstance(identifier, idaapi.struc_t) else idaapi.get_struc(identifier.id)
+            stype = address.typeinfo(sptr.id)
+            ordinal = cls.ordinal(stype)
+            serialized = cls.get_numbered_type(til, ordinal) if ordinal else stype.serialize()
+            return cls.get(til, *serialized)
+
+        elif hasattr(idaapi, 'member_t') and isinstance(identifier, (internal.structure.member_t, idaapi.member_t)):
+            (sptr, mindex, mptr) = (idaapi.get_struc(identifier.id), 0, identifier) if isinstance(identifier, idaapi.member_t) else internal.structure.members.by_identifier(None, identifier.id)
+            mtype = internal.structure.member.get_typeinfo(mptr)
+            ordinal = cls.ordinal(mtype)
+            serialized = cls.get_numbered_type(til, ordinal) if ordinal else mtype.serialize()
+            return cls.get(til, *serialized)
+
+        elif hasattr(idaapi, 'get_enum_idx') and isinstance(identifier, internal.types.integer) and idaapi.get_enum_idx(identifier) != idaapi.BADADDR:
+            fullname = idaapi.get_enum_name(identifier)
+            ordinal = idaapi.get_ordinal_from_idb_type(internal.utils.string.to(fullname), bytes(bytearray([idaapi.BT_COMPLEX | idaapi.BTMT_ENUM])))
+            serialized = tinfo.get_numbered_type(til, ordinal)
+            return cls.get(til, *serialized)
+
+        elif isinstance(identifier, internal.types.integer):
+            raise internal.exceptions.DisassemblerError(u"{:s}.at_identifier({:#x}) : Unable to find the type for the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), identifier, identifier))
+        raise internal.exceptions.InvalidParameterError(u"{:s}.at_identifier({:#x}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), identifier, identifier.__class__))
+
+    @classmethod
     def by_name(cls, name, *library):
         '''Return the ordinal for the type with the given `name` from a type `library`.'''
         [til] = library if library else [cls.library()]
