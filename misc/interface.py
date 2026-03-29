@@ -14279,6 +14279,48 @@ class name(object):
 
     @classmethod
     @contextlib.contextmanager
+    def prototype(cls, type, *library, **names):
+        '''Return a context manager that renames the parameters of the function `type` using `names``, the function with a temporary `name` and yields it.'''
+        Funique_name = internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}".format, 'prototype_parameter'))
+        til, names = library if library else tinfo.library(), names.get('names')
+
+        # if we got an integer, then we need to determine if it's an ordinal or
+        # an identifier so that we can assign it to our type.
+        if isinstance(type, internal.types.integer) and node.identifier(type):
+            serialized = tinfo.at_identifier(type).serialized()
+            ti = tinfo.get(til, *serialized)
+        elif isinstance(type, internal.types.integer) and 0 < type < tinfo.quantity():
+            serialized = cls.get_numbered_type(til, type)
+            ti = tinfo.get(til, *serialized)
+        elif isinstance(type, idaapi.tinfo_t) and (type.is_func() or type.is_funcptr() or tinfo.resolve(type).is_func()):
+            ti = tinfo.copy(type)
+        elif isinstance(type, idaapi.tinfo_t):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.prototype({!r}{:s}) : Unable to get the parameters for the specified type due to it not being a prototype.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ", names={!r}".format(*names) if names else ''))
+        elif isinstance(type, internal.types.integer):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.prototype({!s}{:s}) : Unable to locate the type using the specified {:s} ({!s}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", names={!r}".format(*names) if names else '', 'identifier' if node.identifier(type) else 'ordinal', "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type)))
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.prototype({!r}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ", names={!r}".format(*names) if names else '', type.__class__))
+
+        # now that we got a valid prototype, we need to count the number of
+        # parameters so that we can update them with the correct number.
+        _, ftd = tinfo.prototype_details(ti)
+        count = ftd.size()
+
+        # next we can update the names of the parameters to whatever the caller
+        # gave us, or something that we can guarantee as being unique.
+        iterable = itertools.chain(tinfo.names(ti), [''] * count)
+        oldnames = [name for name in itertools.islice(iterable, count)]
+        newnames = [Funique_name(indexed_name) for indexed_name in enumerate(oldnames)] if names is None else names
+
+        # yield the prototype with the new names that were applied to it.
+        try:
+            yield tinfo.names(ti, newnames), newnames
+        finally:
+            logging.debug(u"{:s}.prototype({!r}{:s}) : Finished renaming the parameters for the given type from the original names ({!r}) to the {:s} names ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ", names={!r}".format(*names) if names else '', oldnames, 'specified' if names else 'unique', newnames))
+        return
+
+    @classmethod
+    @contextlib.contextmanager
     def type(cls, ordinal, library=None, name=None):
         '''Return a context manager that renames the type at the specified `ordinal` in `library` with a temporary `name` on entry and restores it on exit.'''
         Funique_name = internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}_{:x}".format, 'ti_unique', ordinal))
