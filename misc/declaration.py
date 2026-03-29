@@ -7,7 +7,7 @@ function and type declarations.
 TODO: Implement parsers for some of the C++ symbol manglers in order to
       query them for specific attributes or type information.
 """
-import functools, operator, itertools, logging, string as _string
+import functools, operator, itertools, logging, builtins, string as _string
 logging = logging.getLogger(__name__)
 
 import internal, idaapi
@@ -148,7 +148,7 @@ def unmangle_arguments(ea, info):
     param_s = parameters.lstrip('(').rstrip(')')
 
     index, indices, iterable = 0, [], ((idx, item) for idx, item in enumerate(param_s))
-    for argi in range(info.get_nargs()):
+    for argi in builtins.range(info.get_nargs()):
         arg = info.get_nth_arg(argi)
         arg_s = "{!s}".format(arg)
 
@@ -960,7 +960,7 @@ class token(nested):
     def parse(cls, string, tokens):
         '''Return a list of ranges, a tree, and a list of tuples for the errors when parsing the given `tokens` out of `string`.'''
         groups = {length: [{token for token in group} for group in zip(*pairs)] for length, pairs in itertools.groupby(sorted(tokens, key=len), len)}
-        layer, [capture], (open, close) = (groups.pop(length, length * [()]) for length in range(3))
+        layer, [capture], (open, close) = (groups.pop(length, length * [()]) for length in builtins.range(3))
         assert(not groups), u"{:s}.parse({!r}, {!r}) : Unexpected error while processing the specified token groups ({!r}) prior to parsing the given string.".format('.'.join([__name__, cls.__name__]), string, tokens, groups)
 
         # We first need a stack that will store the index of the beginning of
@@ -1377,7 +1377,7 @@ class convention(object):
 
         # XXX: __usercall is special and we interpret it as either >= CM_CC_MANUAL or
         #      > CM_CC_SWIFT on newer versions, but excluding CM_CC_GOLANG if it exists.
-        '__usercall': {cc & idaapi.CM_CC_MASK for cc in range(idaapi.CM_CC_SWIFT if hasattr(idaapi, 'CM_CC_SWIFT') else getattr(idaapi, 'CM_CC_MANUAL', 0x90), 0x100)},
+        '__usercall': {cc & idaapi.CM_CC_MASK for cc in builtins.range(idaapi.CM_CC_SWIFT if hasattr(idaapi, 'CM_CC_SWIFT') else getattr(idaapi, 'CM_CC_MANUAL', 0x90), 0x100)},
     }
 
     # aliases that can resolve to one of our choices.
