@@ -9327,21 +9327,19 @@ class tinfo(object):
     @classmethod
     def constant(cls, type, boolean=True):
         '''Return the specified `type` with its "const" attribute set or cleared depending on the given `boolean`.'''
-        res = cls.copy(type)
-        res.set_const() if boolean else res.clr_const()
-        return cls.concretize(res)
+        return cls.modifiers(type, idaapi.BTM_CONST, idaapi.BTM_CONST if boolean else 0)
 
     @classmethod
     def volatile(cls, type, boolean=True):
         '''Return the specified `type` with its "volatile" attribute set or cleared depending on the given `boolean`.'''
-        res = cls.copy(type)
-        res.set_volatile() if boolean else res.clr_volatile()
-        return cls.concretize(res)
+        return cls.modifiers(type, idaapi.BTM_VOLATILE, idaapi.BTM_VOLATILE if boolean else 0)
 
     @classmethod
     def modifiers(cls, type, *mask_and_modifiers):
         '''Set the `modifiers` selected by `mask` for the specified `type` and return the new modified type.'''
         res = cls.copy(type)
+
+        # if we weren't given any parameters, then just return the modifiers.
         if not mask_and_modifiers:
             return res.get_decltype() & idaapi.TYPE_MODIF_MASK
 
@@ -9353,9 +9351,11 @@ class tinfo(object):
         }
 
         # now we can unpack the parameters, and process our type's modifiers for
-        # the ones that are set in the mask.
-        [mask, modifiers] = mask_and_modifiers
+        # the ones that are set in the mask. if we got just one parameter, then
+        # apply it to all of the available modifiers.
+        [mask, modifiers] = mask_and_modifiers if len(mask_and_modifiers) > 1 else [idaapi.TYPE_MODIF_MASK, mask_and_modifiers[0] if mask_and_modifiers[0] else 0] if mask_and_modifiers else [idaapi.TYPE_MODIF_MASK, 0]
 
+        # loop through the available modifiers calling the correct method.
         for flag in modifier_methods:
             [Fclear_modifier, Fset_modifier] = modifier_methods[flag]
             if mask & flag and modifiers & flag:
