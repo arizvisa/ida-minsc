@@ -711,7 +711,7 @@ class nested(object):
         return (start or 0, position), result
 
     @classmethod
-    def reversed(cls, string, range, segments):
+    def reversedselection(cls, string, range, segments):
         '''Return the specified `range` and `segments` translated for the reversed version of the given `string`.'''
         (start, stop) = range if isinstance(range, tuple) else (0, len(string) if hasattr(string, '__len__') else string)
         result, point = [], len(string)
