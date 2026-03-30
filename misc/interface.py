@@ -14309,7 +14309,7 @@ class name(object):
     def prototype(cls, type, *library, **names):
         '''Return a context manager that renames the parameters of the function `type` using `names``, the function with a temporary `name` and yields it.'''
         Funique_name = internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}".format, 'prototype_parameter'))
-        til, names = library if library else tinfo.library(), names.get('names')
+        til, names, utils = library if library else tinfo.library(), names.get('names'), internal.utils
 
         # if we got an integer, then we need to determine if it's an ordinal or
         # an identifier so that we can assign it to our type.
@@ -14322,16 +14322,42 @@ class name(object):
         elif isinstance(type, idaapi.tinfo_t) and (type.is_func() or type.is_funcptr() or tinfo.resolve(type).is_func()):
             ti = tinfo.copy(type)
         elif isinstance(type, idaapi.tinfo_t):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.prototype({!r}{:s}) : Unable to get the parameters for the specified type due to it not being a prototype.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ", names={!r}".format(*names) if names else ''))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.prototype({!r}{:s}) : Unable to get the parameters for the specified type due to it not being a prototype.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else ''))
         elif isinstance(type, internal.types.integer):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.prototype({!s}{:s}) : Unable to locate the type using the specified {:s} ({!s}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", names={!r}".format(*names) if names else '', 'identifier' if node.identifier(type) else 'ordinal', "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type)))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.prototype({!s}{:s}) : Unable to locate the type using the specified {:s} ({!s}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', 'identifier' if node.identifier(type) else 'ordinal', "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type)))
         else:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.prototype({!r}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ", names={!r}".format(*names) if names else '', type.__class__))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.prototype({!r}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', type.__class__))
 
-        # now that we got a valid prototype, we need to count the number of
-        # parameters so that we can update them with the correct number.
-        _, ftd = tinfo.prototype_details(ti)
-        count = ftd.size()
+        # now that we got a valid prototype, we need to recursively count the
+        # number of parameters for the names that we will be replacing.
+        count, queue, push = 0, [ti], utils.fcompose(utils.fgetattr('append'), utils.fpartial(utils.fpartial, operator.call))
+        while queue:
+            next_t = queue.pop()
+            if next_t.is_func() or next_t.is_funcptr() or tinfo.resolve(next_t).is_func():
+                for aname, atype, astorage in tinfo.function(next_t)[1:]:
+                    if atype.is_typeref():
+                        pass
+                    elif atype.is_func() or atype.is_funcptr() or tinfo.resolve(atype).is_func():
+                        push(queue)(atype)
+                    elif atype.is_udt() or tinfo.resolve(atype).is_udt():
+                        push(queue)(atype)
+                    count += 1
+                pass
+
+            elif next_t.is_udt() or tinfo.resolve(next_t).is_udt():
+                for mname, moffset, msize, mtype, malign in tinfo.members(next_t):
+                    if mtype.is_typeref():
+                        pass
+                    elif mtype.is_func() or mtype.is_funcptr() or tinfo.resolve(mtype).is_func():
+                        push(queue)(mtype)
+                    elif mtype.is_udt() or tinfo.resolve(mtype).is_udt():
+                        push(queue)(mtype)
+                    count += 1
+                pass
+
+            else:
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.prototype({!s}{:s}) : Unable to count the names for an unsupported type {!s}.".format('.'.join([__name__, cls.__name__]), "{!r}".format("{!s}".format(type)) if isinstance(type, idaapi.tinfo_t) else "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', tinfo.quoted(next_t)))
+            continue
 
         # next we can update the names of the parameters to whatever the caller
         # gave us, or something that we can guarantee as being unique.
@@ -14343,7 +14369,7 @@ class name(object):
         try:
             yield tinfo.names(ti, newnames), newnames
         finally:
-            logging.debug(u"{:s}.prototype({!r}{:s}) : Finished renaming the parameters for the given type from the original names ({!r}) to the {:s} names ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ", names={!r}".format(*names) if names else '', oldnames, 'specified' if names else 'unique', newnames))
+            logging.debug(u"{:s}.prototype({!r}{:s}) : Finished renaming the parameters for the given type from the original names ({!r}) to the {:s} names ({!r}).".format('.'.join([__name__, cls.__name__]), "{!r}".format("{!s}".format(type)) if isinstance(type, idaapi.tinfo_t) else "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(*names) if names else '', oldnames, 'specified' if names else 'unique', newnames))
         return
 
     @classmethod
