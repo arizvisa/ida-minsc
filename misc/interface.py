@@ -7808,7 +7808,7 @@ class tinfo(object):
             return [encoded.decode('utf-8') for _, encoded in results]
 
         # otherwise re-encode the names we were given back into the type after clamping them.
-        [items] = names
+        [items] = ([name for name in argument] for argument in names)
         if isinstance(items, internal.types.ordered):
             encoded = (bytes(item) if isinstance(item, (bytes, bytearray)) else item.encode('utf-8') for item in items)
             return cls.get(library, type, cls.encode_bytes([chunk[:0xfe] for chunk in encoded]), cmt or fieldcmts)
