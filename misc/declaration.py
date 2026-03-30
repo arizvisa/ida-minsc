@@ -936,6 +936,23 @@ class nested(object):
             continue
         yield (start, stop), result
 
+    @classmethod
+    def reversed(cls, string, tree):
+        '''Return a new version of the specified `tree` translated for the reversed version of the given `string`.'''
+        new, invert = {}, functools.partial(operator.sub, len(string))
+
+        nodes, mapped = [None], {}
+        while nodes:
+            key, segments = nodes.pop(), []
+            for left, right in tree[key][::-1]:
+                segments.append(builtins.tuple(map(invert, [right, left])))
+                mapped[left] = right
+                if left in tree:
+                    nodes.append(left)
+                continue
+            new[key if key is None else invert(mapped[key])] = segments
+        return new
+
 class token(nested):
     """
     This namespace contains basic utilities for processing a string
