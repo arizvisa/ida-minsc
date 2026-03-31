@@ -14309,7 +14309,7 @@ class name(object):
     def prototype(cls, type, *library, **names):
         '''Return a context manager that renames the parameters of the function `type` using `names``, the function with a temporary `name` and yields it.'''
         Funique_name = internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}".format, 'prototype_parameter'))
-        til, names, utils = library if library else tinfo.library(), names.get('names'), internal.utils
+        til, suggested, utils = library if library else tinfo.library(), names.get('names'), internal.utils
 
         # if we got an integer, then we need to determine if it's an ordinal or
         # an identifier so that we can assign it to our type.
@@ -14329,32 +14329,93 @@ class name(object):
             raise internal.exceptions.InvalidParameterError(u"{:s}.prototype({!r}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', type.__class__))
 
         # now that we got a valid prototype, we need to recursively count the
-        # number of parameters for the names that we will be replacing.
-        count, queue, push = 0, [ti], utils.fcompose(utils.fgetattr('append'), utils.fpartial(utils.fpartial, operator.call))
+        # number of parameters for the names that we will be replacing. we also
+        # store the indices for structures so that we can correct the name
+        # ordering later.
+        push = utils.fcompose(utils.fgetattr('append'), utils.fpartial(utils.fpartial, operator.call))
+        count, queue, sizes = 0, [(0, ti)], {}
+
+        # consume the name index and parameter type from the queue so that we
+        # can recursively count the potential parameter names it may contain.
         while queue:
-            next_t = queue.pop()
+            index, next_t = queue.pop()
+
+            # if the popped element from the queue is a function pointer, then
+            # we need to process the multiple names belonging to the element.
             if next_t.is_func() or next_t.is_funcptr() or tinfo.resolve(next_t).is_func():
+                counter = 0
+
+                # iterate through all of the function parameters while looking
+                # for certain types. if the parameter is a typedef, then its
+                # type doesn't matter and it only has one name.
                 for aname, atype, astorage in tinfo.function(next_t)[1:]:
                     if atype.is_typeref():
                         pass
-                    elif atype.is_func() or atype.is_funcptr() or tinfo.resolve(atype).is_func():
-                        push(queue)(atype)
-                    elif atype.is_udt() or tinfo.resolve(atype).is_udt():
-                        push(queue)(atype)
-                    count += 1
-                pass
 
+                    # if the parameter is a function prototype of some sort,
+                    # then queue it up, and adjust our index using the number of
+                    # parameters that the prototype uses.
+                    elif atype.is_func() or atype.is_funcptr() or tinfo.resolve(atype).is_func():
+                        push(queue)((index, atype))
+                        _, ftd = tinfo.prototype_details(atype)
+                        index += ftd.size()
+
+                    # if the parameter is a structure, then we queue it up and
+                    # adjust our index for the number of fields. we also store
+                    # the current index and size to fix the name ordering later.
+                    elif atype.is_udt() or tinfo.resolve(atype).is_udt():
+                        push(queue)((index, atype))
+                        utd = idaapi.udt_type_data_t()
+                        if not atype.get_udt_details(utd):
+                            raise internal.exceptions.InvalidParameterError(u"{:s}.prototype({!r}{:s}) : Unable to get the udt type data from the parameter type ({!r}) in {!s}.".format('.'.join([__name__, cls.__name__]), "{!r}".format("{!s}".format(type)) if isinstance(type, idaapi.tinfo_t) else "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', "{!s}".format(atype), tinfo.quoted(next_t)))
+                        sizes[index], index = utd.size(), index + utd.size()
+
+                    # adjust the index by adding one for the prototype parameter
+                    # name. we also update our counter for each function
+                    # parameter we've tallied up.
+                    counter, index = counter + 1, index + 1
+
+                # update the total count using the internally scoped counter.
+                count += counter
+
+            # if the element we popped from the queue is a structure, then we
+            # will need to process all of its fields and their types.
             elif next_t.is_udt() or tinfo.resolve(next_t).is_udt():
+                counter = 0
+
+                # iterate through all of the structure fields while looking for
+                # specific types. if the field is a typedef, then its type does
+                # not matter at all since it has only one field name anyways.
                 for mname, moffset, msize, mtype, malign in tinfo.members(next_t):
                     if mtype.is_typeref():
                         pass
-                    elif mtype.is_func() or mtype.is_funcptr() or tinfo.resolve(mtype).is_func():
-                        push(queue)(mtype)
-                    elif mtype.is_udt() or tinfo.resolve(mtype).is_udt():
-                        push(queue)(mtype)
-                    count += 1
-                pass
 
+                    # if the field is a function prototype, then queue it up
+                    # while adjusting our index for the number of parameters.
+                    elif mtype.is_func() or mtype.is_funcptr() or tinfo.resolve(mtype).is_func():
+                        push(queue)((index, mtype))
+                        _, ftd = tinfo.prototype_details(mtype)
+                        index += ftd.size()
+
+                    # if the field is a structure, then queue it up and adjust
+                    # the index by the number of fields. since the names order
+                    # is shuffled, we store the index and its field count.
+                    elif mtype.is_udt() or tinfo.resolve(mtype).is_udt():
+                        push(queue)((index, mtype))
+                        utd = idaapi.udt_type_data_t()
+                        if not atype.get_udt_details(utd):
+                            raise internal.exceptions.InvalidParameterError(u"{:s}.prototype({!s}{:s}) : Unable to get the udt type data for the field type ({!r}) in {!s}.".format('.'.join([__name__, cls.__name__]), "{!r}".format("{!s}".format(type)) if isinstance(type, idaapi.tinfo_t) else "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', "{!s}".format(mtype), tinfo.quoted(next_t)))
+                        sizes[index], index = utd.size(), index + utd.size()
+
+                    # finally we can adjust the index by adding one for the
+                    # field name. since we're tallying up all the names, we
+                    # update our counter for each field that we process.
+                    counter, index = counter + 1, index + 1
+
+                # adjust the total count for the number of names we processed.
+                count += counter
+
+            # if we queued up an unsupported type, then we throw up an error.
             else:
                 raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.prototype({!s}{:s}) : Unable to count the names for an unsupported type {!s}.".format('.'.join([__name__, cls.__name__]), "{!r}".format("{!s}".format(type)) if isinstance(type, idaapi.tinfo_t) else "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', tinfo.quoted(next_t)))
             continue
@@ -14363,13 +14424,23 @@ class name(object):
         # gave us, or something that we can guarantee as being unique.
         iterable = itertools.chain(tinfo.names(ti), [''] * count)
         oldnames = [name for name in itertools.islice(iterable, count)]
-        newnames = [Funique_name(indexed_name) for indexed_name in enumerate(oldnames)] if names is None else names
+        newnames = [Funique_name(indexed_name) for indexed_name in enumerate(oldnames)] if suggested is None else [name for name in suggested][:count]
 
-        # yield the prototype with the new names that were applied to it.
+        # make a copy of the new names so that we can reorder the names that are
+        # related to a structure type. this is because the name for a structure
+        # type comes at the end, rather than being at the first index.
+        reordered = newnames[:]
+        for index, length in sizes.items():
+            fields = newnames[index : 1 + index + length]
+            reordered[index : 1 + index + length] = fields[-1:] + fields[:-1]
+
+        # apply the names that we reordered due to the shuffling of field names
+        # and the parameter for a structure, and apply them to the type. we also
+        # return the applied names in order from left to right.
         try:
-            yield tinfo.names(ti, newnames), newnames
+            yield tinfo.names(ti, reordered), newnames
         finally:
-            logging.debug(u"{:s}.prototype({!r}{:s}) : Finished renaming the parameters for the given type from the original names ({!r}) to the {:s} names ({!r}).".format('.'.join([__name__, cls.__name__]), "{!r}".format("{!s}".format(type)) if isinstance(type, idaapi.tinfo_t) else "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(*names) if names else '', oldnames, 'specified' if names else 'unique', newnames))
+            logging.debug(u"{:s}.prototype({!s}{:s}) : Finished renaming the parameters for the given type from the original names ({!r}) to the {:s} names ({!r}).".format('.'.join([__name__, cls.__name__]), "{!r}".format("{!s}".format(type)) if isinstance(type, idaapi.tinfo_t) else "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', oldnames, 'specified' if suggested else 'unique', newnames))
         return
 
     @classmethod
