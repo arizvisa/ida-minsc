@@ -5634,12 +5634,7 @@ class types(object):
     __matcher__.mapping('typeref', operator.truth, operator.itemgetter(2), utils.fmap(operator.methodcaller('is_typeref'), operator.methodcaller('present')), all), __matcher__.alias('typedef', 'typeref')
     __matcher__.mapping('defined', operator.truth, operator.itemgetter(2), operator.methodcaller('present')), __matcher__.mapping('present', operator.truth, operator.itemgetter(2), operator.methodcaller('present'))
     __matcher__.mapping('undefined', operator.not_, operator.itemgetter(2), operator.methodcaller('present')), __matcher__.mapping('present', operator.truth, operator.itemgetter(2), operator.methodcaller('present'))
-
-    # FIXME: should we split the names up by namespace ('::') and check each
-    #        one to figure out if its an anonymous name? we could also verify
-    #        that the character set (ucase hex) and length (32) is correct.
-    __matcher__.mapping('anonymous', operator.truth, operator.itemgetter(1), operator.methodcaller('startswith', '$'))
-
+    __matcher__.mapping('anonymous', operator.truth, operator.itemgetter(0), utils.fthrough(utils.fcompose(interface.tinfo.reference, operator.methodcaller('is_anonymous_udt')), utils.fcompose(utils.fpartial(idaapi.get_numbered_type_name, None), utils.string.of, re.compile(r'::\$[0-9A-F]{32}').search, operator.truth)), builtins.any)
     __matcher__.mapping('integer', operator.truth, operator.itemgetter(2), operator.methodcaller('is_integral'))
     __matcher__.mapping('pointer', operator.truth, operator.itemgetter(2), operator.methodcaller('is_ptr'))
     __matcher__.mapping('function', operator.truth, operator.itemgetter(2), operator.methodcaller('is_func'))
