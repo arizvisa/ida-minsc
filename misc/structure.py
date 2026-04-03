@@ -1964,9 +1964,9 @@ class v9members(object):
         elif isinstance(type, structure_t) and tinfo.get_type_by_tid(type.id):
             tinfo, sid = tinfo, type.id
         elif isinstance(type, internal.types.integer):
-            raise internal.exceptions.InvalidParameterError(u"{:s}.count({:#x}) : Unable to determine the type from the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type, type))
+            raise E.InvalidParameterError(u"{:s}.count({:#x}) : Unable to determine the type from the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type, type))
         else:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.count({!r}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
+            raise E.InvalidParameterError(u"{:s}.count({!r}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
 
         # Get the structure/union details if the type has them, and return the
         # size. Otherwise, raise an exception that we couldn't get them.
@@ -2768,9 +2768,9 @@ class v9members(object):
         elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t) and tinfo.get_type_by_tid(type.id):
             tinfo, sid = tinfo, type.id
         elif isinstance(type, internal.types.integer):
-            raise internal.exceptions.InvalidParameterError(u"{:s}.in_offset({:#x}, {:+#x}) : Unable to determine the type from the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type, offset, type))
+            raise E.InvalidParameterError(u"{:s}.in_offset({:#x}, {:+#x}) : Unable to determine the type from the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type, offset, type))
         else:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.in_offset({!r}, {:+#x}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, offset, type.__class__))
+            raise E.InvalidParameterError(u"{:s}.in_offset({!r}, {:+#x}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, offset, type.__class__))
 
         # Try and get the structure/union details if it actually is one.
         if not (tinfo.is_struct() or union(tinfo)):
