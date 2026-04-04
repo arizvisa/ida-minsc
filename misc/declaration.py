@@ -629,6 +629,136 @@ class extract(object):
         qualifiers = [(left, right) for left, right in token.segments(*selected_qualifiers)]
         return convention, qualifiers, selected_name
 
+    @classmethod
+    def names(cls, tree, string, range, parameters):
+        '''Use the given `tree` and `range` to return the segments of all the names in `parameters` from the prototype specified by `string`.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        range_description = "{!r}".format(range)
+
+        # define a recursive function that can be used to parse each of the
+        # parameters within a function prototype. we take care to process both
+        # nested function pointers and structures from the prototype arguments.
+        def parse_reversed_tree(reversed, range, retree, reordered):
+            '''This recursive function will parse the parameters for a function prototype.'''
+            start, stop = range if isinstance(range, tuple) else (0, len(reversed))
+
+            # adjust the range if it is cuddled by parentheses.
+            assertion = reversed[start] + reversed[:stop][-1]
+            adjustment = 1 if assertion in {')(', '}{'} else 0
+            (left, right) = (start + adjustment, stop - adjustment)
+
+            # iterate through all the segments and scan the temporary names
+            # for the parameters in reverse. we do it in reverse, because a
+            # temporary name will always be the very first character at the
+            # the very beginning of the string or in front of a delimiter.
+            position, positionindex, structurename = left, 0, ()
+            nameindex, segments, sizes = 0, retree[start], {}
+            for index, segment in enumerate(segments):
+                point, skip = segment
+
+                # if the segment specifies braces, then we fall on through.
+                if reversed[point] + reversed[:skip][-1] == '}{':
+                    reversed[point:skip][::-1]
+                    pass
+
+                # if the segment is a "," or a ";", then also fall through.
+                elif reversed[point : skip] not in {',', ';'}:
+                    continue
+
+                # if we just processed a structure, then we need to update the
+                # one that we just added to sizes[key] with its new end point.
+                elif structurename:
+                    key, structurename = structurename, ()
+                    (comma, _), nested = sizes[key]
+                    sizes[key] = (comma, point), nested
+                    position = skip
+                    continue
+
+                # if the position to the segment is empty, then skip over it.
+                elif not(position < point):
+                    position = skip
+                    continue
+
+                # figure out the parameter name, and slice our parameter out.
+                key, sliced = reordered[nameindex][::-1], reversed[position : point]
+                space = len(sliced) - len(sliced.rstrip())
+
+                # if the entire slice matches our name, then we have a struct.
+                if sliced.rstrip().rstrip('*') == reordered[nameindex]:
+                    nested = parse_reversed_tree(reversed, (point, skip), retree, reordered[1 + nameindex:])
+                    sizes[key] = (position, skip), nested
+                    structurename = key  # this is used to update sizes[key] when we hit a ","
+                    nameindex += 1 + len(nested)
+                    continue
+
+                # otherwise, if the slice starts with our name, then we store
+                # the slice and continue onto the next segment.
+                elif sliced.rstrip().startswith(reordered[nameindex]):
+                    sizes[key] = (position, point - space), {}
+
+                # if we have a function pointer in our slice that starts with a
+                # parentheses, then recursively parse the parameters from it.
+                elif sliced.rstrip().startswith(')'):
+                    iterable = ((left, right) for (left, right) in segments[positionindex:] if left == position)
+                    nested = parse_reversed_tree(reversed, next(iterable), retree, reordered[nameindex:])
+                    key = reordered[nameindex + len(nested)][::-1]
+                    sizes[key] = (position, point - space), nested
+                    nameindex += len(nested)
+
+                else:
+                    raise internal.exceptions.InvalidFormatError(u"{:s}.names({!s}, {!r}, {!s}, {!r}) : Unable to match the given name \"{:s}\" against the current token ({!r}).".format('.'.join([__name__, cls.__name__]), '...', string, range_description, parameters, internal.utils.string.escape(reordered[nameindex][::-1], '"'), sliced[::-1]))
+
+                # move on... to the next iteration.
+                position, positionindex, nameindex = skip, index, nameindex + 1
+
+            # if we processed all the segments, then we have one more segment to
+            # add to our list of sizes. if the last segment processed was a
+            # structure, then the remaining string is its entire segment.
+            key, sliced = structurename if structurename else reordered[nameindex][::-1], reversed[position : stop - adjustment]
+            if structurename:
+                key, structurename = structurename, ()
+                (comma, _), nested = sizes[key]
+                sliced = reversed[comma : stop - adjustment][::-1]
+                sizes[key] = (comma, stop - adjustment), nested
+
+            # if the name can be found at the beginning of the slice, then this
+            # is a regular parameter and we can just store its segment. the
+            # condition where there's just a name can be ignored because our
+            # loop up above won't exit until all the segments are consumed.
+            elif sliced.rstrip().startswith(reordered[nameindex]):
+                sizes[key] = (position, stop - adjustment), {}
+
+            # if our slice starts with parentheses, instead of a name, then we
+            # have a function pointer. we recurse for this one too.
+            elif sliced.rstrip().startswith(')'):
+                #range = position, stop - adjustment
+                iterable = ((left, right) for (left, right) in segments[positionindex:] if left == position)
+                nested = parse_reversed_tree(reversed, next(iterable), retree, reordered[nameindex:])
+                key = reordered[nameindex + len(nested)]
+                sizes[key] = (position, stop - adjustment), nested
+
+            else:
+                raise internal.exceptions.InvalidFormatError(u"{:s}.names({!s}, {!r}, {!s}, {!r}) : Unable to match the given name \"{:s}\" against the final token ({!r}).".format('.'.join([__name__, cls.__name__]), '...', string, range_description, parameters, internal.utils.string.escape(reordered[nameindex][::-1], '"'), sliced[::-1]))
+            return sizes
+
+        # Reverse all of our inputs so that we can process them in reverse since
+        # C-like languages include the name at the end of each parameter.
+        reversed, reordered, retree = string[::-1], [name[::-1] for name in parameters[::-1]], internal.declaration.token.reversed(string, tree)
+        range = rleft, rright = len(string) - stop, len(string) - start
+        results = parse_reversed_tree(reversed, (rleft, rright), retree, reordered)
+
+        def normalize_results(string, dictionary):
+            '''Reverse the specified `dictionary` of sizes for the specified reversed `string`.'''
+            inverted, Finvert = {}, functools.partial(operator.sub, len(string))
+            for key in dictionary:
+                range, sub = dictionary[key]
+                invertedrange = builtins.tuple(map(Finvert, range))[::-1]
+                invertedsub = normalize_results(string, sub)
+                inverted[key] = invertedrange, invertedsub
+            return inverted
+
+        return normalize_results(string, results)
+
 class nested(object):
     """
     This namespace contains basic utilities for processing a string
