@@ -1106,10 +1106,14 @@ class contents(tagging):
         elif isinstance(key, list):
             key, _ = key[0], logging.critical(u"{:s}._read({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
 
-        encdata = internal.netnode.blob.get(key, cls.btag)
+        # fetch the encoded data from the blob for the function specified by
+        # `key` so that we can decode and unmarshal it back into a dictionary.
+        encdata = cls._get_tagcache_blob(key, ea)
         if encdata is None:
             return None
 
+        # first we'll decompress the encoded data unless it raises an ecception.
+        # if it does, then log what happened and raise the correct exception.
         try:
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
@@ -1120,6 +1124,8 @@ class contents(tagging):
             logging.info(u"{:s}._read({!r}, {:#x}) : Error while decoding the following data from the blob cache: {!r}.".format('.'.join([__name__, cls.__name__]), target, ea, encdata))
             raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to decode the contents for address {:#x} from the blob cache ({!s}) associated with key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, ea, cls.btag, key))
 
+        # next we'll unmarshall the decompressed data back into a dictionary. if
+        # this raises an exception for any reason, then reraise the correct one.
         try:
             result = cls.marshaller.loads(data)
 
