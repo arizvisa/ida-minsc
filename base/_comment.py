@@ -61,7 +61,7 @@ import functools, operator, itertools, types
 import collections, heapq, string
 import sys, six, logging
 
-import internal, idaapi
+import internal, idaapi, ida
 import codecs
 
 ### cheap data structure for doing pattern matching with
@@ -716,6 +716,28 @@ def check(data):
         return False
     return True
 
+import bz2
+def checkbzip2(data):
+    '''Return whether the specified `data` is stream-compressed with the BZIP2 algorithm.'''
+    bytes = bytearray(data)
+
+    # magic
+    if bytes[:3] != b'BZh':
+        return False
+
+    # blocksize
+    if not (b'1' <= bytes[3 : 4] <= b'9'):
+        return False
+
+    # decompress a chunk from the stream
+    ok = True
+    try:
+        dec = bz2.BZ2Decompressor()
+        dec.decompress(bytes, max_length=1)
+    except (OSError, ValueError):
+        ok = False
+    return ok
+
 ### Tag reference counting
 class tagging(object):
     """
@@ -931,6 +953,100 @@ class contents(tagging):
 
         ok = internal.netnode.sup.set(node, key, encdata)
         return bool(ok)
+
+    @classmethod
+    def _format_netnode_name(cls, target, ea):
+        """Return the netnode name for storing a blob in the new format that is associated with the specified `target`.
+
+        If `target` is undefined or ``None`` then use `ea` to locate the function.
+        """
+        node, key = cls.node(), cls._key(ea) if target is None else target
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._format_netnode_name({!r}, {:#x}) : Unable to determine the key for the target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, target, ea))
+
+        # If we received a list as the key, then we need to warn the
+        # user that we have to guess which supval to read from.
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._format_netnode_name({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # Now we use the function address (key) to generate a unique netnode
+        # name by taking the function address and adding the `INF_NETADELTA` to
+        # it. Then we go and format the resulting integer by formatting it as
+        # hexadecimal and prefixing it with "F". Afterwards, we prefix the whole
+        # thing with the netnode name to make the name unique to the plugin.
+        Foriginal = functools.partial(operator.add, ida.getinf(idaapi.INF_NETDELTA))
+        formatter = "{:s}.{:s}".format(cls.__node__, 'F{:X}')
+        return formatter.format(key + ida.getinf(idaapi.INF_NETDELTA))
+
+    @classmethod
+    def _has_old_tagcache(cls, ea):
+        '''Return if there is a tagcache in the old format for the function specified by the address `ea`.'''
+        node = cls.node()
+        if not(idaapi.get_func(ea)):
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._has_old_tagcache({:#x}) : Unable to find a function containing the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+        # get the key for the function containing the specified address.
+        key = cls._key(ea)
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._has_old_tagcache({:#x}) : Unable to determine the key for the function containing the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._has_old_tagcache({:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # if there isn't a blob stored for the functon, then we can just go
+        # ahead and return false before doing anything else. otherwise, we
+        # extract the data from the blob so that we can check it for bzip2.
+        if not internal.netnode.blob.has(key, tag=cls.btag):
+            return False
+
+        encoded = internal.netnode.blob.get(key, tag=cls.btag)
+        return checkbzip2(encoded)
+
+    @classmethod
+    def _has_new_tagcache(cls, ea):
+        '''Return if there is a tagcache in the new format for the function specified by the address `ea`.'''
+        node = cls.node()
+        if not(idaapi.get_func(ea)):
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._has_old_tagcache({:#x}) : Unable to find a function containing the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+        # use the address we were given to find the key (function entrypoint)
+        # for the function containing it.
+        key = cls._key(ea)
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._has_old_tagcache({:#x}) : Unable to determine the key for the function containing the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._has_new_tagcache({:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # for performance reasons, we can just format the function address into
+        # a name, and then we just need to check if the netnode already exists.
+        name = cls._format_netnode_name(key, ea)
+        return internal.netnode.has(name)
+
+    @classmethod
+    def _get_tagcache_blob(cls, target, ea):
+        '''Return the blob for the function at the address specified by `target`.'''
+        key = cls._key(ea) if target is None else target
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._get_tagcache_blob({!r}, {:#x}) : Unable to determine the key for the target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, target, ea))
+
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._get_tagcache_blob({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # check if we're using a specific netnode for the function. otherwise, we
+        # need to check if we're using the function's netnode which can be
+        # identified by looking for a bzip2-encoded blob. basically, this
+        # logic is the gateway to fixing issue #198.
+        if cls._has_new_tagcache(key):
+            name = cls._format_netnode_name(key, ea)
+            return internal.netnode.blob.get(name, cls.btag)
+
+        elif not(cls._has_old_tagcache(key)):
+            return None
+
+        # otherwise, we get the blob for the specified function and return it to
+        # the caller so that they can decompress and unmarshall it.
+        return internal.netnode.blob.get(key, cls.btag)
 
     @classmethod
     def _read(cls, target, ea):
