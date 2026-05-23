@@ -794,7 +794,6 @@ class tagging(object):
         return node
 
 class contents(tagging):
-    '''Tagging for an address within a function (contents)'''
     """
     This namespace is used to update the tag state for any content tags
     associated with a function in the database. The address for the top
@@ -809,6 +808,14 @@ class contents(tagging):
     written or removed, the reference count for both the name and the
     address is adjusted.
 
+    Earlier versions of this implementation would store the marshall'd
+    dictionary directly in the netnode for the function. As reported in
+    issue #198, this can conflict with some processor modules. In order
+    to remedy this condition, the implementation creates a completely
+    separate netnode using the function address to avoid any conflict.
+    If the netnode does not exist and the old location has a blob stored
+    within it, then the blob is migrated into the new netnode.
+
     Due to a size limit of a blob, the supval for the tagging node is
     used to store the tag names that are used within a function as a
     marshall'd ``set``. This ``set`` is used to verify that the tag
@@ -822,6 +829,14 @@ class contents(tagging):
     # netnode.sup[fn.start_ea] = marshal.dumps({tagnames})
 
     #btag = idaapi.stag         # XXX: apparently 'S' is used for comments
+    #btag = idaapi.atag         # XXX: apparently 'A' is used for altvals
+
+    # XXX: this tag conflicts with the altvals used by some disassembler
+    #      architectures as a result of how blobs are stored within a netnode.
+    #      so, to avoid interfering with the chosen disassembler we create our
+    #      own netnode by prefixing the `tagging.__node__` string with the
+    #      function address similar to the disassembler's format for a function
+    #      netnode ("$ F10083200").
     btag = idaapi.atag
 
     @classmethod
@@ -1223,6 +1238,36 @@ class contents(tagging):
         # of just choosing something at random to overwrite.
         elif isinstance(key, list):
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to determine the owner of the address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # check if the blob for our function is stored within its own netnode,
+        # so that we can use it. this path should be more efficient.
+        if cls._has_new_tagcache(key):
+            ok = True
+
+        # if there is no old tagcache, then the blob is empty and we can go
+        # ahead and create the blob for the new tagcache.
+        elif not cls._has_old_tagcache(key):
+            logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Creating a netnode for storing the tag cache belonging to function ({:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), key))
+            ok = cls._new_tagcache_blob(key, ea)
+
+        # otherwise, we need to migrate the tag cache blob from the old location
+        # to the new tagcache location. at this point, though, we've already
+        # damaged the altvals for the function and there's nothing we can really
+        # do to recover the original altvals. :-/
+        else:
+            logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Migrating the tag cache for the specified function ({:#x}) to its own netnode.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), key))
+            ok = cls._migrate_tagcache(key)
+
+        # if we couldn't create the netnode for the function to store the tag
+        # cache, or we couldn't migrate it from the old location to the new one,
+        # then we need to complain about it and abort.
+        if not ok:
+            name = cls._format_netnode_name(key, ea)
+            node = internal.netnode.get(name)
+            migrating = cls._has_old_tagcache(key)
+            data = " with data ({!s})".format(internal.utils.string.repr(internal.netnode.blob.get(key, cls.btag)))
+            logging.info(u"{:s}._write({!r}, {:#x}, {!s}) : Failure while {:s} netnode \"{:s}\" ({:#x}) {!s} for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), 'migrating to' if migrating else 'creating', internal.utils.string.escape(name, '"'), node, data if migrating else '', key))
+            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Error while trying to {:s} the tag cache for function {:#x} to an isolated netnode \"{!s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), 'migrate' if migrating else 'create', key, internal.utils.string.escape(name, '"'), node))
 
         # erase cache and blob if no data is specified
         if not value:
