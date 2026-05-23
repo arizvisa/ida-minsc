@@ -1049,6 +1049,49 @@ class contents(tagging):
         return internal.netnode.blob.get(key, cls.btag)
 
     @classmethod
+    def _migrate_tagcache(cls, ea):
+        '''Move the tag cache for the function specified by `ea` to its own isolated netnode if it doesn't already exist.'''
+        node, key = cls.node(), cls._key(ea)
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._migrate_tagcache({:#x}) : Unable to determine the key for the function containing address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._migrate_tagcache({:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # if we're already using an isolated netnode for the function, then
+        # there isn't anything for us to do and we can just return success.
+        if cls._has_new_tagcache(key):
+            return True
+
+        # if the tag cache is not stashed in the function's netnode, then we
+        # don't need to migrate anything. the `contents.has_old_tagcache` method
+        # will only return true if the netnode exists and its blob is bzip2'd.
+        elif not(cls._has_old_tagcache(key)):
+            return True
+
+        # now we go ahead and grab the blob from the old location in the
+        # function's netnode, and then we write it to the new location. if the
+        # blob is empty, then we create the new netnode but we leave it alone.
+        encoded = internal.netnode.blob.get(key, cls.btag)
+        if encoded is None:
+            return True
+
+        name = cls._format_netnode_name(key, ea)
+        node = internal.netnode.new(name)
+
+        ok = internal.netnode.blob.set(node, cls.btag, encoded)
+        if not ok:
+            logging.info(u"{:s}._migrate_tagcache({:#x}) : Error while writing the following data to the blob cache in \"{:s}\" ({:#x}): {!r}.".format('.'.join([__name__, cls.__name__]), ea, internal.utils.string.repr(value), internal.utils.string.escape(name, '"'), node, encoded))
+            raise internal.exceptions.DisassemblerError(u"{:s}._migrate_tagcache({:#x}) : Unable to migrate the contents for address {:#x} from the blob cache ({!s}) in the function associated with the key {:#x} to the new netnode \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea, cls.btag, key, internal.utils.string.escape(name, '"'), node))
+
+        # finally, we go ahead and remove the blob that was previously stashed
+        # to the netnode for the specified function.
+        ok = internal.netnode.blob.remove(key, cls.btag)
+        if not ok:
+            logging.warning(u"{:s}._migrate_tagcache({:#x}) : Error while trying to remove the blob data from the tag cache stashed in the function netnode at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, key))
+        return ok
+
+    @classmethod
     def _read(cls, target, ea):
         """Reads the value from the contents supval for the specific `target`.
 
