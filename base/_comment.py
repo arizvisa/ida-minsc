@@ -1231,9 +1231,12 @@ class contents(tagging):
                 if not ok:
                     logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to remove the address {:#x} from the cache header associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, key))
 
+            # after removing the supvalue in the header for the given function,
+            # now we can delete the blob that is stored within the netnode for
+            # the function.
             finally:
-                count = internal.netnode.blob.remove(key, cls.btag)
-                logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Removed {:d} blob{:s} ({!s}) associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), count, '' if count == 1 else 's', cls.btag, key))
+                ok = cls._del_tagcache_blob(key, ea)
+                logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Removed the blob ({!s}) associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), cls.btag, key))
 
             return True
 
@@ -1256,8 +1259,12 @@ class contents(tagging):
         if sz != len(data):
             raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}, {!s}) : The number of bytes that was encoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), sz, len(data)))
 
-        # write blob
-        ok = internal.netnode.blob.set(key, cls.btag, encdata)
+        # now that we have an encoded version of the data, we can now write the
+        # encoded data into the blob for the specified function. we use the
+        # classmethod since in order to fix issue #198, so that we store to the
+        # correct place if the function tagcache netnode exists. otherwise we
+        # fall back to the old (busted) location stored in the function netnode.
+        ok = cls._set_tagcache_blob(key, ea, encdata)
         if not ok:
             logging.info(u"{:s}._write({!r}, {:#x}, {!s}) : Error while writing the following data to the blob cache: {!r}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), encdata))
             raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to write the contents for address {:#x} to the blob cache ({!s}) associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, cls.btag, key))
