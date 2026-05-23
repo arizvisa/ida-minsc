@@ -1049,6 +1049,80 @@ class contents(tagging):
         return internal.netnode.blob.get(key, cls.btag)
 
     @classmethod
+    def _new_tagcache_blob(cls, target, ea):
+        """Create a tag cache netnode for the function at the address specified by `target`.
+
+        If `target` is undefined or ``None`` then use `ea` to locate the function.
+        """
+        key = cls._key(ea) if target is None else target
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._new_tagcache_blob({!r}, {:#x}) : Unable to determine the key for the function containing address {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, ea))
+
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._new_tagcache_blob({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # figure out the name of the netnode using the key for the function, and
+        # check to see if it already exists so that we can avoid creating it.
+        name = cls._format_netnode_name(key, ea)
+        if internal.netnode.has(name):
+            return True
+
+        # now we can use the name to create a new netnode with nothing stashed
+        # inside of it. last thing is to return whether we created it or not.
+        node = internal.netnode.new(name)
+        return internal.netnode.has(node)
+
+    @classmethod
+    def _set_tagcache_blob(cls, target, ea, encoded):
+        """Update the blob for the function at the address specified by `target` with the given `encoded` data.
+
+        If `target` is undefined or ``None`` then use `ea` to locate the function.
+        """
+        key = cls._key(ea) if target is None else target
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._set_tagcache_blob({!r}, {:#x}, {!r}) : Unable to determine the key for the target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, encoded, target, ea))
+
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._set_tagcache_blob({!r}, {:#x}, {!r}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, encoded, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # if we're using the migrated tagcache already, then go ahead and write
+        # to it. this should be what happens by default.
+        if cls._has_new_tagcache(key):
+            name = cls._format_netnode_name(key, ea)
+            node = internal.netnode.get(name)
+            return internal.netnode.blob.set(node, cls.btag, encoded)
+
+        # otherwise, we just write it to the old location of the tag cache. the
+        # tagcache should actually be migrated by someone else. so, that makes
+        # this logic a fallback in case that other person didn't migrate it yet.
+        return internal.netnode.blob.set(key, cls.btag, encoded)
+
+    @classmethod
+    def _del_tagcache_blob(cls, target, ea):
+        """Remove the blob for the function at the address specified by `target`.
+
+        If `target` is undefined or ``None`` then use `ea` to locate the function.
+        """
+        key = cls._key(ea) if target is None else target
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._del_tagcache_blob({!r}, {:#x}) : Unable to determine the key for the target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, target, ea))
+
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._del_tagcache_blob({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # if we're using the migrated tagcache already, then go and erase the
+        # bitch. this is intended to switch between the old and new locations.
+        if cls._has_new_tagcache(key):
+            name = cls._format_netnode_name(key, ea)
+            node = internal.netnode.get(name)
+            return internal.netnode.blob.remove(node, cls.btag)
+
+        # otherwise, we just remove it from the old location. this should only
+        # occur if it hasn't been migrated yet as this location conflicts with
+        # some of the disassemblers like AArch and AArch64.
+        return internal.netnode.blob.remove(key, cls.btag)
+
+    @classmethod
     def _migrate_tagcache(cls, ea):
         '''Move the tag cache for the function specified by `ea` to its own isolated netnode if it doesn't already exist.'''
         node, key = cls.node(), cls._key(ea)
