@@ -859,7 +859,7 @@ class contents(tagging):
 
         If `target` is ``None``, then use the address of the function containing `ea`.
         """
-        node, key = tagging.node(), cls._key(ea) if target is None else target
+        node, key = cls.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._read_header({!r}, {:#x}) : Unable to locate a function for target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, key, ea))
 
@@ -896,7 +896,7 @@ class contents(tagging):
         If `target` is ``None`` then use `ea` to locate the function.
         If `value` is ``None``, then remove the supval at the specified `target`.
         """
-        node, key = tagging.node(), cls._key(ea) if target is None else target
+        node, key = cls.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to determine the key for target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), target, ea))
 
@@ -938,7 +938,7 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `ea` to locate the function.
         """
-        node, key = tagging.node(), cls._key(ea) if target is None else target
+        node, key = cls.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._read({!r}, {:#x}) : Unable to determine the key for the target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, target, ea))
 
@@ -976,7 +976,7 @@ class contents(tagging):
         If `target` is undefined or ``None`` then use `ea` to locate the function.
         If `value` is ``None``, then erase the value from the supval.
         """
-        node, key = tagging.node(), cls._key(ea) if target is None else target
+        node, key = cls.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to determine the key for target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), target, ea))
 
@@ -1033,7 +1033,7 @@ class contents(tagging):
     @classmethod
     def iterate(cls):
         '''Yield each address and names for all of the contents tags in the database according to what is written into the tagging supval.'''
-        node = tagging.node()
+        node = cls.node()
         for ea in internal.netnode.sup.fiter(node):
             view = internal.netnode.sup.get(node, ea, type=memoryview)
             encdata = view.tobytes()
@@ -1235,7 +1235,7 @@ class globals(tagging):
     @classmethod
     def inc(cls, address, name):
         '''Increase the global tag count for the given `address` and `name`.'''
-        node, eName = tagging.node(), internal.utils.string.to(name)
+        node, eName = cls.node(), internal.utils.string.to(name)
 
         cName = (internal.netnode.hash.get(node, eName, type=int) or 0) + 1
         cAddress = (internal.netnode.alt.get(node, address) or 0) + 1
@@ -1248,7 +1248,7 @@ class globals(tagging):
     @classmethod
     def dec(cls, address, name):
         '''Decrease the global tag count for the given `address` and `name`.'''
-        node, eName = tagging.node(), internal.utils.string.to(name)
+        node, eName = cls.node(), internal.utils.string.to(name)
 
         cName = (internal.netnode.hash.get(node, eName, type=int) or 1) - 1
         cAddress = (internal.netnode.alt.get(node, address) or 1) - 1
@@ -1268,18 +1268,18 @@ class globals(tagging):
     @classmethod
     def name(cls):
         '''Return all the tag names (``set``) in the specified database (globals and func-tags)'''
-        node = tagging.node()
+        node = cls.node()
         return { internal.utils.string.of(name) for name in internal.netnode.hash.fiter(node) }
 
     @classmethod
     def address(cls):
         '''Return all the tag addresses (``sorted``) in the specified database (globals and func-tags)'''
-        return sorted(ea for ea in internal.netnode.alt.fiter(tagging.node()))
+        return sorted(ea for ea in internal.netnode.alt.fiter(cls.node()))
 
     @classmethod
     def set_name(cls, name, count):
         '''Set the global tag count for `name` in the database to `count`.'''
-        node, eName = tagging.node(), internal.utils.string.to(name)
+        node, eName = cls.node(), internal.utils.string.to(name)
         res = internal.netnode.hash.get(node, eName, type=int)
         internal.netnode.hash.set(node, eName, count)
         return res
@@ -1287,7 +1287,7 @@ class globals(tagging):
     @classmethod
     def set_address(cls, address, count):
         '''Set the global tag count for `address` in the database to `count`.'''
-        node = tagging.node()
+        node = cls.node()
         res = internal.netnode.alt.get(node, address)
         internal.netnode.alt.set(node, address, count)
         return res
@@ -1295,7 +1295,7 @@ class globals(tagging):
     @classmethod
     def iterate(cls):
         '''Yield the address and count for each of the globals in the database according to what is written in the altvals.'''
-        node = tagging.node()
+        node = cls.node()
         for ea, count in internal.netnode.alt.fitems(node):
             yield ea, count
         return
@@ -1303,7 +1303,7 @@ class globals(tagging):
     @classmethod
     def counts(cls):
         '''Yield the tag name and its count for each of the globals in the database according to what is written in the hashvals.'''
-        node = tagging.node()
+        node = cls.node()
 
         for item, count in internal.netnode.hash.fitems(node, int):
             string = internal.utils.string.of(item)
