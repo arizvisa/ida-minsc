@@ -1123,12 +1123,7 @@ class contents(tagging):
     @classmethod
     def _migrate_tagcache(cls, ea):
         '''Move the tag cache for the function specified by `ea` to its own isolated netnode if it doesn't already exist.'''
-        node, key = cls.node(), cls._key(ea)
-        if key is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._migrate_tagcache({:#x}) : Unable to determine the key for the function containing address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
-
-        elif isinstance(key, list):
-            key, _ = key[0], logging.critical(u"{:s}._migrate_tagcache({:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+        key = ea
 
         # if we're already using an isolated netnode for the function, then
         # there isn't anything for us to do and we can just return success.
