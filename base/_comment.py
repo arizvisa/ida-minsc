@@ -1269,21 +1269,33 @@ class contents(tagging):
             logging.info(u"{:s}._write({!r}, {:#x}, {!s}) : Failure while {:s} netnode \"{:s}\" ({:#x}) {!s} for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), 'migrating to' if migrating else 'creating', internal.utils.string.escape(name, '"'), node, data if migrating else '', key))
             raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Error while trying to {:s} the tag cache for function {:#x} to an isolated netnode \"{!s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), 'migrate' if migrating else 'create', key, internal.utils.string.escape(name, '"'), node))
 
-        # erase cache and blob if no data is specified
+        # erase cache and blob if no data is specified. we will also be removing
+        # the netnode, so we'll start by getting its identifier.
         if not value:
+            name = cls._format_netnode_name(key, ea)
+            node = internal.netnode.get(name)
+
+            # first we clear the supvalues in the header.
             try:
-                ok = cls._write_header(target, ea, None)
+                ok = cls._write_header(key, ea, None)
                 if not ok:
                     logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to remove the address {:#x} from the cache header associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, key))
 
             # after removing the supvalue in the header for the given function,
             # now we can delete the blob that is stored within the netnode for
-            # the function.
+            # the function and we should be able to remove the entire netnode.
             finally:
                 ok = cls._del_tagcache_blob(key, ea)
                 logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Removed the blob ({!s}) associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), cls.btag, key))
 
-            return True
+                # next we'll try to remove the entire netnode since it's empty.
+                if ok:
+                    logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Attempting to remove the netnode \"{!s}\" ({:#x}) containing the tag cache for function {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), internal.utils.string.escape(name, '"'), node, key))
+                    ok = internal.netnode.remove(node)
+                    logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Removal of netnode \"{!s}\" ({:#x}) from emptying function {:#x} has {!s}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), internal.utils.string.escape(name, '"'), node, key, 'succeeded' if ok else 'failed'))
+
+                ok = ok
+            return ok
 
         # update blob for given address
         res = value
