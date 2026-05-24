@@ -996,22 +996,16 @@ class contents(tagging):
     @classmethod
     def _has_old_tagcache(cls, ea):
         '''Return if there is a tagcache in the old format for the function specified by the address `ea`.'''
-        node = cls.node()
-        if not(idaapi.get_func(ea)):
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._has_old_tagcache({:#x}) : Unable to find a function containing the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+        key = ea
 
-        # get the key for the function containing the specified address.
-        key = cls._key(ea)
-        if key is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._has_old_tagcache({:#x}) : Unable to determine the key for the function containing the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
-
-        elif isinstance(key, list):
-            key, _ = key[0], logging.critical(u"{:s}._has_old_tagcache({:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+        # if there is no netnode for the function key, then return false.
+        if not internal.netnode.has(key):
+            return False
 
         # if there isn't a blob stored for the functon, then we can just go
         # ahead and return false before doing anything else. otherwise, we
         # extract the data from the blob so that we can check it for bzip2.
-        if not internal.netnode.blob.has(key, tag=cls.btag):
+        elif not internal.netnode.blob.has(key, tag=cls.btag):
             return False
 
         encoded = internal.netnode.blob.get(key, tag=cls.btag)
@@ -1020,18 +1014,7 @@ class contents(tagging):
     @classmethod
     def _has_new_tagcache(cls, ea):
         '''Return if there is a tagcache in the new format for the function specified by the address `ea`.'''
-        node = cls.node()
-        if not(idaapi.get_func(ea)):
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._has_old_tagcache({:#x}) : Unable to find a function containing the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
-
-        # use the address we were given to find the key (function entrypoint)
-        # for the function containing it.
-        key = cls._key(ea)
-        if key is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._has_old_tagcache({:#x}) : Unable to determine the key for the function containing the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
-
-        elif isinstance(key, list):
-            key, _ = key[0], logging.critical(u"{:s}._has_new_tagcache({:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+        key = ea
 
         # for performance reasons, we can just format the function address into
         # a name, and then we just need to check if the netnode already exists.
