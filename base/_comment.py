@@ -975,7 +975,7 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `ea` to locate the function.
         """
-        node, key = cls.node(), cls._key(ea) if target is None else target
+        key = cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._format_netnode_name({!r}, {:#x}) : Unable to determine the key for the target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, target, ea))
 
@@ -992,6 +992,50 @@ class contents(tagging):
         Foriginal = functools.partial(operator.add, ida.getinf(idaapi.INF_NETDELTA))
         formatter = "{:s}.{:s}".format(cls.__node__, 'F{:X}')
         return formatter.format(key + ida.getinf(idaapi.INF_NETDELTA))
+
+    @classmethod
+    def _move_netnode_tagcache(cls, old, new):
+        '''Rename the netnode for the `old` address to the specified `new` address.'''
+        oldname = cls._format_netnode_name(old, old)
+        newname = cls._format_netnode_name(new, new)
+
+        # First check if the netnode exists with the old name. If it doesn't,
+        # then we don't need to move anything at all.
+        if not internal.netnode.has(oldname):
+            return False
+
+        # Now we can grab the original netnode that we are going to rename.
+        # Once we grab it, we then check to see if the new netnode name already
+        # exists. If it doesn't, then we can just go ahead and rename. If it
+        # does, though, then we extract the tagcache stored for the old name.
+        oldnode = internal.netnode.get(oldname)
+        if not internal.netnode.has(newname):
+            return internal.netnode.name.set(oldnode, newname)
+        oldencoded = internal.netnode.blob.get(oldnode, tag=cls.btag)
+
+        # If the new name already exists, then we're going to overwrite its
+        # Otherwise, the new name already exists which means we'll be
+        # overwriting the contents with the tagcache from the old netnode. We
+        # grab the new netnode and also preserve its contents so that we can log
+        # exactly what it is we're overwriting.
+        newnode = internal.netnode.get(newname)
+        newencoded = internal.netnode.blob.get(newnode, tag=cls.btag)
+
+        # Log a warning explaining that we are overwriting the new netnode with
+        # the old contents and ensure that the data being overwritten is
+        # displayed. Afterwards, we can go ahead and assign the encoded data.
+        logging.warning(u"{:s}._move_netnode_tagcache({:#x}, {:#x}) : Overwriting the target netnode \"{!s}\" ({:#x}) using the contents from the source netnode \"{!s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), old, new, internal.utils.string.escape(newname, '"'), newnode, internal.utils.string.escape(oldname, '"'), oldnode))
+        logging.debug(u"{:s}._move_netnode_tagcache({:#x}, {:#x}) : Overwriting the new netnode data in {:#x} ({!s}) using the contents from the old netnode at {:#x} ({!s}).".format('.'.join([__name__, cls.__name__]), old, new, newnode, ''.join(map("{:02x}".format, bytearray(newencoded))), oldnode, ''.join(map("{:02x}".format, bytearray(oldencoded)))))
+
+        if not internal.netnode.blob.set(newnode, cls.btag, oldencoded):
+            logging.critical(u"{:s}._move_netnode_tagcache({:#x}, {:#x}) : Failure trying to copy {:d} byte{:s} of old tagcache \"{!s}\" ({:#x}) for function {:#x} over {:d} byte{:s} of new tagcache \"{!s}\" ({:#x}) for function {:#x}.".format('.'.join([__name__, cls.__name__]), old, new, len(oldencoded), '' if len(oldencoded) == 1 else 's', internal.utils.string.escape(oldname, '"'), oldnode, old, len(newencoded), '' if len(newencoded) == 1 else 's', internal.utils.string.escape(newname, '"'), newnode, new))
+
+        # Finally, we can remove the netnode containing the old tagcache since
+        # it was already copied into the new target netnode.
+        ok = internal.netnode.remove(oldnode)
+        if not ok:
+            logging.warning(u"{:s}._move_netnode_tagcache({:#x}, {:#x}) : Failure trying to remove the netnode \"{!s}\" ({:#x}) containing the tag cache for the old function address ({:#x}).".format('.'.join([__name__, cls.__name__]), old, new, internal.utils.string.escape(oldname, '"'), oldnode, old))
+        return ok
 
     @classmethod
     def _has_old_tagcache(cls, ea):
