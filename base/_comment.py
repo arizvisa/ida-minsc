@@ -1002,7 +1002,7 @@ class contents(tagging):
         # First check if the netnode exists with the old name. If it doesn't,
         # then we don't need to move anything at all.
         if not internal.netnode.has(oldname):
-            return False
+            return True
 
         # Now we can grab the original netnode that we are going to rename.
         # Once we grab it, we then check to see if the new netnode name already
