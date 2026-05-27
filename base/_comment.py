@@ -58,7 +58,7 @@ that is prefixed with a backslash.
 """
 
 import functools, operator, itertools, types
-import collections, heapq, string
+import collections, heapq, string, bz2
 import sys, six, logging
 
 import internal, idaapi, ida
@@ -716,28 +716,6 @@ def check(data):
         return False
     return True
 
-import bz2
-def checkbzip2(data):
-    '''Return whether the specified `data` is stream-compressed with the BZIP2 algorithm.'''
-    bytes = bytearray(data)
-
-    # magic
-    if bytes[:3] != b'BZh':
-        return False
-
-    # blocksize
-    if not (b'1' <= bytes[3 : 4] <= b'9'):
-        return False
-
-    # decompress a chunk from the stream
-    ok = True
-    try:
-        dec = bz2.BZ2Decompressor()
-        dec.decompress(bytes, max_length=1)
-    except (OSError, ValueError):
-        ok = False
-    return ok
-
 ### Tag reference counting
 class tagging(object):
     """
@@ -1052,8 +1030,28 @@ class contents(tagging):
         elif not internal.netnode.blob.has(key, tag=cls.btag):
             return False
 
+        # grab the encoded contents of the blob so that we can verify whether it
+        # is is bzip2-compressed or not. we need to check for the magic first
+        # before verifying that we can actually decompress some of it.
         encoded = internal.netnode.blob.get(key, tag=cls.btag)
-        return checkbzip2(encoded)
+
+        # magic
+        bytes = bytearray(encoded)
+        if bytes[:3] != b'BZh':
+            return False
+
+        # blocksize
+        if not (b'1' <= bytes[3 : 4] <= b'9'):
+            return False
+
+        # decompress a chunk from the stream
+        ok = True
+        try:
+            dec = bz2.BZ2Decompressor()
+            dec.decompress(bytes, max_length=1)
+        except (OSError, ValueError):
+            ok = False
+        return ok
 
     @classmethod
     def _has_new_tagcache(cls, ea):
