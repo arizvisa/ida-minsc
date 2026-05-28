@@ -1595,6 +1595,182 @@ class hashraw(hash):
         '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         return cls.__repr__(nodeidx, tag, operator.methodcaller('hex'))
 
+class lexical(object):
+    """
+    This namespace contains a number of tools that can be used to encode
+    integers into bytes so that their order is preserved when they are sorted
+    lexically. Paired with encoding, the method to decode the bytes back into
+    the integer is included. This class also allowing customization of the
+    alphabet that will be used to encode each integer.
+
+    The `lexical.fixed` namespace contains tools for encoding and decoding
+    integers to a fixed size as specified by the alphabet given to its
+    instantiation function. Each function defined within contains the number of
+    bytes that should be used for encoding or decoding the integer.
+
+    The `lexical.variable` namespace contains the remaining tools for encoding
+    and decoding integers to a variable size using the alphabet given to its
+    instantiation function. It also contains the `lexical.variable.prefix`
+    namespace which is used to encode a length at the beginning of the bytes
+    being returned so that smaller integers will end up being grouped together
+    when they are lexically sorted. The implementation of this namespace depends
+    on its peer, `lexical.fixed`, for performing most of its work.
+    """
+
+    def __new__(cls, bytes):
+        '''Return an alphabet that contains the specified `bytes`.'''
+        symbols = {byte for byte in bytes}
+        iterable = (byte for byte in range(0x100) if byte in symbols)
+        alphabet = bytearray(iterable)
+        reversed = [alphabet.index(byte) if byte in symbols else -1 for byte in range(0x100)]
+        return alphabet, len(alphabet), reversed
+
+    class fixed(object):
+        """
+        Used to encode and decode data that can be lexically sorted at a fixed
+        size. The length of the sorted result is specified by `width`.
+        """
+        def __new__(cls, width, bytes):
+            '''Create a new alphabet composed of the specified `bytes` to encode/decode data of the given `width`.'''
+            alphabet = _, base, _ = lexical(bytes)
+            return alphabet, width, pow(base, width) - 1
+
+        @classmethod
+        def linear(cls, symbols, base, integer, width):
+            '''Encode the specified `integer` as `width` bytes with the given `symbols` and `base`.'''
+            Fencode = lambda aggregate, base: (lambda integer, remainder: aggregate + [(integer, symbols[remainder])])(*divmod(aggregate[-1][0], base))
+            iterable = functools.reduce(Fencode, [base] * width, [(integer, base)])[1:][::-1]
+            return bytearray(byte for integer, byte in iterable)
+
+        @classmethod
+        def encode(cls, fixed, integer):
+            '''Encode the specified `integer` using the alphabet specified by `fixed`.'''
+            alphabet, width, maximum = fixed
+            symbols, base, reversed = alphabet
+
+            if width <= 0x10:
+                return cls.linear(symbols, base, integer, width)
+
+            stack, chunks = [(integer, width)], bytearray()
+            while stack:
+                integer, width = stack.pop()
+                midpoint, _  = divmod(width, 2)
+
+                if width <= 0x10:
+                    chunks.extend(cls.linear(symbols, base, integer, width))
+                else:
+                    divisor = pow(base, midpoint)
+                    right, left = divmod(integer, divisor)
+
+                    stack.append((left, midpoint))
+                    stack.append((right, width - midpoint))
+                continue
+            return chunks
+
+        @classmethod
+        def decode(cls, fixed, bytes):
+            '''Decode the specified `bytes` into an integer using the alphabet `fixed`.'''
+            alphabet, _, _ = fixed
+            _, base, reversed = alphabet
+            return functools.reduce(lambda aggregate, byte: aggregate * base + reversed[byte], bytes, 0)
+
+    class variable(object):
+        """
+        Used to encode and decode data that can be lexically sorted at a
+        variable size. The encoding will only use one of the specified `bytes`.
+
+        This namespace contains the `lexical.variable.prefix` namespace which is
+        used to encode the number of bytes as a prefix that can be inserted
+        before an encoding so that the lexical sorting will have the effect of
+        grouping encoded integers of the same length.
+        """
+        def __new__(cls, bytes):
+            '''Return an alphabet for the specified `bytes` to encode or decode an integer with a variable size.'''
+            alphabet = symbols, base, _ = lexical(bytes)
+            return alphabet, symbols[-1], base - 1, base.bit_length()
+
+        class prefix(object):
+            """
+            This namespace is used to encode a prefix for a specific length of
+            bytes so that their lexical order will be grouped by the number of
+            bytes stored in the prefix. These bytes will always coincide with
+            the alphabet that was chosen.
+            """
+            @classmethod
+            def minimum(cls, variable, integer):
+                '''Return the minimum number of bytes for the specified `integer` using the alphabet `variable`.'''
+                if integer < 1:
+                    return 1
+                bits = integer.bit_length()
+                alphabet, maximum, count, perbyte = variable
+                _, base, _ = alphabet
+
+                left = max(1, (bits + perbyte - 1) // perbyte)
+                right = ((bits + perbyte - 2) // (perbyte - 1)) if perbyte > 1 else bits
+                right = max(left, right)
+
+                while left < right:
+                    mid = (left + right) // 2
+                    left, right = (left, mid) if pow(base, mid) > integer else (mid + 1, right)
+                return left
+
+            @classmethod
+            def encode(cls, variable, width):
+                '''Use the alphabet from `variable` to encode bytes representing the specified `width`.'''
+                alphabet, maximum, count, perbyte = variable
+                symbols, _, _ = alphabet
+                continuation, terminal = divmod(width - 1, count)
+                iterable = itertools.chain([maximum] * continuation, [symbols[terminal]])
+                return bytearray(iterable)
+
+            @classmethod
+            def decode(cls, variable, bytes, offset):
+                '''Use the alphabet from `variable` to encode the specified `bytes` at the given `offset`.'''
+                alphabet, maximum, count, perbyte = variable
+                _, _, reversed = alphabet
+                continuation, index = 0, offset
+                while index < len(bytes) and bytes[index] == maximum:
+                    continuation += 1
+                    index += 1
+                if index >= len(bytes):
+                    raise IndexError("{:s}.decode({!s}, {!s}, {:d}): The given bytes ({:d}) are not large enough ({:d}) to contain the encoded integer after the variable-length prefix.".format('.'.join([__module__, 'lexical', 'variable', cls.__name__]), '<alphabet>', "...{:d} byte{:s}...".format(len(bytes), '' if len(bytes) == 1 else 's'), offset, len(bytes), index))
+                terminal = reversed[bytes[index]]
+                if terminal < 0:
+                    raise IndexError("{:s}.decode({!s}, {!s}, {:d}): The index ({:d}) used to recover the terminal byte ({:d}) references a byte ({:#02x}) that is not within the given alphabet.".format('.'.join([__module__, 'lexical', 'variable', cls.__name__]), '<alphabet>', "...{:d} byte{:s}...".format(len(bytes), '' if len(bytes) == 1 else 's'), index, terminal, bytearray(bytes)[index]))
+                index += 1
+                width = continuation * maximum + terminal + 1
+                return width, index - offset
+
+        @classmethod
+        def encode(cls, variable, integer):
+            '''Use the alphabet specified by `variable` to encode the given `integer`.'''
+            width = cls.prefix.minimum(variable, integer)
+            alphabet, maximum, count, perbyte = variable
+            symbols, _, _ = alphabet
+            fixed = lexical.fixed(width, symbols)
+            iterable = itertools.chain(cls.prefix.encode(variable, width), lexical.fixed.encode(fixed, integer))
+            return bytearray(iterable)
+
+        @classmethod
+        def decode(cls, variable, bytes):
+            '''Use the alphabet specified by `variable` to decode the given `bytes` as an integer.'''
+            width, left = cls.prefix.decode(variable, bytes, 0)
+            right = left + width
+            if right > len(bytes):
+                raise ValueError(width, left, len(bytes))
+            alphabet, maximum, count, perbyte = variable
+            symbols, _, _ = alphabet
+            fixed = lexical.fixed(width, symbols)
+            return lexical.fixed.decode(fixed, bytes[left : right])
+
+        @classmethod
+        def length(cls, variable, integer):
+            '''Return the number of bytes of the specified `integer` encoded with the alphabet `variable`.'''
+            width = cls.prefix.minimum(variable, integer)
+            _, _, count, _ = variable
+            continuation = (width - 1) // count
+            return continuation + 1 + width
+
 class hashbytes(hash):
     """
     This is a derivative of the `hash` namespace which is used to
