@@ -6,7 +6,7 @@ can be mindless when reading/writing/enumerating data out of a netnode.
 This is an internal module and is not expected to be used by the user.
 """
 
-import functools, operator, itertools
+import functools, itertools, sys, operator
 import idaapi
 
 import internal
@@ -1781,82 +1781,66 @@ class hashbytes(hash):
 
     The bytes stored in a "hashval" are encoded to ensure that
     there's no "\0" byte being used since it is intended to store
-    only strings. We overcome this limitation by always ensuring
-    that the lowest bit is always set resulting in each byte being
-    able to store only 7-bits worth of information. It is worth
-    noting that the encoding we use will screw up the ordering of
-    each item in the "hashval".
-
-    This results in a dictionary in where the key is encoded when
-    written into its specified netnode. The maximum length of a
-    "hashval" key is 1024 bytes (MAXSPECSIZE). Due to the encoding,
-    the maximum size is not 8192 bits, but 7168 bits. This results
-    in the size being 896 bytes for a 12.5% increase in its cost.
+    only strings. This results in a dictionary in where the key is
+    encoded when written into its specified netnode. The maximum
+    length of a "hashval" key is 1024 bytes (MAXSPECSIZE). However,
+    due to the encoding, the maximum integer size decreases from
+    8192 bits down to 8146 bits. This results in the maximum byte
+    being a total of 1018 bytes.
     """
 
-    # FIXME: is there a better way to do this with a universal coding and
-    #        perhaps reduce the bit loss that this algorithm has?
+    alphabet = lexical.variable(range(1, 0x100))
 
-    # FIXME: a side effect of encoding this is that the sort order that the
-    #        disassembler uses will be incorrectly sorted since it will be
-    #        acting on the encoded bytes and not the original ones.
+    ### We need the following functions to convert to and from integers since
+    ### our lexicographical encoding algorithm was originally written for them.
+    def __encode_integer_py2(integer):
+        '''Convert the specified `integer` into its corresponding bytes for Py2.'''
+        octets, divisor = bytearray(), 0x100
+        while integer > 0:
+            integer, octet = divmod(integer, divisor)
+            octets.insert(0, octet)
+        return octets or bytearray([0])
 
-    @staticmethod
-    def __decode_bytes(bytes):
-        '''Yield each of the specified `bytes` decoded into their original form.'''
-        octets = bytearray(bytes)
-        iterable = itertools.cycle([pow(2, index) for index in range(8)][::-1])
-        shifts = itertools.chain([pow(2, 0)], iterable)
+    def __encode_integer_py3(integer):
+        '''Convert the specified `integer` into its corresponding bytes for Py3.'''
+        bits = integer.bit_length()
+        length, _ = divmod(bits + 7, 8)
+        return integer.to_bytes(length, byteorder='big')
 
-        # zip together our powers of 2 in order to figure out where the bits
-        # that're carried are supposed to go. the only time that we have less
-        # than 7-bits is when we're at a multiple of the first byte.
-        carry = 0
-        for octet, shift in zip(octets, shifts):
-            carry += octet * shift
-            if shift == 1:
-                continue
-            carry, integer = divmod(carry, 0x100)
-            yield integer
-        return
+    # Use the major version of Python to assign the correct one for encoding.
+    __encode_integer = staticmethod(__encode_integer_py2 if sys.version_info.major < 3 else __encode_integer_py3)
 
-    @staticmethod
-    def __encode_bytes(bytes):
-        '''Yield each of the specified `bytes` encoded into a form that excludes "\x00" bytes.'''
-        octets, shift = bytearray(bytes), 0x80
+    def __decode_integer_py2(bytes):
+        '''Convert the specified `bytes` into a native integer for Py2.'''
+        iterable = iter(bytearray(bytes)) if isinstance(bytes, (b''.__class__, bytearray)) else iter(bytes or b'')
+        Faggregate = lambda carry, octet: carry * 0x100 + octet
+        return functools.reduce(Faggregate, iterable, 0)
 
-        # FIXME: is there a way to avoid this counting?
-        count, extra = divmod(8 * len(octets), 7)
-        count += 1 if extra else 0
+    def __decode_integer_py3(bytes):
+        '''Convert the specified `bytes` into a native integer for Py3.'''
+        return int.from_bytes(bytes, 'big')
 
-        # carrying the high bit aggregates a bit count that is a power of 2, so
-        # we'll need to include those bits for each octet that we process.
-        carry = index = 0
-        for index, octet in enumerate(octets):
-            carry, integer = divmod(octet * pow(2, index) + carry, shift)
-            yield integer
+    # Do the same using the Python major version, but for decoding an integer.
+    __decode_integer = staticmethod(__decode_integer_py2 if sys.version_info.major < 3 else __decode_integer_py3)
 
-        # handle the carried integer until we hit the expected byte count.
-        while 1 + index < count:
-            carry, integer = divmod(carry, shift)
-            yield integer
-            index += 1
-        return
+    ### The following two functions are for encoding and decoding bytes so that
+    ### they can be used with our lexicographical encoding algorithm.
+    @classmethod
+    def encode_bytes(cls, bytes):
+        '''Encode the specified bytes in their lexicographically sortable format.'''
+        integer = cls.__decode_integer(bytes)
+        encoded = lexical.variable.encode(cls.alphabet, integer)
+        return bytearray(encoded)
 
     @classmethod
-    def encode_bytes(cls, decoded):
-        '''Encode the bytes specified by `decoded`.'''
-        encoded = cls.__encode_bytes(decoded)
-        iterable = (2 * integer + 1 for integer in encoded)
-        return bytearray(iterable)
-
-    @classmethod
-    def decode_bytes(cls, encoded):
-        '''Decode the specified `encoded` bytes back to their original form..'''
-        iterable = (integer // 2 for integer in bytearray(encoded))
-        decoded = cls.__decode_bytes(iterable)
+    def decode_bytes(cls, bytes):
+        '''Decode the encoded `bytes` back to their original form.'''
+        integer = lexical.variable.decode(cls.alphabet, bytes)
+        decoded = cls.__encode_integer(integer)
         return bytearray(decoded)
 
+    ### The next two functions are responsible for taking some bytes used as the
+    ### key, and encoding them so that they are sorted in the specified hashval.
     @classmethod
     def encode_key(cls, key):
         '''Encode the bytes specified by `key` into a format recognized by the "hashval" api.'''
