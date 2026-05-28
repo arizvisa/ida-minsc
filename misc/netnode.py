@@ -1565,6 +1565,36 @@ class hash(object):
         '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         return cls.__repr__(nodeidx, tag, "{!r}".format)
 
+class hashraw(hash):
+    """
+    This derivative of the `hash` namespace is used to store byte data within a
+    given netnode. The byte data is keyed by an arbitrary number of characters
+    that exclude the "\x00" byte. The namespace is intended to preserve the
+    original key and values as accurately as possible.
+    """
+
+    @classmethod
+    def encode_key(cls, key):
+        '''Encode the bytes specified by `key` into a format recognized by the "hashval" api.'''
+        if isinstance(key, internal.types.string):
+            data = key.encode('latin1', 'replace').decode('latin1', 'replace')
+        else:
+            data = bytes(key).decode('latin1', 'replace')
+        return super(hashraw, cls).encode_key(data)
+
+    @classmethod
+    def decode_key(cls, data):
+        '''Decode the specified `data` from the "hashval" api back into its original bytes.'''
+        key = super(hashraw, cls).decode_key(data)
+        if isinstance(key, internal.types.string):
+            return bytes(key.encode('latin1', 'replace'))
+        return bytes(key)
+
+    @classmethod
+    def repr(cls, nodeidx, tag=None):
+        '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
+        return cls.__repr__(nodeidx, tag, operator.methodcaller('hex'))
+
 class hashbytes(hash):
     """
     This is a derivative of the `hash` namespace which is used to
