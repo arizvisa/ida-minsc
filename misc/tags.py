@@ -351,6 +351,24 @@ class query_v0(object):
             if collected: yield blocks[ea], collected
         return
 
+    @classmethod
+    def hexcontents(cls, required=[], included=[]):
+        '''Query the tags of all decompiled functions and yield a tuple containing the function address and all of the `required` tags with any `included` ones.'''
+        return
+        yield
+
+    @classmethod
+    def hexfunction(cls, func, required=[], included=[]):
+        '''Query the tags of the decompiled function `func` and yield a tuple containing the location and all of the `required` tags with any `included` ones.'''
+        return
+        yield
+
+    @classmethod
+    def hexvariable(cls, func, *args, **kwargs):
+        '''Query the tags for the variables from the decompiled function `func` and yield a tuple containing the location and all of the `required` tags with any `included` ones.'''
+        return
+        yield
+
 class select_v0(object):
     """
     This namespace is used to select different types of tags from the tagcache
@@ -530,7 +548,7 @@ class select_v0(object):
 
     @classmethod
     def blocks(cls, func, *args, **kwargs):
-        '''Query the basic blocks of the func `func` and yield a tuple containing each block and all of the `required` tags with any `included` ones.'''
+        '''Query the basic blocks of the function `func` and yield a tuple containing each block and all of the `required` tags with any `included` ones.'''
         if args or kwargs:
             for bb, res in query_v0.blocks(func, *args, **kwargs):
                 yield bb, res
@@ -544,6 +562,21 @@ class select_v0(object):
                 yield bb, explicit
             continue
         return
+
+    @classmethod
+    def hexcontents(cls, *args, **kwargs):
+        '''Query the tags of all decompiled functions and yield a tuple containing the function address and all of the `required` tags with any `included` ones.'''
+        return query_v0.hexcontents(*args, **kwargs)
+
+    @classmethod
+    def hexfunction(cls, func, *args, **kwargs):
+        '''Query the tags of the decompiled function `func` and yield a tuple containing the location and all of the `required` tags with any `included` ones.'''
+        return query_v0.hexfunction(func, *args, **kwargs)
+
+    @classmethod
+    def hexvariable(cls, func, *args, **kwargs):
+        '''Query the tags for the variables from the decompiled function `func` and yield a tuple containing the location and all of the `required` tags with any `included` ones.'''
+        return query_v0.hexvariable(func, *args, **kwargs)
 
 class query_v1(object):
     """
