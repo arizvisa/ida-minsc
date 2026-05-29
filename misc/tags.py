@@ -2831,6 +2831,54 @@ class reference_v1(object):
             selected = [mid for mid, used in iterable]
             return internal.tagindex.members.erase(sid, selected)
 
+    class hexfunction(object):
+        """
+        This namespace is just a frontend for the addresses that belong to a
+        decompiled function. Each location is a specified by a database-native
+        address and a 32-bit `item_preciser_t`.
+        """
+        @classmethod
+        def has(cls, preciser, **target):
+            res = internal.tagindex.hexfunction.get(preciser)
+            return True if res else False
+        @classmethod
+        def get(cls, preciser, **target):
+            return internal.tagindex.hexfunction.get(preciser)
+        @classmethod
+        def increment(cls, preciser, name, **target):
+            return internal.tagindex.hexfunction.increment(preciser, name)
+        @classmethod
+        def decrement(cls, preciser, name, **target):
+            return internal.tagindex.hexfunction.decrement(preciser, name)
+        @classmethod
+        def count(cls, preciser, **target):
+            return len(cls.get(preciser, **target))
+        @classmethod
+        def iterate(cls):
+            iterable = internal.tagindex.hexfunction.select()
+            return ((ea, internal.tagindex.tags.names(used)) for ea, used in iterable)
+        @classmethod
+        def name(cls, func, **target):
+            used = internal.tagindex.hexfunction.usage(func)
+            return internal.tagindex.tags.names(used)
+        @classmethod
+        def address(cls, func, **target):
+            return [ea for ea, _ in internal.tagindex.hexfunction.function(func)]
+        @classmethod
+        def counts(cls, func):
+            res, used = {}, (integer for ea, integer in internal.tagindex.hexfunction.function(func))
+            for name in itertools.chain(*map(internal.tagindex.tags.names, used)):
+                res[name] = res.setdefault(name, 0) + 1
+            return res
+        @classmethod
+        def erase_address(cls, preciser):
+            names = internal.tagindex.hexfunction.get(preciser)
+            removed = [internal.tagindex.hexfunction.decrement(preciser, name) for name in names]
+            return len(names)
+        @classmethod
+        def erase(cls, func):
+            return internal.tagindex.hexfunction.erase(func)
+
 # Select the v0 frontend by default. This using the functionality provided
 # by the tagcache which has since been redesigned into the tagging index.
 reference = reference_v0
