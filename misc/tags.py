@@ -2633,6 +2633,48 @@ class reference_v0(object):
         def erase(cls, sid):
             return []
 
+    class hexfunction(object):
+        """
+        This namespace is just a frontend for the addresses that belong to a
+        decompiled function. Each location is a specified by a database-native
+        address and a 32-bit `item_preciser_t`. This has no implementation
+        because the `internal.tagcache` backend does not have support for
+        querying information from a decompiled function.
+        """
+        @classmethod
+        def has(cls, preciser, **target):
+            return False
+        @classmethod
+        def get(cls, ea, **target):
+            return {tag for tag in []}
+        @classmethod
+        def increment(cls, preciser, name, **target):
+            return 0
+        @classmethod
+        def decrement(cls, preciser, name, **target):
+            return 0
+        @classmethod
+        def count(cls, preciser, **target):
+            return 0
+        @classmethod
+        def iterate(cls):
+            return (preciser for preciser in [])
+        @classmethod
+        def name(cls, func, **target):
+            return {tag for tag in []}
+        @classmethod
+        def address(cls, func, **target):
+            return [preciser for preciser in []]
+        @classmethod
+        def counts(cls, address):
+            return {}
+        @classmethod
+        def erase_address(cls, preciser):
+            return []
+        @classmethod
+        def erase(cls, func):
+            return []
+
 class reference_v1(object):
     """
     This namespace is basically a frontend to whatever backend is currently
