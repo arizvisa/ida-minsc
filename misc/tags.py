@@ -2606,13 +2606,25 @@ class hexfunction(object):
     """
 
     @classmethod
-    def get(cls, preciser):
+    def get(cls, func, *args):
         '''Return a dictionary containing the tags for the decompiler item at `preciser`.'''
         treeloc = idaapi.treeloc_t()
+
+        # if we were given two parameters, then one of them is the function.
+        if args:
+            [preciser] = args
+            cfunc = internal.hexrays.function(func)
+
+        # if we were given one parameter, then we need to figure out the cfunc
+        # ourselves using the address given in the preciser.
+        else:
+            preciser = ea, itp = func
+            cfunc = internal.hexrays.function(ea)
+
+        # now we can create the locator for the function's ctree.
         treeloc.ea, treeloc.itp = preciser
 
         # get the comment at the specified preciser and decode it into a dict.
-        cfunc = internal.hexrays.function(treeloc.ea)
         usercmt = cfunc.get_user_cmt(treeloc, idaapi.RETRIEVE_ALWAYS)
         decoded = comment.decode(usercmt)
 
@@ -2640,13 +2652,30 @@ class hexfunction(object):
         return decoded
 
     @classmethod
-    def set(cls, preciser, key, value):
+    def set(cls, func, *args):
         '''Set the tag specified by `key` to `value` for the decompiler item at `preciser`.'''
         treeloc = idaapi.treeloc_t()
-        treeloc.ea, treeloc.itp = preciser
 
-        # get the user comment for the specified preciser.
-        cfunc = internal.hexrays.function(treeloc.ea)
+        # if we were given three parameters, then we have the function and only
+        # need to unpack the preciser, key, and value from our args.
+        if len(args) == 3:
+            [preciser, key, value] = args
+            cfunc = internal.hexrays.function(func)
+
+        # if we were given two parameters, then we need to figure out the cfunc
+        # ourselves using the preciser
+        elif len(args) == 2:
+            [key, value] = args
+            preciser = ea, itp = func
+            cfunc = internal.hexrays.function(ea)
+
+        # otherwise we got an invalid number of parameters.
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}, {:#x}, {:d}).tag({!r}, {!r}) : Unable to set the requested tag due to an unexpected number of parameters being used.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), treeloc.ea, treeloc.itp, key, value))
+
+        # now we can use the preciser to create the tree locator, and then we
+        # can use the tree locator to get the comment from the function.
+        treeloc.ea, treeloc.itp = preciser
         usercmt = cfunc.get_user_cmt(treeloc, idaapi.RETRIEVE_ALWAYS)
 
         # then we can start checking for the implicit tags.
@@ -2673,13 +2702,30 @@ class hexfunction(object):
         return res
 
     @classmethod
-    def remove(cls, preciser, key, none):
+    def remove(cls, func, *args):
         '''Remove the tag specified by `key` from the decompiler item at `preciser`.'''
         treeloc = idaapi.treeloc_t()
-        treeloc.ea, treeloc.itp = preciser
 
-        # get the user comment for the specified preciser.
-        cfunc = internal.hexrays.function(treeloc.ea)
+        # if we were given three parameters, then we have the function and only
+        # need to unpack the preciser, key, and value from our args.
+        if len(args) == 3:
+            [preciser, key, none] = args
+            cfunc = internal.hexrays.function(func)
+
+        # if we were given two parameters, then we need to figure out the cfunc
+        # ourselves using the preciser
+        elif len(args) == 2:
+            [key, none] = args
+            preciser = ea, itp = func
+            cfunc = internal.hexrays.function(ea)
+
+        # otherwise we got an invalid number of parameters.
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}, {:#x}, {:d}).tag({!r}, {!r}) : Unable to remove the requested tag due to an unexpected number of parameters being used.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), treeloc.ea, treeloc.itp, key, none))
+
+        # now we can create the locator for the function's ctree and use it to
+        # get the comment from the specified preciser.
+        treeloc.ea, treeloc.itp = preciser
         usercmt = cfunc.get_user_cmt(treeloc, idaapi.RETRIEVE_ALWAYS)
 
         # if the implicit tag is a name, then go ahead and remove it.
@@ -2721,19 +2767,34 @@ class hexvariable(object):
     """
 
     @classmethod
-    def get(cls, locator):
+    def get(cls, func, *args):
         '''Return a dictionary containing the tags for the decompiler variable specified by `locator`.'''
-        if isinstance(locator, internal.hexrays.ida_hexrays_types.lvar_locator_t):
+        [arg] = args if args else [func]
+
+        # figure out if we were given a locator or a function with a locator.
+        # then we can determine unpack the locator depending on the type.
+        if args and isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
+            locator = internal.hexrays.variables.by(func, *args)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+
+        elif args:
+            if isinstance(func, internal.hexrays.ida_hexrays_types.hexrays_func_types):
+                ea = internal.hexrays.function.address(func)
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}).tag() : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), ea, arg))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({!r}, {!r}).tag() : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), func, arg))
+
+        elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
+            locator = internal.hexrays.variables.by(*args)
+            defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+
         else:
-            defea, atype, alocinfo = locator
-        cfunc = internal.hexrays.function(defea)
+            defea, atype, alocinfo = arg
+            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+            locator = internal.hexrays.variable.new_locator(defea, vdloc)
 
-        # instantiate an lvar_locator_t for the variable locator we were given.
-        locator, vdloc = idaapi.lvar_locator_t(), internal.hexrays.variable.copy_vdloc(atype, alocinfo)
-        locator.defea, locator.location = defea, vdloc
-
-        # now we can grab the comment for the variable and decode it.
+        # now we can get the function from the parameters, and then use the
+        # locator to grab the comment for the variable and decode it.
+        cfunc = internal.hexrays.function(func if args else defea)
         cmt = internal.hexrays.variable.get_comment(cfunc, locator)
         decoded = comment.decode(cmt)
 
@@ -2760,20 +2821,37 @@ class hexvariable(object):
         return decoded
 
     @classmethod
-    def set(cls, locator, key, value):
+    def set(cls, func, *args):
         '''Set the tag specified by `key` to `value` for the decompiler variable specified by `locator`.'''
-        if isinstance(locator, internal.hexrays.ida_hexrays_types.lvar_locator_t):
+        if len(args) not in {2, 3}:
+            parameters = [("{!r}".format(arg) if isinstance(arg, internal.types.string) else "{!s}".format(arg)) for arg in args]
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({!r}).tag({!s}) : Unable to determine the key and value from an unexpected number of parameters.".format('.'.join([__name__, cls.__name__]), func, ', '.join(parameters)))
+
+        # unpack the arguments and determine whether we were given a locator or
+        # a function with a locator, and then use the arg type to unpack it.
+        [arg, key, value] = args if len(args) == 3 else itertools.chain([func], args)
+        if len(args) > 2 and isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
+            locator = internal.hexrays.variables.by(func, *args)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+
+        elif len(args) > 2:
+            if isinstance(func, internal.hexrays.ida_hexrays_types.hexrays_func_types):
+                ea = internal.hexrays.function.address(func)
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}).tag({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), ea, arg, key, value))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({!r}, {!r}).tag({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), func, arg, key, value))
+
+        elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
+            locator = internal.hexrays.variables.by(*args)
+            defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+
         else:
-            defea, atype, alocinfo = locator
-        cfunc = internal.hexrays.function(defea)
+            defea, atype, alocinfo = arg
+            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+            locator = internal.hexrays.variable.new_locator(defea, vdloc)
 
-        # instantiate an lvar_locator_t for the variable locator we were given.
-        locator, vdloc = idaapi.lvar_locator_t(), internal.hexrays.variable.copy_vdloc(atype, alocinfo)
-        locator.defea, locator.location = defea, vdloc
-
-        # first thing is to determine if we're supposed to be setting an
-        # implicit tag. this requires checking the variable and its type.
+        # now we can grab the function from the determined address or argument
+        # and figure out if we're supposed to be setting an implicit tag or not.
+        cfunc = internal.hexrays.function(func if len(args) > 2 else defea)
         if key == '__name__':
             return internal.hexrays.variable.set_name(cfunc, locator, value)
 
@@ -2794,20 +2872,39 @@ class hexvariable(object):
         return res
 
     @classmethod
-    def remove(cls, locator, key, none):
+    def remove(cls, func, *args):
         '''Remove the tag specified by `key` from the decompiler variable specified by `locator`.'''
-        if isinstance(locator, internal.hexrays.ida_hexrays_types.lvar_locator_t):
-            defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
-        else:
-            defea, atype, alocinfo = locator
-        cfunc = internal.hexrays.function(defea)
+        if len(args) not in {2, 3}:
+            parameters = [("{!r}".format(arg) if isinstance(arg, internal.types.string) else "{!s}".format(arg)) for arg in args]
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({!r}).tag({!s}) : Unable to determine the key and value from an unexpected number of parameters.".format('.'.join([__name__, cls.__name__]), func, ', '.join(parameters)))
 
-        # instantiate an lvar_locator_t for the variable locator we were given.
-        locator, vdloc = idaapi.lvar_locator_t(), internal.hexrays.variable.copy_vdloc(atype, alocinfo)
-        locator.defea, locator.location = defea, vdloc
+        # unpack the arguments and determine whether we were given a locator or
+        # a function with a locator, and then use the arg type to unpack it.
+        [arg, key, none] = args if len(args) == 3 else itertools.chain([func], args)
+        if len(args) > 2 and isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
+            locator = internal.hexrays.variables.by(func, *args)
+            defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+
+        elif len(args) > 2:
+            if isinstance(func, internal.hexrays.ida_hexrays_types.hexrays_func_types):
+                ea = internal.hexrays.function.address(func)
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}).tag({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), ea, arg, key, none))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({!r}, {!r}).tag({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), func, arg, key, none))
+
+        elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
+            locator = internal.hexrays.variables.by(*args)
+            defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+
+        else:
+            defea, atype, alocinfo = arg
+            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+            locator = internal.hexrays.variable.new_locator(defea, vdloc)
 
         # then figure out if we need to remove something due to an implicit tag
         # being specified. we start with the name and then we can do the type.
+        # then we can grab the function from the unpacked information, and
+        # determine if we need to handle removing an implicit tag.
+        cfunc = internal.hexrays.function(func if len(args) > 2 else defea)
         if _key == '__name__':
             return internal.hexrays.variable.remove_name(cfunc, locator)
 
