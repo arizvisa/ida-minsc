@@ -2604,7 +2604,27 @@ class hexfunction(object):
         usercmt = cfunc.get_user_cmt(treeloc, idaapi.RETRIEVE_ALWAYS)
         decoded = comment.decode(usercmt)
 
-        # FIXME: add any of the implicit tags to the decoded dictionary.
+        # first we need to check the address to look for an associated name.
+        name = interface.name.get(treeloc.ea, idaapi.GN_LOCAL)
+        if name is not None:
+            decoded.setdefault('__name__', name)
+
+        # then we need to see if there's a label nearby. to accomplish this,
+        # it seems we'll need to iterate through the instructions to find
+        # each address of a labelled location and then compare it.
+        iterable = internal.hexrays.function.user_labels(cfunc.user_labels)
+        iterable = ((cfunc.find_label(num), label) for name, label in iterable)
+        filtered = ((citem.ea, label) for citem, label in iterable if citem)
+
+        # now we can check if the address matches the location. if it does, then
+        # we can go ahead and set the tag.
+        # FIXME: it might be better to check the boundaries of the block
+        #        containing the preciser and then check the address with that.
+        ea_label = next(filtered, None)
+        if ea_label is not None:
+            ea, label = ea_label
+            decoded.setdefault('__label__', label) if ea == treeloc.ea else decoded
+
         return decoded
 
     @classmethod
@@ -2617,7 +2637,16 @@ class hexfunction(object):
         cfunc = internal.hexrays.function(treeloc.ea)
         usercmt = cfunc.get_user_cmt(treeloc, idaapi.RETRIEVE_ALWAYS)
 
-        # FIXME: add support for writing the implicit tags here.
+        # then we can start checking for the implicit tags.
+        if key == '__name__':
+            return interface.name.set(treeloc.ea, value, idaapi.SN_LOCAL)
+
+        # FIXME: this is currently unimplemented. i think we'd need to first
+        #        confirm if the location points to a labelled treeitem, and
+        #        then we can apply the label. unfortunately, i don't know of
+        #        a way to enumerate all of the labelled address in a function.
+        elif name == '__label__':
+            pass
 
         # decode the comment and update the tags with the new value. once that
         # is done we just need to re-encode the tags prior to writing.
@@ -2641,7 +2670,15 @@ class hexfunction(object):
         cfunc = internal.hexrays.function(treeloc.ea)
         usercmt = cfunc.get_user_cmt(treeloc, idaapi.RETRIEVE_ALWAYS)
 
-        # FIXME: if there are any implicit tags, remove them here.
+        # if the implicit tag is a name, then go ahead and remove it.
+        if key == '__name__':
+            return interface.name.set(treeloc.ea, None, idaapi.SN_LOCAL)
+
+        # FIXME: this is currently unimplemented similar to the `set` function
+        #        since i don't know of an immediate way to map an address to the
+        #        actual label number used by `cfunc_t.find_label`.
+        elif key == '__label__':
+            pass
 
         # decode the comment and check the key to remove actually exists.
         decoded = comment.decode(usercmt)
@@ -2688,9 +2725,26 @@ class hexvariable(object):
         cmt = internal.hexrays.variable.get_comment(cfunc, locator)
         decoded = comment.decode(cmt)
 
-        # FIXME: add all the implicit tags here too.
+        # now all we need to do is to add the implicit tags here. all of this
+        # is basically handled by the `internal.hexrays.variable` namespace.
+        name = internal.hexrays.variable.get_name(cfunc, locator)
+        typeinfo = internal.hexrays.variable.get_type(cfunc, locator)
 
-        # now all we need to do is return the modified dictionary.
+        # when processing the name, we need to distinguish whether there's a
+        # custom name applied or a regular name chosen by the decompiler.
+        lvar = internal.hexrays.variables.get(cfunc, locator)
+        if lvar.has_user_name:
+            decoded.setdefault('__name__', name)
+
+        # when determining whether the type has a tag, we need to distinguish
+        # between a native compiler type and a user-specified one.
+        if not interface.tinfo.compiler(typeinfo):
+            validname = interface.name.member(name) # FIXME: types have different character requirements
+            typeinfo_string = idaapi.print_tinfo('', 0, 0, 0, typeinfo, validname, '')
+            decoded.setdefault('__typeinfo__', typeinfo_string)
+
+        # that should be everything, so all we need to do now is to return the
+        # modified dictionary.
         return decoded
 
     @classmethod
@@ -2706,11 +2760,17 @@ class hexvariable(object):
         locator, vdloc = idaapi.lvar_locator_t(), internal.hexrays.variable.copy_vdloc(atype, alocinfo)
         locator.defea, locator.location = defea, vdloc
 
-        # FIXME: add support for writing the implicit tags for variables here.
+        # first thing is to determine if we're supposed to be setting an
+        # implicit tag. this requires checking the variable and its type.
+        if key == '__name__':
+            return internal.hexrays.variable.set_name(cfunc, locator, value)
 
-        # first thing to do is to grab the comment and then decode it. after
-        # it's been coded, we update the dictionary with whatever the user
-        # specified and then re-encode it so that we can write it back.
+        elif key == '__typeinfo__':
+            return internal.hexrays.variable.set_type(cfunc, locator, value)
+
+        # otherwise we can grab the comment and then decode it. after it's been
+        # coded, we update the dictionary with whatever the user specified and
+        # then re-encode it so that we can write it back.
         cmt = internal.hexrays.variable.get_comment(cfunc, locator)
         decoded = comment.decode(cmt)
         res, decoded[key] = decoded.get(key, None), value
@@ -2734,7 +2794,13 @@ class hexvariable(object):
         locator, vdloc = idaapi.lvar_locator_t(), internal.hexrays.variable.copy_vdloc(atype, alocinfo)
         locator.defea, locator.location = defea, vdloc
 
-        # FIXME: if there are any implicit tags, remove them here.
+        # then figure out if we need to remove something due to an implicit tag
+        # being specified. we start with the name and then we can do the type.
+        if _key == '__name__':
+            return internal.hexrays.variable.remove_name(cfunc, locator)
+
+        elif key == '__typeinfo__':
+            return internal.hexrays.variable.remove_type(cfunc, locator)
 
         # now we use the locator to get the command and decode it. before doing
         # anything, though, we check that the tag exists in the decoded comment.
