@@ -877,8 +877,20 @@ class query_v1(object):
     @classmethod
     def hexvariable(cls, func, require=frozenset(), include=frozenset()):
         '''Yield the variable locator and tags for the variables from the decompiled function `func` containing all the tags in `require` and including any from `include`.'''
+        fn = interface.function.by(func)
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+        for mid, used in internal.tagindex.hexvariable.function(fn):
+            if not(used):
+                continue
+            elif not(selection) and used:
+                yield mid, internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield mid, internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield mid, internal.tagindex.tags.names(used & requested)
+            continue
         return
-        yield
 
 class select_v1(object):
     """
@@ -1059,13 +1071,13 @@ class select_v1(object):
         '''Yield the function address and tags from the contents of each function containing all the tags in `require` and including any from `include`.'''
         selection = True if any([args, kwargs]) else False
         for preciser, used in query_v1.hexfunction(func, *args, **kwargs):
-            ea, itp = preciser
-            tags = {}   # FIXME: we need a way to get the tags for a preciser.
+            ea, _ = preciser
+            tags = hexfunction.get(preciser)
             ea = cls.navigation.analyze(ea)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
             if selection:
-                yield preciser, used
+                yield preciser, selected
             elif explicit:
                 yield preciser, explicit
             continue
@@ -1077,12 +1089,12 @@ class select_v1(object):
         selection = True if any([args, kwargs]) else False
         for locator, used in query_v1.hexvariable(func, *args, **kwargs):
             defea, atype, alocinfo = locator
-            tags = {}   # FIXME: we need a way to get the tags for a variable by its locator.
+            tags = hexvariable.get(locator)
             ea = cls.navigation.analyze(defea)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
             if selection:
-                yield locator, used
+                yield locator, selected
             elif explicit:
                 yield locator, explicit
             continue
