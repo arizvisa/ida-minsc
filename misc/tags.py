@@ -839,6 +839,47 @@ class query_v1(object):
             continue
         return
 
+    @classmethod
+    def hexcontents(cls, require=frozenset(), include=frozenset()):
+        '''Yield the function address and tags for each decompiled function containing all the tags in `require` and including any from `include`.'''
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+        for ea, used in internal.tagindex.hexfunction.select():
+            if not(used):
+                continue
+            elif not(selection) and used:
+                yield ea, internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield ea, internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield ea, internal.tagindex.tags.names(used & requested)
+            continue
+        return
+
+    @classmethod
+    def hexfunction(cls, func, require=frozenset(), include=frozenset()):
+        '''Yield the preciser and tags from the decompiled function `func` containing all the tags in `require` and including any from `include`.'''
+        fn = interface.function.by(func)
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+        for preciser, used in internal.tagindex.hexfunction.function(interface.range.start(fn)):
+            if not(used):
+                continue
+            elif not(selection) and used:
+                yield preciser, internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield preciser, internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield preciser, internal.tagindex.tags.names(used & requested)
+            continue
+        return
+
+    @classmethod
+    def hexvariable(cls, func, require=frozenset(), include=frozenset()):
+        '''Yield the variable locator and tags for the variables from the decompiled function `func` containing all the tags in `require` and including any from `include`.'''
+        return
+        yield
+
 class select_v1(object):
     """
     This namespace is used to query different types of tags from the tagindex
@@ -993,6 +1034,57 @@ class select_v1(object):
                 yield bb, selected
             elif explicit:
                 yield bb, explicit
+            continue
+        return
+
+    @classmethod
+    def hexcontents(cls, *args, **kwargs):
+        '''Yield the function address and tags from the contents of each function containing all the tags in `require` and including any from `include`.'''
+        selection = True if any([args, kwargs]) else False
+        for ea, used in query_v1.hexcontents(*args, **kwargs):
+            is_function = interface.function.has(cls.navigation.procedure(ea))
+            owners = {f for f in interface.function.owners(ea)} if is_function else {ea}
+            explicit = {key for key in used if key and not key.startswith('__')}
+            if ea not in owners:
+                pass
+            elif selection:
+                yield ea, used
+            elif explicit:
+                yield ea, explicit
+            continue
+        return
+
+    @classmethod
+    def hexfunction(cls, func, *args, **kwargs):
+        '''Yield the function address and tags from the contents of each function containing all the tags in `require` and including any from `include`.'''
+        selection = True if any([args, kwargs]) else False
+        for preciser, used in query_v1.hexfunction(func, *args, **kwargs):
+            ea, itp = preciser
+            tags = {}   # FIXME: we need a way to get the tags for a preciser.
+            ea = cls.navigation.analyze(ea)
+            selected = {key : value for key, value in tags.items() if key in used}
+            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
+            if selection:
+                yield preciser, used
+            elif explicit:
+                yield preciser, explicit
+            continue
+        return
+
+    @classmethod
+    def hexvariable(cls, func, *args, **kwargs):
+        '''Yield the variable locator and tags for the variables from the decompiled function `func` containing all the tags in `require` and including any from `include`.'''
+        selection = True if any([args, kwargs]) else False
+        for locator, used in query_v1.hexvariable(func, *args, **kwargs):
+            defea, atype, alocinfo = locator
+            tags = {}   # FIXME: we need a way to get the tags for a variable by its locator.
+            ea = cls.navigation.analyze(defea)
+            selected = {key : value for key, value in tags.items() if key in used}
+            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
+            if selection:
+                yield locator, used
+            elif explicit:
+                yield locator, explicit
             continue
         return
 
