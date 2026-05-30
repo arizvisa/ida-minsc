@@ -2358,9 +2358,9 @@ class hexfunction(counted):
     in the netnode using a "hashval" type. The `netnode.hashintegers` namespace
     is used to facilitate the usage of a bigint as a key.
     """
-    name = 'minsc.decompiler'   # FIXME
+    name = 'minsc.hexrays'
 
-    basetag = schema.basetag + 0o60
+    basetag = schema.basetag + 0o0
 
     ## the tags in this schema start at index 0x30.
     statstag = basetag + 0
@@ -2447,7 +2447,7 @@ class hexfunction(counted):
 
     @classmethod
     def getusage(cls, node, key, *tag, **kwargs):
-        '''Set the usage mask for the function `func` to the integer in `used`.'''
+        '''Return the usage mask for the tags from the decompiled function `func`.'''
         usagenode = cls.node()
         return super(hexfunction, cls).getusage(usagenode, key, tag=cls.usagetag)
 
