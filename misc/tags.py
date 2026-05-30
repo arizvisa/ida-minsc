@@ -2674,14 +2674,82 @@ class hexvariable(object):
     @classmethod
     def get(cls, locator):
         '''Return a dictionary containing the tags for the decompiler variable specified by `locator`.'''
+        if isinstance(locator, internal.hexrays.ida_hexrays_types.lvar_locator_t):
+            defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+        else:
+            defea, atype, alocinfo = locator
+        cfunc = internal.hexrays.function(defea)
+
+        # instantiate an lvar_locator_t for the variable locator we were given.
+        locator, vdloc = idaapi.lvar_locator_t(), internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+        locator.defea, locator.location = defea, vdloc
+
+        # now we can grab the comment for the variable and decode it.
+        cmt = internal.hexrays.variable.get_comment(cfunc, locator)
+        decoded = comment.decode(cmt)
+
+        # FIXME: add all the implicit tags here too.
+
+        # now all we need to do is return the modified dictionary.
+        return decoded
 
     @classmethod
     def set(cls, locator, key, value):
         '''Set the tag specified by `key` to `value` for the decompiler variable specified by `locator`.'''
+        if isinstance(locator, internal.hexrays.ida_hexrays_types.lvar_locator_t):
+            defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+        else:
+            defea, atype, alocinfo = locator
+        cfunc = internal.hexrays.function(defea)
+
+        # instantiate an lvar_locator_t for the variable locator we were given.
+        locator, vdloc = idaapi.lvar_locator_t(), internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+        locator.defea, locator.location = defea, vdloc
+
+        # FIXME: add support for writing the implicit tags for variables here.
+
+        # first thing to do is to grab the comment and then decode it. after
+        # it's been coded, we update the dictionary with whatever the user
+        # specified and then re-encode it so that we can write it back.
+        cmt = internal.hexrays.variable.get_comment(cfunc, locator)
+        decoded = comment.decode(cmt)
+        res, decoded[key] = decoded.get(key, None), value
+        encoded = comment.encode(decoded)
+
+        # only thing remaining is to apply the comment to the variable, and then
+        # we can return the old tag value that was modified.
+        old = internal.hexrays.variable.set_comment(cfunc, locator, encoded)
+        return res
 
     @classmethod
     def remove(cls, locator, key, none):
         '''Remove the tag specified by `key` from the decompiler variable specified by `locator`.'''
+        if isinstance(locator, internal.hexrays.ida_hexrays_types.lvar_locator_t):
+            defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+        else:
+            defea, atype, alocinfo = locator
+        cfunc = internal.hexrays.function(defea)
+
+        # instantiate an lvar_locator_t for the variable locator we were given.
+        locator, vdloc = idaapi.lvar_locator_t(), internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+        locator.defea, locator.location = defea, vdloc
+
+        # FIXME: if there are any implicit tags, remove them here.
+
+        # now we use the locator to get the command and decode it. before doing
+        # anything, though, we check that the tag exists in the decoded comment.
+        cmt = internal.hexrays.variable.get_comment(cfunc, locator)
+        decoded = comment.decode(cmt)
+        if key not in decoded:
+            raise internal.exceptions.MissingTagError(u"{:s}({:#x}, {:d}, {!s}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the variable defined at {:#x} of the decompiled function {:#x}.".format('.'.join([__name__, cls.__name__]), defea, atype, alocinfo, key, none, utils.string.escape(key, '"'), defea, internal.hexrays.function(cfunc)))
+
+        # all that is left to do is to remove the key from the dictionary and
+        # update the old variable comment with the new encoded comment before
+        # returning the value of the key that was specified.
+        res = decoded.pop(key)
+        encoded = comment.encode(decoded)
+        old = internal.hexrays.variable.set_comment(cfunc, locator, encoded)
+        return res
 
 class reference_v0(object):
     """
