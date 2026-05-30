@@ -2579,6 +2579,59 @@ class member(object):
             raise internal.exceptions.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, none, 'repeatable' if repeatable else 'non-repeatable', utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id)))))
         return res
 
+class hexfunction(object):
+    """
+    This namespace is responsible for reading from and writing tags for
+    a decompiled function. The tags belonging to a decompiled function
+    are located using a tuple composed of an address and an `item_preciser_t`.
+    This type of tagging supports the following implicit tags:
+
+        `__name__` - The name of the item at the specified preciser.
+        `__label__` - The name of a label specified in the decompiler.
+
+    The tags for each decompiled function are indexed and maintained using
+    the `internal.tags.reference.hexfunction` namespace (in this module).
+    """
+
+    @classmethod
+    def get(cls, preciser):
+        '''Return a dictionary containing the tags for the decompiler item at `preciser`.'''
+
+    @classmethod
+    def set(cls, preciser, key, value):
+        '''Set the tag specified by `key` to `value` for the decompiler item at `preciser`.'''
+
+    @classmethod
+    def remove(cls, preciser, key, none):
+        '''Remove the tag specified by `key` from the decompiler item at `preciser`.'''
+
+class hexvariable(object):
+    """
+    This namespace is responsible for reading from and writing tags to a
+    variable from a a decompiled function. The tags belonging to the variable
+    are located using a tuple containing the information from `lvar_locator_t`.
+    This type of tagging supports the following implicit tags:
+
+        `__name__` - The name of the variable at the specified locator.
+        `__typeinfo__` - The type information for the variable.
+
+    The tags for the variables from each decompiled function are indexed and
+    maintained with the `internal.tags.reference.hexvariable` namespace (in
+    this module).
+    """
+
+    @classmethod
+    def get(cls, locator):
+        '''Return a dictionary containing the tags for the decompiler variable specified by `locator`.'''
+
+    @classmethod
+    def set(cls, locator, key, value):
+        '''Set the tag specified by `key` to `value` for the decompiler variable specified by `locator`.'''
+
+    @classmethod
+    def remove(cls, locator, key, none):
+        '''Remove the tag specified by `key` from the decompiler variable specified by `locator`.'''
+
 class reference_v0(object):
     """
     This namespace is a frontend to the tagging backend that resides within the
