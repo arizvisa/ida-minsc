@@ -2596,14 +2596,65 @@ class hexfunction(object):
     @classmethod
     def get(cls, preciser):
         '''Return a dictionary containing the tags for the decompiler item at `preciser`.'''
+        treeloc = idaapi.treeloc_t()
+        treeloc.ea, treeloc.itp = preciser
+
+        # get the comment at the specified preciser and decode it into a dict.
+        cfunc = internal.hexrays.function(treeloc.ea)
+        usercmt = cfunc.get_user_cmt(treeloc, idaapi.RETRIEVE_ALWAYS)
+        decoded = comment.decode(usercmt)
+
+        # FIXME: add any of the implicit tags to the decoded dictionary.
+        return decoded
 
     @classmethod
     def set(cls, preciser, key, value):
         '''Set the tag specified by `key` to `value` for the decompiler item at `preciser`.'''
+        treeloc = idaapi.treeloc_t()
+        treeloc.ea, treeloc.itp = preciser
+
+        # get the user comment for the specified preciser.
+        cfunc = internal.hexrays.function(treeloc.ea)
+        usercmt = cfunc.get_user_cmt(treeloc, idaapi.RETRIEVE_ALWAYS)
+
+        # FIXME: add support for writing the implicit tags here.
+
+        # decode the comment and update the tags with the new value. once that
+        # is done we just need to re-encode the tags prior to writing.
+        decoded = comment.decode(usercmt)
+        res, decoded[key] = decoded.get(key, None), value
+        encoded = comment.encode(decoded)
+
+        # encode the modified tags and assign the comment at the specified
+        # preciser. afterwards, we need to save the user comments.
+        cfunc.set_user_cmt(treeloc, encoded)
+        cfunc.save_user_cmts()
+        return res
 
     @classmethod
     def remove(cls, preciser, key, none):
         '''Remove the tag specified by `key` from the decompiler item at `preciser`.'''
+        treeloc = idaapi.treeloc_t()
+        treeloc.ea, treeloc.itp = preciser
+
+        # get the user comment for the specified preciser.
+        cfunc = internal.hexrays.function(treeloc.ea)
+        usercmt = cfunc.get_user_cmt(treeloc, idaapi.RETRIEVE_ALWAYS)
+
+        # FIXME: if there are any implicit tags, remove them here.
+
+        # decode the comment and check the key to remove actually exists.
+        decoded = comment.decode(usercmt)
+        if key not in decoded:
+            raise internal.exceptions.MissingTagError(u"{:s}({:#x}, {:d}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the decompiler address {:#x}/{:d}.".format('.'.join([__name__, cls.__name__]), treeloc.ea, treeloc.itp, key, none, utils.string.escape(key, '"'), treeloc.ea, treeloc.itp))
+
+        # now we can just remove the key from the dictionary and update the old
+        # comment at the specified location with the new encoded dictionary.
+        res = decoded.pop(key)
+        encoded = comment.encode(decoded)
+        cfunc.set_user_cmt(treeloc, encoded)
+        cfunc.save_user_cmts()
+        return res
 
 class hexvariable(object):
     """
