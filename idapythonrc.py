@@ -69,10 +69,10 @@ print_banner = lambda: None
 
 # find the frame that fucks with our sys.modules, and save it for later
 frame = __import__('sys')._getframe()
-while frame.f_code.co_name != 'IDAPython_ExecScript':
+while frame and frame.f_code.co_name != 'IDAPython_ExecScript':
     frame = frame.f_back
 
 # inject our current sys.modules state into IDAPython_ExecScript's state if it's the broken version
-if 'basemodules' in frame.f_locals:
+if frame and 'basemodules' in frame.f_locals:
     frame.f_locals['basemodules'].update(__import__('sys').modules)
 del(frame)
