@@ -1112,9 +1112,6 @@ class variable(object):
         '''Return a description for the given ``ida_hexrays.lvar_locator_t`` in `locator` defined at the address `ea`.'''
         ea, location = locator.defea, locator.location
         atype, alocinfo = interface.tinfo.location_raw(location)
-        if atype == idaapi.ALOC_REG2:
-            ltypes = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('ALOC_')}
-            raise exceptions.InvalidTypeOrValueError(u"{:s}.repr_locator({!r}) : Unable to describe the given locator due to its type {:s} being unsupported.".format('.'.join([__name__, cls.__name__]), location, "{:s}({:d})".format(ltypes[atype], atype) if atype in ltypes else "{:d}".format(atype)))
 
         def describe(atype, alocinfo):
             if atype == idaapi.ALOC_STACK:
