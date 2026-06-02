@@ -1081,7 +1081,11 @@ class variable(object):
     @classmethod
     def new_locator(cls, ea, locator):
         '''Return the ``ida_hexrays.lvar_locator_t`` for a variable defined at the address `ea` using the given `locator` as its type.'''
-        ea, alocinfo = int(ea), interface.tinfo.location_raw(locator)
+        ea = int(ea)
+        if isinstance(locator, internal.types.tuple) and len(locator) == 2:
+            alocinfo = locator
+        else:
+            alocinfo = interface.tinfo.location_raw(locator)
         vdloc = cls.copy_vdloc(*alocinfo)
         return ida_hexrays.lvar_locator_t(vdloc, ea)
 
