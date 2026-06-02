@@ -1126,10 +1126,9 @@ class variable(object):
                 ridx, roff = alocinfo
                 return "RREL({:d}, {:d})".format(ridx, roff)
             elif atype == idaapi.ALOC_DIST:
-                F = lambda atype, item, offset, size: describe(atype, (item, offset, size))
+                F = lambda atype, item, offset, size: (offset, describe(atype, (item, offset, size)))
                 iterable = ( F(atype, *item) for atype, item in alocinfo )
                 return "DIST({!s})".format({offset : item for offset, item in iterable})
-
             elif atype == idaapi.ALOC_REG1:
                 locinfo, offset, size = alocinfo
                 return "REG1({:#x}{:+#x}, {:#0{:d}x})".format(offset, size, locinfo, 2 + 8)
