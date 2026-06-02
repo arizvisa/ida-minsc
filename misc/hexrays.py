@@ -1108,12 +1108,13 @@ class variable(object):
         return cls.new_locator(lvar.defea, lvar.location)
 
     @classmethod
-    def repr_locator(cls, locator):
-        '''Return a description for the given ``ida_hexrays.lvar_locator_t`` in `locator` defined at the address `ea`.'''
-        ea, location = locator.defea, locator.location
-        atype, alocinfo = interface.tinfo.location_raw(location)
+    def describe_location(cls, location):
+        '''Return a description for the variable at the specified `location` initialized at address `ea`.'''
+        atype, alocinfo = location if isinstance(location, internal.types.tuple) else interface.tinfo.location_raw(location)
 
-        def describe(atype, alocinfo):
+        # we need to define a closure so that we can recursively render each of
+        # the entires for the specified variable location.
+        def recurse(atype, alocinfo):
             if atype == idaapi.ALOC_STACK:
                 return "STACK({:+#x})".format(alocinfo)
             elif atype == idaapi.ALOC_STATIC:
@@ -1126,7 +1127,7 @@ class variable(object):
                 ridx, roff = alocinfo
                 return "RREL({:d}, {:d})".format(ridx, roff)
             elif atype == idaapi.ALOC_DIST:
-                F = lambda atype, item, offset, size: (offset, describe(atype, (item, offset, size)))
+                F = lambda atype, item, offset, size: (offset, recurse(atype, (item, offset, size)))
                 iterable = ( F(atype, *item) for atype, item in alocinfo )
                 return "DIST({!s})".format({offset : item for offset, item in iterable})
             elif atype == idaapi.ALOC_REG1:
@@ -1138,7 +1139,15 @@ class variable(object):
             elif atype == idaapi.ALOC_NONE:
                 return 'NONE'
             return "UNKNOWN({!s})".format(alocinfo)
-        return "{:s}({:#x}, {:s})".format(internal.utils.pycompat.fullname(ida_hexrays.lvar_locator_t), ea, describe(atype, alocinfo))
+        return recurse(atype, alocinfo)
+
+    @classmethod
+    def repr_locator(cls, locator):
+        '''Return a description for the given ``ida_hexrays.lvar_locator_t`` in `locator` defined at the address `ea`.'''
+        ea, location = locator.defea, locator.location
+        atype, alocinfo = interface.tinfo.location_raw(location)
+        description = cls.describe_location((atype, alocinfo))
+        return "{:s}({:#x}, {:s})".format(internal.utils.pycompat.fullname(ida_hexrays.lvar_locator_t), ea, description)
 
     @classmethod
     def identity(cls, locator):
