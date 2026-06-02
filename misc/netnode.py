@@ -1550,16 +1550,16 @@ class hash(object):
         '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         res, stag = [], utils.sbyte(tag, netnode.hashtag)
         try:
-            l1 = max(len('' if key is None else format_key(key)) for key in cls.fiter(nodeidx, tag=stag))
-            l2 = max(len("{!r}".format(cls.get(nodeidx, key, tag=stag))) for key in cls.fiter(nodeidx, tag=stag))
+            length_keys = max(len('' if key is None else format_key(key)) for key in cls.fiter(nodeidx, tag=stag))
+            length_values = max(len("{!r}".format(cls.get(nodeidx, key, tag=stag))) for key in cls.fiter(nodeidx, tag=stag))
         except ValueError:
-            l1, l2 = 0, 2
+            length_keys, length_values = 0, 2
 
         # iterate through all of the hash keys and collect each of the values in
         # all of the supported formats so that we can format them for output.
         for index, key in enumerate(cls.fiter(nodeidx, tag=stag)):
-            value = "{:<{:d}s} : default={!r}, bytes={!r}, int={:#x} ({:d})".format("{!r}".format(cls.get(nodeidx, key, tag=stag)), l2, cls.get(nodeidx, key, None, tag=stag), cls.get(nodeidx, key, bytes, tag=stag), cls.get(nodeidx, key, int, tag=stag), cls.get(nodeidx, key, int, tag=stag))
-            res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, format_key(key), l1, value))
+            value = "{:<{:d}s} : bytes={!r}, int={:#x} ({:d})".format("{!r}".format(cls.get(nodeidx, key, None, tag=stag)), length_values, cls.get(nodeidx, key, bytes, tag=stag), cls.get(nodeidx, key, int, tag=stag), cls.get(nodeidx, key, int, tag=stag))
+            res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, format_key(key), length_keys, value))
         if not res:
             description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}{!s}) : The specified node ({:s}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), description, '' if tag is None else ", tag={!s}".format(tag), description))
