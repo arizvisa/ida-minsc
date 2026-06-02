@@ -24,7 +24,7 @@ can be tracked and counted is limited to the native integer size that is used
 for a database (32-bit or 64-bit).
 """
 import functools, operator, itertools, math
-import abc, contextlib, collections, heapq, string, codecs
+import abc, contextlib, collections, heapq, string, codecs, hashlib
 import sys, logging, fnmatch, re
 logging = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ NSUP_START = idaapi.NSUP_ORIGFMD + 0x1000
 ### Define the hooks that can be used by an outsider to initialize the tagindex.
 def init_tagindex(*idp_modname):
     '''This function is a hook that is responsible for deploying our schemas.'''
-    schemas = [tags, globals, contents, members, structure, hexfunction]
+    schemas = [tags, globals, contents, members, structure, hexfunction, hexvariable]
     for item in schemas:
         if item.exists():
             logging.info(u"{:s}.init_tagindex({!s}) : Using the already existing netnode for \"{!s}\".".format(__name__, "{!r}".format(*idp_modname) if idp_modname else '', utils.string.escape(utils.pycompat.fullname(item), '"')))
@@ -2742,3 +2742,987 @@ class hexfunction(counted):
             exploded = ','.join(map("{:d}".format, tags.explode(integer)))
             lines.append("{!s}: {:<{:d}s} : {!s}".format("({:#x}, {:d})".format(ea, itp), exploded, positions_width, tags.names(integer)))
         return '\n'.join(lines)
+
+class hexvariable(counted):
+    """
+    This namespace is used to track the tag state for any tags applied to a
+    variable belonging to a decompiled function. The namespace and schema should
+    be relatively similar to the `members` namespace since we are storing and
+    indexing tags for frame members. It is similar to its peer namespace,
+    `hexfunction`, in that we need to encode a tuple so that we can index it
+    into a "hashval" type. This tuple contains the variable locator information
+    and is encoded before using it with the `netnode.hashintegers` namespace
+    which basically facilitates the ability to store a bigint as a key.
+    """
+    name = 'minsc.hexrays'
+
+    basetag = schema.basetag + 0o10
+
+    ## the tags in this schema start at index 0x8.
+    statstag = basetag + 0
+    NSUP_SCHEMA_VERSION = schema.NSUP_SCHEMA_VERSION
+    NSUP_LOCINFO_ID = NSUP_START + 0x10
+
+    variabletag = basetag + 1
+    locinfotag = basetag + 2
+    uniquetag = basetag + 3
+    usagetag = basetag + 4
+
+    # tags attached directly to a function
+    counttag = ord(b'v')
+
+    ## schema
+    schema = {
+        (netnode.sup, statstag): {
+            NSUP_SCHEMA_VERSION: 1,
+
+            # this is a unique id for encoding and stashing a variable locator.
+            NSUP_LOCINFO_ID: 1,
+        },
+
+        # contains the locator and tags for all our variables.
+        (netnode.hashintegers, variabletag): {},
+        # contains the id map for serialized variable locators.
+        (netnode.sup, locinfotag): {},
+        # contains a map for deduplication for the "locinfotag" table
+        (netnode.hashbytes, uniquetag): {},
+        # tag usage per function, stored in regular netnode.
+        (netnode.sup, usagetag): {},
+        # tag counts per function, stored in function netnode
+        (netnode.sup, counttag): {},
+    }
+
+    ## the tools we intend to use for encoding the "locinfotag" table.
+    marshaller = __import__('marshal')
+    codec = __import__('codecs').lookup('zlib')
+
+    ## these tabls represent the bit sizes for each of the components that
+    ## compose the key that is encoded for a decompiler variable locator.
+    __locator_function_sizes = {32: 32, 64: 64}
+    __locator_address_sizes = {32: 32, 64: 64}
+    __locator_type_size = 4         # argloc_type_t: 0..8
+
+    # the locinfo is an encoded integer describing the raw location information
+    # that is used for the location. we encode this with a maximum length since
+    # we can fit almost all the location types into it. hence, the following
+    # dictionary repesents the sizes for both database address types. if we
+    # can't fit the encoded type within these bits, then we add a compressed
+    # version of the raw location information to the "locinfotag" table.
+    __locator_locinfo_sizes = {32: 4 + 32 + 32, 64: 4 + 64 + 32}
+
+    @classmethod
+    def locinfo_has(cls, id):
+        '''Return whether the location information stored at index `id` exists.'''
+        node = cls.node()
+        return netnode.sup.has(node, id, tag=cls.locinfotag)
+
+    @classmethod
+    def locinfo_raw(cls, id):
+        '''Decode the location information stored at index `id` and return it.'''
+        node = cls.node()
+
+        # first check that that specified index actually exists.
+        if not netnode.sup.has(node, id, tag=cls.locinfotag):
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.locinfo_raw({:d}) : Unable to get the location information for the specified index ({:d}).".format('.'.join([__name__, cls.__name__]), id, id))
+
+        encoded = netnode.sup.get(node, id, type=bytearray, tag=cls.locinfotag)
+
+        # all we have do to return the location information is to decompress the
+        # returned bytes and unmarshall it back into its original values.
+        try:
+            data, sz = cls.codec.decode(encoded)
+            if len(encoded) != sz:
+                raise internal.exceptions.SizeMismatchError(u"{:s}.locinfo_raw({:d}) : The number of bytes that was decoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join([__name__, cls.__name__]), id, sz, len(encoded)))
+
+        except Exception as E:
+            logging.warning(u"{:s}.locinfo_raw({:d}) : An exception {!r} ({!s}) was raised while trying to decode the location information from the entry at index {:d}.".format('.'.join([__name__, cls.__name__]), id, E.__class__.__name__, E, id), exc_info=True)
+            logging.info(u"{:s}.locinfo_raw({:d}) : Error occurred while decoding the following data from the specified index ({:d}): {!r}.".format('.'.join([__name__, cls.__name__]), id, id, encoded))
+            raise internal.exceptions.SerializationError(u"{:s}.locinfo_raw({:d}) : Unable to decode the location information at the specified index {:d}.".format('.'.join([__name__, cls.__name__]), id, id))
+
+        # we've decompressed it, so now to unmarshal it back into an object.
+        try:
+            result = cls.marshaller.loads(data)
+
+        except Exception as E:
+            logging.info(u"{:s}.locinfo_raw({:d}) : Error occurred while unmarshalling the following data from the specified index {:d}.".format('.'.join([__name__, cls.__name__]), id, id))
+            raise internal.exceptions.SerializationError(u"{:s}.locinfo_raw({:d}) : Unable to unmarshal the location information at the specified index {:d}.".format('.'.join([__name__, cls.__name__]), id, id))
+        return result
+
+    @classmethod
+    def locinfo_get(cls, func, *args):
+        '''Use the function `func` with the specified variable `locator` to return the encoded location information for index `id`.'''
+        [arg, id] = args if len(args) == 2 else itertools.chain([func], args)
+
+        # we don't really need these parameters and only need to know the id,
+        # but we grab them so that we can output more details in our errors.
+        cfunc, locator = cls.__get_cfunc_and_locator(func, *args[:-1] if len(args) == 2 else [arg])
+
+        # now we have the index for getting the encoded location info, so we'll
+        # first verify that the id exists. once confirmed, we can extract the
+        # location information from "locinfotags" as the raw bytes for decoding.
+        node = cls.node()
+        if not netnode.sup.has(node, id, tag=cls.locinfotag):
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.locinfo_get({:#x}, {!s}) : Unable to get the location information for the variable {!s} using the specified index ({:d}).".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), internal.hexrays.variable.repr_locator(locator), id))
+
+        encoded = netnode.sup.get(node, id, type=bytearray, tag=cls.locinfotag)
+
+        # all we have do to return the location information is to decompress the
+        # returned bytes and unmarshall it back into its original values.
+        try:
+            data, sz = cls.codec.decode(encoded)
+            if len(encoded) != sz:
+                raise internal.exceptions.SizeMismatchError(u"{:s}.locinfo_get({:#x}, {!s}) : The number of bytes that was decoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), sz, len(encoded)))
+
+        except Exception as E:
+            logging.warning(u"{:s}.locinfo_get({:#x}, {!s}) : An exception {!r} was raised while trying to decode the location information for the variable located by {!s} for function {:#x} from the entry at index {:d}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), E, internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc), id), exc_info=True)
+            logging.info(u"{:s}.locinfo_get({:#x}, {!s}) : Error occurred while decoding the following data from the specified index ({:d}): {!r}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), id, encoded))
+            raise internal.exceptions.SerializationError(u"{:s}.locinfo_get({:#x}, {!s}) : Unable to decode the entry at index {:d} for the variable located by {!s} in function {:#x}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), id, internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc)))
+
+        # now we just need to unmarshal it back into a native python object.
+        try:
+            result = cls.marshaller.loads(data)
+
+        except Exception as E:
+            logging.info(u"{:s}.locinfo_get({:#x}, {!s}) : Error occurred while unmarshalling the following data from the entry at index {:d} for the variable located by {!s} in function {:#x}: {!r}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), id, internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc), data))
+            raise internal.exceptions.SerializationError(u"{:s}.locinfo_get({:#x}, {!s}) : Unable to unmarshal the location information at index {:d} for the variable located by {!s} in function {:#x}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), id, internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc)))
+        return result
+
+    @classmethod
+    def locinfo_set(cls, func, *args):
+        '''Use the function `func` with the specified variable `locator` to assign the given location information to index `id`.'''
+        [arg, id, alocinfo] = args if len(args) == 3 else itertools.chain([func], args)
+        if len(args) not in {2, 3}:
+            descriptions = [("{!s}".format(arg) if isinstance(arg, internal.types.integer) else "{!r}".format(arg)) for arg in args]
+            raise internal.exceptions.InvalidParameterError(u"{:s}.locinfo_set({!r}{!s}) : Unable to set the location information for the specified variable due to an unsupported number of parameters ({:d}).".format('.'.join([__name__, cls.__name__]), func, ", {:s}".format(', '.join(descriptions)) if descriptions else '', 1 + len(args)))
+        cfunc, locator = cls.__get_cfunc_and_locator(func, *args[:-2] if len(args) == 3 else [arg])
+
+        # now we need to encode and compress the location information so that we
+        # can write it to the "locinfotag" table. if any failures occur, then we
+        # need to complain about it. we also check that the encoded size fits.
+        try:
+            data = cls.marshaller.dumps(alocinfo)
+
+        except Exception as E:
+            logging.info(u"{:s}.locinfo_set({:#x}, {!s}, {!s}) : Error occurred while marshalling the following location information: {!r}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), internal.utils.string.repr(alocinfo), alocinfo))
+            raise internal.exceptions.SerializationError(u"{:s}.locinfo_set({:#x}, {!s}, {!s}) : Unable to marshal the location information for the variable located by {!s} in function {:#x} using the index {:d}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), internal.utils.string.repr(alocinfo), internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc), id))
+
+        # after marshalling the data, we can now use the "codec" to compress it.
+        try:
+            encoded, sz = cls.codec.encode(data)
+            if sz != len(data):
+                raise internal.exceptions.SizeMismatchError(u"{:s}.locinfo_set({:#x}, {!s}, {!s}) : The number of bytes that was encoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), internal.utils.string.repr(alocinfo), sz, len(data)))
+
+        except Exception as E:
+            logging.warning(u"{:s}.locinfo_set({:#x}, {!s}, {!s}) : An exception {!r} was raised while trying to encode the location information for the variable located by {!s} for function {:#x} using the index {:d}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), internal.utils.string.repr(alocinfo), target, ea, internal.utils.string.repr(value), E, ea, id), exc_info=True)
+            logging.info(u"{:s}.locinfo_set({:#x}, {!s}, {!s}) : Error encoding the following data for the location information: {!r}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), internal.utils.string.repr(alocinfo), data))
+            raise internal.exceptions.SerializationError(u"{:s}.locinfo_set({:#x}, {!s}, {!s}) : Unable to encode the location information of the variable located by {!s} for function {:#x} using the index {:d}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), internal.utils.string.repr(alocinfo), internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc), id))
+
+        if len(encoded) > netnode.MAXSPECSIZE:
+            logging.warning(u"{:s}.locinfo_set({:#x}, {!s}, {!s}) : Reached limit ({:d} > {:d}) while encoding the variable located by {!s} for function {:#x} using the index {:d}. Encountered possible corruption while indexing the decompiler variables.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable,repr_locator(locator), internal.utils.string.repr(alocinfo), len(encoded), netnode.MAXSPECSIZE, internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc), id))
+
+        # first check to see if our encoded data already exists as a duplicate
+        # so that we can avoid having to assign already-existing data.
+        node, digest = cls.node(), hashlib.blake2s(encoded, digest_size=16).digest()
+        if netnode.hashbytes.has(node, digest, tag=cls.uniquetag):
+            id = netnode.hashbytes.get(node, digest, type=int, tag=cls.uniquetag)
+            logging.debug(u"{:s}.locinfo_set({:#x}, {!s}, {!s}) : Found a duplicate entry for digest {!s} at index {:d} for the variable located by {!s} of the function {:#x}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), internal.utils.string.repr(alocinfo), str().join(map("{:02x}".format, bytearray(digest))), id, internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc)))
+
+        # if it doesn't exist, then add an entry for the digest to store the id
+        # being used and raise an exception if we couldn't succeed at that.
+        elif not netnode.hashbytes.set(node, digest, id, tag=cls.uniquetag):
+            raise internal.exceptions.DisassemblerError(u"{:s}.locinfo_set({:#x}, {!s}, {!s}) : Unable to store the index ({:d}) for the variable located by {!s} of the function {:#x} using the given digest ({!s}).".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), internal.utils.string.repr(alocinfo), id, internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc), str().join(map("{:02x}".format, bytearray(digest)))))
+
+        # otherwise we were successful and can log exactly what was done.
+        else:
+            logging.debug(u"{:s}.locinfo_set({:#x}, {!s}, {!s}) : Added a new entry for digest {!s} at index {:d} for the variable located by {!s} of the function {:#x}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), internal.utils.string.repr(alocinfo), str().join(map("{:02x}".format, bytearray(digest))), id, internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc)))
+
+        # we can now use the encoded data to assign into the "locinfotag" table
+        # and then return the id that we either found (duplicate) or used.
+        ok = netnode.sup.set(node, id, encoded, tag=cls.locinfotag)
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.locinfo_set({:#x}, {!s}, {!s}) : Unable to assign the encoded location information for the variable located by {!s} of the function {:#x} using the index {:d}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), internal.utils.string.repr(alocinfo), internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc), id))
+        return id
+
+    @classmethod
+    def locinfo_alloc(cls, func, *args):
+        '''Use the function `func` with the specified variable `locator` to add the given location information to a unique index.'''
+        [arg, alocinfo] = args if len(args) == 2 else itertools.chain([func], args)
+        if len(args) not in {2, 3}:
+            descriptions = [("{!s}".format(arg) if isinstance(arg, internal.types.integer) else "{!r}".format(arg)) for arg in args]
+            raise internal.exceptions.InvalidParameterError(u"{:s}.locinfo_alloc({!r}{!s}) : Unable to set the location information for the specified variable due to an unsupported number of parameters ({:d}).".format('.'.join([__name__, cls.__name__]), func, ", {:s}".format(', '.join(descriptions)) if descriptions else '', 1 + len(args)))
+        cfunc, locator = cls.__get_cfunc_and_locator(func, *args[:-2] if len(args) == 3 else [arg])
+
+        # start out by grabbing the next id to use from our "statstag" table.
+        node = cls.node()
+        id = netnode.sup.get(node, cls.NSUP_LOCINFO_ID, type=int, tag=cls.statstag)
+
+        # next we'll try to encode our data and set it into the slot specified
+        # by the id we extracted from the "statstag" table.
+        try:
+            written = cls.locinfo_set(cfunc, locator, id, alocinfo)
+
+        # if a known exception was raised, then re-raise so that the user knows.
+        except (internal.exceptions.SerializationError, internal.exceptions.DisassemblerError) as E:
+            raise E
+
+        # if an unknown exception was raised, then log the error and raise an
+        # exception to inform the user what's up.
+        except Exception as E:
+            logging.error(u"{:s}.locinfo_alloc({:#x}, {!s}, {!r}) : An error occurred trying to assign the location information for the variable {!s} to index {:d}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), alocinfo, internal.hexrays.variable.repr_locator(locator), id), exc_info=True)
+            raise internal.exceptions.DisassemblerError(u"{:s}.locinfo_alloc({:#x}, {!s}, {!r}) : Unable to set the location information at the allocated index ({:d}) for the variable {!s} due to an unexpected {!s} ({!s}).".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), alocinfo, id, internal.hexrays.variable.repr_locator(locator), E.__class__.__name__, E))
+
+        # if the id that was written is not our largest id, then we can just go
+        # ahead and return the id that we used since we don't need to update.
+        if written < id:
+            logging.debug(u"{:s}.locinfo_alloc({:#x}, {!s}, {!r}) : Reused an already-existing id ({:d}) to store the encoded location information for the variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), alocinfo, written, internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc)), exc_info=True)
+
+        # otherwise, if we used the most recent id and successfully assigned the
+        # encoded location information then we need to update it by incrementing
+        # the value we're maintaining in the "stagstag" table.
+        elif not netnode.sup.set(node, cls.NSUP_LOCINFO_ID, id + 1, tag=cls.statstag):
+            raise internal.exceptions.DisassemblerError(u"{:s}.locinfo_alloc({:#x}, {!s}, {!r}) : Unable to update the current allocated index ({:d}) to its next value ({:d}).".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), alocinfo, id, 1 + id))
+
+        # if we were successful, log something and then return the id.
+        else:
+            logging.debug(u"{:s}.locinfo_alloc({:#x}, {!s}, {!r}) : Added a new id ({:d}) to store the encoded location information for the variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), internal.hexrays.function.address(cfunc), internal.hexrays.variable.repr_locator(locator), alocinfo, written, internal.hexrays.variable.repr_locator(locator), internal.hexrays.function.address(cfunc)), exc_info=True)
+        return written
+
+    @classmethod
+    def __get_cfunc_and_locator(cls, func, *args):
+        '''Use the function specified by `func` and any location information to return the decompiled function and a variable locator.'''
+        [arg] = args if args else [func]
+
+        # figure out how to get the locator depending on whether we were also
+        # given a function, and whether the expected types match.
+        if args and isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
+            locator = internal.hexrays.variables.by(func, *args)
+            defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+
+        # if we were given a three-element tuple, then this is likely a packed
+        # variable locator. so we only need to unpack it and copy our function.
+        elif args and isinstance(arg, internal.types.tuple) and len(arg) == 3:
+            defea, atype, alocinfo = arg
+            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+            locator = internal.hexrays.variable.new_locator(defea, vdloc)
+
+        # if we got some arguments and it didn't match the function-variable
+        # types that we expected, then we raise an exception because we don't
+        # know how to find the information with the types that we were given.
+        elif args:
+            if isinstance(func, internal.hexrays.ida_hexrays_types.hexrays_func_types):
+                ea = internal.hexrays.function.address(func)
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.encode_locator({:#x}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported locator type.".format('.'.join([__name__, cls.__name__]), ea, arg, arg))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.encode_locator({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported locator type.".format('.'.join([__name__, cls.__name__]), func, arg, arg))
+
+        # if our argument represents a valid variable type, then use it to get a
+        # variable and then unpack its locator information to get the address.
+        elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
+            locator = internal.hexrays.variables.by(arg)
+            defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+            func = defea
+
+        # otherwise the locator information is packed into a tuple.
+        elif len(arg) == 3:
+            defea, atype, alocinfo = arg
+            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+            locator = internal.hexrays.variable.new_locator(defea, vdloc)
+            func = defea
+
+        # this other tuple contains a function address inside it.
+        elif len(arg) == 4:
+            func, defea, atype, alocinfo = arg
+            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+            locator = internal.hexrays.variable.new_locator(defea, vdloc)
+
+        # we were given a single, packed parameter, and it is not of a length
+        # where we can extract the function address from it.
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.encode_locator({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported length ({:d}).".format('.'.join([__name__, cls.__name__]), func, arg, arg, len(arg)))
+
+        # now we can get the function from the parameters, and then grab its
+        # address so that we can begin encoding the locator. to encode the
+        # locator, we build a list of each value and its size.
+        return internal.hexrays.function(func), locator
+
+    @classmethod
+    def encode_locator(cls, func, *args):
+        '''Encode the specified variable `locator` as an integer without including the locator information.'''
+        cfunc, locator = cls.__get_cfunc_and_locator(func, *args)
+        defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+
+        # build a list containing each value and its size. this is so we can
+        # combine all the components into a single integer.
+        fn = internal.hexrays.function.address(cfunc)
+        encoding = [
+            (idaapi.ea2node(fn), cls.__locator_function_sizes[interface.database.bits()]),
+            (defea, cls.__locator_address_sizes[interface.database.bits()]),
+            (atype, cls.__locator_type_size),
+        ]
+
+        # use the variable locator type to figure out how to encode the bits for
+        # the "alocinfo". these should be 64 for 32-bit databases and 96 for
+        # 64-bit. we also include a 4-bit value for storing the encoding type.
+
+        # "\x00" - empty, for ALOC_NONE
+        # "\x01" - native-size address, 32-bits of 0x00
+        # "\x02" - native-size relative offset, 32-bits of 0x00
+        # "\x03" - 16-bit register1, 16-bit register2, native-size of 0x00
+        # "\x04" - native-size register offset, 32-bits of register index
+        # "\x05" - id of encoded scatter_aloc_t
+
+        # we use a 4-bit encoding type prefix since when combined with the
+        # location type will end up being byte-aligned as a multiple of 8. we
+        # build each of these entries in reverse order so that when decoding
+        # things we can consume it from the least-significant bit.
+        if atype == idaapi.ALOC_NONE:
+            rencoded = [(0x00, 4), (0, cls.__locator_locinfo_sizes[interface.database.bits()])]
+        elif atype == idaapi.ALOC_STATIC:
+            rencoded = [(0x01, 4), (alocinfo, interface.database.bits()), (0, 32)]
+        elif atype == idaapi.ALOC_STACK:
+            rencoded = [(0x02, 4), (alocinfo, interface.database.bits()), (0, 32)]
+        elif atype == idaapi.ALOC_REG1:
+            rencoded = [(0x03, 4), (alocinfo, 32), (0, max(0, cls.__locator_locinfo_sizes[interface.database.bits()] - 36))]
+        elif atype == idaapi.ALOC_REG2:
+            rencoded = [(0x03, 4), (alocinfo, 32), (0, max(0, cls.__locator_locinfo_sizes[interface.database.bits()] - 36))]
+        elif atype == idaapi.ALOC_RREL:
+            ridx, roff = alocinfo
+            rencoded = [(0x04, 4), (ridx, 32), (roff, cls.__locator_locinfo_sizes[interface.database.bits()])]
+        elif atype == idaapi.ALOC_DIST:
+            id = cls.locinfo_alloc(cfunc, locator, alocinfo)
+            rencoded = [(0x05, 4), (id, interface.database.bits()), (0, 32)]
+            logging.info(u"{:s}.encode_locator({:#x}, {!s}) : Stored the scattered location information ({:d}) for the variable {!s} of function {:#x} to index {:d}.".format('.'.join([__name__, cls.__name__]), fn, internal.hexrays.variable.repr_locator(locator), atype, internal.hexrays.variable.repr_locator(locator), fn, id))
+        else:
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.encode_locator({:#x}, {!s}) : Unable to encode the locator key using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), fn, internal.hexrays.variable.repr_locator(locator), atype))
+
+        # extend the encodings with the encoded "alocinfo" data, and then get
+        # the sum of the number of bits that we will be encoding. if the number
+        # of bits does not correspond to the expected size, then whine about it.
+        encoding.extend(rencoded[::-1])
+        size = sum(bits for _, bits in encoding)
+
+        expected = 0
+        expected+= cls.__locator_function_sizes[interface.database.bits()]
+        expected+= cls.__locator_address_sizes[interface.database.bits()]
+        expected+= cls.__locator_type_size
+        expected+= cls.__locator_locinfo_sizes[interface.database.bits()]
+
+        if size != expected:
+            raise exceptions.SizeMismatchError(u"{:s}.encode_locator({:#x}, {!s}) : Error encoding the locator for the variable {!s} from function {:#x} due to the encoded size ({:d}) being different from what was expected ({:d}).".format('.'.join([__name__, cls.__name__]), fn, internal.hexrays.variable.repr_locator(locator), internal.hexrays.variable.repr_locator(locator), fn, size, expected))
+
+        # all we need to do is to take our encodings and concatenate them into a
+        # single variable-sized integer. we can iterate through each element of
+        # our encodings, and then merge them into the integer to be returned.
+        res = 0
+        for integer, bits in encoding:
+            shift = pow(2, bits)
+            mask = shift - 1
+            res *= shift
+            res |= integer & mask
+        return res
+
+    @classmethod
+    def encode_locator_start(cls, func, *args):
+        '''Encode the tuple or starting address specified by `locator` as an integer.'''
+        res = cls.encode_locator(func, *args)
+
+        # now we need to set the last bits to 0 so that we can exclude any atype
+        # for each variable, and ignore the alocinfo. so we grab the total size
+        # and use it to create a mask so that we can zero the lower bits.
+        bits = cls.__locator_type_size + cls.__locator_locinfo_sizes[interface.database.bits()]
+        mask = pow(2, bits) - 1
+
+        lower = res & mask
+        return res ^ lower
+
+    @classmethod
+    def encode_locator_stop(cls, func, *args):
+        '''Encode the tuple or stopping address specified by `locator` as an integer.'''
+        res = cls.encode_locator(func, *args)
+
+        # now we need to set the last bits to 1 so that we can include any atype
+        # for each variable, and ignore the alocinfo. so we grab the total size
+        # and use it to create a mask so that we can set all of the lower bits.
+        bits = cls.__locator_type_size + cls.__locator_locinfo_sizes[interface.database.bits()]
+        mask = pow(2, bits) - 1
+        return res | mask
+
+    @classmethod
+    def decode_locator(cls, integer):
+        '''Decode the specified `integer` into a tuple containing the address and locator.'''
+        decodings = [
+            cls.__locator_function_sizes[interface.database.bits()],
+            cls.__locator_address_sizes[interface.database.bits()],
+            cls.__locator_type_size,
+            cls.__locator_locinfo_sizes[interface.database.bits()],
+        ]
+
+        # the first thing we need to do is to start splitting up our integer
+        # into its different components. we do this in reverse, so that we can
+        # shift the consumed bits off of the right side of the integer.
+        res, components = integer, []
+        for bits in decodings[::-1]:
+            shift = pow(2, bits)
+            mask = shift - 1
+            components.append(res & mask)
+            res //= shift
+
+        # if our integer is not 0, then this integer is larger than what we
+        # expected and we need to complain about it to someone... anyone?
+        if res:
+            raise internal.exceptions.AssertionError(u"{:s}.decode_locator({:#x}) : The remaining bits after decoding each component contains an integer {:#x} that should have been {:d}.".format('.'.join([__name__, cls.__name__]), integer, res, 0))
+
+        # we can now unpack each of our integer components. since the location
+        # information is actually still encoded, we still need to process it to
+        # get the original information. we also need to translate the function
+        # address to a database one before returning it, so we do that now.
+        [node, defea, atype, alocinfo] = components[::-1]
+        func = idaapi.node2ea(node)
+
+        # assign some common constants for selecting the word size which depends
+        # on whether the database is 32-bit or 64-bit.
+        wordshift = pow(2, interface.database.bits())
+        wordmask = wordshift - 1
+
+        # we should be good to process the encoded location information, so
+        # start out by consuming its first 4 bit for the storage type.
+        encoding = alocinfo & 0xF
+        integer, _ = divmod(alocinfo, 0x10)
+
+        # finally we can start use the storage type to figure out how to decode
+        # the rest of the encoded integer. these are tied to `encode_locator`.
+        if encoding == 0:
+            res = None
+
+        # this encoding is for an `sval_t`... basically a database address.
+        elif encoding == 1:
+            res = integer & wordmask
+
+        # this next encoding is also an `sval_t`, but for a stack offset.
+        elif encoding == 2:
+            res = integer & wordmask
+
+        # this is a `DWORD`, containing a 32-bit integer for the register info.
+        elif encoding == 3:
+            mask = pow(2, 32) - 1
+            res = integer & mask
+
+        # this is a larger field combining a `DWORD` and an `sval_t` to store
+        # a register and its offset.
+        elif encoding == 4:
+            shift = pow(2, 32)
+            mask = shift - 1
+            remaining = integer // shift
+            ridx = integer & mask,
+            roff = remaining & wordmask
+            res = ridx, roff
+
+        # this encoding is used for storing arbitrarily-sized data by allocating
+        # an index in the "locinfotag" table, and then serializing the data and
+        # then writing it. specifically, this is used by the `ALOC_DIST` type. 
+        elif encoding == 5:
+            res = cls.locinfo_raw(integer & wordmask)
+
+        # if the type is unsupported, then cry about it on the nearest shoulder.
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.decode_locator({:#x}) : Unable to decode location information of the specified type ({:d}) due to it being unsupported.".format('.'.join([__name__, cls.__name__]), integer, encoding, 0))
+
+        # now we can return each component with the raw location information
+        # that we stored in our result variable... which might actually work.
+        return func, defea, atype, res
+
+    @classmethod
+    def encode_address_start(cls, address):
+        '''Encode the tuple or starting address specified by `locator` as an integer.'''
+        bits = interface.database.bits()
+        res = cls.__locator_address_sizes[bits] + cls.__locator_type_size + cls.__locator_locinfo_sizes[bits]
+        shift = pow(2, res)
+        mask = shift - 1
+        return ~mask & idaapi.ea2node(address) * shift
+
+    @classmethod
+    def encode_address_stop(cls, address):
+        '''Encode the tuple or stopping address specified by `locator` as an integer.'''
+        bits = interface.database.bits()
+        res = cls.__locator_address_sizes[bits] + cls.__locator_type_size + cls.__locator_locinfo_sizes[bits]
+        shift = pow(2, res)
+        mask = shift - 1
+        return idaapi.ea2node(address) * shift | mask
+
+    # methods that the parent namespace requires us to implement.
+    @classmethod
+    def hascount(cls, node, key, position, *tag, **kwargs):
+        '''Return whether the reference count of the specified tag `position` exists for the variable locator `key` in the netnode `node`.'''
+        func, defea, atype, res = cls.decode_locator(key)
+        fn = interface.function.by(func)
+        countnode = idaapi.ea2node(interface.range.start(fn))
+        return super(hexvariable, cls).hascount(countnode, key, position, tag=cls.counttag)
+
+    @classmethod
+    def getcount(cls, node, key, position, *tag, **kwargs):
+        '''Return the reference count of the specified tag `position` from the variable locator `key` in the netnode `node`.'''
+        func, defea, atype, res = cls.decode_locator(key)
+        fn = interface.function.by(func)
+        countnode = idaapi.ea2node(interface.range.start(fn))
+        return super(hexvariable, cls).getcount(countnode, key, position, tag=cls.counttag)
+
+    @classmethod
+    def setcount(cls, node, key, position, count, *tag, **kwargs):
+        '''Set the reference `count` in the variable locator given by `key` for the specified tag `position` in the netnode `node`.'''
+        func, defea, atype, res = cls.decode_locator(key)
+        fn = interface.function.by(func)
+        countnode = idaapi.ea2node(interface.range.start(fn))
+        return super(hexvariable, cls).setcount(countnode, key, position, count, tag=cls.counttag)
+
+    @classmethod
+    def getusage(cls, node, key, *tag, **kwargs):
+        '''Return the usage mask for the variables from the decompiled function `func`.'''
+        usagenode = cls.node()
+        return super(hexvariable, cls).getusage(usagenode, key, tag=cls.usagetag)
+
+    @classmethod
+    def setusage(cls, node, key, used, *tag, **kwargs):
+        '''Set the usage mask for the variables from the decompiled function `func` to the integer in `used`.'''
+        usagenode = cls.node()
+        return super(hexvariable, cls).setusage(usagenode, key, used, tag=cls.usagetag)
+
+    # now the methods that are intended to be used externally.
+    @classmethod
+    def get(cls, func, *args):
+        '''Return all of the tags that are currently associated with the specified variable `locator`.'''
+        node, integer = cls.node(), cls.encode_locator(func, *args)
+        res = hashtools.bigint(node, integer, tag=cls.variabletag)
+        return tags.names(res)
+
+    @classmethod
+    def usage(cls, func):
+        '''Return the usage mask containing tags used by all the variables from the decompiled function `func`.'''
+        node, key = cls.node(), idaapi.ea2node(internal.hexrays.function.address(func))
+        return cls.getusage(node, key, tag=cls.usagetag)
+
+    @classmethod
+    def repr_locinfo(cls):
+        '''Display the "locinfotag" table containing the encoded location information for the variables from the decompiled functions in the database.'''
+        node = cls.node()
+
+        # start out by collecting the id and decide location information into a
+        # list that we can iterate through to display each entry. afterwards,
+        # we try to collect the maximum width of the index (id) field.
+        count, entries = 0, []
+        for id in netnode.sup.fiter(cls.node(), tag=cls.locinfotag):
+            if not cls.locinfo_has(id):
+                continue
+            entries.append((id, cls.locinfo_raw(id)))
+            count += 1
+
+        length = max(len("[{:d}]".format(id)) for id, _ in entries) if entries else 0
+
+        # Now we can display a description, and then iterate through the results
+        # we collected and then display each of them on their own line.
+        lines = []
+        lines.append(u"Found {:d} entr{:s} containing raw variable location information.".format(count, 'y' if count == 1 else 'ies'))
+        for id, data in entries:
+            lines.append(u"{:<{:d}s} -> {!r}".format("Entry #{:d}".format(id), length, data))
+        return '\n'.join(lines)
+
+    @classmethod
+    def repr_encoded_locator(cls, integer):
+        '''Display the encoded variable locator in `integer` as a printable and easy-to-understand form.'''
+        func, defea, atype, alocinfo = cls.decode_locator(integer)
+        locator = internal.hexrays.variable.new_locator(defea, (atype, alocinfo))
+        ea, location = locator.defea, locator.location
+        return "{:s}({:#x}) -> {:s}({:#x}, {!s})".format(internal.utils.pycompat.fullname(idaapi.func_t), func, internal.utils.pycompat.fullname(internal.hexrays.ida_hexrays_types.lvar_locator_t), ea, internal.hexrays.variable.describe_location(location))
+
+    @classmethod
+    def adjust(cls, func, *args):
+        '''Adjust the reference count and usage for the tag `name` at the specified variable location.'''
+        [arg, name, adjustment] = args if len(args) == 3 else itertools.chain([func], args)
+        cfunc, locator = cls.__get_cfunc_and_locator(func, *[arg] if len(args) == 3 else [])
+
+        # assign some default variables, like the encoded location, the
+        # different node locations, and a couple of other things.
+        node, fn = cls.node(), internal.hexrays.function.address(cfunc)
+        key = cls.encode_locator(cfunc, locator)
+        funckey = idaapi.ea2node(fn)
+        usagenode, countnode = node, funckey
+
+        # next we assign some descriptions for all of the parameters so that we
+        # can pretty up the logging messages and any exceptions that are raised.
+        func_descr = "{:#x}".format(internal.hexrays.function.address(cfunc))
+        key_descr = internal.hexrays.variable.repr_locator(locator)
+        name_descr = "{!s}".format(name) if isinstance(name, internal.types.integer) else "{!r}".format(name)
+        adjustment_descr = "{:+d}".format(adjustment) if isinstance(adjustment, internal.types.integer) else "{!r}".format(adjustment)
+        parameters = [func_descr, key_descr, name_descr, adjustment_descr]
+
+        # then we create a transaction so that we can adjust all the tags.
+        with tags.transactional_adjust(name) as (position, tagcount):
+            bit, clear = pow(2, position), ~pow(2, position)
+
+            # get our metadata fields, like the number of tags, and which tags
+            # are used in the current function. afterwards, we need to verify
+            # that our values resulting from adjustment are within boundaries.
+            ok = cls.hascount(countnode, key, position, tag=cls.counttag)
+            count = cls.getcount(countnode, key, position, tag=cls.counttag) if ok else 0
+            usage = cls.getusage(usagenode, funckey, cls.usagetag)
+
+            if adjustment > 0 and not(count + adjustment < MAXIMUM_SPEC_INTEGER):
+                bits = count.bit_count() if hasattr(count, 'bit_count') else "{:b}".format(count).count('1')
+                raise OverflowError(u"{:s}.adjust({!s}) : Unable to increment ({:+d}) the reference count ({:d}) for the specified tag ({!s}) due to the current count already being at its maximum number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), adjustment, count, "{!r}".format(name), bits))
+
+            elif adjustment < 0 and not(count + adjustment >= 0):
+                bits = count.bit_count() if hasattr(count, 'bit_count') else "{:b}".format(count).count('1')
+                raise OverflowError(u"{:s}.adjust({!s}) : Unable to decrement ({:+d}) the reference count ({:d}) for the specified tag ({!s}) due to the current count already being at its minimum number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), adjustment, count, "{!r}".format(name), bits))
+
+            # adjust the count, and then adjust the usage flags based on whether
+            # a new bit was added or an existing bit was removed.
+            newcount = count + adjustment
+
+            if count > 1:
+                newusage = usage
+            elif adjustment > 0:
+                newusage = usage | bit
+            elif adjustment < 0:
+                newusage = usage & clear
+            else:
+                newusage = usage
+
+            # next we can apply our changes and write our new values for both
+            # the count and usage back into the netnode tables.
+            try:
+                ok_count = cls.setcount(countnode, key, position, newcount, tag=cls.counttag)
+                ok_mask = newusage == usage or cls.setusage(usagenode, funckey, newusage, tag=cls.usagetag)
+
+                # if we were successful with both the `hexvariable.setcount` and
+                # `hexvariable.setusage` functions, then we do the adjustment.
+                if ok_count and ok_mask:
+                    position, count = tagcount.send(adjustment)
+
+                # if either were not successful, then we raise an exception here
+                # to avoid writing anything else. this has the effect of exiting
+                # the current exception and branching to the generic handler.
+                else:
+                    raise exceptions.DisassemblerError(u"{:s}.adjust({!s}) : Unable to update the locator {!s} for the given tag ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), key_descr, "{!r}".format(name)))
+
+            # if any kind of exception was raised while adjusting the metadata
+            # tables, then we need to cleanly abort. so, we need to restore
+            # everything that we've modified before re-throwing the exception.
+            except Exception as E:
+                bits = usage.bit_count() if hasattr(usage, 'bit_count') else "{:b}".format(usage).count('1')
+                logging.info(u"{:s}.adjust({!s}) : Rolling back the usage mask and reference count for the locator {!s} to its previous number of bits ({:d}) and value ({:d}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), key_descr, bits, count))
+                if not cls.setcount(countnode, key, position, count, tag=cls.counttag):
+                    logging.error(u"{:s}.adjust({!s}) : Unable to roll back the reference count for the locator {!s} in netnode {:#x} to its previous value ({:d}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), key_descr, countnode, count))
+                elif not cls.setusage(usagenode, funckey, usage, tag=cls.usagetag):
+                    logging.error(u"{:s}.adjust({!s}) : Unable to roll back the usage mask for the locator {!s} in netnode {:#x} to its previous number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), key_descr, usagenode, bits))
+                tagcount.throw(E)
+
+            # do some sanity checks to track what was written to the usage flags
+            # and the tag counts for the function.
+            written = cls.getusage(usagenode, funckey, tag=cls.usagetag)
+            adjusted = cls.getcount(countnode, key, position, tag=cls.counttag)
+
+            if newusage != written:
+                raise AssertionError(u"{:s}.adjust({!s}) : Error updating the usage masks for the locator {!s} in the specified netnode ({:#x}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), key_descr, usagenode))
+
+            elif newcount != adjusted:
+                raise AssertionError(u"{:s}.adjust({!s}) : Error updating the reference count for the locator {!s} in the specified netnode ({:#x}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), key_descr, countnode))
+
+            # we're done, and only need to return the tag index and its count.
+            return position, newcount
+        return position, newcount
+
+    @classmethod
+    def increment(cls, func, *args):
+        '''Increment the reference count of the tag specified by `name` for the decompiler variable specified by `locator`.'''
+        [arg, name] = args if len(args) == 2 else itertools.chain([func], args)
+        cfunc, locator = cls.__get_cfunc_and_locator(func, *args[:-1])
+        node, fn = cls.node(), internal.hexrays.function.address(cfunc)
+
+        # assign some variables that we'll use while incrementing.
+        key = cls.encode_locator(cfunc, locator)
+        funckey = idaapi.ea2node(fn)
+        usagenode, countnode = cls.node(), funckey
+
+        # describe all of the parameters and such so that we can emit logging
+        # messages or raise exceptions that make sense and have context.
+        func_descr = "{:#x}".format(internal.hexrays.function.address(cfunc))
+        key_descr = internal.hexrays.variable.repr_locator(locator)
+        name_descr = "{!s}".format(name) if isinstance(name, internal.types.integer) else "{!r}".format(name)
+        parameters = [func_descr, key_descr, name_descr]
+
+        # we need the bit position for the tag. we can get this with `tags.get`,
+        # or we can use `tags.add` and get the position from the result.
+        position, count = tags.get(name) if tags.has(name) else tags.add(name)
+        bit, clear = pow(2, position), ~pow(2, position)
+
+        # then we check the "variabletag" table to see if the flag for the tag
+        # has already been set. if it's already set, then just return the count.
+        res = hashtools.bigint(node, key, tag=cls.variabletag)
+        if res & bit:
+            return position, cls.getcount(funckey, key, position, tag=cls.counttag)
+
+        # otherwise, it wasn't set. so, we can continue by setting it ourselves.
+        elif not hashtools.setbigint(node, key, res | bit, tag=cls.variabletag):
+            raise exceptions.DisassemblerError(u"{:s}.increment({!s}) : Unable to increment the reference count of the specified tag ({!s}) for variable located by {!s} in the current netnode ({:#x}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), "{!r}".format(name), key_descr, node))
+
+        # now we can adjust the usage and reference count for the given tag.
+        # proceed to adjust the tag reference count for the variable locator.
+        try:
+            result = cls.adjust(cfunc, locator, name, +1)
+
+        # if adjusting the tag reference count resulted in an exception being
+        # raised, then we need to roll-back the settings that were just made.
+        except:
+            bits = res.bit_count() if hasattr(res, 'bit_count') else "{:b}".format(res).count('1')
+            logging.info(u"{:s}.increment({!s}) : Rolling back the usage mask for the variable located by {!s} to its previous number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), key_descr, bits))
+            if not hashtools.setbigint(node, key, res, tag=cls.variabletag):
+                logging.error(u"{:s}.increment({!s}) : Unable to roll back the usage mask for the variable located by {!s} to its previous number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), key_descr, bits))
+            raise
+        return result
+
+    @classmethod
+    def decrement(cls, func, *args):
+        '''Decrement the reference count of the tag specified by `name` for the decompiler variable specified by `locator`.'''
+        [arg, name] = args if len(args) == 2 else itertools.chain([func], args)
+        cfunc, locator = cls.__get_cfunc_and_locator(func, *args[:-1])
+        node, fn = cls.node(), internal.hexrays.function.address(cfunc)
+
+        # start by assigning some variables that we will be using.
+        key = cls.encode_locator(cfunc, locator)
+        funckey = idaapi.ea2node(fn)
+        usagenode, countnode = cls.node(), funckey
+
+        # describe each of the parameters, and combine them into a list. this
+        # way we can emit pretty messages with context when logging or raising.
+        func_descr = "{:#x}".format(internal.hexrays.function.address(cfunc))
+        key_descr = internal.hexrays.variable.repr_locator(locator)
+        name_descr = "{!s}".format(name) if isinstance(name, internal.types.integer) else "{!r}".format(name)
+        parameters = [func_descr, key_descr, name_descr]
+
+        # sanity check that the tag exists since it doesn't make sense to
+        # decrement a tag that doesn't exist.
+        if not(tags.has(name)):
+            raise exceptions.MissingTagError(u"{:s}.decrement({!s}) : Unable to decrement the reference count of the specified tag ({!s}) due to the tag not being available.".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), "{!r}".format(name)))
+
+        # figure out what bit position we are supposed to decrement. if the tag
+        # doesn't exist, then we add it so that we can know the bit position.
+        position, count = tags.get(name) if tags.has(name) else tags.add(name)
+        bit, clear = pow(2, position), ~pow(2, position)
+
+        # now we can check to see if the position for the tag has already been
+        # cleared, returning the current count as if it was really decremented.
+        res = hashtools.bigint(node, key, tag=cls.variabletag)
+        if not(res & bit):
+            return position, cls.getcount(idaapi.ea2node(fn), key, position, tag=cls.counttag)
+
+        # otherwise the bit is set, and it needs to be cleared to continue.
+        elif not hashtools.setbigint(node, key, res & clear, tag=cls.variabletag):
+            raise exceptions.DisassemblerError(u"{:s}.decrement({!s}) : Unable to decrement the reference count of the specified tag ({!s}) for the variable located by {!s} in the current netnode ({:#x}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), "{!r}".format(name), key_descr, node))
+
+        # we are now ready to decrement the count for the location that we were
+        # given. on failure, this will throw an exception up the call stack.
+        try:
+            result = cls.adjust(cfunc, locator, name, -1)
+
+        # before rethrowing the exception, we need to roll-back all of the
+        # changes we made to the "variabletag" table.
+        except:
+            bits = res.bit_count() if hasattr(res, 'bit_count') else "{:b}".format(res).count('1')
+            logging.info(u"{:s}.decrement({!s}) : Rolling back the usage mask for the variable located by {!s} to its previous number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), key_descr, bits))
+            if not hashtools.setbigint(node, key, res, tag=cls.variabletag):
+                logging.error(u"{:s}.decrement({!s}) : Unable to roll back the usage mask for the variable located by {!s} to its previous number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), key_descr, bits))
+            raise
+        return result
+
+    @classmethod
+    def forward(cls, *args):
+        '''Yield a variable locator and mask for each tag starting from the specified decompiler variable (if given).'''
+        node = cls.node()
+
+        # figure out whether we're starting from an address or a locator.
+        if len(args) == 1 and (isinstance(args[0], internal.types.integer) or hasattr(args, '__int__')):
+            start = cls.encode_address_start(*map(int, args))
+            iterable = hashtools.forward(node, start, tag=cls.variabletag)
+
+        # we were given a function and some kind of locator.
+        elif len(args) == 2:
+            cfunc, locator = cls.__get_cfunc_and_locator(*args)
+            start = cls.encode_locator_start(cfunc, locator)
+            iterable = hashtools.forward(node, start, tag=cls.variabletag)
+
+        # if we have more parameters, then abort since we don't support them.
+        elif len(args) > 2:
+            descriptions = [("{!s}".format(arg) if isinstance(arg, internal.types.integer) else "{!r}".format(arg)) for arg in args]
+            raise internal.exceptions.InvalidParameterError(u"{:s}.forward({!s}) : Unable to determine the function and locator to start from variable due to an unsupported number of parameters ({:d}).".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions) if descriptions else '', len(args)))
+
+        # if there are no parameters, then start at the very beginning.
+        else:
+            iterable = hashtools.forward(node, tag=cls.variabletag)
+
+        # now we can use "start" as the key to seek forward from.
+        for key, integer in iterable:
+            yield cls.decode_locator(key), integer
+        return
+
+    @classmethod
+    def backward(cls, *locator):
+        '''Yield a variable locator and mask for each tag in reverse from the specified decompiler variable (if given).'''
+        node = cls.node()
+
+        # figure out if we're going to be starting from an address or a locator.
+        if len(args) == 1 and (isinstance(args[0], internal.types.integer) or hasattr(args, '__int__')):
+            stop = cls.encode_address_stop(*map(int, args))
+            iterable = hashtools.backward(node, stop, tag=cls.variabletag)
+
+        # if we have two parameters, then get the function and locator for them.
+        elif len(args) == 2:
+            cfunc, locator = cls.__get_cfunc_and_locator(*args)
+            stop = cls.encode_locator_stop(cfunc, locator)
+            iterable = hashtools.backward(node, stop, tag=cls.variabletag)
+
+        # if more parameters were received, then we don't support them.
+        elif len(args) > 2:
+            descriptions = [("{!s}".format(arg) if isinstance(arg, internal.types.integer) else "{!r}".format(arg)) for arg in args]
+            raise internal.exceptions.InvalidParameterError(u"{:s}.forward({!s}) : Unable to determine the function and locator to start from variable due to an unsupported number of parameters ({:d}).".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions) if descriptions else '', len(args)))
+
+        # if no parameters were given, then start at the very very end.
+        else:
+            iterable = hashtools.backward(node, tag=cls.variabletag)
+
+        # once we've figured out where to start, we can begin to seek backwards
+        # to get all of the decompiler variables and the tags applied to them.
+        for key, integer in iterable:
+            yield cls.decode_locator(key), integer
+        return
+
+    @classmethod
+    def range(cls, start, stop):
+        '''Return a list of each variable locator and mask from the address or locator `start` to `stop`.'''
+        node = cls.node()
+
+        # this is a little weird, because the "start" parameter can either be an
+        # address or a variable locator packed into a tuple.
+        if isinstance(start, internal.types.integer) or hasattr(start, '__int__'):
+            encoded_start = cls.encode_address_start(int(start))
+        else:
+            encoded_start = cls.encode_locator_start(*start)
+
+        # this is similar and we have to do the same thing for the "stop"
+        # parameter. this gives us the full range of keys to traverse.
+        if isinstance(stop, internal.types.integer) or hasattr(stop, '__int__'):
+            encoded_stop = cls.encode_address_stop(int(stop))
+        else:
+            encoded_stop = cls.encode_locator_stop(*stop)
+
+        # iterate through the entire range and return the results as a list.
+        items = hashtools.range(node, encoded_start, encoded_stop, tag=cls.variabletag)
+        return [(cls.decode_locator(key), integer) for key, integer in items]
+
+    @classmethod
+    def function(cls, func):
+        '''Yield every variable locator and mask belonging to the decompiled function `func`.'''
+        cfunc = internal.hexrays.function(func)
+
+        # we could use the function entrypoint to grab all the chunks and remove
+        # all ranges inside it, but since each locator is prefixed with the
+        # function address, we'll have enough to select the entire function.
+        node, fn = cls.node(), internal.hexrays.function.address(cfunc)
+        start, stop = cls.encode_address_start(fn), cls.encode_address_stop(fn)
+
+        # now we have the boundaries, so we can just select the entire range
+        for key, integer in hashtools.range(node, start, stop, tag=cls.variabletag):
+            yield cls.decode_locator(key), integer
+        return
+
+    @classmethod
+    def select(cls, *ea):
+        '''Yield the function address and usage for the variables from each decompiled function in the database.'''
+        node = cls.node()
+        for key, integer in super(hexvariable, cls).forward(node, *map(idaapi.ea2node, ea), tag=cls.usagetag):
+            yield idaapi.node2ea(key), integer
+        return
+
+    @classmethod
+    def repr(cls, *pattern):
+        '''Display the contents of the index containing information about the decompiler variables in the database.'''
+        Fmatch = re.compile(fnmatch.translate(*pattern), re.IGNORECASE).match if pattern else utils.fconstant(True)
+        usageresults = suptools.fall(cls.node(), tag=cls.usagetag)
+
+        # Display the schema version just in case.
+        lines = []
+        lines.append(u"Schema version: {:d}".format(cls.version()))
+
+        # Next we'll iterate through all of the usageresults and then measure
+        # the length of their tags rendered as a string. this is for alignment.
+        listable = [','.join(map("{:d}".format, tags.explode(integer))) for ea, integer in usageresults if Fmatch("{:#x}".format(ea))]
+        positions_width = max(map(len, listable)) if listable else 0
+
+        # Then we can iterate through all of the functions that we have, and
+        # gather each entry so that we can format it in a single line.
+        usage = [(u'Usage tags:')]
+        for key, integer in usageresults:
+            ea = idaapi.node2ea(key)
+            if not Fmatch("{:#x}".format(ea)):
+                continue
+            exploded = ','.join(map("{:d}".format, tags.explode(integer)))
+            usage.append("{:s}: {:<{:d}s} : {!s}".format("{:#x}".format(ea) if ea == key else "{:#x} ({:#x})".format(ea, key), exploded, positions_width, tags.names(integer)))
+        lines.extend(itertools.chain(usage, [''] if usage else []))
+
+        # Next we'll gather all of the entries from the "variabletag" table and
+        # determine the maximum length for rendering the tags.
+        iterable = ((key, integer) for key, integer in hashtools.forward(cls.node(), tag=cls.variabletag))
+        items = [(key, integer, cls.decode_locator(key)) for key, integer in iterable]
+        listable = [','.join(map("{:d}".format, tags.explode(integer))) for key, integer, decoded in items if Fmatch("{:#x}".format(idaapi.node2ea(decoded[0])))]
+        positions_width = max(map(len, listable)) if listable else 0
+
+        # Finally we can go through all of our items in the database, and then
+        # display each entry along with the tags that have been applied to it.
+        lines.append(u'Variables with tags:')
+        for key, integer, decoded in items:
+            fn, defea, _, _ = decoded
+            if not Fmatch("{:#x}".format(fn)):
+                continue
+            exploded = ','.join(map("{:d}".format, tags.explode(integer)))
+            key_descr = cls.repr_encoded_locator(key)
+            lines.append("{:s}: {:<{:d}s} : {!s}".format(key_descr, exploded, positions_width, tags.names(integer)))
+        return '\n'.join(lines)
+
+    @classmethod
+    def erase(cls, func):
+        '''Remove the locators, masks, and reference counts for the variables from the decompiled function `func`.'''
+        node, cfunc = cls.node(), internal.hexrays.function.by(func)
+        fn = internal.hexrays.function.address(cfunc)
+        funckey, parameter = idaapi.ea2node(fn), "{:#x}".format(fn)
+        usagenode, countnode = node, funckey
+
+        # first we'll remove the usage mask for the address of the function
+        # which is stored within our netnode.
+        if not netnode.sup.remove(usagenode, funckey, cls.usagetag):
+            logging.error(u"{:s}.erase({!s}) : Unable to remove the usage mask in netnode {:#x} for the variables from the decompiled function at {:#x}.".format('.'.join([__name__, cls.__name__]), parameter, usagenode, fn))
+
+        # now we use the netnode for the function to remove the reference counts
+        # for each of the masks that have been used. this is basically the
+        # equivalent of setting all the tag counts to 0.
+        for position in netnode.sup.fiter(countnode, cls.counttag):
+            if netnode.sup.remove(countnode, position, tag=cls.counttag):
+                continue
+            logging.error(u"{:s}.erase({!s}) : Unable to remove the reference count for the specified tag ({:d}) from netnode {:#x}.".format('.'.join([__name__, cls.__name__]), parameter, position, countnode))
+
+        # now we need to remove the variable locator masks from this entire
+        # function. all of the encoded variable locators (integers) are prefixed
+        # with the address of the function entrypoint, which we can encode and
+        # use to select all of the related variables and then erase them.
+        # snag all the precisers and values for the given function, and then go
+        # through and decrement each of them till everything is removed.
+        start, stop = cls.encode_address_start(fn), cls.encode_address_stop(fn)
+        deleting = {cls.decode_locator(key) : used for key, used in hashtools.range(node, start, stop, tag=cls.variabletag)}
+        for locator, used in deleting.items():
+
+            # iterate through all of the tags for each locator and decrement the
+            # reference count. if there isn't a reference count for the selected
+            # locator, then set it to 1 so we can decrement it without issue.
+            for position in tags.explode(used):
+                if not cls.hascount(countnode, cls.encode_locator(locator), position, tag=cls.counttag):
+                    cls.setcount(countnode, cls.encode_locator(locator), position, 1, tag=cls.counttag)
+                # XXX: no need for cfunc due to locator already being unpacked.
+                cls.decrement(locator, position)
+            continue
+        return sorted(deleting)
