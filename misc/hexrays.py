@@ -1029,15 +1029,33 @@ class variable(object):
     def copy_vdloc(cls, atype, alocinfo):
         '''Return a new instance of ``ida_hexrays.vdloc_t`` using the given `atype` and `alocinfo`.'''
         result = ida_hexrays.vdloc_t()
-        if atype in {idaapi.ALOC_REG1}:
+
+        # In case we receive this type, then there is absolutely nothing to do.
+        if atype in {idaapi.ALOC_NONE}:
+            pass
+
+        # If we were given a single register, then use it.
+        elif atype in {idaapi.ALOC_REG1}:
             result.set_reg1(alocinfo & 0x0000FFFF)
 
+        # According to documentation, the `ida_hexrays.vdloc_t` does not ever
+        # use the `ALOC_REG2` type. Despite this constraint, the decompiler
+        # doesn't give a single fuck what the documentation says. So, we handle
+        # it with the expectation that the decompiler will fix things.
+        elif atype in {idaapi.ALOC_REG2}:
+            iterable = [alocinfo & 0x0000FFFF, alocinfo & 0xFFFF0000]
+            [reg1, reg2] = (reg // pow(0x10000, index) for index, reg in enumerate(iterable))
+            result.set_reg2(reg1, reg2)
+
+        # Both the static and stack types are damned near the same.
         elif atype in {idaapi.ALOC_STATIC}:
             result.set_ea(alocinfo)
 
         elif atype in {idaapi.ALOC_STACK}:
             result.set_stkoff(alocinfo)
 
+        # If we're using a register relative type, then we repack our location
+        # information back into its individual fields.
         elif atype in {idaapi.ALOC_RREL}:
             rrel = idaapi.rrel_t()
             rrel.reg, rrel.off = alocinfo
@@ -1054,6 +1072,7 @@ class variable(object):
                 scattered_aloc.push_back(argpart)
             result.consume_scattered(scattered_aloc)
 
+        # Abort just in case we were given an unsupported type.
         else:
             ltypes = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('ALOC_')}
             raise exceptions.InvalidTypeOrValueError(u"{:s}.copy_vdloc({:d}, {!r}) : Unable to duplicate a location of type {:s} for the specified location information ({!r}).".format('.'.join([__name__, cls.__name__]), atype, alocinfo, "{:s}({:d})".format(ltypes[atype], atype) if atype in ltypes else "{:d}".format(atype), alocinfo))
