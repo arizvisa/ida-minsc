@@ -1081,13 +1081,7 @@ class variable(object):
     @classmethod
     def new_locator(cls, ea, locator):
         '''Return the ``ida_hexrays.lvar_locator_t`` for a variable defined at the address `ea` using the given `locator` as its type.'''
-        ea, atype, alocinfo = int(ea), locator.atype(), interface.tinfo.location_raw(locator)
-        if atype == idaapi.ALOC_REG2:
-            ltypes = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('ALOC_')}
-            raise exceptions.InvalidTypeOrValueError(u"{:s}.new_locator({:#x}, {!r}) : Unable to create a locator for the variable at address {:#x} using an unsupported type {:s}.".format('.'.join([__name__, cls.__name__]), ea, locator, ea, "{:s}({:d})".format(ltypes[atype], atype) if atype in ltypes else "{:d}".format(atype)))
-
-        # use the location info that we extracted with interface.tinfo, and
-        # use its result  to create a new instance of the decompiler's vdloc_t.
+        ea, alocinfo = int(ea), interface.tinfo.location_raw(locator)
         vdloc = cls.copy_vdloc(*alocinfo)
         return ida_hexrays.lvar_locator_t(vdloc, ea)
 
