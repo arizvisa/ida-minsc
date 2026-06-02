@@ -1306,9 +1306,14 @@ class sup(object):
     def repr(cls, nodeidx, tag=None):
         '''Display the "supval" array belonging to the netnode identified by `nodeidx`.'''
         res, stag = [], utils.sbyte(tag, netnode.suptag)
+        try:
+            length_keys = max(len("{:x}".format(item)) for item in cls.fiter(nodeidx, tag=stag))
+            length_values = max(len("{!r}".format(cls.get(nodeidx, item, tag=stag))) for item in cls.fiter(nodeidx, tag=stag))
+        except ValueError:
+            length_keys, length_values = 0, 2
         for index, item in enumerate(cls.fiter(nodeidx, tag=stag)):
-            value = cls.get(nodeidx, item, tag=stag)
-            res.append("[{:d}] {:x} : {!r}".format(index, item, value))
+            value = "{:<{:d}s} : bytes={!r}, int={:#x} ({:d})".format("{!r}".format(cls.get(nodeidx, item, None, tag=stag)), length_values, cls.get(nodeidx, item, bytes, tag=stag), cls.get(nodeidx, item, int, tag=stag), cls.get(nodeidx, item, int, tag=stag))
+            res.append("[{:d}] {:>0{:d}x} : {!s}".format(index, item, length_keys, value))
         if not res:
             description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}{!s}) : The specified node ({:s}) does not have any supvals.".format('.'.join([__name__, cls.__name__]), description, '' if tag is None else ", tag={!s}".format(tag), description))
