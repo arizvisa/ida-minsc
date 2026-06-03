@@ -484,6 +484,8 @@ class functions(object):
         `contents` - Filter the functions for any that use the specified tag(s) in their contents
         `thunk` - Filter the functions for any that are thunks
         `export` or `exports` - Filter the functions for any that are exports
+        `chunks` - Filter the functions by their number of chunks
+        `blocks` - Filter the functions by their number of basic blocks
         `entrypoint` or `entrypoints` - Filter the functions for any that are entrypoints
         `result` - Filter the functions for any that return the specified type
         `listed` - Filter the functions for any with a listed name
@@ -561,6 +563,9 @@ class functions(object):
     __matcher__.alias('exports', 'export')
     __matcher__.combinator('entrypoint', utils.fcompose(utils.fcompose, utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(interface.entries.entries), utils.fpartial(utils.itermap, utils.nth(1)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(interface.entries.entries), utils.fpartial(utils.itermap, utils.nth(1)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains), utils.frpartial(utils.fcompose, operator.not_)))))
     __matcher__.alias('entrypoints', 'entrypoint'), __matcher__.alias('entries', 'entrypoint'), __matcher__.alias('entry', 'entrypoint')
+
+    __matcher__.combinator('chunks', utils.fcondition(utils.finstance(internal.types.bool), utils.finstance(internal.types.integer))(utils.fcompose(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, len, utils.fpartial(operator.lt, 1))), utils.fcompose(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, len)), utils.fcompose(internal.types.set, utils.fpartial(utils.fpartial, operator.contains), utils.fpartial(utils.fcompose, len))), interface.function.chunks, utils.fpartial(map, interface.range.unpack), internal.types.list)
+    __matcher__.combinator('blocks', utils.fcondition(utils.finstance(internal.types.bool), utils.finstance(internal.types.integer))(utils.fcompose(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, len, utils.fpartial(operator.lt, 1))), utils.fcompose(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, len)), utils.fcompose(internal.types.set, utils.fpartial(utils.fpartial, operator.contains), utils.fpartial(utils.fcompose, len))), interface.function.blocks, utils.fpartial(map, interface.range.unpack), internal.types.list)
 
     def __new__(cls, *string, **type):
         '''Return the address of each of the functions within the database as a list.'''
