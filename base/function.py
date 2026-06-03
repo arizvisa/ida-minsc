@@ -691,6 +691,79 @@ class chunks(object):
         iterable = interface.function.epilogue(func)
         return (ea for ea in iterable)
 
+    # FIXME: this should be aliased in the `chunk` namespace.
+    @utils.multicase(start=types.integer)
+    @classmethod
+    def add(cls, start):
+        '''Add the chunk starting at the address `start` to the chunks for the current function.'''
+        return cls.add(ui.current.function(), start)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def add(cls, bounds):
+        '''Add the chunk specified by `bounds` to the chnks for the current function.'''
+        return cls.add(ui.current.function(), bounds)
+    @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
+    @classmethod
+    def add(cls, func, ea):
+        '''Add the chunk starting at address `ea` to the chunks for the function `func`.'''
+        fn = interface.function.by(func)
+        start = interface.address.inside(ea)
+        if not idaapi.append_func_tail(fn, start, idaapi.BADADDR):
+            fullname = '.'.join([getattr(idaapi.append_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.append_func_tail, attribute)])
+            raise E.DisassemblerError(u"{:s}.add({!r}, {:#x}) : Unable add the chunk at the specified address ({:#x}) to the function at {:#x} with `{:s}`.".format('.'.join([__name__, cls.__name__]), func, ea, start, interface.range.start(fn), fullname))
+        ui.state.wait()
+        return interface.range.bounds(interface.function.chunk(start, start))
+    @utils.multicase(func=(idaapi.func_t, types.integer), start=types.integer, end=types.integer)
+    @classmethod
+    def add(cls, func, start, end):
+        '''Add the chunk from the address `start` until `end` to the chunks for the function `func`.'''
+        fn = interface.function.by(func)
+        ea, stop = bounds = interface.bounds_t(*interface.address.within(start, end))
+        if not idaapi.append_func_tail(fn, ea, stop):
+            fullname = '.'.join([getattr(idaapi.append_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.append_func_tail, attribute)])
+            raise E.DisassemblerError(u"{:s}.add({!r}, {:#x}, {:#x}) : Unable add the specified chunk ({:s}) to the function at {:#x} with `{:s}`.".format('.'.join([__name__, cls.__name__]), func, start, end, bounds, interface.range.start(fn), fullname))
+        ui.state.wait()
+        return interface.range.bounds(interface.function.chunk(ea, ea))
+    @utils.multicase(func=(idaapi.func_t, types.integer), bounds=interface.bounds_t)
+    @classmethod
+    def add(cls, func, bounds):
+        '''Add the chunk specified by `bounds` to the chunks for the function `func`.'''
+        start, end = bounds
+        return cls.add(func, start, end)
+
+    @utils.multicase()
+    @classmethod
+    def remove(cls):
+        '''Remove the chunk containing the current address from the first function that owns it.'''
+        return cls.remove(ui.current.address())
+    @utils.multicase(ea=types.integer)
+    @classmethod
+    def remove(cls, ea):
+        '''Remove the chunk at `ea` from the first function that owns it.'''
+        return cls.remove(ea, ea)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def remove(cls, bounds):
+        '''Remove the chunk specified by `bounds` from the first function that owns it.'''
+        ea, _ = bounds
+        return cls.remove(ea, ea)
+    @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
+    @classmethod
+    def remove(cls, func, ea):
+        '''Remove the chunk at `ea` from the chunks for the function `func`.'''
+        fn, ea = interface.function.by(func), interface.address.within(ea)
+        bounds = interface.range.bounds(interface.function.chunk(fn, ea))
+        if not idaapi.remove_func_tail(fn, ea):
+            fullname = '.'.join([getattr(idaapi.remove_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.remove_func_tail, attribute)])
+            raise E.DisassemblerError(u"{:s}.remove({!r}, {:#x}) : Unable to delete the chunk ({:s}) for the function at {:#x} with `{:s}`.".format('.'.join([__name__, cls.__name__]), func, ea, bounds, interface.range.start(fn), fullname))
+        return bounds
+    @utils.multicase(func=(idaapi.func_t, types.integer), bounds=interface.bounds_t)
+    @classmethod
+    def remove(cls, func, bounds):
+        '''Remove the chunk specified by `bounds` from the chunks for the function `func`.'''
+        ea, _ = bounds
+        return cls.remove(func, ea)
+
 iterate = utils.alias(chunks.iterate, 'chunks')
 contains = utils.alias(chunks.contains, 'chunks')
 register = utils.alias(chunks.register, 'chunks')
@@ -954,77 +1027,8 @@ class chunk(object):
         left = interface.range.start(interface.function.chunk(ea, ea))
         return interface.address.offset(left) + offset
 
-    @utils.multicase(start=types.integer)
-    @classmethod
-    def add(cls, start):
-        '''Add the chunk starting at the address `start` to the current function.'''
-        return cls.add(ui.current.function(), start)
-    @utils.multicase(bounds=interface.bounds_t)
-    @classmethod
-    def add(cls, bounds):
-        '''Add the chunk specified by `bounds` to the current function.'''
-        return cls.add(ui.current.function(), bounds)
-    @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
-    @classmethod
-    def add(cls, func, ea):
-        '''Add the chunk starting at address `ea` to the function `func`.'''
-        fn = interface.function.by(func)
-        start = interface.address.inside(ea)
-        if not idaapi.append_func_tail(fn, start, idaapi.BADADDR):
-            fullname = '.'.join([getattr(idaapi.append_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.append_func_tail, attribute)])
-            raise E.DisassemblerError(u"{:s}.add({!r}, {:#x}) : Unable add the chunk at the specified address ({:#x}) to the function at {:#x} with `{:s}`.".format('.'.join([__name__, cls.__name__]), func, ea, start, interface.range.start(fn), fullname))
-        ui.state.wait()
-        return interface.range.bounds(interface.function.chunk(start, start))
-    @utils.multicase(func=(idaapi.func_t, types.integer), start=types.integer, end=types.integer)
-    @classmethod
-    def add(cls, func, start, end):
-        '''Add the chunk from the address `start` until `end` to the function `func`.'''
-        fn = interface.function.by(func)
-        ea, stop = bounds = interface.bounds_t(*interface.address.within(start, end))
-        if not idaapi.append_func_tail(fn, ea, stop):
-            fullname = '.'.join([getattr(idaapi.append_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.append_func_tail, attribute)])
-            raise E.DisassemblerError(u"{:s}.add({!r}, {:#x}, {:#x}) : Unable add the specified chunk ({:s}) to the function at {:#x} with `{:s}`.".format('.'.join([__name__, cls.__name__]), func, start, end, bounds, interface.range.start(fn), fullname))
-        ui.state.wait()
-        return interface.range.bounds(interface.function.chunk(ea, ea))
-    @utils.multicase(func=(idaapi.func_t, types.integer), bounds=interface.bounds_t)
-    @classmethod
-    def add(cls, func, bounds):
-        '''Add the chunk specified by `bounds` to the function `func`.'''
-        start, end = bounds
-        return cls.add(func, start, end)
-
-    @utils.multicase()
-    @classmethod
-    def remove(cls):
-        '''Remove the chunk containing the current address from its function.'''
-        return cls.remove(ui.current.address())
-    @utils.multicase(ea=types.integer)
-    @classmethod
-    def remove(cls, ea):
-        '''Remove the chunk at `ea` from its function.'''
-        return cls.remove(ea, ea)
-    @utils.multicase(bounds=interface.bounds_t)
-    @classmethod
-    def remove(cls, bounds):
-        '''Remove the chunk specified by `bounds` from its function.'''
-        ea, _ = bounds
-        return cls.remove(ea, ea)
-    @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
-    @classmethod
-    def remove(cls, func, ea):
-        '''Remove the chunk at `ea` from the function `func`.'''
-        fn, ea = interface.function.by(func), interface.address.within(ea)
-        bounds = interface.range.bounds(interface.function.chunk(fn, ea))
-        if not idaapi.remove_func_tail(fn, ea):
-            fullname = '.'.join([getattr(idaapi.remove_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.remove_func_tail, attribute)])
-            raise E.DisassemblerError(u"{:s}.remove({!r}, {:#x}) : Unable to delete the chunk ({:s}) for the function at {:#x} with `{:s}`.".format('.'.join([__name__, cls.__name__]), func, ea, bounds, interface.range.start(fn), fullname))
-        return bounds
-    @utils.multicase(func=(idaapi.func_t, types.integer), bounds=interface.bounds_t)
-    @classmethod
-    def remove(cls, func, bounds):
-        '''Remove the chunk specified by `bounds` from the function `func`.'''
-        ea, _ = bounds
-        return cls.remove(func, ea)
+    add = utils.alias(chunks.add, 'chunks')
+    remove = utils.alias(chunks.remove, 'chunks')
 
     @utils.multicase()
     @classmethod
