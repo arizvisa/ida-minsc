@@ -2383,6 +2383,11 @@ class hexfunction(counted):
         (netnode.sup, counttag): {},
     }
 
+    # FIXME: there might be an issue here if more than one decompiled function
+    #        uses a basic-block. this would allow multiple comments to be
+    #        applied to the same address. whenver this is confirmed, it'll be
+    #        worth it to encode the owning function as part of the key similar
+    #        to the `hexvariable` namespace.
     __preciser_size = 32
     @classmethod
     def encode_preciser(cls, preciser):
@@ -2395,6 +2400,12 @@ class hexfunction(counted):
         # full 32-bits hopefully future-proofing this schema.
         res, clamped = idaapi.ea2node(ea) * shift, itp & shiftmask
         return res | clamped
+
+    @classmethod
+    def encode_object(cls, treeloc):
+        '''Encode the specified `treeloc` of type ``ida_hexrays.treeloc_t`` to an integer.'''
+        ea, itp = preciser = treeloc.ea, treeloc.itp
+        return cls.encode_preciser(preciser)
 
     @classmethod
     def encode_preciser_start(cls, preciser):
@@ -2422,6 +2433,14 @@ class hexfunction(counted):
         shift = pow(2, cls.__preciser_size)
         ea, itp = divmod(integer, shift)
         return idaapi.node2ea(ea), itp
+
+    @classmethod
+    def decode_object(cls, preciser):
+        '''Decode the specified `preciser` into an instance of the ``ida_hexrays.treeloc_t`` type.'''
+        ea, itp = cls.decode_preciser(preciser) if isinstance(preciser, internal.types.integer) else preciser
+        res = internal.hexrays.ida_hexrays_types.treeloc_t()
+        res.ea, res.itp = ea, itp
+        return res
 
     # methods that the parent namespace requires us to implement.
     @classmethod
@@ -3122,6 +3141,12 @@ class hexvariable(counted):
         return res
 
     @classmethod
+    def encode_object(cls, func, *args):
+        '''Encode the specified `locator` of type ``ida_hexrays.lvar_locator_t`` to an integer.'''
+        # we actually do this already, so this is really just an alias
+        return cls.encode_locator(func, *args)
+
+    @classmethod
     def encode_locator_start(cls, func, *args):
         '''Encode the tuple or starting address specified by `locator` as an integer.'''
         res = cls.encode_locator(func, *args)
@@ -3233,6 +3258,21 @@ class hexvariable(counted):
         # work. we still need to, however, translate our variable address from a
         # its netnode form to a database one with the correct base address.
         return func, idaapi.node2ea(defea), atype, res
+
+    @classmethod
+    def decode_object(cls, locator):
+        '''Decode the specified `locator` into an instance of the ``ida_hexrays.lvar_locator_t``.'''
+        res = internal.hexrays.ida_hexrays_types.lvar_locator_t()
+        if isinstance(locator, internal.types.integer):
+            _, defea, atype, alocinfo = cls.decode_locator(locator)
+        else:
+            _, defea, atype, alocinfo = locator
+
+        # Now we can assign the designated fields to the result type and then we
+        # can return the parameters as an `ida_hexrays.lvar_locator_t`.
+        res.defea = defea
+        res.location = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+        return res
 
     @classmethod
     def encode_address_start(cls, address):
