@@ -3055,7 +3055,7 @@ class hexvariable(counted):
         fn = internal.hexrays.function.address(cfunc)
         encoding = [
             (idaapi.ea2node(fn), cls.__locator_function_sizes[interface.database.bits()]),
-            (defea, cls.__locator_address_sizes[interface.database.bits()]),
+            (idaapi.ea2node(defea), cls.__locator_address_sizes[interface.database.bits()]),
             (atype, cls.__locator_type_size),
         ]
 
@@ -3076,8 +3076,9 @@ class hexvariable(counted):
         # things we can consume it from the least-significant bit.
         if atype == idaapi.ALOC_NONE:
             rencoded = [(0x00, 4), (0, cls.__locator_locinfo_sizes[interface.database.bits()])]
+        # this is an address, which we need to translate to a netnode address.
         elif atype == idaapi.ALOC_STATIC:
-            rencoded = [(0x01, 4), (alocinfo, interface.database.bits()), (0, 32)]
+            rencoded = [(0x01, 4), (idaapi.ea2node(alocinfo), interface.database.bits()), (0, 32)]
         elif atype == idaapi.ALOC_STACK:
             rencoded = [(0x02, 4), (alocinfo, interface.database.bits()), (0, 32)]
         elif atype == idaapi.ALOC_REG1:
@@ -3193,9 +3194,10 @@ class hexvariable(counted):
         if encoding == 0:
             res = None
 
-        # this encoding is for an `sval_t`... basically a database address.
+        # this encoding is for an `sval_t`... basically a netnode address, which
+        # we need to translate back to a database address.
         elif encoding == 1:
-            res = integer & wordmask
+            res = idaapi.node2ea(integer & wordmask)
 
         # this next encoding is also an `sval_t`, but for a stack offset.
         elif encoding == 2:
@@ -3226,9 +3228,11 @@ class hexvariable(counted):
         else:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.decode_locator({:#x}) : Unable to decode location information of the specified type ({:d}) due to it being unsupported.".format('.'.join([__name__, cls.__name__]), integer, encoding, 0))
 
-        # now we can return each component with the raw location information
-        # that we stored in our result variable... which might actually work.
-        return func, defea, atype, res
+        # now we return each decoded component with the raw location information
+        # that we converted into our result variable... which might actually
+        # work. we still need to, however, translate our variable address from a
+        # its netnode form to a database one with the correct base address.
+        return func, idaapi.node2ea(defea), atype, res
 
     @classmethod
     def encode_address_start(cls, address):
