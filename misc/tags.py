@@ -863,14 +863,15 @@ class query_v1(object):
         rmask, imask = (cls.mask(names) for names in [require, include])
         requested, selection = rmask | imask, require or include
         for preciser, used in internal.tagindex.hexfunction.function(interface.range.start(fn)):
+            instance = internal.tagindex.hexfunction.decode_object(preciser)
             if not(used):
                 continue
             elif not(selection) and used:
-                yield preciser, internal.tagindex.tags.names(used)
+                yield instance, internal.tagindex.tags.names(used)
             elif rmask and used & rmask == rmask:
-                yield preciser, internal.tagindex.tags.names(used & requested)
+                yield instance, internal.tagindex.tags.names(used & requested)
             elif not(rmask) and used & imask:
-                yield preciser, internal.tagindex.tags.names(used & requested)
+                yield instance, internal.tagindex.tags.names(used & requested)
             continue
         return
 
@@ -880,15 +881,16 @@ class query_v1(object):
         fn = interface.function.by(func)
         rmask, imask = (cls.mask(names) for names in [require, include])
         requested, selection = rmask | imask, require or include
-        for mid, used in internal.tagindex.hexvariable.function(fn):
+        for locator, used in internal.tagindex.hexvariable.function(fn):
+            instance = internal.tagindex.hexvariable.decode_object(locator)
             if not(used):
                 continue
             elif not(selection) and used:
-                yield mid, internal.tagindex.tags.names(used)
+                yield instance, internal.tagindex.tags.names(used)
             elif rmask and used & rmask == rmask:
-                yield mid, internal.tagindex.tags.names(used & requested)
+                yield instance, internal.tagindex.tags.names(used & requested)
             elif not(rmask) and used & imask:
-                yield mid, internal.tagindex.tags.names(used & requested)
+                yield instance, internal.tagindex.tags.names(used & requested)
             continue
         return
 
