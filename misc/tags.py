@@ -3393,6 +3393,70 @@ class reference_v1(object):
         def erase(cls, func):
             return internal.tagindex.hexfunction.erase(func)
 
+    class hexvariable(object):
+        """
+        This namespace is just a frontend for the variables that belong to a
+        decompiled function. Each location is a ``ida_hexrays.lvar_locator_t``.
+        """
+        @classmethod
+        def has(cls, locator, **target):
+            if 'target' not in target:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.has({!s}{!s}) : Unable to interact with variables due to the missing parameter \"{:s}\" which should contain the decompiled function.".format('.'.join([__name__, cls.__name__]), locator, ", {!s}".format(utils.string.kwargs(target)) if target else '', 'target'))
+            res = internal.tagindex.hexvariable.get(target['target'], locator)
+            return True if res else False
+        @classmethod
+        def get(cls, locator, **target):
+            if 'target' not in target:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.get({!s}{!s}) : Unable to interact with variables due to the missing parameter \"{:s}\" which should contain the decompiled function.".format('.'.join([__name__, cls.__name__]), locator, ", {!s}".format(utils.string.kwargs(target)) if target else '', 'target'))
+            return internal.tagindex.hexvariable.get(target['target'], locator)
+        @classmethod
+        def increment(cls, locator, name, **target):
+            if 'target' not in target:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.increment({!s}, {!r}{!s}) : Unable to interact with variables due to the missing parameter \"{:s}\" which should contain the decompiled function.".format('.'.join([__name__, cls.__name__]), locator, name, ", {!s}".format(utils.string.kwargs(target)) if target else '', 'target'))
+            return internal.tagindex.hexvariable.increment(target['target'], locator, name)
+        @classmethod
+        def decrement(cls, locator, name, **target):
+            if 'target' not in target:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.decrement({!s}, {!r}{!s}) : Unable to interact with variables due to the missing parameter \"{:s}\" which should contain the decompiled function.".format('.'.join([__name__, cls.__name__]), locator, name, ", {!s}".format(utils.string.kwargs(target)) if target else '', 'target'))
+            return internal.tagindex.hexvariable.decrement(target['target'], locator, name)
+
+        @classmethod
+        def count(cls, locator, **target):
+            if 'target' not in target:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.count({!s}{!s}) : Unable to interact with variables due to the missing parameter \"{:s}\" which should contain the decompiled function.".format('.'.join([__name__, cls.__name__]), locator, ", {!s}".format(utils.string.kwargs(target)) if target else '', 'target'))
+            return len(cls.get(target['target'], locator, **target))
+        @classmethod
+        def iterate(cls):
+            iterable = internal.tagindex.hexvariable.select()
+            return ((ea, internal.tagindex.tags.names(used)) for ea, used in iterable)
+        @classmethod
+        def name(cls, **target):
+            if 'target' not in target:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.name({!s}) : Unable to interact with variables due to the missing parameter \"{:s}\" which should contain the decompiled function.".format('.'.join([__name__, cls.__name__]), utils.string.kwargs(target) if target else '', 'target'))
+            used = internal.tagindex.hexvariable.usage(target['target'])
+            return internal.tagindex.tags.names(used)
+        @classmethod
+        def address(cls, **target):
+            if 'target' not in target:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.address({!s}) : Unable to interact with variables due to the missing parameter \"{:s}\" which should contain the decompiled function.".format('.'.join([__name__, cls.__name__]), utils.string.kwargs(target) if target else '', 'target'))
+            return [ea for ea, _ in internal.tagindex.hexvariable.function(target['target'])]
+        @classmethod
+        def counts(cls, func):
+            res, used = {}, (integer for ea, integer in internal.tagindex.hexvariable.function(func))
+            for name in itertools.chain(*map(internal.tagindex.tags.names, used)):
+                res[name] = res.setdefault(name, 0) + 1
+            return res
+        @classmethod
+        def erase_address(cls, locator, **target):
+            if 'target' not in target:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.erase_address({!s}{!s}) : Unable to interact with variables due to the missing parameter \"{:s}\" which should contain the decompiled function.".format('.'.join([__name__, cls.__name__]), locator, ", {!s}".format(utils.string.kwargs(target)) if target else '', 'target'))
+            names = internal.tagindex.hexvariable.get(target['target'], locator)
+            removed = [internal.tagindex.hexvariable.decrement(target['target'], locator, name) for name in names]
+            return len(names)
+        @classmethod
+        def erase(cls, func):
+            return internal.tagindex.hexvariable.erase(func)
+
 # Select the v0 frontend by default. This using the functionality provided
 # by the tagcache which has since been redesigned into the tagging index.
 reference = reference_v0
