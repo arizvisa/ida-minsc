@@ -3297,24 +3297,21 @@ class hexvariable(counted):
     def hascount(cls, node, key, position, *tag, **kwargs):
         '''Return whether the reference count of the specified tag `position` exists for the variable locator `key` in the netnode `node`.'''
         func, defea, atype, res = cls.decode_locator(key)
-        fn = interface.function.by(func)
-        countnode = idaapi.ea2node(interface.range.start(fn))
+        countnode = idaapi.ea2node(interface.range.start(interface.function.by(func))) if node is None else node
         return super(hexvariable, cls).hascount(countnode, key, position, tag=cls.counttag)
 
     @classmethod
     def getcount(cls, node, key, position, *tag, **kwargs):
         '''Return the reference count of the specified tag `position` from the variable locator `key` in the netnode `node`.'''
         func, defea, atype, res = cls.decode_locator(key)
-        fn = interface.function.by(func)
-        countnode = idaapi.ea2node(interface.range.start(fn))
+        countnode = idaapi.ea2node(interface.range.start(interface.function.by(func))) if node is None else node
         return super(hexvariable, cls).getcount(countnode, key, position, tag=cls.counttag)
 
     @classmethod
     def setcount(cls, node, key, position, count, *tag, **kwargs):
         '''Set the reference `count` in the variable locator given by `key` for the specified tag `position` in the netnode `node`.'''
         func, defea, atype, res = cls.decode_locator(key)
-        fn = interface.function.by(func)
-        countnode = idaapi.ea2node(interface.range.start(fn))
+        countnode = idaapi.ea2node(interface.range.start(interface.function.by(func))) if node is None else node
         return super(hexvariable, cls).setcount(countnode, key, position, count, tag=cls.counttag)
 
     @classmethod
@@ -3732,7 +3729,7 @@ class hexvariable(counted):
     @classmethod
     def erase(cls, func):
         '''Remove the locators, masks, and reference counts for the variables from the decompiled function `func`.'''
-        node, cfunc = cls.node(), internal.hexrays.function.by(func)
+        node, cfunc = cls.node(), internal.hexrays.function(func)
         fn = internal.hexrays.function.address(cfunc)
         funckey, parameter = idaapi.ea2node(fn), "{:#x}".format(fn)
         usagenode, countnode = node, funckey
