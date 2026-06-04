@@ -859,10 +859,10 @@ class query_v1(object):
     @classmethod
     def hexfunction(cls, func, require=frozenset(), include=frozenset()):
         '''Yield the preciser and tags from the decompiled function `func` containing all the tags in `require` and including any from `include`.'''
-        fn = interface.function.by(func)
+        cfunc = internal.hexrays.function(func)
         rmask, imask = (cls.mask(names) for names in [require, include])
         requested, selection = rmask | imask, require or include
-        for preciser, used in internal.tagindex.hexfunction.function(interface.range.start(fn)):
+        for preciser, used in internal.tagindex.hexfunction.function(cfunc):
             instance = internal.tagindex.hexfunction.decode_object(preciser)
             if not(used):
                 continue
@@ -878,10 +878,10 @@ class query_v1(object):
     @classmethod
     def hexvariable(cls, func, require=frozenset(), include=frozenset()):
         '''Yield the variable locator and tags for the variables from the decompiled function `func` containing all the tags in `require` and including any from `include`.'''
-        fn = interface.function.by(func)
+        cfunc = internal.hexrays.function(func)
         rmask, imask = (cls.mask(names) for names in [require, include])
         requested, selection = rmask | imask, require or include
-        for locator, used in internal.tagindex.hexvariable.function(fn):
+        for locator, used in internal.tagindex.hexvariable.function(cfunc):
             instance = internal.tagindex.hexvariable.decode_object(locator)
             if not(used):
                 continue
