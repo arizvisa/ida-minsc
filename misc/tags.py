@@ -2618,7 +2618,7 @@ class hexfunction(object):
         # if we were given one parameter, then we need to figure out the cfunc
         # ourselves using the address given in the preciser.
         else:
-            preciser = ea, itp = func
+            preciser = ea, itp = (func.ea, func.itp) if isinstance(func, idaapi.treeloc_t) else func
             cfunc = internal.hexrays.function(ea)
 
         # now we can create the locator for the function's ctree.
@@ -2666,7 +2666,7 @@ class hexfunction(object):
         # ourselves using the preciser
         elif len(args) == 2:
             [key, value] = args
-            preciser = ea, itp = func
+            preciser = ea, itp = (func.ea, func.itp) if isinstance(func, idaapi.treeloc_t) else func
             cfunc = internal.hexrays.function(ea)
 
         # otherwise we got an invalid number of parameters.
@@ -2716,7 +2716,7 @@ class hexfunction(object):
         # ourselves using the preciser
         elif len(args) == 2:
             [key, none] = args
-            preciser = ea, itp = func
+            preciser = ea, itp = (func.ea, func.itp) if isinstance(func, idaapi.treeloc_t) else func
             cfunc = internal.hexrays.function(ea)
 
         # otherwise we got an invalid number of parameters.
@@ -2776,6 +2776,7 @@ class hexvariable(object):
         if args and isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
             locator = internal.hexrays.variables.by(func, *args)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+            func = defea
 
         elif args:
             if isinstance(func, internal.hexrays.ida_hexrays_types.hexrays_func_types):
@@ -2786,15 +2787,28 @@ class hexvariable(object):
         elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
             locator = internal.hexrays.variables.by(*args)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+            func = defea
 
-        else:
+        # otherwise the locator information is packed into a tuple.
+        elif len(arg) == 3:
             defea, atype, alocinfo = arg
             vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
             locator = internal.hexrays.variable.new_locator(defea, vdloc)
+            func = defea
+
+        # this other tuple contains a function address inside it.
+        elif len(arg) == 4:
+            func, defea, atype, alocinfo = arg
+            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+            locator = internal.hexrays.variable.new_locator(defea, vdloc)
+
+        # otherwise an exception needs to be raised.
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}({!r}, {!r}).tag() : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported length ({:d}).".format('.'.join([__name__, cls.__name__]), func, arg, arg, len(arg)))
 
         # now we can get the function from the parameters, and then use the
         # locator to grab the comment for the variable and decode it.
-        cfunc = internal.hexrays.function(func if args else defea)
+        cfunc = internal.hexrays.function(func)
         cmt = internal.hexrays.variable.get_comment(cfunc, locator)
         decoded = comment.decode(cmt)
 
@@ -2833,6 +2847,7 @@ class hexvariable(object):
         if len(args) > 2 and isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
             locator = internal.hexrays.variables.by(func, *args)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+            func = defea
 
         elif len(args) > 2:
             if isinstance(func, internal.hexrays.ida_hexrays_types.hexrays_func_types):
@@ -2843,15 +2858,28 @@ class hexvariable(object):
         elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
             locator = internal.hexrays.variables.by(*args)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+            func = defea
 
-        else:
+        # if we got a tuple, then unpack its fields to get a locator.
+        elif len(arg) == 3:
             defea, atype, alocinfo = arg
             vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
             locator = internal.hexrays.variable.new_locator(defea, vdloc)
+            func = defea
+
+        # we might've gotten a tuple with the function address already inside.
+        elif len(arg) == 4:
+            func, defea, atype, alocinfo = arg
+            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+            locator = internal.hexrays.variable.new_locator(defea, vdloc)
+
+        # otherwise we have no idea and need to throw up an exception.
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}({!r}, {!r}).tag({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported length ({:d}).".format('.'.join([__name__, cls.__name__]), func, arg, key, value, arg, len(arg)))
 
         # now we can grab the function from the determined address or argument
         # and figure out if we're supposed to be setting an implicit tag or not.
-        cfunc = internal.hexrays.function(func if len(args) > 2 else defea)
+        cfunc = internal.hexrays.function(func)
         if key == '__name__':
             return internal.hexrays.variable.set_name(cfunc, locator, value)
 
@@ -2884,6 +2912,7 @@ class hexvariable(object):
         if len(args) > 2 and isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
             locator = internal.hexrays.variables.by(func, *args)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+            func = defea
 
         elif len(args) > 2:
             if isinstance(func, internal.hexrays.ida_hexrays_types.hexrays_func_types):
@@ -2894,17 +2923,30 @@ class hexvariable(object):
         elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
             locator = internal.hexrays.variables.by(*args)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+            func = defea
 
-        else:
+        # if we got a 3-element tuple, then use the locator address as a func.
+        elif len(arg) == 3:
             defea, atype, alocinfo = arg
             vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
             locator = internal.hexrays.variable.new_locator(defea, vdloc)
+            func = defea
+
+        # if we got the function as part of that tuple, then use it.
+        elif len(arg) == 4:
+            func, defea, atype, alocinfo = arg
+            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+            locator = internal.hexrays.variable.new_locator(defea, vdloc)
+
+        # if nothing landed, then throw up an exception into the sky.
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}({!r}, {!r}).tag({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported length ({:d}).".format('.'.join([__name__, cls.__name__]), func, arg, key, none, arg, len(arg)))
 
         # then figure out if we need to remove something due to an implicit tag
         # being specified. we start with the name and then we can do the type.
         # then we can grab the function from the unpacked information, and
         # determine if we need to handle removing an implicit tag.
-        cfunc = internal.hexrays.function(func if len(args) > 2 else defea)
+        cfunc = internal.hexrays.function(func)
         if _key == '__name__':
             return internal.hexrays.variable.remove_name(cfunc, locator)
 
