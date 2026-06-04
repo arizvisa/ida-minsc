@@ -2447,21 +2447,21 @@ class hexfunction(counted):
     def hascount(cls, node, key, position, *tag, **kwargs):
         '''Return whether the reference count at the specified `key` exists for the tag at `position` of the netnode specified by `node`.'''
         ea, itp = cls.decode_preciser(key)
-        countnode = interface.range.start(interface.function.by(ea))
+        countnode = idaapi.ea2node(interface.range.start(interface.function.by(ea))) if node is None else node
         return super(hexfunction, cls).hascount(countnode, key, position, tag=cls.counttag)
 
     @classmethod
     def getcount(cls, node, key, position, *tag, **kwargs):
         '''Return the reference count at the specified `key` for the tag at `position` of the netnode specified by `node`.'''
         ea, itp = cls.decode_preciser(key)
-        countnode = interface.range.start(interface.function.by(ea))
+        countnode = idaapi.ea2node(interface.range.start(interface.function.by(ea))) if node is None else node
         return super(hexfunction, cls).getcount(countnode, key, position, tag=cls.counttag)
 
     @classmethod
     def setcount(cls, node, key, position, count, *tag, **kwargs):
         '''Set the reference count at the specified `key` for the tag at `position` of the netnode specified by `node` to `count`.'''
         ea, itp = cls.decode_preciser(key)
-        countnode = interface.range.start(interface.function.by(ea))
+        countnode = idaapi.ea2node(interface.range.start(interface.function.by(ea))) if node is None else node
         return super(hexfunction, cls).setcount(countnode, key, position, count, tag=cls.counttag)
 
     @classmethod
@@ -2675,7 +2675,8 @@ class hexfunction(counted):
     @classmethod
     def function(cls, func):
         '''Yield every preciser and mask belonging to the decompiled function `func`.'''
-        fn = interface.function.by(func)
+        cfunc = internal.hexrays.function(func)
+        fn = internal.hexrays.function.address(cfunc)
         chunks = interface.function.chunks(fn)
         ranges = map(interface.range.unpack, chunks)
 
@@ -2688,18 +2689,17 @@ class hexfunction(counted):
     @classmethod
     def erase(cls, func):
         '''Remove the precisers, masks, and reference counts for the decompiled function `func`.'''
-        node, parameter = cls.node(), "{:#x}".format(func) if isinstance(func, types.integer) else "{:s}".format(func)
-        fn = func if isinstance(func, types.integer) and netnode.sup.has(node, idaapi.ea2node(func), cls.usagetag) else interface.function.by(func)
-        address = fn if isinstance(fn, types.integer) else interface.range.start(fn)
-
-        key = idaapi.ea2node(address)
+        node, cfunc = cls.node(), internal.hexrays.function(func)
+        fn = internal.hexrays.function.address(cfunc)
+        node = usagenode = cls.node()
+        key = countnode = idaapi.ea2node(fn)
         if not netnode.sup.remove(node, key, cls.usagetag):
-            logging.error(u"{:s}.erase({!s}) : Unable to remove the usage mask for the decompiled function at {:#x} from netnode {:#x}.".format('.'.join([__name__, cls.__name__]), parameter, address, node))
+            logging.error(u"{:s}.erase({:#x}) : Unable to remove the usage mask for the decompiled function at {:#x} from netnode {:#x}.".format('.'.join([__name__, cls.__name__]), fn, fn, node))
 
-        for position in netnode.sup.fiter(key, cls.counttag):
-            if netnode.sup.remove(key, position, tag=cls.counttag):
+        for position in netnode.sup.fiter(countnode, cls.counttag):
+            if netnode.sup.remove(countnode, position, tag=cls.counttag):
                 continue
-            logging.error(u"{:s}.erase({!s}) : Unable to remove the reference count for the specified tag ({:d}) from netnode {:#x}.".format('.'.join([__name__, cls.__name__]), parameter, position, key))
+            logging.error(u"{:s}.erase({:#x}) : Unable to remove the reference count for the specified tag ({:d}) from netnode {:#x}.".format('.'.join([__name__, cls.__name__]), fn, position, key))
 
         # now we need to remove the address masks from this entire function.
         chunks = interface.function.chunks(fn)
@@ -2708,14 +2708,14 @@ class hexfunction(counted):
 
         # snag all the precisers and values for the given function, and then go
         # through and decrement each of them till everything is removed.
-        deleting = {preciser : used for preciser, used in cls.function(fn)}
+        deleting = {preciser : used for preciser, used in cls.function(cfunc)}
         for preciser, used in deleting.items():
             for position in tags.explode(used):
 
                 # if our count doesn't exist, due to a discrepancy (corruption),
                 # then set it to 1 so that we can decrement without issue.
-                if not cls.hascount(address, cls.encode_preciser(preciser), position, tag=cls.counttag):
-                    cls.setcount(address, cls.encode_preciser(preciser), position, 1, tag=cls.counttag)
+                if not cls.hascount(countnode, cls.encode_preciser(preciser), position, tag=cls.counttag):
+                    cls.setcount(countnode, cls.encode_preciser(preciser), position, 1, tag=cls.counttag)
                 cls.decrement(preciser, position)
             continue
         return sorted(deleting)
