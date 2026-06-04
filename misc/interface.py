@@ -9237,6 +9237,14 @@ class tinfo(object):
             idaapi.BTMT_SIZE128,
         }
 
+        # We also need to handle any explicit boolean types.
+        bool_types = {
+            idaapi.BTMT_BOOL1,
+            idaapi.BTMT_BOOL2,
+            idaapi.BTMT_BOOL4,
+            idaapi.BTMT_BOOL8,
+        }
+
         # unpack the type declaration into its components so that we can test.
         base, flags, modifiers = (decl & mask for mask in masks)
 
@@ -9261,6 +9269,10 @@ class tinfo(object):
 
         # floating-point numbers require us to test the flags for the type.
         elif base == idaapi.BT_FLOAT and flags in {idaapi.BTMT_FLOAT, idaapi.BTMT_DOUBLE, idaapi.BTMT_SPECFLT}:
+            return True
+
+        # booleans also require us to test the flags for the type.
+        elif base == idaapi.BT_BOOL and flags in bool_types:
             return True
 
         # anything else was explicitly specified by the user or decompiler.
