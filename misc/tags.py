@@ -1071,11 +1071,10 @@ class select_v1(object):
     @classmethod
     def hexfunction(cls, func, *args, **kwargs):
         '''Yield the function address and tags from the contents of each function containing all the tags in `require` and including any from `include`.'''
-        selection = True if any([args, kwargs]) else False
-        for preciser, used in query_v1.hexfunction(func, *args, **kwargs):
-            ea, _ = preciser
+        cfunc, selection = internal.hexrays.function(func), True if any([args, kwargs]) else False
+        for preciser, used in query_v1.hexfunction(cfunc, *args, **kwargs):
+            ea, _ = cls.navigation.analyze(preciser.ea), preciser.itp
             tags = hexfunction.get(preciser)
-            ea = cls.navigation.analyze(ea)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
             if selection:
@@ -1088,11 +1087,9 @@ class select_v1(object):
     @classmethod
     def hexvariable(cls, func, *args, **kwargs):
         '''Yield the variable locator and tags for the variables from the decompiled function `func` containing all the tags in `require` and including any from `include`.'''
-        selection = True if any([args, kwargs]) else False
-        for locator, used in query_v1.hexvariable(func, *args, **kwargs):
-            defea, atype, alocinfo = locator
-            tags = hexvariable.get(locator)
-            ea = cls.navigation.analyze(defea)
+        cfunc, selection = internal.hexrays.function(func), True if any([args, kwargs]) else False
+        for locator, used in query_v1.hexvariable(cfunc, *args, **kwargs):
+            tags, defea = hexvariable.get(cfunc, locator), cls.navigation.analyze(locator.defea)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
             if selection:
