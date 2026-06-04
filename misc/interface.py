@@ -9285,6 +9285,52 @@ class tinfo(object):
         return cls.basic(type, flags)
 
     @classmethod
+    def primitive(cls, type):
+        '''Return whether the given `type` is a primitive type that is supported natively by the chosen assembler.'''
+        decl = type.get_decltype()
+        masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
+
+        # We are looking for primitive types that have no information.
+        void_types = {
+            idaapi.BTMT_SIZE0,
+            idaapi.BTMT_SIZE12,
+            idaapi.BTMT_SIZE48,
+            idaapi.BTMT_SIZE128,
+        }
+
+        # We're also looking for boolean types that have no information.
+        bool_types = {
+            idaapi.BTMT_BOOL1,
+            idaapi.BTMT_BOOL2,
+            idaapi.BTMT_BOOL4,
+            idaapi.BTMT_BOOL8,
+        }
+
+        # To start, we'll need to unpack the type into its integer components.
+        base, flags, modifiers = (decl & mask for mask in masks)
+
+        # If there are any type modifiers, then it's not a primitive type.
+        if modifiers:
+            return False
+
+        # Now check to see if it is one of the integer-based primitives.
+        elif base in {idaapi.BT_VOID, idaapi.BT_UNK} and flags in void_types:
+            return True
+
+        # Next we need to check the booleans using the flags we extracted.
+        elif base == idaapi.BT_BOOL and flags in bool_types:
+            return True
+
+        # The only floating point type that's a primitive is `_TBYTE`. This is
+        # A `_TBYTE` is the only floating point type that's a primitive. This is
+        # done using the `idaapi.BTMT_SPECFLT` flags with an `idaapi.BT_FLOAT`.
+        elif (base, flags) == (idaapi.BT_FLOAT, idaapi.BTMT_SPECFLT):
+            return True
+
+        # Otherwise, this isn't one of the types we are looking for.
+        return False
+
+    @classmethod
     def boolean(cls, type, *sizes):
         '''Return whether the given `type` is a boolean type per the selected compiler.'''
         masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
