@@ -1383,7 +1383,7 @@ class globals(counted):
         Fmatch = re.compile(fnmatch.translate(*pattern), re.IGNORECASE).match if pattern else utils.fconstant(True)
         used = cls.getusage(cls.node(), cls.NSUP_TAGNAME_USAGE, tag=cls.statstag)
         names = tags.names(used)
-        items = [(ea, integer) for ea, integer in cls.iterate() if Fmatch("{:#x}".format(ea))]
+        items = [(ea, integer) for ea, integer in cls.iterate() if any(Fmatch(F(ea) or '') for F in ["{:#x}".format, interface.name.get])]
 
         iterable = (','.join(map("{:d}".format, tags.explode(integer))) for ea, integer in items)
         positions_width = max(map(len, iterable)) if items else 0
@@ -1394,7 +1394,6 @@ class globals(counted):
         lines.append(u"Used tags (name): ({:d}) {!s}".format(len(names), ', '.join(map(repr, names))))
         lines.append(u'Globals with tags:')
         for ea, integer in items:
-            if not Fmatch("{:#x}".format(ea)): continue
             names = tags.names(integer)
             exploded = ','.join(map("{:d}".format, tags.explode(integer)))
             lines.append("{:#x}: {:<{:d}s} : {!s}".format(ea, exploded, positions_width, names))
@@ -1923,7 +1922,7 @@ class contents(counted):
         usage = [(u'Usage tags:')]
         for key, integer in usageresults:
             ea = idaapi.node2ea(key)
-            if not Fmatch("{:#x}".format(ea)):
+            if not any(Fmatch(F(ea)) for F in ["{:#x}".format, interface.function.name]):
                 continue
             exploded = ','.join(map("{:d}".format, tags.explode(integer)))
             usage.append("{:s}: {:<{:d}s} : {!s}".format("{:#x}".format(ea) if ea == key else "{:#x} ({:#x})".format(ea, key), exploded, positions_width, tags.names(integer)))
@@ -1936,7 +1935,7 @@ class contents(counted):
         lines.append(u'Contents with tags:')
         for key, integer in items:
             ea = idaapi.node2ea(key)
-            if not Fmatch("{:#x}".format(ea)):
+            if not any(Fmatch(F(ea)) for F in ["{:#x}".format, interface.function.name]):
                 continue
             exploded = ','.join(map("{:d}".format, tags.explode(integer)))
             lines.append("{:s}: {:<{:d}s} : {!s}".format("{:#x}".format(ea) if ea == key else "{:#x} ({:#x})".format(ea, key), exploded, positions_width, tags.names(integer)))
@@ -2744,7 +2743,8 @@ class hexfunction(counted):
         usage = [(u'Usage tags:')]
         for key, integer in usageresults:
             ea = idaapi.node2ea(key)
-            if not Fmatch("{:#x}".format(ea)):
+            fn = interface.range.start(interface.function.by(ea))
+            if not any(Fmatch(F(fn)) for F in ["{:#x}".format, interface.function.name]):
                 continue
             exploded = ','.join(map("{:d}".format, tags.explode(integer)))
             usage.append("{!s}: {:<{:d}s} : {!s}".format("{:#x}".format(ea) if ea == key else "{:#x} ({:#x})".format(ea, key), exploded, positions_width, tags.names(integer)))
@@ -2756,7 +2756,8 @@ class hexfunction(counted):
 
         lines.append(u'Precisers with tags:')
         for (ea, itp), integer in items:
-            if not Fmatch("{:#x}".format(ea)):
+            fn = interface.range.start(interface.function.by(ea))
+            if not any(Fmatch(F(fn)) for F in ["{:#x}".format, interface.function.name]):
                 continue
             exploded = ','.join(map("{:d}".format, tags.explode(integer)))
             lines.append("{!s}: {:<{:d}s} : {!s}".format("({:#x}, {:d})".format(ea, itp), exploded, positions_width, tags.names(integer)))
@@ -3701,7 +3702,7 @@ class hexvariable(counted):
         usage = [(u'Usage tags:')]
         for key, integer in usageresults:
             ea = idaapi.node2ea(key)
-            if not Fmatch("{:#x}".format(ea)):
+            if not any(Fmatch(F(ea)) for F in ["{:#x}".format, interface.function.name]):
                 continue
             exploded = ','.join(map("{:d}".format, tags.explode(integer)))
             usage.append("{:s}: {:<{:d}s} : {!s}".format("{:#x}".format(ea) if ea == key else "{:#x} ({:#x})".format(ea, key), exploded, positions_width, tags.names(integer)))
@@ -3719,7 +3720,7 @@ class hexvariable(counted):
         lines.append(u'Variables with tags:')
         for key, integer, decoded in items:
             fn, defea, _, _ = decoded
-            if not Fmatch("{:#x}".format(fn)):
+            if not any(Fmatch(F(fn)) for F in ["{:#x}".format, interface.function.name]):
                 continue
             exploded = ','.join(map("{:d}".format, tags.explode(integer)))
             key_descr = cls.repr_encoded_locator(key)
