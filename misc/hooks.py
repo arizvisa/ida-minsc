@@ -6227,12 +6227,44 @@ class decompilermonitor(object):
     ### a function that has been decompiled.
     def __handle_func_printed(self, fn, old, new):
         '''Update the references in the function `fn` for changing all of the comments and variables specified in `old` to `new.'''
-        cls = self.__class__
+        cls, cfunc = self.__class__, internal.hexrays.function(fn)
 
         # As usual, unpack our parameter so that we can figure out what to do
         # with the new state by comparing it to the old state.
         oldcomments, oldvariables = old.comments, old.variables
         newcomments, newvariables = new.comments, new.variables
+
+        # If we were given some old comments, then go and decrement them if
+        # there are any already indexed tags. We have to do the exact same thing
+        # checking whether it's indexed and decrementing it for the variables.
+        for ea, itp, comment in oldcomments:
+            decoded = internal.comment.decode(comment or '')
+            if internal.tags.reference.hexfunction.has((ea, itp), target=fn):
+                [internal.tags.reference.hexfunction.decrement((ea, itp), name, target=fn) for name in decoded]
+            continue
+
+        for locator, variable in oldvariables:
+            decoded = internal.comment.decode(variable.comment or '')
+            if internal.tags.reference.hexvariable.has(locator, target=fn):
+                [internal.tags.reference.hexvariable.decrement(locator, name, target=fn) for name in decoded]
+            continue
+
+        # XXX: Is it safer to just erase the tagindex for the entire function?
+
+        # Hopefully that cleared all the references within the function, because
+        # then we will need to go through all of the new comments and variables
+        # in order to update the tag index with any new values that were added.
+        for ea, itp, comment in newcomments:
+            decoded = internal.comment.decode(comment or '')
+            if not internal.tags.reference.hexfunction.has((ea, itp), target=fn):
+                [internal.tags.reference.hexfunction.increment((ea, itp), name, target=fn) for name in decoded]
+            continue
+
+        for locator, variable in newvariables:
+            decoded = internal.comment.decode(variable.comment or '')
+            if not internal.tags.reference.hexvariable.has(locator, target=fn):
+                [internal.tags.reference.hexvariable.increment(locator, name, target=fn) for name in decoded]
+            continue
         return
 
     ### Utilities for maintaining the state of the decompiler comments for an address.
