@@ -6198,10 +6198,10 @@ class decompilermonitor(object):
     back into our methods to handle the actual tag reference count tracking.
     """
 
-    def __new__(cls):
-        logging.info(u"{:s}() : Initializing the decompiler monitor for v{:.1f} and instantiating the state for tracking any changes.".format('.'.join([__name__, cls.__name__]), idaapi.__version__))
-
-        # now we can instantiate our state for tracking.
+    @classmethod
+    def attach(cls, *args, **kwargs):
+        '''Attach the handler implementations in this namespace to the decompiler monitor state.'''
+        logging.warning(u"{:s}({!s}{!s}) : Attaching the decompiler monitor to track changes to the database for version v{:.1f}.".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, args)), ", {:s}".format(utils.string.kwargs(kwargs)) if kwargs else '', idaapi.__version__))
         state = __import__('hook').decompilermonitor
 
         # assign the actual implementations for acting on the confirmed event
@@ -6211,6 +6211,19 @@ class decompilermonitor(object):
         state.implementors[decompilermonitor_types.lvar_cmt_changed] = cls.__handle_lvar_cmt_changed
         state.implementors[decompilermonitor_types.lvar_type_changed] = cls.__handle_lvar_type_changed
         state.implementors[decompilermonitor_types.lvar_name_changed] = cls.__handle_lvar_name_changed
+
+    @classmethod
+    def detach(cls, *args, **kwargs):
+        '''Detach the handler implementations in this namespace from the decompiler monitor state.'''
+        logging.warning(u"{:s}({!s}{!s}) : Detaching the decompiler monitor from the database for version v{:.1f}.".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, args)), ", {:s}".format(utils.string.kwargs(kwargs)) if kwargs else '', idaapi.__version__))
+        state = __import__('hook').decompilermonitor
+
+        # now we can pop out each of the events that we've attached to.
+        state.implementors.pop(decompilermonitor_types.func_printed, callable)
+        state.implementors.pop(decompilermonitor_types.cmt_changed, callable)
+        state.implementors.pop(decompilermonitor_types.lvar_cmt_changed, callable)
+        state.implementors.pop(decompilermonitor_types.lvar_type_changed, callable)
+        state.implementors.pop(decompilermonitor_types.lvar_name_changed, callable)
 
     ### Utilities for tracking the comments and variables already defined within
     ### a function that has been decompiled.
