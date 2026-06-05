@@ -6199,11 +6199,11 @@ class decompilermonitor(object):
     """
 
     def __init__(self):
-        cls = self.__class__
+        cls, hook = self.__class__, __import__('hook')
         logging.info(u"{:s}() : Initializing the decompiler monitor for v{:.1f} and instantiating the state for tracking any changes.".format('.'.join([__name__, cls.__name__]), idaapi.__version__))
 
         # now we can instantiate our state for tracking.
-        self.state = state = decompilermonitor_state()
+        self.state = state = hook.decompilermonitor
 
         # assign the actual implementations for acting on the confirmed event
         # types produced by the decompiler in the decompilermonitor state.
@@ -6460,72 +6460,102 @@ class decompilermonitor(object):
         return
 
     ### Entrypoints for all of the related hooks sent by the decompiler.
-    def cmt_changed(self, cfunc, treeloc, cmt):
+    def cmt_changed(self, function, treeloc, cmt):
         '''This is the handler used for hooking the `hexrays.cmt_changed` event.'''
-        oldcomment = self.state.get_user_comment(cfunc, treeloc.ea, treeloc.itp)
+        state = __import__('hook').decompilermonitor
+
+        # grab the function from the event we were given, and then use it to get
+        # the old and new comments from the function and the decompiler state.
+        cfunc = internal.hexrays.function(function)
+        oldcomment = state.get_user_comment(cfunc, treeloc.ea, treeloc.itp)
         newcomment = utils.string.of(cmt)
+
+        # dispatch the comment changes to the decompiler state.
         try:
-            self.state.cmt_changed(cfunc, treeloc, cmt)
+            state.cmt_changed(cfunc, treeloc, cmt)
         finally:
-            self.state.consume(cfunc)
+            state.consume(cfunc)
         return
 
     def lvar_name_changed(self, vdui, lvar, name, is_user_name):
         '''This is the handler used for hooking the `hexrays.lvar_name_changed` event.'''
+        state = __import__('hook').decompilermonitor
+
+        # grab the function from the parameter, and unpack the identity from the
+        # local variable that we were given.
         cfunc = internal.hexrays.function(vdui)
         defea, atype, alocinfo = internal.hexrays.variable.identity(lvar)
-        old = self.state.get_variable_name(cfunc, lvar)
+
+        # now we get the old and new variable name for dispatch to the state.
+        old = state.get_variable_name(cfunc, lvar)
         oldname, olduser = old if old else ('', False)
         newname, newuser = utils.string.of(name), is_user_name
 
+        # dispatch the name changed event to our decompiler state.
         try:
-            self.state.lvar_name_changed(vdui, lvar, name, is_user_name)
+            state.lvar_name_changed(vdui, lvar, name, is_user_name)
         finally:
-            self.state.consume(cfunc)
+            state.consume(cfunc)
         return
 
     def lvar_type_changed(self, vdui, lvar, tinfo):
         '''This is the handler used for hooking the `hexrays.lvar_type_changed` event.'''
+        state = __import__('hook').decompilermonitor
+
+        # use the parameter to get the function containing the variable, and
+        # then go ahead and unpack the variable into a form to store the state.
         cfunc = internal.hexrays.function(vdui)
         defea, atype, alocinfo = internal.hexrays.variable.identity(lvar)
-        oldtype = self.state.get_variable_type(cfunc, lvar)
+
+        # grab both the old and new types from the variable and the state.
+        oldtype = state.get_variable_type(cfunc, lvar)
         newtype = interface.tinfo.copy(tinfo)
 
+        # dispatch the type change to our decompiler state.
         try:
-            self.state.lvar_type_changed(vdui, lvar, tinfo)
+            state.lvar_type_changed(vdui, lvar, tinfo)
         finally:
-            self.state.consume(cfunc)
+            state.consume(cfunc)
         return
 
     def lvar_cmt_changed(self, vdui, lvar, cmt):
         '''This is the handler used for hooking the `hexrays.lvar_cmt_changed` event.'''
+        state = __import__('hook').decompilermonitor
+
+        # get the function owning the variable, and then unpack its locator.
         cfunc = internal.hexrays.function(vdui)
         defea, atype, alocinfo = internal.hexrays.variable.identity(lvar)
-        oldcomment = self.state.get_variable_comment(cfunc, lvar)
+
+        # now we can get the old comment from our state, and the new one.
+        oldcomment = state.get_variable_comment(cfunc, lvar)
         newcomment = utils.string.of(cmt)
 
+        # dispatch the changed comment to our decompiler state.
         try:
-            self.state.lvar_cmt_changed(vdui, lvar, cmt)
+            state.lvar_cmt_changed(vdui, lvar, cmt)
         finally:
-            self.state.consume(cfunc)
+            state.consume(cfunc)
         return
 
-    def func_printed(self, cfunc):
+    def func_printed(self, function):
         '''This is the handler used for hooking the `hexrays.func_printed` event.'''
-        cfunc = internal.hexrays.function(cfunc)
+        state = __import__('hook').decompilermonitor
+
+        # get the function we were given and snag its address.
+        cfunc = internal.hexrays.function(function)
         ea = internal.hexrays.function.address(cfunc)
 
         # if our monitor state says we've already captured the state of the
         # decompiled function, then go ahead and dispatch the event to it.
-        if ea in self.state:
-            return self.state.func_printed(cfunc)
+        if ea in state:
+            return state.func_printed(cfunc)
 
         # otherwise, we need to ensure that we initialize the state for the
         # decompiled function so that the other events can work.
         try:
-            self.state.func_printed(cfunc)
+            state.func_printed(cfunc)
         finally:
-            self.state.consume(cfunc)
+            state.consume(cfunc)
         return
 
 class supermethods(object):
