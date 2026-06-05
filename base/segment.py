@@ -52,7 +52,7 @@ __matcher__.attribute('index', 'index')     # XXX: dirty attribute added to segm
 __matcher__.attribute('identifier', 'name'), __matcher__.attribute('id', 'name')
 __matcher__.attribute('selector', 'sel')
 __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of)
-__matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of, operator.methodcaller('lower'))
+__matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(utils.itermap, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of, operator.methodcaller('lower'))
 
 if idaapi.__version__ < 7.0:
     __matcher__.boolean('greater', operator.le, 'endEA')
