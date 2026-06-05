@@ -4927,7 +4927,7 @@ class localtypesmonitor_84(object):
         descriptions = [parameter for parameter in map("{!r}".format, args)]
         count = interface.tinfo.quantity()
         logging.info(u"{:s}.load_local_types_monitor({!s}) : Loading {:d} type{:s} from the local type library...".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions), count, '' if count == 1 else 's'))
-        count = cls.state.load()
+        count = __import__('hook').localtypesmonitor.load()
         logging.info(u"{:s}.load_local_types_monitor({!s}) : Loaded {:d} type{:s} from the local type library that were structures or unions.".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions), count, '' if count == 1 else 's'))
 
     @classmethod
@@ -4938,7 +4938,7 @@ class localtypesmonitor_84(object):
         """
         descriptions = [parameter for parameter in map("{!r}".format, args)]
         logging.info(u"{:s}.unload_local_types_monitor({!s}) : Unloading types from the local type library...".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions)))
-        count = cls.state.unload()
+        count = __import__('hook').localtypesmonitor.unload()
         logging.info(u"{:s}.unload_local_types_monitor({!s}) : Unloaded {:d} type{:s} from the local type library.".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions), count, '' if count == 1 else 's'))
 
     @classmethod
@@ -4950,10 +4950,12 @@ class localtypesmonitor_84(object):
     @classmethod
     def changed(cls, ltc, ordinal, name):
         '''local_types_changed(ltc, ordinal, name)'''
-        events_where_we_can_load = ['LTC_ADDED', 'LTC_DELETED', 'LTC_EDITED', 'LTC_TIL_LOADED']
+        state = __import__('hook').localtypesmonitor
+        ignored_events = ['LTC_TIL_COMPACTED', 'LTC_TIL_LOADED', 'LTC_TIL_UNLOADED']
 
-        # First check if we've been initialized. If not, then we need to abort.
-        if not hasattr(cls, 'state'):
+        # First check if we've been initialized, but only for events not related
+        # to the state of the type library. If we're not loaded then abort.
+        if ltc not in {cls.table[name] for name in ignored_events} and not state.loaded:
             return logging.error(u"{:s}.changed({:#x}, {!s}, {!s}) : Unable to handle event {:s}({:d}) for {:s}.local_types_changed due to the monitor being uninitialized.".format('.'.join([__name__, cls.__name__]), ltc, "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), cls.table[ltc], ltc, cls.__name__))
 
         # Now we'll need to figure out which event was just dispatched.
@@ -5018,7 +5020,7 @@ class localtypesmonitor_84(object):
     @classmethod
     def local_type_added(cls, ordinal, name):
         '''Handle the event when a new type has been added to the type library.'''
-        ltc, event = cls.table['LTC_ADDED'], 'LTC_ADDED'
+        ltc, event, state = cls.table['LTC_ADDED'], 'LTC_ADDED', __import__('hook').localtypesmonitor
         logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Received local type change event of type {:s}({:d}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), event, cls.table[event]))
 
         # Figure out the correct ordinal number for the type. If the ordinal
@@ -5035,12 +5037,12 @@ class localtypesmonitor_84(object):
         # hook gets dispatched before the local type actually gets created. This
         # callback is responsible for updating our state cache and its tags.
         def update_identifier_and_type(newordinal):
-            sid = cls.state.identifier(newordinal)
+            sid = state.identifier(newordinal)
 
             # Check to ensure that the ordinal exists. If it doesn't, then
             # there's a chance that we've been raced by a deletion event and we
             # need to abort since we won't be able to update the ids anyways.
-            if not cls.state.cached(newordinal):
+            if not state.cached(newordinal):
                 logging.debug(u"{:s}.local_type_added({!s}, {!s}).update_identifier_and_type({:d}) : Ignoring the addition of a non-cached type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newordinal, utils.string.escape(newname, '"'), sid))
                 return
 
@@ -5052,7 +5054,7 @@ class localtypesmonitor_84(object):
         # Start by creating the type in our cache. Due to the time that the
         # disassembler dispatches our event, we won't have the correct
         # identifier. Fortunately, it can always be added later.
-        addedsid, addedname, addedcomment, addedmembers = cls.state.created(newordinal, True)
+        addedsid, addedname, addedcomment, addedmembers = state.created(newordinal, True)
         logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Created a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, utils.string.escape(newname, '"'), addedsid))
 
         # Since our "local_types_changed" event gets dispatched before the
@@ -5066,7 +5068,7 @@ class localtypesmonitor_84(object):
     @classmethod
     def local_type_deleted(cls, ordinal, name):
         '''Handle the event when a type has been removed from the type library.'''
-        ltc, event = cls.table['LTC_DELETED'], 'LTC_DELETED'
+        ltc, event, state = cls.table['LTC_DELETED'], 'LTC_DELETED', __import__('hook').localtypesmonitor
         logging.debug(u"{:s}.local_type_deleted({!s}, {!s}) : Received local type change event of type {:s}({:d}) for the type at ordinal {:d} of the local type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), event, cls.table[event], ordinal))
 
         # Figure out the correct ordinal number for the type. If the ordinal
@@ -5081,11 +5083,11 @@ class localtypesmonitor_84(object):
 
         # First check that we've cached this type. The only time the type isn't
         # cached is if it's a type we don't support (enumeration).
-        if not cls.state.cached(oldordinal):
+        if not state.cached(oldordinal):
             return logging.debug(u"{:s}.local_type_deleted({!s}, {!s}) : Ignoring the removal of a non-cached type at ordinal {:d} of the local type library named \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), oldordinal, utils.string.escape(oldname, '"')))
 
         # Now we can update our data cache, and log what just happened.
-        oldsid, oldname, oldcomment, oldmembers = cls.state.removed(oldordinal, True)
+        oldsid, oldname, oldcomment, oldmembers = state.removed(oldordinal, True)
         logging.debug(u"{:s}.local_type_deleted({!s}, {!s}) : Discovered a removed type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), oldordinal, oldname, oldsid))
 
         # Since we're removing a type from the local type library, we really
@@ -5097,7 +5099,7 @@ class localtypesmonitor_84(object):
     @classmethod
     def local_type_edited(cls, ordinal, name):
         '''Handle the event when a type in the type library has been modified.'''
-        ltc, event = cls.table['LTC_EDITED'], 'LTC_EDITED'
+        ltc, event, state = cls.table['LTC_EDITED'], 'LTC_EDITED', __import__('hook').localtypesmonitor
         logging.debug(u"{:s}.local_type_edited({!s}, {!s}) : Received local type change event of type {:s}({:d}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), event, cls.table[event]))
 
         # Figure out the correct ordinal number for the type. If the ordinal
@@ -5116,7 +5118,7 @@ class localtypesmonitor_84(object):
         # then updating them, we then need to tally the tags used for the
         # members that were modified.
         def update_member_changes(newordinal):
-            changes = cls.state.changes(newordinal, True)
+            changes = state.changes(newordinal, True)
             changes and logging.info(u"{:s}.local_type_edited({!s}, {!s}).update_member_changes({:d}) : The type \"{!s}\" at ordinal {:d} has had {!s} changed.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, utils.string.escape(newname, '"'), newordinal, "{:d} member{:s}".format(len(changes), '' if len(changes) == 1 else 's') if changes else 'no members'))
 
             # Now we just need to update the tags for the members of the type.
@@ -5125,7 +5127,7 @@ class localtypesmonitor_84(object):
         # Start out by processing the type in case it was renamed or changed.
         # Once we're done, we can go ahead and update its name and comment.
         cls.type_updater(ltc, newordinal)
-        oldname, oldcomment = cls.state.renamed(ordinal), cls.state.commented(ordinal)
+        oldname, oldcomment = state.renamed(ordinal), state.commented(ordinal)
 
         # Afterwards we tell the disassembler to dispatch to our callback so
         # that it can check if any of its members have changed and safely grab
@@ -5162,7 +5164,8 @@ class localtypesmonitor_84(object):
     @classmethod
     def is_field_general(cls, ordinal, mindex, name):
         '''Return true if the `name` for the member at `mindex` of the type in `ordinal` is a default field name that was chosen by the disassembler.'''
-        prefixes, tinfo = {'field'}, cls.state.get_type(ordinal)
+        state = __import__('hook').localtypesmonitor
+        prefixes, tinfo = {'field'}, state.get_type(ordinal)
 
         # Start by populating the `idaapi.udm_t` with the information for the
         # given member. This way we can extract the offset and do a proper
@@ -5243,7 +5246,7 @@ class localtypesmonitor_84(object):
     @classmethod
     def is_type_tracked(cls, ordinal, tid, name):
         '''Return true if the type at the specified `ordinal` and `name` should be tracked with tags.'''
-        tinfo = cls.state.get_type(ordinal)
+        tinfo = __import__('hook').localtypesmonitor.get_type(ordinal)
 
         # First figure out if we're ready to begin tracking types from the local
         # type library that have been created or edited.
@@ -5344,17 +5347,18 @@ class localtypesmonitor_84(object):
     @classmethod
     def type_added(cls, ltc, ordinal):
         '''Add the type specified in `ordinal` and update any tags that it was created with.'''
-        if not hasattr(cls, 'state'):
+        state = __import__('hook').localtypesmonitor
+        if not state.loaded:
             return logging.error(u"{:s}.type_added({:d}, {:d}) : Unable to handle an addition for type at ordinal {:d} due to the monitor state being uninitialized.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal))
 
         # Grab all the old information about the type, and then go ahead and add
         # it so that we can grab its current information for processing. We'll
         # also figure out which type id it uses.
-        newsid, newname, newcomment, newmembers = cls.state.added(ordinal, True)
+        newsid, newname, newcomment, newmembers = state.added(ordinal, True)
         sid = oldsid if newsid == idaapi.BADADDR else newsid
 
         # First check its type, we only support structures and unions atm.
-        tinfo, aliased = cls.state.get_type(ordinal), interface.tinfo.at_ordinal(ordinal)
+        tinfo, aliased = state.get_type(ordinal), interface.tinfo.at_ordinal(ordinal)
         if not (tinfo.is_struct() or tinfo.is_union()):
             return sid, newname, newcomment, newmembers
 
@@ -5393,20 +5397,21 @@ class localtypesmonitor_84(object):
     @classmethod
     def type_updater(cls, ltc, ordinal):
         '''Check the changes for the type specified in `ordinal` and update any tags resulting from them.'''
-        if not hasattr(cls, 'state'):
+        state = __import__('hook').localtypesmonitor
+        if not state.loaded:
             return logging.error(u"{:s}.type_updater({:d}, {:d}) : Unable to handle an update for type at ordinal {:d} due to the monitor state being uninitialized.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal))
 
         # If the type isn't cached, then there is really nothing to update. This
         # can happen because the disassembler can dispatch the "LTC_DELETED"
         # event before the "LTC_EDITED" event. Thanks, IDA!
-        elif not cls.state.cached(ordinal):
+        if not state.cached(ordinal):
             return logging.debug(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} due to the type not being cached.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal))
 
         # First thing to do is to grab the identifier for the type at the given
         # ordinal. We try the cached version first, and then fall back to to the
         # most recent identifier.
-        oldsid, tinfo, aliased = cls.state.cachedidentifier(ordinal), cls.state.get_type(ordinal), interface.tinfo.at_ordinal(ordinal)
-        newsid = cls.state.identifier(ordinal) if oldsid == idaapi.BADADDR else oldsid
+        oldsid, tinfo, aliased = state.cachedidentifier(ordinal), state.get_type(ordinal), interface.tinfo.at_ordinal(ordinal)
+        newsid = state.identifier(ordinal) if oldsid == idaapi.BADADDR else oldsid
         if newsid == idaapi.BADADDR:
             return logging.warning(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} ({:#x}) due to the identifier for the type {!s} being unavailable.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, interface.tinfo.quoted(tinfo)))
 
@@ -5425,8 +5430,8 @@ class localtypesmonitor_84(object):
         # Then we'll need to snag the old and new names for the type that we'll
         # be comparing. Then we can do some basic checks to figure out whether
         # we should update its tags or not.
-        oldname = cls.state.cachedname(ordinal)
-        newname = cls.state.name(ordinal)
+        oldname = state.cachedname(ordinal)
+        newname = state.name(ordinal)
 
         # Next we can compare the names to see how exactly they were changed. If
         # we switched from a general name to user-specified, then increment it.
@@ -5467,7 +5472,7 @@ class localtypesmonitor_84(object):
             logging.debug(u"{:s}.type_updater({:d}, {:d}) : Tracking for type at ordinal {:d} ({:#x}) did not need to be adjusted.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid))
 
         # Grab the comment that's been applied to the type, and update its refs.
-        oldcomment, newcomment = cls.state.cachedcomment(ordinal), cls.state.comment(ordinal)
+        oldcomment, newcomment = state.cachedcomment(ordinal), state.comment(ordinal)
         oldtags, newtags = ({tag for tag in decoded} for decoded in map(internal.comment.decode, [oldcomment, newcomment]))
         if oldtags != newtags:
             logging.debug(u"{:s}.type_updater({:d}, {:d}) : Comment tags for type at ordinal {:d} ({:#x}) were changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, sorted(oldtags), sorted(newtags)))
@@ -5481,14 +5486,15 @@ class localtypesmonitor_84(object):
     @classmethod
     def member_updater(cls, ltc, ordinal, changes):
         '''Iterate through the specified `changes` for the type in `ordinal` and update the tags for each of its members.'''
-        if not hasattr(cls, 'state'):
+        state = __import__('hook').localtypesmonitor
+        if not state.loaded:
             parameter = "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal)
             return logging.error(u"{:s}.member_updater({:d}, {:#x}, {!s}) : Unable to handle an update for the members of type {!s} due to the monitor state being uninitialized.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', parameter))
 
         # First we'll need to get the type identifier for our parameters. We try
         # the cached version first, and then use the noncached one if it fails.
-        sid = cls.state.cachedidentifier(ordinal)
-        sid = cls.state.identifier(ordinal) if sid == idaapi.BADADDR else sid
+        sid = state.cachedidentifier(ordinal)
+        sid = state.identifier(ordinal) if sid == idaapi.BADADDR else sid
         parameter = "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal)
 
         if sid == idaapi.BADADDR:
