@@ -4905,18 +4905,6 @@ class localtypesmonitor_84(object):
     table.update({value : attribute for attribute, value in table.items()})
 
     @classmethod
-    def init_local_types_monitor(cls, *idp_modname):
-        """Initialize the internal state for the local types monitor.
-
-        This function is called when the database has been initialized and is
-        used to create the state that is required for monitoring the local types
-        library.
-        """
-        descriptions = [parameter for parameter in map("{!r}".format, idp_modname)]
-        logging.info(u"{:s}.init_local_types_monitor({!s}) : Initializing the local type monitor for v{:.1f} and instantiating the class for tracking their changes.".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions), idaapi.__version__))
-        cls.state = localtypesmonitor_state()
-
-    @classmethod
     def load_local_types_monitor(cls, *args):
         """Load the currently available types from the local types library into the monitor state.
 
@@ -4940,12 +4928,6 @@ class localtypesmonitor_84(object):
         logging.info(u"{:s}.unload_local_types_monitor({!s}) : Unloading types from the local type library...".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions)))
         count = __import__('hook').localtypesmonitor.unload()
         logging.info(u"{:s}.unload_local_types_monitor({!s}) : Unloaded {:d} type{:s} from the local type library.".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions), count, '' if count == 1 else 's'))
-
-    @classmethod
-    def nw_init_local_types_monitor(cls, nw_code, is_old_database):
-        '''Initialize the state for the local types monitor as a notification.'''
-        idp_modname = idaapi.get_idp_name()
-        return cls.init_local_types_monitor(idp_modname)
 
     @classmethod
     def changed(cls, ltc, ordinal, name):
@@ -7045,7 +7027,6 @@ def make_ida_not_suck_cocks(nw_code):
     # If we're using 8.4, then we can use the monitor for the local types library.
     # FIXME: This hasn't been tested in 8.5 which came out a little bit ago.
     elif idaapi.__version__ <= 8.4:
-        scheduler.default(hook.idp, 'ev_init', localtypesmonitor_84.init_local_types_monitor, -10000)
         scheduler.default(hook.idp, 'ev_oldfile', localtypesmonitor_84.load_local_types_monitor, -100)
         scheduler.default(hook.idp, 'ev_newfile', localtypesmonitor_84.load_local_types_monitor, -100)
         scheduler.default(hook.idb, 'closebase', localtypesmonitor_84.unload_local_types_monitor, +10000)
