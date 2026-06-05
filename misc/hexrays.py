@@ -1437,15 +1437,17 @@ class function(object):
     def __new__(cls, func, cached=True):
         '''Return the ``ida_hexrays.cfunc_t`` for the function specified by `func`.'''
         if isinstance(func, (ida_hexrays_types.cfunc_t, ida_hexrays_types.cfuncptr_t)):
-            return func
+            return func if cached else cls(func.entry_ea, cached=cached)
         elif isinstance(func, ida_hexrays_types.mba_t):
-            return cls(func.entry_ea)
+            return cls(func.entry_ea, cached=cached)
+        elif isinstance(func, ida_hexrays_types.vdui_t):
+            return func.cfunc if cached else cls(func.cfunc.entry_ea, cached=cached)
         elif isinstance(func, (types.integer, idaapi.func_t)):
             return cls.cached(func) if cls.has(func) and cached else cls.by(func)
         elif isinstance(func, idaapi.lvar_locator_t):
-            return cls(func.defea)
+            return cls(func.defea, cached=cached)
         elif isinstance(func, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t, ida_hexrays_types.stkvar_ref_t)):
-            return cls(func.mba.entry_ea)
+            return cls(func.mba.entry_ea, cached=cached)
         raise exceptions.InvalidTypeOrValueError(u"{:s}({!r}) : Unable to fetch a decompiled function using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), func, func.__class__))
 
     @classmethod
@@ -1635,16 +1637,18 @@ class code(object):
     def __new__(cls, func, cached=True):
         '''Return the ``ida_hexrays.mba_t`` for the function specified by `func`.'''
         if isinstance(func, (ida_hexrays_types.cfunc_t, ida_hexrays_types.cfuncptr_t)):
-            return func.mba
+            return func.mba if cached else cls(func.mba.entry_ea, cached=cached)
         elif isinstance(func, ida_hexrays_types.mba_t):
-            return cls(func.entry_ea)
+            return func if cached else cls(func.entry_ea, cached=cached)
+        elif isinstance(func, ida_hexrays_types.vdui_t):
+            return func.mba if cached else cls(func.mba.entry_ea, cached=cached)
         elif isinstance(func, (types.integer, idaapi.func_t)):
             cfunc = function.cached(func) if function.has(func) and cached else function.by(func)
-            return cls(cfunc)
+            return cls(cfunc, cached=cached)
         elif isinstance(func, ida_hexrays_types.lvar_locator_t):
-            return cls(func.defea)
+            return cls(func.defea, cached=cached)
         elif isinstance(func, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t, ida_hexrays_types.stkvar_ref_t)):
-            return cls(func.mba.entry_ea)
+            return cls(func.mba.entry_ea, cached=cached)
         raise exceptions.InvalidTypeOrValueError(u"{:s}({!r}) : Unable to fetch the microcode from a decompiled function using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), func, func.__class__))
 
     @classmethod
@@ -1705,6 +1709,10 @@ class snippet(object):
         elif isinstance(snippet, ida_hexrays_types.mbl_graph_t):
             return snippet.mba
         elif isinstance(snippet, ida_hexrays_types.codegen_t):
+            return snippet.mba
+
+        # visual disassembler user interface
+        elif isinstance(snippet, ida_hexrays_types.vdui_t):
             return snippet.mba
 
         # a reference to an lvar.
