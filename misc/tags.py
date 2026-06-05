@@ -3199,6 +3199,48 @@ class reference_v0(object):
         def erase(cls, func):
             return []
 
+    class hexvariable(object):
+        """
+        This namespace is just a frontend for the variables that belong to a
+        decompiled function. Each location is a specified by an instance of
+        the `lvar_locator_t`. This has no implementation because the
+        `internal.tagcache` backend does not have support for querying
+        information from the variables for a decompiled function.
+        """
+        @classmethod
+        def has(cls, locator, **target):
+            return False
+        @classmethod
+        def get(cls, locator, **target):
+            return {tag for tag in []}
+        @classmethod
+        def increment(cls, locator, name, **target):
+            return 0
+        @classmethod
+        def decrement(cls, locator, name, **target):
+            return 0
+        @classmethod
+        def count(cls, locator, **target):
+            return 0
+        @classmethod
+        def iterate(cls):
+            return (locator for locator in [])
+        @classmethod
+        def name(cls, func, **target):
+            return {tag for tag in []}
+        @classmethod
+        def address(cls, func, **target):
+            return [locator for locator in []]
+        @classmethod
+        def counts(cls, address):
+            return {}
+        @classmethod
+        def erase_address(cls, preciser):
+            return []
+        @classmethod
+        def erase(cls, func):
+            return []
+
 class reference_v1(object):
     """
     This namespace is basically a frontend to whatever backend is currently
