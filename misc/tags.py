@@ -1081,7 +1081,7 @@ class select_v1(object):
 
     @classmethod
     def hexfunctions(cls, *args, **kwargs):
-        '''Yield the function address and tags from the contents of each function containing all the tags in `require` and including any from `include`.'''
+        '''Yield the function address and tags from the contents of each decompiled function containing all the tags in `require` and including any from `include`.'''
         selection = True if any([args, kwargs]) else False
         for ea, used in query_v1.hexfunctions(*args, **kwargs):
             is_function = interface.function.has(cls.navigation.procedure(ea))
@@ -1109,6 +1109,23 @@ class select_v1(object):
                 yield preciser, selected
             elif explicit:
                 yield preciser, explicit
+            continue
+        return
+
+    @classmethod
+    def hexvariables(cls, *args, **kwargs):
+        '''Yield the function address and tags for the variables from each decompiled function containing all the tags in `require` and including any from `include`.'''
+        selection = True if any([args, kwargs]) else False
+        for ea, used in query_v1.hexvariables(*args, **kwargs):
+            is_function = interface.function.has(cls.navigation.procedure(ea))
+            owners = {f for f in interface.function.owners(ea)} if is_function else {ea}
+            explicit = {key for key in used if key and not key.startswith('__')}
+            if ea not in owners:
+                pass
+            elif selection:
+                yield ea, used
+            elif explicit:
+                yield ea, explicit
             continue
         return
 
