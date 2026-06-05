@@ -452,6 +452,7 @@ class ida_hexrays_template(object):
     vivl_t = missing_class
     scif_t = missing_class
     codegen_t = missing_class
+    vdui_t = missing_class
 
     init_hexrays_plugin = use_callable(utils.fconstant(False))
     get_hexrays_version = use_callable(utils.fconstant('0.0.0.0'))
@@ -632,6 +633,7 @@ class ida_hexrays_types(object):
     treeloc_t           = Fget_type_from_module(ida_hexrays, 'treeloc_t')
     var_ref_t           = Fget_type_from_module(ida_hexrays, 'var_ref_t')
     vdloc_t             = Fget_type_from_module(ida_hexrays, 'vdloc_t')
+    vdui_t              = Fget_type_from_module(ida_hexrays, 'vdui_t')
     vivl_t              = Fget_type_from_module(ida_hexrays, 'vivl_t')
     voff_t              = Fget_type_from_module(ida_hexrays, 'voff_t')
 
@@ -658,7 +660,8 @@ class ida_hexrays_types(object):
     hexrays_func_types = (
         types.integer, idaapi.func_t,
         mba_t,
-        cfuncptr_t, cfunc_t
+        cfuncptr_t, cfunc_t,
+        vdui_t,
     )
 
     # types that can get us to a variable locator.
