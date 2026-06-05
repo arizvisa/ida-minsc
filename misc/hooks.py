@@ -5619,6 +5619,8 @@ class localtypesmonitor_84(object):
             continue
         return
 
+localtypesmonitor = localtypesmonitor_84
+
 class decompilermonitor_types(object):
     """
     This class is intended to preserve the order of the change events
@@ -7642,6 +7644,10 @@ class module(object):
     # Create a descriptor that maintains the scheduler that controls the enabling
     # and disabling of hooks depending on the current database state.
     scheduler = singleton_descriptor(lambda cons, *args: cons(*args), Scheduler, __repr__=staticmethod(lambda: 'Internal scheduler for managing hooks depending on database state.'))
+
+    # Create a descriptor that maintains the monitor for tracking changes made
+    # to any of the types from the local types library.
+    localtypesmonitor = singleton_descriptor(lambda cons, *args: cons(*args), localtypesmonitor, __repr__=staticmethod(lambda: 'Internal monitor for tracking changes made to the local types library.'))
 
 # Now we just need to change the name of our class so that the documentation reads right.
 module.__name__ = 'hook'
