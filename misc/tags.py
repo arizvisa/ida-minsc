@@ -352,7 +352,7 @@ class query_v0(object):
         return
 
     @classmethod
-    def hexcontents(cls, required=[], included=[]):
+    def hexfunctions(cls, required=[], included=[]):
         '''Query the tags of all decompiled functions and yield a tuple containing the function address and all of the `required` tags with any `included` ones.'''
         return
         yield
@@ -564,9 +564,9 @@ class select_v0(object):
         return
 
     @classmethod
-    def hexcontents(cls, *args, **kwargs):
+    def hexfunctions(cls, *args, **kwargs):
         '''Query the tags of all decompiled functions and yield a tuple containing the function address and all of the `required` tags with any `included` ones.'''
-        return query_v0.hexcontents(*args, **kwargs)
+        return query_v0.hexfunctions(*args, **kwargs)
 
     @classmethod
     def hexfunction(cls, func, *args, **kwargs):
@@ -840,7 +840,7 @@ class query_v1(object):
         return
 
     @classmethod
-    def hexcontents(cls, require=frozenset(), include=frozenset()):
+    def hexfunctions(cls, require=frozenset(), include=frozenset()):
         '''Yield the function address and tags for each decompiled function containing all the tags in `require` and including any from `include`.'''
         rmask, imask = (cls.mask(names) for names in [require, include])
         requested, selection = rmask | imask, require or include
@@ -1052,10 +1052,10 @@ class select_v1(object):
         return
 
     @classmethod
-    def hexcontents(cls, *args, **kwargs):
+    def hexfunctions(cls, *args, **kwargs):
         '''Yield the function address and tags from the contents of each function containing all the tags in `require` and including any from `include`.'''
         selection = True if any([args, kwargs]) else False
-        for ea, used in query_v1.hexcontents(*args, **kwargs):
+        for ea, used in query_v1.hexfunctions(*args, **kwargs):
             is_function = interface.function.has(cls.navigation.procedure(ea))
             owners = {f for f in interface.function.owners(ea)} if is_function else {ea}
             explicit = {key for key in used if key and not key.startswith('__')}
