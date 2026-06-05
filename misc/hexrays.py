@@ -1941,3 +1941,30 @@ class ctree(object):
         # recurse into ourselves to do the actual rendering.
         treeitem = cfunc.treeitems[item]
         return cls.repr(cfunc, treeitem)
+
+    @classmethod
+    def get_comment(cls, func, ea, itp, *always):
+        '''Return the comment at precisely `itp` of address `ea` in the decompiled function `func`.'''
+        location, cfunc = ida_hexrays.treeloc_t(), hexrays.function(func)
+        location.ea, location.itp = ea, itp
+        res = cfunc.get_user_cmt(location, *always if always else [idaapi.RETRIEVE_ALWAYS])
+        return utils.string.of(res)
+
+    @classmethod
+    def set_comment(cls, func, ea, itp, comment):
+        '''Apply the specified `comment` to precisely `itp` of address `ea` in the decompiled function `func`.'''
+        location, cfunc = ida_hexrays.treeloc_t(), hexrays.function(func)
+        location.ea, location.itp = ea, itp
+        res = cfunc.get_user_cmt(location, idaapi.RETRIEVE_ALWAYS)
+        cfunc.set_user_cmt(location, utils.string.to(comment))
+        cfunc.save_user_cmts(i)
+        return utils.string.of(res)
+
+    @classmethod
+    def iterate(cls, func):
+        '''Yield each index and tree item as a ``ida_hexrays.citem_t`` from the decompiled function `func`.'''
+        cfunc = function(func)
+        iterable = ((index, cfunc.treeitems[index]) for index in range(cfunc.treeitems.size()))
+        for index in range(cfunc.treeitems.size()):
+            yield index, cfunc.treeitems[index]
+        return
