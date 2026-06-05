@@ -6198,26 +6198,27 @@ class decompilermonitor(object):
     back into our methods to handle the actual tag reference count tracking.
     """
 
-    def __init__(self):
-        cls, hook = self.__class__, __import__('hook')
+    def __new__(cls):
+        hook = __import__('hook')
         logging.info(u"{:s}() : Initializing the decompiler monitor for v{:.1f} and instantiating the state for tracking any changes.".format('.'.join([__name__, cls.__name__]), idaapi.__version__))
 
         # now we can instantiate our state for tracking.
-        self.state = state = hook.decompilermonitor
+        cls.state = state = hook.decompilermonitor
 
         # assign the actual implementations for acting on the confirmed event
         # types produced by the decompiler in the decompilermonitor state.
-        state.implementors[decompilermonitor_types.func_printed] = self.__handle_func_printed
-        state.implementors[decompilermonitor_types.cmt_changed] = self.__handle_cmt_changed
-        state.implementors[decompilermonitor_types.lvar_cmt_changed] = self.__handle_lvar_cmt_changed
-        state.implementors[decompilermonitor_types.lvar_type_changed] = self.__handle_lvar_type_changed
-        state.implementors[decompilermonitor_types.lvar_name_changed] = self.__handle_lvar_name_changed
+        state.implementors[decompilermonitor_types.func_printed] = cls.__handle_func_printed
+        state.implementors[decompilermonitor_types.cmt_changed] = cls.__handle_cmt_changed
+        state.implementors[decompilermonitor_types.lvar_cmt_changed] = cls.__handle_lvar_cmt_changed
+        state.implementors[decompilermonitor_types.lvar_type_changed] = cls.__handle_lvar_type_changed
+        state.implementors[decompilermonitor_types.lvar_name_changed] = cls.__handle_lvar_name_changed
 
     ### Utilities for tracking the comments and variables already defined within
     ### a function that has been decompiled.
-    def __handle_func_printed(self, fn, old, new):
-        '''Update the references in the function `fn` for changing all of the comments and variables specified in `old` to `new.'''
-        cls, cfunc = self.__class__, internal.hexrays.function(fn)
+    @classmethod
+    def __handle_func_printed(cls, function, old, new):
+        '''Update the references in the decompiled `function` for changing all of the comments and variables from `old` to `new.'''
+        cfunc = internal.hexrays.function(function)
 
         # As usual, unpack our parameter so that we can figure out what to do
         # with the new state by comparing it to the old state.
@@ -6229,14 +6230,14 @@ class decompilermonitor(object):
         # checking whether it's indexed and decrementing it for the variables.
         for ea, itp, comment in oldcomments:
             decoded = internal.comment.decode(comment or '')
-            if internal.tags.reference.hexfunction.has((ea, itp), target=fn):
-                [internal.tags.reference.hexfunction.decrement((ea, itp), name, target=fn) for name in decoded]
+            if internal.tags.reference.hexfunction.has((ea, itp), target=cfunc):
+                [internal.tags.reference.hexfunction.decrement((ea, itp), name, target=cfunc) for name in decoded]
             continue
 
         for locator, variable in oldvariables:
             decoded = internal.comment.decode(variable.comment or '')
-            if internal.tags.reference.hexvariable.has(locator, target=fn):
-                [internal.tags.reference.hexvariable.decrement(locator, name, target=fn) for name in decoded]
+            if internal.tags.reference.hexvariable.has(locator, target=cfunc):
+                [internal.tags.reference.hexvariable.decrement(locator, name, target=cfunc) for name in decoded]
             continue
 
         # XXX: Is it safer to just erase the tagindex for the entire function?
@@ -6246,21 +6247,24 @@ class decompilermonitor(object):
         # in order to update the tag index with any new values that were added.
         for ea, itp, comment in newcomments:
             decoded = internal.comment.decode(comment or '')
-            if not internal.tags.reference.hexfunction.has((ea, itp), target=fn):
-                [internal.tags.reference.hexfunction.increment((ea, itp), name, target=fn) for name in decoded]
+            if not internal.tags.reference.hexfunction.has((ea, itp), target=cfunc):
+                [internal.tags.reference.hexfunction.increment((ea, itp), name, target=cfunc) for name in decoded]
             continue
 
         for locator, variable in newvariables:
             decoded = internal.comment.decode(variable.comment or '')
-            if not internal.tags.reference.hexvariable.has(locator, target=fn):
-                [internal.tags.reference.hexvariable.increment(locator, name, target=fn) for name in decoded]
+            if not internal.tags.reference.hexvariable.has(locator, target=cfunc):
+                [internal.tags.reference.hexvariable.increment(locator, name, target=cfunc) for name in decoded]
             continue
         return
 
     ### Utilities for maintaining the state of the decompiler comments for an address.
     @classmethod
-    def __create_cmt_refs(cls, fn, ea, itp, old, new):
-        '''Create the references to the `new` tags at address `ea`/`itp` of the function specified by `fn`.'''
+    def __create_cmt_refs(cls, function, ea, itp, old, new):
+        '''Create the references to the `new` tags at address `ea`/`itp` of the specified decompiled `function`.'''
+        cfunc = internal.hexrays.function(function)
+        fn = internal.hexrays.function.address(cfunc)
+
         oldkeys, newkeys = ({item for item in (content or {})} for content in [old, new])
         if not (new is not None and isinstance(new, internal.types.dictionary)) or (False if old is None else True):
             raise internal.exceptions.InvalidParameterError(u"{:s}.__create_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : An invalid parameter was used when trying to create the references for address {:#x}/{:d} belonging to function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, ea, itp, fn))
@@ -6271,12 +6275,15 @@ class decompilermonitor(object):
         logging.debug(u"{:s}.__create_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Creating tags ({!s}) at address {:#x}/{:d} for function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, utils.string.repr(newkeys), ea, itp, fn))
         for key in newkeys - oldkeys:
             logging.debug(u"{:s}.__create_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Increasing reference count for tag {!s} at address {:#x}/{:d} of function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, utils.string.repr(key), ea, itp, fn))
-            internal.tags.reference.hexfunction.increment((ea, itp), key, target=fn)
+            internal.tags.reference.hexfunction.increment((ea, itp), key, target=cfunc)
         return
 
     @classmethod
-    def __delete_cmt_refs(cls, fn, ea, itp, old, new):
-        '''Delete the references to the `old` tags at address `ea`/`itp` of the function specified by `fn`.'''
+    def __delete_cmt_refs(cls, function, ea, itp, old, new):
+        '''Delete the references to the `old` tags at address `ea`/`itp` of the specified decompiled `function`.'''
+        cfunc = internal.hexrays.function(function)
+        fn = internal.hexrays.function.address(cfunc)
+
         oldkeys, newkeys = ({item for item in (content or {})} for content in [old, new])
         if not (old is not None and isinstance(new, internal.types.dictionary)) or (False if new is None else True):
             raise internal.exceptions.InvalidParameterError(u"{:s}.__delete_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : An invalid parameter was used when trying to delete the references for address {:#x}/{:d} belonging to function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, ea, itp, fn))
@@ -6284,15 +6291,18 @@ class decompilermonitor(object):
         logging.debug(u"{:s}.__delete_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Deleting tags ({!s}) at address {:#x}/{:d} for function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, utils.string.repr(oldkeys), ea, itp, fn))
         for key in (oldkeys & newkeys):
             logging.debug(u"{:s}.__delete_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Decreasing reference count for tag {!s} at address {:#x}/{:d} of function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, utils.string.repr(key), ea, itp, fn))
-            internal.tags.reference.hexfunction.decrement((ea, itp), key, target=fn)
+            internal.tags.reference.hexfunction.decrement((ea, itp), key, target=cfunc)
 
         if oldkeys ^ newkeys:
             logging.debug(u"{:s}.__delete_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Due to a discrepancy for some of the tags ({!s}) at address {:#x}/{:d} of function {:#x}, not all keys may have been removed ({!s}).".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, utils.string.repr(oldkeys - newkeys), ea, itp, fn, utils.string.repr(newkeys - oldkeys)))
         return
 
     @classmethod
-    def __update_cmt_refs(cls, fn, ea, itp, old, new):
-        '''Update the references from the `old` tags to the `new` tags for address `ea`/`itp` of the function specified by `fn`.'''
+    def __update_cmt_refs(cls, function, ea, itp, old, new):
+        '''Update the references from the `old` tags to the `new` tags for address `ea`/`itp` of the specified decompiled `function`.'''
+        cfunc = internal.hexrays.function(function)
+        fn = internal.hexrays.function.address(cfunc)
+
         oldkeys, newkeys = ({item for item in (content or {})} for content in [old, new])
         if not all(content is not None and isinstance(content, internal.types.dictionary) for content in [old, new]):
             raise internal.exceptions.InvalidParameterError(u"{:s}.__update_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : An invalid parameter was used when trying to update the references for address {:#x}/{:d} belonging to function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, ea, itp, fn))
@@ -6303,16 +6313,18 @@ class decompilermonitor(object):
         for key in oldkeys ^ newkeys:
             if key not in new:
                 logging.debug(u"{:s}.__update_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Decreasing reference count for tag {!s} at address {:#x}/{:d} for function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, key, ea, itp, fn))
-                internal.tags.reference.hexfunction.decrement((ea, itp), key, target=fn)
+                internal.tags.reference.hexfunction.decrement((ea, itp), key, target=cfunc)
             if key not in old:
                 logging.debug(u"{:s}.__update_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Increasing reference count for tag {!s} at address {:#x}/{:d} for function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, key, ea, itp, fn))
-                internal.tags.reference.hexfunction.increment((ea, itp), key, target=fn)
+                internal.tags.reference.hexfunction.increment((ea, itp), key, target=cfunc)
             continue
         return
 
-    def __handle_cmt_changed(self, fn, old, new):
-        '''Update the references in the function `fn` for changing the tags specified in `old` to `new.'''
-        cls = self.__class__
+    @classmethod
+    def __handle_cmt_changed(cls, function, old, new):
+        '''Update the references in the specified `function` for changing the tags specified in `old` to `new.'''
+        cfunc = internal.hexrays.function(function)
+        fn = internal.hexrays.function.address(cfunc)
 
         # Unpack the parameters and decode the comments into dictionaries.
         oldea, olditp, oldcomment = old.ea, old.itp, old.comment
@@ -6322,21 +6334,24 @@ class decompilermonitor(object):
         # If the old location and the new location actually match, then we just
         # need to update the tag references.
         if (oldea, olditp) == (newea, newitp):
-            return self.__update_cmt_refs(fn, newea, newitp, oldtags, newtags)
+            return cls.__update_cmt_refs(cfunc, newea, newitp, oldtags, newtags)
 
         # Otherwise something strange and unexpected happened. So, delete any of
         # the old references and recreate the ones that have been added.
         logging.fatal(u"{:s}.__handle_cmt_changed({:#x}, {!r}, {!r}) : The locations for the `{:s}` event references two completely different locations ({:#x}/{:d} != {:#x}/{:d}).".format('.'.join([__name__, cls.__name__]), fn, old, new, 'hexrays.cmt_changed', oldea, olditp, newea, newitp))
         logging.warning(u"{:s}.__handle_cmt_changed({:#x}, {!r}, {!r}) : Deleting the references for the tags at address {:#x}/{:d} of function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, old, new, oldea, olditp, fn))
-        self.__delete_cmt_refs(fn, oldea, olditp, oldtags, newtags)
+        cls.__delete_cmt_refs(cfunc, oldea, olditp, oldtags, newtags)
         logging.warning(u"{:s}.__handle_cmt_changed({:#x}, {!r}, {!r}) : Creating the references for the tags at address {:#x}/{:d} of function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, old, new, newea, newitp, fn))
-        self.__create_cmt_refs(fn, newea, newitp, oldtags, newtags)
+        cls.__create_cmt_refs(cfunc, newea, newitp, oldtags, newtags)
         return
 
     ### Utilities for maintaining the state of the decompiler comments for a variable
     @classmethod
-    def __lvar_create_cmt_refs(cls, fn, locator, old, new):
-        '''Create the references to the `new` tags for the variable specified by `locator` from the function `fn`.'''
+    def __lvar_create_cmt_refs(cls, function, locator, old, new):
+        '''Create the references to the `new` tags for the variable specified by `locator` from the specified decompiled `function`.'''
+        cfunc = internal.hexrays.function(function)
+        fn = internal.hexrays.function.address(cfunc)
+
         oldkeys, newkeys = ({item for item in (content or {})} for content in [old, new])
         if not (new is not None and isinstance(new, internal.types.dictionary)) or (False if old is None else True):
             raise internal.exceptions.InvalidParameterError(u"{:s}.__lvar_create_cmt_refs({:#x}, {!s}, {!r}, {!r}) : An invalid parameter was used when trying to create the references for the variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, locator, fn))
@@ -6347,13 +6362,15 @@ class decompilermonitor(object):
         logging.debug(u"{:s}.__lvar_create_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Creating tags ({!s}) for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(newkeys), locator, fn))
         for key in newkeys - oldkeys:
             logging.debug(u"{:s}.__lvar_create_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Increasing reference count of tag {!s} for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(key), locator, fn))
-            internal.tags.reference.hexvariable.increment(locator, key, target=fn)
+            internal.tags.reference.hexvariable.increment(locator, key, target=cfunc)
         return
 
     @classmethod
-    def __lvar_delete_cmt_refs(cls, fn, locator, old, new):
-        '''Delete the references to the `old` tags for the variable specified by `locator` from the function `fn`.'''
-        oldkeys, newkeys = ({item for item in (content or {})} for content in [old, new])
+    def __lvar_delete_cmt_refs(cls, function, locator, old, new):
+        '''Delete the references to the `old` tags for the variable specified by `locator` from the specified decompiled `function`.'''
+        cfunc = internal.hexrays.function(function)
+        fn = internal.hexrays.function.address(cfunc)
+
         oldkeys, newkeys = ({item for item in (content or {})} for content in [old, new])
         if not (old is not None and isinstance(new, internal.types.dictionary)) or (False if new is None else True):
             raise internal.exceptions.InvalidParameterError(u"{:s}.__lvar_delete_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : An invalid parameter was used when trying to delete the references for the variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, locator, fn))
@@ -6361,15 +6378,18 @@ class decompilermonitor(object):
         logging.debug(u"{:s}.__lvar_delete_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Deleting tags ({!s}) for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(oldkeys), locator, fn))
         for key in (oldkeys & newkeys):
             logging.debug(u"{:s}.__lvar_delete_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Decreasing reference count for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(key), locator, fn))
-            internal.tags.reference.hexvariable.decrement(locator, key, target=fn)
+            internal.tags.reference.hexvariable.decrement(locator, key, target=cfunc)
 
         if oldkeys ^ newkeys:
             logging.debug(u"{:s}.__lvar_delete_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Due to a discrepancy for some of the tags ({!s}) for variable {!s} from function {:#x}, not all keys may have been removed ({!s}).".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(oldkeys - newkeys), locator, fn, utils.string.repr(newkeys - oldkeys)))
         return
 
     @classmethod
-    def __lvar_update_cmt_refs(cls, fn, locator, old, new):
-        '''Update the references from the `old` to the `new` tags for the variable specpified by `locator` from function `fn`.'''
+    def __lvar_update_cmt_refs(cls, function, locator, old, new):
+        '''Update the references from the `old` to the `new` tags for the variable specified by `locator` from the specified decompiled `function`.'''
+        cfunc = internal.hexrays.function(function)
+        fn = internal.hexrays.function.address(cfunc)
+
         oldkeys, newkeys = ({item for item in (content or {})} for content in [old, new])
         if not all(content is not None and isinstance(content, internal.types.dictionary) for content in [old, new]):
             raise internal.exceptions.InvalidParameterError(u"{:s}.__lvar_update_cmt_refs({:#x}, {!s}, {!r}, {!r}) : An invalid parameter was used when trying to update the references for the variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, fn))
@@ -6380,16 +6400,18 @@ class decompilermonitor(object):
         for key in oldkeys ^ newkeys:
             if key not in new:
                 logging.debug(u"{:s}.__lvar_update_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Decreasing reference count of tag {!s} for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, key, locator, fn))
-                internal.tags.reference.hexvariable.decrement(locator, key, target=fn)
+                internal.tags.reference.hexvariable.decrement(locator, key, target=cfunc)
             if key not in old:
                 logging.debug(u"{:s}.__lvar_update_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Increasing reference count for tag {!s} for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, key, locator, fn))
-                internal.tags.reference.hexvariable.increment(locator, key, target=fn)
+                internal.tags.reference.hexvariable.increment(locator, key, target=cfunc)
             continue
         return
 
-    def __handle_lvar_cmt_changed(self, fn, old, new):
-        '''Update the references in the function `fn` for changing the variable comment specified in `old` to `new.'''
-        cls = self.__class__
+    @classmethod
+    def __handle_lvar_cmt_changed(cls, function, old, new):
+        '''Update the references in the decompiled `function` for changing the variable comment from `old` to `new.'''
+        cfunc = internal.hexrays.function(function)
+        fn = internal.hexrays.function.address(cfunc)
 
         # First unpack all the parameters so that we can decode the comments.
         oldlocator, oldcomment = (None, '') if old is None else old.locator, old.comment
@@ -6400,20 +6422,22 @@ class decompilermonitor(object):
         # variable or the old locator didn't have anything.. If they do,
         # though,then we can go ahead and update the comments.
         if oldlocator is None or oldlocator == newlocator:
-            return self.__lvar_update_cmt_refs(fn, newlocator, oldtags, newtags)
+            return cls.__lvar_update_cmt_refs(cfunc, newlocator, oldtags, newtags)
 
         # Otherwise, the variable was moved which shouldn't actually happen. So,
         # we go through and delete the old references and create the new ones.
         logging.fatal(u"{:s}.__handle_lvar_cmt_changed({:#x}, {!r}, {!r}) : The variable locations for the `{:s}` event references two completely different locations ({!s} != {!s}).".format('.'.join([__name__, cls.__name__]), fn, old, new, 'hexrays.lvar_cmt_changed', oldlocator, newlocator))
         logging.warning(u"{:s}.__handle_lvar_cmt_changed({:#x}, {!r}, {!r}) : Deleting the references to the tags for the variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, old, new, oldlocator, fn))
-        self.__lvar_delete_cmt_refs(fn, newlocator, oldtags, newtags)
+        cls.__lvar_delete_cmt_refs(cfunc, newlocator, oldtags, newtags)
         logging.warning(u"{:s}.__handle_lvar_cmt_changed({:#x}, {!r}, {!r}) : Creating the references to the tags for the variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, old, new, newlocator, fn))
-        self.__lvar_create_cmt_refs(fn, oldlocator if oldlocator else newlocator, oldtags, newtags)
+        cls.__lvar_create_cmt_refs(cfunc, oldlocator if oldlocator else newlocator, oldtags, newtags)
 
     ### Utilities for maintaining the state of the decompiler variable types.
-    def __handle_lvar_type_changed(self, fn, old, new):
-        '''Update the references in the function `fn` for changing the variable type specified in `old` to `new.'''
-        cls = self.__class__
+    @classmethod
+    def __handle_lvar_type_changed(cls, function, old, new):
+        '''Update the references in the specified decompiled `function` for changing the variable type from `old` to `new.'''
+        cfunc = internal.hexrays.function(function)
+        fn = internal.hexrays.function.address(cfunc)
 
         # First unpack the parameters so that we can compare the types.
         oldlocator, oldtype = (None, None) if old is None else (old.locator, old.type)
@@ -6421,16 +6445,18 @@ class decompilermonitor(object):
 
         # If the variable locators match, then we will need to check if the tag
         # doesn't already exist and then update the tag if the type changed.
-        if oldlocator == newlocator and '__typeinfo__' not in internal.tags.reference.hexvariable.get(newlocator, target=fn):
-            internal.tags.reference.hexvariable.increment(newlocator, '__typeinfo__', target=fn)
+        if oldlocator == newlocator and '__typeinfo__' not in internal.tags.reference.hexvariable.get(newlocator, target=cfunc):
+            internal.tags.reference.hexvariable.increment(newlocator, '__typeinfo__', target=cfunc)
         elif oldlocator is None:
-            internal.tags.reference.hexvariable.increment(newlocator, '__typeinfo__', target=fn)
+            internal.tags.reference.hexvariable.increment(newlocator, '__typeinfo__', target=cfunc)
         return
 
     ### Utilities for maintaining the state of the decompiler variable names.
-    def __handle_lvar_name_changed(self, fn, old, new):
-        '''Update the references in the function `fn` for changing the variable name specified in `old` to `new.'''
-        cls = self.__class__
+    @classmethod
+    def __handle_lvar_name_changed(cls, function, old, new):
+        '''Update the references in the specified decompiled `function` for changing the variable name from `old` to `new.'''
+        cfunc = internal.hexrays.function(function)
+        fn = internal.hexrays.function.address(cfunc)
 
         # First unpack the parameters so that we can compare the names.
         oldlocator, oldname, olduser = (None, '', False) if old is None else (old.locator, old.name, old.is_user_name)
@@ -6439,28 +6465,29 @@ class decompilermonitor(object):
         # If the variable location matches, then we will need to check whether
         # the tag name exists or not. If the name was changed and the new name
         # has a value, then increment its reference count.
-        exists = '__name__' in internal.tags.reference.hexvariable.get(newlocator, target=fn)
+        exists = '__name__' in internal.tags.reference.hexvariable.get(newlocator, target=cfunc)
         if oldlocator == newlocator and oldname != newname and newname:
             if not exists:
-                internal.tags.reference.hexvariable.increment(newlocator, '__name__', target=fn)
+                internal.tags.reference.hexvariable.increment(newlocator, '__name__', target=cfunc)
             return
 
         # Otherwise, if the name was changed with the new name being empty, then
         # the name is removed and we need to remove the tag reference to it.
         elif oldlocator == newlocator and oldname != newname and not newname:
             if exists:
-                internal.tags.reference.hexvariable.decrement(newlocator, '__name__', target=fn)
+                internal.tags.reference.hexvariable.decrement(newlocator, '__name__', target=cfunc)
             return
 
         # If there was no previous name, then go ahead and add it.
         elif oldlocator is None:
             if not exists:
-                internal.tags.reference.hexvariable.increment(newlocator, '__name__', target=fn)
+                internal.tags.reference.hexvariable.increment(newlocator, '__name__', target=cfunc)
             return
         return
 
     ### Entrypoints for all of the related hooks sent by the decompiler.
-    def cmt_changed(self, function, treeloc, cmt):
+    @classmethod
+    def cmt_changed(cls, function, treeloc, cmt):
         '''This is the handler used for hooking the `hexrays.cmt_changed` event.'''
         state = __import__('hook').decompilermonitor
 
@@ -6477,7 +6504,8 @@ class decompilermonitor(object):
             state.consume(cfunc)
         return
 
-    def lvar_name_changed(self, vdui, lvar, name, is_user_name):
+    @classmethod
+    def lvar_name_changed(cls, vdui, lvar, name, is_user_name):
         '''This is the handler used for hooking the `hexrays.lvar_name_changed` event.'''
         state = __import__('hook').decompilermonitor
 
@@ -6498,7 +6526,8 @@ class decompilermonitor(object):
             state.consume(cfunc)
         return
 
-    def lvar_type_changed(self, vdui, lvar, tinfo):
+    @classmethod
+    def lvar_type_changed(cls, vdui, lvar, tinfo):
         '''This is the handler used for hooking the `hexrays.lvar_type_changed` event.'''
         state = __import__('hook').decompilermonitor
 
@@ -6518,7 +6547,8 @@ class decompilermonitor(object):
             state.consume(cfunc)
         return
 
-    def lvar_cmt_changed(self, vdui, lvar, cmt):
+    @classmethod
+    def lvar_cmt_changed(cls, vdui, lvar, cmt):
         '''This is the handler used for hooking the `hexrays.lvar_cmt_changed` event.'''
         state = __import__('hook').decompilermonitor
 
@@ -6537,17 +6567,18 @@ class decompilermonitor(object):
             state.consume(cfunc)
         return
 
-    def func_printed(self, function):
+    @classmethod
+    def func_printed(cls, function):
         '''This is the handler used for hooking the `hexrays.func_printed` event.'''
         state = __import__('hook').decompilermonitor
 
         # get the function we were given and snag its address.
         cfunc = internal.hexrays.function(function)
-        ea = internal.hexrays.function.address(cfunc)
+        fn = internal.hexrays.function.address(cfunc)
 
         # if our monitor state says we've already captured the state of the
         # decompiled function, then go ahead and dispatch the event to it.
-        if ea in state:
+        if fn in state:
             return state.func_printed(cfunc)
 
         # otherwise, we need to ensure that we initialize the state for the
