@@ -6249,7 +6249,7 @@ class decompilermonitor(object):
         logging.debug(u"{:s}.__create_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Creating tags ({!s}) at address {:#x}/{:d} for function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, utils.string.repr(newkeys), ea, itp, fn))
         for key in newkeys - oldkeys:
             logging.debug(u"{:s}.__create_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Increasing reference count for tag {!s} at address {:#x}/{:d} of function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, utils.string.repr(key), ea, itp, fn))
-            internal.tagindex.hexfunction.increment((ea, itp), key)
+            internal.tags.reference.hexfunction.increment((ea, itp), key, target=fn)
         return
 
     @classmethod
@@ -6262,7 +6262,7 @@ class decompilermonitor(object):
         logging.debug(u"{:s}.__delete_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Deleting tags ({!s}) at address {:#x}/{:d} for function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, utils.string.repr(oldkeys), ea, itp, fn))
         for key in (oldkeys & newkeys):
             logging.debug(u"{:s}.__delete_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Decreasing reference count for tag {!s} at address {:#x}/{:d} of function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, utils.string.repr(key), ea, itp, fn))
-            internal.tagindex.hexfunction.decrement((ea, itp), key)
+            internal.tags.reference.hexfunction.decrement((ea, itp), key, target=fn)
 
         if oldkeys ^ newkeys:
             logging.debug(u"{:s}.__delete_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Due to a discrepancy for some of the tags ({!s}) at address {:#x}/{:d} of function {:#x}, not all keys may have been removed ({!s}).".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, utils.string.repr(oldkeys - newkeys), ea, itp, fn, utils.string.repr(newkeys - oldkeys)))
@@ -6281,10 +6281,10 @@ class decompilermonitor(object):
         for key in oldkeys ^ newkeys:
             if key not in new:
                 logging.debug(u"{:s}.__update_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Decreasing reference count for tag {!s} at address {:#x}/{:d} for function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, key, ea, itp, fn))
-                internal.tagindex.hexfunction.decrement((ea, itp), key)
+                internal.tags.reference.hexfunction.decrement((ea, itp), key, target=fn)
             if key not in old:
                 logging.debug(u"{:s}.__update_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Increasing reference count for tag {!s} at address {:#x}/{:d} for function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, key, ea, itp, fn))
-                internal.tagindex.hexfunction.increment((ea, itp), key)
+                internal.tags.reference.hexfunction.increment((ea, itp), key, target=fn)
             continue
         return
 
@@ -6325,7 +6325,7 @@ class decompilermonitor(object):
         logging.debug(u"{:s}.__lvar_create_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Creating tags ({!s}) for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(newkeys), locator, fn))
         for key in newkeys - oldkeys:
             logging.debug(u"{:s}.__lvar_create_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Increasing reference count of tag {!s} for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(key), locator, fn))
-            internal.tagindex.hexvariable.increment(locator, key)
+            internal.tags.reference.hexvariable.increment(locator, key, target=fn)
         return
 
     @classmethod
@@ -6339,7 +6339,7 @@ class decompilermonitor(object):
         logging.debug(u"{:s}.__lvar_delete_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Deleting tags ({!s}) for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(oldkeys), locator, fn))
         for key in (oldkeys & newkeys):
             logging.debug(u"{:s}.__lvar_delete_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Decreasing reference count for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(key), locator, fn))
-            internal.tagindex.hexvariable.decrement(locator, key)
+            internal.tags.reference.hexvariable.decrement(locator, key, target=fn)
 
         if oldkeys ^ newkeys:
             logging.debug(u"{:s}.__lvar_delete_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Due to a discrepancy for some of the tags ({!s}) for variable {!s} from function {:#x}, not all keys may have been removed ({!s}).".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(oldkeys - newkeys), locator, fn, utils.string.repr(newkeys - oldkeys)))
@@ -6358,10 +6358,10 @@ class decompilermonitor(object):
         for key in oldkeys ^ newkeys:
             if key not in new:
                 logging.debug(u"{:s}.__lvar_update_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Decreasing reference count of tag {!s} for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, key, locator, fn))
-                internal.tagindex.hexvariable.decrement(locator, key)
+                internal.tags.reference.hexvariable.decrement(locator, key, target=fn)
             if key not in old:
                 logging.debug(u"{:s}.__lvar_update_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Increasing reference count for tag {!s} for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, key, locator, fn))
-                internal.tagindex.hexvariable.increment(locator, key)
+                internal.tags.reference.hexvariable.increment(locator, key, target=fn)
             continue
         return
 
@@ -6399,10 +6399,10 @@ class decompilermonitor(object):
 
         # If the variable locators match, then we will need to check if the tag
         # doesn't already exist and then update the tag if the type changed.
-        if oldlocator == newlocator and '__typeinfo__' not in internal.tagindex.hexvariable.get(newlocator):
-            internal.tagindex.hexvariable.increment(newlocator, '__typeinfo__')
+        if oldlocator == newlocator and '__typeinfo__' not in internal.tags.reference.hexvariable.get(newlocator, target=fn):
+            internal.tags.reference.hexvariable.increment(newlocator, '__typeinfo__', target=fn)
         elif oldlocator is None:
-            internal.tagindex.hexvariable.increment(newlocator, '__typeinfo__')
+            internal.tags.reference.hexvariable.increment(newlocator, '__typeinfo__', target=fn)
         return
 
     ### Utilities for maintaining the state of the decompiler variable names.
@@ -6417,23 +6417,23 @@ class decompilermonitor(object):
         # If the variable location matches, then we will need to check whether
         # the tag name exists or not. If the name was changed and the new name
         # has a value, then increment its reference count.
-        exists = '__name__' in internal.tagindex.hexvariable.get(newlocator)
+        exists = '__name__' in internal.tags.reference.hexvariable.get(newlocator, target=fn)
         if oldlocator == newlocator and oldname != newname and newname:
             if not exists:
-                internal.tagindex.hexvariable.increment(newlocator, '__name__')
+                internal.tags.reference.hexvariable.increment(newlocator, '__name__', target=fn)
             return
 
         # Otherwise, if the name was changed with the new name being empty, then
         # the name is removed and we need to remove the tag reference to it.
         elif oldlocator == newlocator and oldname != newname and not newname:
             if exists:
-                internal.tagindex.hexvariable.decrement(newlocator, '__name__')
+                internal.tags.reference.hexvariable.decrement(newlocator, '__name__', target=fn)
             return
 
         # If there was no previous name, then go ahead and add it.
         elif oldlocator is None:
             if not exists:
-                internal.tagindex.hexvariable.increment(newlocator, '__name__')
+                internal.tags.reference.hexvariable.increment(newlocator, '__name__', target=fn)
             return
         return
 
@@ -6450,8 +6450,8 @@ class decompilermonitor(object):
 
     def lvar_name_changed(self, vdui, lvar, name, is_user_name):
         '''This is the handler used for hooking the `hexrays.lvar_name_changed` event.'''
-        hexrays, cfunc, mba = internal.hexrays, vdui.cfunc, vdui.mba
-        defea, atype, alocinfo = hexrays.variable.identity(lvar)
+        cfunc = internal.hexrays.function(vdui)
+        defea, atype, alocinfo = internal.hexrays.variable.identity(lvar)
         old = self.state.get_variable_name(cfunc, lvar)
         oldname, olduser = old if old else ('', False)
         newname, newuser = utils.string.of(name), is_user_name
@@ -6464,8 +6464,8 @@ class decompilermonitor(object):
 
     def lvar_type_changed(self, vdui, lvar, tinfo):
         '''This is the handler used for hooking the `hexrays.lvar_type_changed` event.'''
-        hexrays, cfunc, mba = internal.hexrays, vdui.cfunc, vdui.mba
-        defea, atype, alocinfo = hexrays.variable.identity(lvar)
+        cfunc = internal.hexrays.function(vdui)
+        defea, atype, alocinfo = internal.hexrays.variable.identity(lvar)
         oldtype = self.state.get_variable_type(cfunc, lvar)
         newtype = interface.tinfo.copy(tinfo)
 
@@ -6477,8 +6477,8 @@ class decompilermonitor(object):
 
     def lvar_cmt_changed(self, vdui, lvar, cmt):
         '''This is the handler used for hooking the `hexrays.lvar_cmt_changed` event.'''
-        hexrays, cfunc, mba = internal.hexrays, vdui.cfunc, vdui.mba
-        defea, atype, alocinfo = hexrays.variable.identity(lvar)
+        cfunc = internal.hexrays.function(vdui)
+        defea, atype, alocinfo = internal.hexrays.variable.identity(lvar)
         oldcomment = self.state.get_variable_comment(cfunc, lvar)
         newcomment = utils.string.of(cmt)
 
@@ -6490,6 +6490,7 @@ class decompilermonitor(object):
 
     def func_printed(self, cfunc):
         '''This is the handler used for hooking the `hexrays.func_printed` event.'''
+        cfunc = internal.hexrays.function(cfunc)
         ea = internal.hexrays.function.address(cfunc)
 
         # if our monitor state says we've already captured the state of the
