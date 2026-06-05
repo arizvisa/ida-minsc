@@ -887,6 +887,23 @@ class query_v1(object):
         return
 
     @classmethod
+    def hexvariables(cls, require=frozenset(), include=frozenset()):
+        '''Yield the function address and tags for the variables from each decompiled function containing all the tags in `require` and including any from `include`.'''
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+        for ea, used in internal.tagindex.hexvariable.select():
+            if not(used):
+                continue
+            elif not(selection) and used:
+                yield ea, internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield ea, internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield ea, internal.tagindex.tags.names(used & requested)
+            continue
+        return
+
+    @classmethod
     def hexvariable(cls, func, require=frozenset(), include=frozenset()):
         '''Yield the variable locator and tags for the variables from the decompiled function `func` containing all the tags in `require` and including any from `include`.'''
         cfunc = internal.hexrays.function(func)
