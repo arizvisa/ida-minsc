@@ -91,7 +91,7 @@ __matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('
 __matcher__.attribute('index', 'id', idaapi.get_struc_idx)
 __matcher__.attribute('identifier', 'id'), __matcher__.alias('id', 'identifier')
 __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
-__matcher__.combinator('name', utils.fcondition(utils.finstance(types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), types.set, utils.fpartial(utils.fpartial, operator.contains))), 'name', operator.methodcaller('lower'))
+__matcher__.combinator('name', utils.fcondition(utils.finstance(types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(utils.itermap, operator.methodcaller('lower')), types.set, utils.fpartial(utils.fpartial, operator.contains))), 'name', operator.methodcaller('lower'))
 __matcher__.combinator('size', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.attrgetter('ptr'), idaapi.get_struc_size)
 __matcher__.boolean('ge', operator.le, operator.attrgetter('ptr'), idaapi.get_struc_size)
 __matcher__.boolean('gt', operator.lt, operator.attrgetter('ptr'), idaapi.get_struc_size), __matcher__.alias('greater', 'gt')
@@ -115,7 +115,7 @@ __matcher__.combinator('members', utils.fcompose(utils.fcompose, utils.fconditio
 __matcher__.mapping('anonymous', operator.truth, 'name', operator.methodcaller('startswith', '$'))
 
 __matcher__.mapping('contiguous', functools.partial(operator.le, 0), operator.attrgetter('ptr'), utils.fcondition(internal.structure.union)(utils.fconstant(0), utils.fcompose(utils.fmap(utils.fcompose(operator.attrgetter('members'), functools.partial(functools.partial, operator.getitem)), utils.fcompose(operator.attrgetter('memqty'), builtins.range)), utils.funpack(builtins.map), utils.freverse(functools.partial(functools.reduce, lambda eoff, member: member.eoff if member.soff == eoff else -1), 0))))
-__matcher__.combinator('structure', utils.fcondition(utils.finstance(idaapi.struc_t, internal.structure.structure_t))(utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(filter, utils.finstance(idaapi.struc_t, internal.structure.structure_t)), utils.fpartial(map, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), 'id')
+__matcher__.combinator('structure', utils.fcondition(utils.finstance(idaapi.struc_t, internal.structure.structure_t))(utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(filter, utils.finstance(idaapi.struc_t, internal.structure.structure_t)), utils.fpartial(utils.itermap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), 'id')
 __matcher__.alias('structures', 'structure')
 __matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
 
