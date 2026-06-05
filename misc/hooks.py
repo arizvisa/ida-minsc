@@ -7649,5 +7649,9 @@ class module(object):
     # to any of the types from the local types library.
     localtypesmonitor = singleton_descriptor(lambda cons, *args: cons(*args), localtypesmonitor, __repr__=staticmethod(lambda: 'Internal monitor for tracking changes made to the local types library.'))
 
+    # Create a descriptor that maintains the decompiler monitor for tracking any
+    # changes made via the visual decompiler interface.
+    decompilermonitor = singleton_descriptor(lambda cons, *args: cons(*args), decompilermonitor, __repr__=staticmethod(lambda: 'Internal monitor for tracking changes made with the visual decompiler.'))
+
 # Now we just need to change the name of our class so that the documentation reads right.
 module.__name__ = 'hook'
