@@ -5860,11 +5860,11 @@ class decompilermonitor_state(object):
 
     def cmt_changed(self, cfunc, treeloc, cmt):
         '''Receive the comment that was dispatched to us by the `Hexrays_Hooks.cmt_changed` event.'''
-        hexrays, locator = internal.hexrays, treeloc
+        cfunc, locator = internal.hexrays.function(cfunc), treeloc
 
         # if the queue hasn't been created yet, then we need to grab all the
         # information from the function so that we can initialize it.
-        ea = hexrays.function.address(cfunc)
+        ea = internal.hexrays.function.address(cfunc)
         if ea not in self.updatequeues:
             self.func_printed(cfunc)
 
@@ -5893,11 +5893,11 @@ class decompilermonitor_state(object):
 
     def lvar_name_changed(self, vdui, lvar, name, is_user_name):
         '''Receive a variable rename that was dispatched to us by the `Hexrays_Hooks.lvar_name_changed` event.'''
-        hexrays, cfunc, mba = internal.hexrays, vdui.cfunc, vdui.mba
+        cfunc = internal.hexrays.function(vdui)
 
         # if we haven't allocated the queue for this function yet, then we need
         # to grab all of its attributes so that we can initialize everything.
-        ea, locator = hexrays.function.address(cfunc), self.get_locator(lvar)
+        ea, locator = internal.hexrays.function.address(cfunc), self.get_locator(lvar)
         if ea not in self.updatequeues:
             self.func_printed(cfunc)
 
@@ -5936,11 +5936,11 @@ class decompilermonitor_state(object):
 
     def lvar_type_changed(self, vdui, lvar, tinfo):
         '''Receive a variable type change that was dispatched to us by the `Hexrays_Hooks.lvar_type_changed` event.'''
-        hexrays, cfunc, mba = internal.hexrays, vdui.cfunc, vdui.mba
+        cfunc = internal.hexrays.function(vdui)
 
         # check if we've allocated the queue for this function yet. if we
         # haven't, then we need to before we add the `lvar_type_changed` event.
-        ea, locator = hexrays.function.address(cfunc), self.get_locator(lvar)
+        ea, locator = internal.hexrays.function.address(cfunc), self.get_locator(lvar)
         if ea not in self.updatequeues:
             self.func_printed(cfunc)
 
@@ -5977,11 +5977,11 @@ class decompilermonitor_state(object):
 
     def lvar_cmt_changed(self, vdui, lvar, cmt):
         '''Receive a variable comment change that was dispatched to us the `Hexrays_Hooks.lvar_cmt_changed` event.'''
-        hexrays, cfunc, mba = internal.hexrays, vdui.cfunc, vdui.mba
+        cfunc = internal.hexrays.function(vdui)
 
         # verify that we've already allocated the queue for this function. since
         # if we haven't, then we don't know what the comment was changed from.
-        ea, locator = hexrays.function.address(cfunc), self.get_locator(lvar)
+        ea, locator = internal.hexrays.function.address(cfunc), self.get_locator(lvar)
         if ea not in self.updatequeues:
             self.func_printed(cfunc)
 
@@ -6017,12 +6017,12 @@ class decompilermonitor_state(object):
 
     def func_printed(self, cfunc):
         '''Gather all information from the function `cfunc` that has been dispatched to us by the `Hexrays_Hooks.func_printed` event.'''
-        hexrays, cfunc, mba = internal.hexrays, cfunc, cfunc.mba
+        cfunc = internal.hexrays.function(cfunc)
 
         # get the address of the printed function. if the queue has already been
         # allocated, then we can ignore this event since we've already collected
         # all the initial information that was needed for tracking changes.
-        ea = hexrays.function.address(cfunc)
+        ea = internal.hexrays.function.address(cfunc)
         if ea in self.updatequeues:
             return
 
