@@ -6199,11 +6199,10 @@ class decompilermonitor(object):
     """
 
     def __new__(cls):
-        hook = __import__('hook')
         logging.info(u"{:s}() : Initializing the decompiler monitor for v{:.1f} and instantiating the state for tracking any changes.".format('.'.join([__name__, cls.__name__]), idaapi.__version__))
 
         # now we can instantiate our state for tracking.
-        cls.state = state = hook.decompilermonitor
+        state = __import__('hook').decompilermonitor
 
         # assign the actual implementations for acting on the confirmed event
         # types produced by the decompiler in the decompilermonitor state.
@@ -7699,7 +7698,7 @@ class module(object):
 
     # Create a descriptor that maintains the decompiler monitor for tracking any
     # changes made via the visual decompiler interface.
-    decompilermonitor = singleton_descriptor(lambda cons, *args: cons(*args), decompilermonitor, __repr__=staticmethod(lambda: 'Internal monitor for tracking changes made with the visual decompiler.'))
+    decompilermonitor = singleton_descriptor(lambda cons, *args: cons(*args), decompilermonitor_state, __repr__=staticmethod(lambda: 'Internal monitor for tracking changes made with the visual decompiler.'))
 
 # Now we just need to change the name of our class so that the documentation reads right.
 module.__name__ = 'hook'
