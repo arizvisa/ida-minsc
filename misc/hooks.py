@@ -7647,7 +7647,7 @@ class module(object):
 
     # Create a descriptor that maintains the monitor for tracking changes made
     # to any of the types from the local types library.
-    localtypesmonitor = singleton_descriptor(lambda cons, *args: cons(*args), localtypesmonitor, __repr__=staticmethod(lambda: 'Internal monitor for tracking changes made to the local types library.'))
+    localtypesmonitor = singleton_descriptor(lambda cons, *args: cons(*args), localtypesmonitor_state, __repr__=staticmethod(lambda: 'Internal state for tracking any and all changes made to the local types library.'))
 
     # Create a descriptor that maintains the decompiler monitor for tracking any
     # changes made via the visual decompiler interface.
