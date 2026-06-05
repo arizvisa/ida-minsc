@@ -469,7 +469,7 @@ __matcher__.attribute('index', idaapi.get_enum_idx)
 __matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
 __matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
 __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
-__matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_enum_name, utils.string.of, operator.methodcaller('lower'))
+__matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(utils.itermap, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_enum_name, utils.string.of, operator.methodcaller('lower'))
 __matcher__.boolean('bitfield', operator.eq, idaapi.is_bf, operator.truth)
 __matcher__.attribute('identifier'), __matcher__.alias('id', 'identifier')
 __matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
@@ -864,7 +864,7 @@ class members(object):
 
     # FIXME: Implement a matcher class for enumeration members that can be used with .iterate and .list below.
     __members_matcher = utils.matcher()
-    __members_matcher.combinator('name', utils.fcondition(utils.finstance(types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_enum_member_name, utils.string.of, operator.methodcaller('lower'))
+    __members_matcher.combinator('name', utils.fcondition(utils.finstance(types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(utils.itermap, operator.methodcaller('lower')), types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_enum_member_name, utils.string.of, operator.methodcaller('lower'))
     __members_matcher.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_member_name, utils.string.of)
     __members_matcher.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_member_name, utils.string.of)
     __members_matcher.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), idaapi.get_enum_member_name, utils.string.of)
