@@ -364,6 +364,12 @@ class query_v0(object):
         yield
 
     @classmethod
+    def hexvariables(cls, required=[], included=[]):
+        '''Query the tags for the variables from all the decompiled functions and yield a tuple containing the function address and all of the `required` tags with any `included` ones.'''
+        return
+        yield
+
+    @classmethod
     def hexvariable(cls, func, *args, **kwargs):
         '''Query the tags for the variables from the decompiled function `func` and yield a tuple containing the location and all of the `required` tags with any `included` ones.'''
         return
@@ -572,6 +578,11 @@ class select_v0(object):
     def hexfunction(cls, func, *args, **kwargs):
         '''Query the tags of the decompiled function `func` and yield a tuple containing the location and all of the `required` tags with any `included` ones.'''
         return query_v0.hexfunction(func, *args, **kwargs)
+
+    @classmethod
+    def hexvariables(cls, *args, **kwargs):
+        '''Query the tags for the variables from all decompiled functions and yield a tuple containing the function address and all of the `required` tags with any `included` ones.'''
+        return query_v0.hexvariables(*args, **kwargs)
 
     @classmethod
     def hexvariable(cls, func, *args, **kwargs):
