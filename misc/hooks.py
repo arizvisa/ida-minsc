@@ -7141,6 +7141,18 @@ def make_ida_not_suck_cocks(nw_code):
             scheduler.default(hook.notification, idaapi.NW_OPENIDB, micro.nw_newprc, -10)
         del(micro)
 
+    # add the hooks required for tracking any changes made using the visual
+    # decompiler. these functions depend on the `hook.decompilermonitor` state
+    # which serializes the events received and monitors them for changes.
+    if idaapi.__version__ < 8.5 and hasattr(hook, 'hexrays') and hasattr(hook, 'decompilermonitor'):
+        scheduler.default(hook.idp, 'ev_init', decompilermonitor.attach, -10000)
+        scheduler.default(hook.idb, 'closebase', decompilermonitor.detach, +10000)
+        scheduler.default(hook.hexrays, 'cmt_changed', decompilermonitor.cmt_changed, 0)
+        scheduler.default(hook.hexrays, 'lvar_name_changed', decompilermonitor.lvar_name_changed, 0)
+        scheduler.default(hook.hexrays, 'lvar_type_changed', decompilermonitor.lvar_type_changed, 0)
+        scheduler.default(hook.hexrays, 'lvar_cmt_changed', decompilermonitor.lvar_cmt_changed, 0)
+        scheduler.default(hook.hexrays, 'func_printed', decompilermonitor.func_printed, 0)
+
     ## just some debugging notification hooks
     #[ hook.ui.add(item, notify(item), -100) for item in ['range','idcstop','idcstart','suspend','resume','term','ready_to_run'] ]
     #[ hook.idp.add(item, notify(item), -100) for item in ['ev_newfile','ev_oldfile','ev_init','ev_term','ev_newprc','ev_newasm','ev_auto_queue_empty'] ]
