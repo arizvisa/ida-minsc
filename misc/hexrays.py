@@ -1968,3 +1968,15 @@ class ctree(object):
         for index in range(cfunc.treeitems.size()):
             yield index, cfunc.treeitems[index]
         return
+
+    @classmethod
+    def boundaries(cls, func):
+        '''Yield the index of each instruction item and its corresponding address range from the function specified by `func`.'''
+        cfunc = function(func)
+        boundaries = cfunc.get_boundaries()
+        for instruction in boundaries.keys():
+            ranges = boundaries[instruction]
+            iterable = ((ranges[index].start_ea, ranges[index].end_ea) for index in range(ranges.nranges()))
+            index = -1 if instruction.is_epilog() else cfunc.treeitems[instruction.index].index
+            yield index, [interface.bounds_t(start, stop) for start, stop in iterable]
+        return
