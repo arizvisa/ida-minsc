@@ -1238,6 +1238,8 @@ class variable(object):
     @classmethod
     def get_name(cls, *args):
         '''Return the name from the variable identified by the given `args`.'''
+        if len(args) == 1 and isinstance(args[0], ida_hexrays_types.lvar_t):
+            return utils.string.of(args[0].name)
         lvar = variables.get(*args)
         return utils.string.of(lvar.name)
 
@@ -1358,6 +1360,8 @@ class variable(object):
     @classmethod
     def get_type(cls, *args):
         '''Return the type from the variable identified by the given `args`.'''
+        if len(args) == 1 and isinstance(args[0], ida_hexrays_types.lvar_t):
+            return interface.tinfo.copy(args[0].tif)
         lvar = variables.get(*args)
         return interface.tinfo.copy(lvar.tif)
 
