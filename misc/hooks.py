@@ -652,7 +652,7 @@ class typeinfo(changingchanged):
         # First check if we need to remove the typeinfo that's stored at the
         # given address. Afterwards we can unpack our original values.
         if any(original):
-            ctx.decrement(ea, '__typeinfo__')
+            ctx.decrement(ea, '__typeinfo__') if '__typeinfo__' in ctx.get(ea) else ctx.decrement
         old_type, old_fname = original
 
         # Wait until we get the ti_changed event...
@@ -1414,7 +1414,7 @@ class naming(changingchanged):
         if not new_name:
             # if it's a custom name
             if (not labelQ and customQ):
-                ctx.decrement(ea, '__name__')
+                ctx.decrement(ea, '__name__') if '__name__' in ctx.get(ea) else ctx.decrement
                 logging.debug(u"{:s}.rename({:#x}, {!r}) : Decreasing reference count for tag {!r} at address due to an empty name.".format('.'.join([__name__, cls.__name__]), ea, new_name, '__name__'))
             return
 
@@ -1571,7 +1571,7 @@ def item_color_changed(ea, color):
 
     # If the color was restored, then we need to decrease its ref.
     if color in {DEFCOLOR}:
-        ctx.decrement(ea, '__color__')
+        ctx.decrement(ea, '__color__') if '__color__' in ctx.get(ea) else ctx.decrement
 
     # The color is being applied, so we can just increase its reference.
     else:
