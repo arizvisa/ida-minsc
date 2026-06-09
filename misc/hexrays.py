@@ -1016,6 +1016,17 @@ class variables(object):
         # If we got here, then the variable type is completely unsupported.
         raise exceptions.InvalidTypeOrValueError(u"{:s}.repr({!r}, {!r}) : Unable to render the specified variable using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), func, arg, func.__class__))
 
+    @classmethod
+    def index(cls, func, locator):
+        '''Return the index of the specified `variable` into the vector of variables from the function `func`.'''
+        cfunc = function(func)
+        locator = cls.by(cfunc, locator)
+        lvar = cls.get(cfunc, locator)
+        type = variable.get_type(lvar)
+        width = interface.tinfo.size(type)
+        defea, location = locator.defea, locator.location
+        return cls(cfunc).find_lvar(location, width)
+
 class variable(object):
     """
     This namespace contains utilities that are related to an individual variable
