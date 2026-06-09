@@ -1790,7 +1790,7 @@ class snippet(object):
 
     @classmethod
     def blocks(cls, mba):
-        '''Yield each microcode block belonging to the microcode specified by `mba`.'''
+        '''Yield each block and its serial from the microcode specified by `mba`.'''
         mblockarray = cls(mba)
 
         # We gather each block as a list before returning the iterator for them
@@ -1798,8 +1798,8 @@ class snippet(object):
         blocks = []
         for index in range(mblockarray.qty):
             mblock = mblockarray.get_mblock(index)
-            blocks.append(mblock)
-        return (mblock for mblock in blocks)
+            blocks.append((mblock.serial, mblock))
+        return ((serial, mblock) for serial, mblock in blocks)
 
 class ctree(object):
     """
