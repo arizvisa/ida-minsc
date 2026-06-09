@@ -518,13 +518,13 @@ class xref(object):
                 tinfo, utd, mindex, udm = reference_or_member
                 yield tinfo, mindex
 
-            # Otherwise it is a tuple for a structure member, and we need to
-            # use it to construct a structure_t and fetch the member by index.
+            # Otherwise it is a tuple for a structure alias or a member, and we
+            # need to use it to yield a structure_t or member_t with the index.
             else:
                 mowner, mcandidate = reference_or_member
-                mindex = members.index(mowner, mcandidate)
-                member = structure_t(mowner, offset).members[mindex]
-                yield member
+                mindex = -1 if mcandidate is None else members.index(mowner, mcandidate)
+                owner = structure_t(mowner, offset=offset) if offset else structure_t(mowner)
+                yield owner if mcandidate is None else owner.members[mindex]
             continue
         return
 
@@ -1819,9 +1819,10 @@ class member(object):
                 if isinstance(item, interface.ref_t):
                     continue
 
-                # unpack the item and then check if it's a frame, since we can skip those too.
+                # unpack the item and then check if it's a frame or a structure
+                # alias, so that we can skip it to avoid yielding them.
                 mowner, mmember = item
-                if frame(mowner):
+                if frame(mowner) or mmember is None:
                     continue
                 mrealoffset = 0 if union(mowner) else mmember.soff
                 table[mowner.id] = mowner
