@@ -1681,6 +1681,24 @@ class code(object):
         start, stop = ea, interface.range.stop(area)
         return interface.bounds_t(start, stop)
 
+    @classmethod
+    def blocks(cls, func):
+        '''Yield the index (serial) and block for each basic block from the microcode for function `func`.'''
+        mba = cls(func)
+
+        # We could just iterate through all of the blocks, but instead we build
+        # a graph so that we can use it for getting each microcode block.
+        ok = mba.build_graph()
+        if ok != ida_hexrays.MERR_OK:
+            raise exceptions.DisassemblerError(u"{:s}.blocks({:#x)) : Unable to build a control flow graph for the microcode at address {:#x} due to an error ({:d}).".format('.'.join([__name__, cls.__name__]), mba.entry_ea, mba.entry_ea, ok))
+
+        # Now we use it and yield each serial and its block to the caller.
+        G = mba.get_graph()
+        for index in range(G.size()):
+            blk = mba.get_mblock(index)
+            yield blk.serial, blk
+        return
+
 class snippet(object):
     """
     This namespace is for interacting with any microcode that is produced by the
