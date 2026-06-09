@@ -11796,16 +11796,29 @@ class xref(object):
 
     @classmethod
     def structure(cls, sptr):
-        '''Yield each structure or frame member referencing the structure identified by `sptr` as a tuple composed of the offset and reference type or member.'''
+        '''Yield each structure or frame member referencing the structure identified by `sptr` as a tuple composed of the offset and reference type, structure, or member.'''
         results, this = [], idaapi.get_struc(sptr if isinstance(sptr, internal.types.integer) else sptr.id)
 
-        # Iterate through each reference for the structure to determine what it was
-        # actually applied to. If the reference is an identifier, then we need to know
-        # the mptr, full name, and sptr to identify what is actually being referenced.
+        # Iterate through each reference for the structure to determine what it
+        # was actually applied to. If the reference is an identifier, then we
+        # need to know whether it's a structure or member identifier. For the
+        # former, we return the sptr with an empty member for the offset `None`
+        # to represent the alias. Otherwise, we need the mptr, full name, and
+        # sptr in order to identify what member is actually being referenced.
         for xrfrom, xriscode, xrtype in cls.to(this.id, idaapi.XREF_ALL):
             if node.identifier(xrfrom):
                 mpack = idaapi.get_member_by_id(xrfrom)
-                if mpack is None:
+
+                # If we couldn't get the member identifier, but our reference is
+                # pointing directly to a structure, then we have a structure
+                # alias which means we yield the pair with the member missing.
+                if mpack is None and idaapi.get_struc(xrfrom):
+                    logging.info(u"{:s}.structure({:#x}) : Skipping reference to the specified structure ({:#x}) from the aliased structure identified by {:#x}.".format('.'.join([__name__, cls.__name__]), this.id, this.id, xrfrom))
+                    packed = idaapi.get_struc(xrfrom), None
+                    yield mpack, packed
+                    continue
+
+                elif mpack is None:
                     raise internal.exceptions.MemberNotFoundError(u"{:s}.structure({:#x}) : Unable to locate the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), this.id, xrfrom))
 
                 mptr, name, sptr = mpack
