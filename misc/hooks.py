@@ -2558,10 +2558,13 @@ class structures(changingchanged):
     # types into the comment chosen by the user (combined).
     single, combined = False, False
 
+    # This contains the implicit tags that won't be found inside a comment.
+    ignored = {'__name__', '__typeinfo__'}
+
     @classmethod
     def update_refs(cls, sid, old, new):
         '''Update the reference counts for the structure in `sid` by comparing the `old` tags with the ones in `new`.'''
-        oldkeys, newkeys, tags = ({item for item in content} for content in [old, new, internal.tags.reference.structure.get(sid)])
+        oldkeys, newkeys, tags = ({item for item in content if item not in cls.ignored} for content in [old, new, internal.tags.reference.structure.get(sid)])
 
         # compare the original keys against the modified ones in order to figure
         # out whether we're removing a key or simply adding it.
@@ -2579,7 +2582,7 @@ class structures(changingchanged):
     @classmethod
     def create_refs(cls, sid, new):
         '''Create the references for the structure in `sid` using the tags in `new`.'''
-        available = internal.tags.reference.structure.get(sid)
+        available = {item for item in internal.tags.reference.structure.get(sid) if item not in cls.ignored}
         contentkeys = {item for item in new}
 
         if available - contentkeys:
@@ -2587,14 +2590,14 @@ class structures(changingchanged):
 
         logging.debug(u"{:s}.create_refs({:#x}) : Creating tags ({!s}) for structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(contentkeys), sid))
         for key in contentkeys - available:
-            logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for tag {!s} in structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(key), sid))
+            logging.debug(u"{:s}.create_refs({:#x}) : Inreasing reference count for tag {!s} in structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(key), sid))
             internal.tags.reference.structure.increment(sid, key)
         return
 
     @classmethod
     def delete_refs(cls, sid, old):
         '''Delete the references from the structure in `sid` using the tags in `old`.'''
-        available = internal.tags.reference.structure.get(sid)
+        available = {item for item in internal.tags.reference.structure.get(sid) if item not in cls.ignored}
         contentkeys = {item for item in old}
         logging.debug(u"{:s}.delete_refs({:#x}) : Deleting tags ({!s}) from structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(sorted(contentkeys)), sid))
         for key in (contentkeys & available):
@@ -3043,10 +3046,13 @@ class membertagscommon(changingchanged):
     # comments should be combined into whatever was modified (combined).
     single, combined = False, False
 
+    # These are the implicit tags that won't be found inside a comment.
+    ignored = {'__name__', '__typeinfo__'}
+
     @classmethod
     def update_refs(cls, mid, old, new):
         '''Update the reference counts for the member in `mid` by comparing the `old` tags with the ones in `new`.'''
-        oldkeys, newkeys, tags = ({item for item in content} for content in [old, new, internal.tags.reference.members.get(mid)])
+        oldkeys, newkeys, tags = ({item for item in content if item not in cls.ignored} for content in [old, new, internal.tags.reference.members.get(mid)])
 
         # compare the original keys against the modified ones in order to figure
         # out whether we're removing a key or simply adding it.
@@ -3064,7 +3070,7 @@ class membertagscommon(changingchanged):
     @classmethod
     def create_refs(cls, mid, new):
         '''Create the references for the member in `mid` using the tags in `new`.'''
-        available = internal.tags.reference.members.get(mid)
+        available = {item for item in internal.tags.reference.members.get(mid) if item not in cls.ignored}
         contentkeys = {item for item in new}
 
         if available - contentkeys:
@@ -3079,7 +3085,7 @@ class membertagscommon(changingchanged):
     @classmethod
     def delete_refs(cls, mid, old):
         '''Delete the references from the member in `mid` using the tags in `old`.'''
-        available = internal.tags.reference.members.get(mid)
+        available = {item for item in internal.tags.reference.members.get(mid) if item not in cls.ignored}
         contentkeys = {item for item in old}
         logging.debug(u"{:s}.delete_refs({:#x}) : Deleting tags ({!s}) from member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(sorted(contentkeys)), mid))
         for key in (contentkeys & available):
