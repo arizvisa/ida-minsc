@@ -4910,6 +4910,10 @@ class localtypesmonitor_84(object):
     table = {attribute : getattr(idaapi, attribute) for attribute in dir(idaapi) if attribute.startswith('LTC_')}
     table.update({value : attribute for attribute, value in table.items()})
 
+    # These implicit tags won't be found inside a comment for either a member or
+    # a type (structure). We skip over these when deleting or creating refs.
+    ignored = {'__name__', '__typeinfo__'}
+
     @classmethod
     def load_local_types_monitor(cls, *args):
         """Load the currently available types from the local types library into the monitor state.
@@ -5299,7 +5303,7 @@ class localtypesmonitor_84(object):
     @classmethod
     def update_member_comments(cls, sid, mid, old, new):
         '''Update the member `mid` for the type in `sid` using the tags from the comment in `old` that is modified to `new`.'''
-        oldkeys, newkeys, tags = ({item for item in tags} for tags in [old, new, internal.tags.reference.members.get(mid)])
+        oldkeys, newkeys, tags = ({item for item in tags if item not in cls.ignored} for tags in [old, new, internal.tags.reference.members.get(mid)])
 
         # check the original keys against the modified ones and iterate through
         # them figuring out whether we're removing the key or just adding it.
@@ -5317,7 +5321,7 @@ class localtypesmonitor_84(object):
     @classmethod
     def update_type_comments(cls, sid, old, new):
         '''Update the type in `sid` using the tags in `old` that have been changed to `new`.'''
-        oldkeys, newkeys, tags = ({item for item in tags} for tags in [old, new, internal.tags.reference.structure.get(sid)])
+        oldkeys, newkeys, tags = ({item for item in tags if item not in cls.ignored} for tags in [old, new, internal.tags.reference.structure.get(sid)])
 
         # check the original keys against the modified ones and iterate through
         # them figuring out whether we're removing the key or just adding it.
