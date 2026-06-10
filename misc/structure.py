@@ -7035,17 +7035,16 @@ class structure_t(object):
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment for the structure to `value`.'''
         sid, owner = self.id, self.ptr
-        ok = comment.set(owner, value, repeatable) if value else comment.remove(owner, repeatable)
-        if not ok:
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure {:s}.".format('.'.join([__name__, cls.__name__]), sid, repeatable, utils.string.repr(self.name)))
 
-        # verify that the comment was actually assigned
+        # update the comment or remove it depending on the value.
+        res = comment.set(owner, value, repeatable) if value else comment.remove(owner, repeatable)
+
+        # verify the comment was actually assigned, and return the old value.
         assigned = comment.get(owner, repeatable)
         if utils.string.of(assigned) != utils.string.of(value or ''):
             cls = self.__class__
             logging.info(u"{:s}({:#x}).comment(..., repeatable={!s}) : The comment ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), sid, repeatable, utils.string.repr(utils.string.of(assigned)), utils.string.repr(value or '')))
-        return assigned
+        return res
 
     @property
     def alignment(self):
