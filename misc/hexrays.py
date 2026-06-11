@@ -1173,6 +1173,27 @@ class variable(object):
         return recurse(atype, alocinfo)
 
     @classmethod
+    def has_location(cls, locator):
+        '''Return whether the variable `locator` has a valid address and contains valid location.'''
+        ea, location = locator.defea, locator.location
+
+        # There are situations where a variable can have an address of -4, which
+        # seems to only occur when examining a variable result that has one of
+        # the weird storage types when using a __usercall calling convention.
+        # So, before doing anything we check if it is using this bunk address.
+        invalid = {-4, idaapi.BADADDR}
+
+        # XXX: From my rudimentary testing, this mostly occurs when accessing a
+        #      result variable. However, when testing the different location
+        #      types, things such as ALOC_STATIC and ALOC_RREL result in the
+        #      prototype not being serializable. Using ALOC_REG2 and ALOC_DIST
+        #      result in the result variable not even being created. So, that
+        #      leaves ALOC_STACK and ALOC_REG1 which can have -4 as its address.
+
+        signed = idaapi.as_signed(ea, interface.database.bits())
+        return all(address not in invalid for address in [ea, signed])
+
+    @classmethod
     def repr_locator(cls, locator):
         '''Return a description for the given ``ida_hexrays.lvar_locator_t`` in `locator` defined at the address `ea`.'''
         ea, location = locator.defea, locator.location
