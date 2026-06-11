@@ -739,9 +739,20 @@ class variables(object):
     def get(cls, *args):
         '''Return an ``ida_hexrays.lvar_t`` for the variable identified by the given `args`.'''
         fn = function(*args[:1]) if len(args) > 1 else None
+
+        # Get the variable locator so that we can use it to find the function if
+        # we weren't given one. We complain if its address is not in a function.
         locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
+        if fn is None and not(interface.function.has(locator.defea)):
+            description = variable.repr_locator(locator)
+            raise exceptions.FunctionNotFoundError(u"{:s}.get({!s}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), description, locator.defea))
+
+        # Now we can use the locator to grab the function, or use the parameter
+        # if we were actually given one. With that, we can grab its variables.
         cfunc = function(locator.defea) if fn is None else fn
         ea, lvars = cfunc.entry_ea, cls(cfunc)
+
+        # Search through the list of variables for the specified locator.
         lvar = lvars.find(locator)
         if lvar is None:
             description = variable.repr_locator(locator)
@@ -845,6 +856,9 @@ class variables(object):
         elif not isinstance(locator, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
             raise exceptions.InvalidTypeOrValueError(u"{:s}.by({!r}) : Unable to locate a variable with a locator type ({!s}) that is unsupported.".format('.'.join([__name__, cls.__name__]), locator, locator.__class__))
 
+        elif not(interface.function.has(locator.defea)):
+            raise exceptions.FunctionNotFoundError(u"{:s}.by({!s}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), varable.repr_locator(locator), locator.defea))
+
         cfunc = function(locator.defea)
         lvars = cls(locator.defea)
         lvar = lvars.find(locator)
@@ -857,8 +871,8 @@ class variables(object):
     def has(cls, func, locator):
         '''Return whether the variable identified by `locator` can be found in the function `func`.'''
         if isinstance(locator, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
-            fn = interface.function.by(locator.defea)
-            chunks = map(interface.range.unpack, interface.function.chunks(fn))
+            ea = function.address(func)
+            chunks = map(interface.range.unpack, interface.function.chunks(ea))
             return any(left <= locator.defea < right for left, right in chunks)
 
         # XXX: it might be a better idea to check `func` directly for the mba.
@@ -909,9 +923,6 @@ class variables(object):
         '''Return the storage location for the variable identified by the given `locator` in the function `func`.'''
         cfunc = function(func)
         locator = cls.by(cfunc, locator)
-        if not any(start <= locator.defea < stop for start, stop in map(interface.range.bounds, interface.function.chunks(cfunc.entry_ea))):
-            ea, description = cfunc.entry_ea, variable.repr_locator(locator)
-            raise exceptions.ItemNotFoundError(u"{:s}.storage({:#x}, {:s}) : Unable to find the variable for the specified locator due to the function at {:#x} not containing the address of the locator ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, description, ea, locator.defea))
 
         # next we need to grab the lvars for the function and use the locator to
         # find our variable in order to grab the width to return its storage.
@@ -988,6 +999,9 @@ class variables(object):
         # the function and return the variable rendered to a string.
         if func is None and isinstance(arg, ida_hexrays_types.hexrays_var_types):
             locator = cls.by(arg)
+            if not(interface.function.has(locator.defea)):
+                description = variable.repr_locator(locator)
+                raise exceptions.FunctionNotFoundError(u"{:s}.repr({!s}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), description, locator.defea))
             ea = function.address(locator.defea)
             cfunc = function(ea)
             return cls.repr(cfunc, arg)
@@ -1024,8 +1038,7 @@ class variables(object):
         lvar = cls.get(cfunc, locator)
         type = variable.get_type(lvar)
         width = interface.tinfo.size(type)
-        defea, location = locator.defea, locator.location
-        return cls(cfunc).find_lvar(location, width)
+        return cls(cfunc).find_lvar(locator.location, width)
 
 class variable(object):
     """
@@ -1201,7 +1214,13 @@ class variable(object):
     @classmethod
     def get_storage(cls, locator, size):
         '''Return the storage location of the variable described by the given `locator` and `size`.'''
-        fn = interface.function.by(locator.defea)
+        ea = locator.defea
+
+        # First we need to make sure the address actually points to a function.
+        if not(interface.function.has(ea)):
+            raise exceptions.FunctionNotFoundError(u"{:s}.get_storage({!s}, {:d}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), cls.repr_locator(locator), size, ea))
+        else:
+            fn = interface.function.by(locator.defea)
 
         # If this function has already been decompiled, then we can grab the
         # cached bytecode and copy out the decompiler stacksize for the frame.
@@ -1261,6 +1280,11 @@ class variable(object):
         lvar = variables.get(*itertools.chain(args if fn is None else [fn], args[1:]))
         lvarname = utils.string.of(lvar.name)
 
+        # check that the locator actually belongs to a function.
+        if fn is None and not(interface.function.has(lvar.defea)):
+            description = cls.repr_locator(lvar)
+            raise exceptions.FunctionNotFoundError(u"{:s}.remove_name({!s}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), description, lvar.defea))
+
         # grab all information about the function containing the variable.
         cfunc = function(lvar.defea) if fn is None else fn
         ea, locator = cfunc.entry_ea, cls.get_locator(lvar)
@@ -1306,11 +1330,14 @@ class variable(object):
     @classmethod
     def set_name(cls, func, variable, string):
         '''Modify the name of the given `variable` in the function `func` to the specified `string`.'''
-        fn = func if func is None else function(func)
+        fn = None if func is None else function(func)
         packed = interface.tuplename(*itertools.chain([string] if isinstance(string, types.string) else string))
 
-        # grab the variable locator and entrypoint for the function owning it.
+        # grab the variable locator and use it to determine the function if we
+        # weren't given one. after verifying, we can then get the decompilation.
         locator = variables.by(*filter(None, [fn, variable]))
+        if fn is None and not(interface.function.has(locator.defea)):
+            raise exceptions.FunctionNotFoundError(u"{:s}.set_name({!s}, {!s}, {!r}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), func, cls.repr_locator(locator), packed, locator.defea))
         cfunc = function(locator.defea) if fn is None else fn
 
         # use everything to build the lvar_saved_info_t that we pass to the api.
@@ -1336,6 +1363,8 @@ class variable(object):
         '''Remove the comment from the variable identified by the given `args`.'''
         fn = function(*args[:1]) if len(args) > 1 else None
         locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
+        if fn is None and not(interface.function.has(locator.defea)):
+            raise exceptions.FunctionNotFoundError(u"{:s}.remove_comment({!s}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), cls.repr_locator(locator), locator.defea))
         cfunc = function(locator.defea) if fn is None else fn
         return cls.set_comment(cfunc, locator, '')
 
@@ -1346,6 +1375,8 @@ class variable(object):
 
         # grab the variable locator and the function information if available.
         locator = variables.by(*filter(None, [fn, variable]))
+        if fn is None and not(interface.function.has(locator.defea)):
+            raise exceptions.FunctionNotFoundError(u"{:s}.set_comment({!s}, {!s}, {!r}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), fn, cls.repr_locator(locator), string, locator.defea))
         cfunc = function(locator.defea) if fn is None else fn
 
         # use everything to build the lvar_saved_info_t that we pass to the api.
@@ -1381,6 +1412,8 @@ class variable(object):
         '''Remove the type from the variable identified by the given `args`.'''
         fn = function(*args[:1]) if len(args) > 1 else None
         locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
+        if fn is None and not(interface.function.has(locator.defea)):
+            raise exceptions.FunctionNotFoundError(u"{:s}.remove_type({!s}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), cls.repr_locator(locator), locator.defea))
         cfunc = function(locator.defea) if fn is None else fn
 
         # you really can't remove a type from a variable using the decompiler,
@@ -1398,6 +1431,9 @@ class variable(object):
 
         # grab the variable locator and entrypoint for the function owning it.
         locator = variables.by(*filter(None, [fn, variable]))
+        if fn is None and not(interface.function.has(locator.defea)):
+            description = "{!s}".format(ti)
+            raise exceptions.FunctionNotFoundError(u"{:s}.set_type({!s}, {!s}, {!r}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), fn, cls.repr_locator(locator), description, locator.defea))
         cfunc = function(locator.defea) if fn is None else fn
 
         # use everything to build the lvar_saved_info_t that we pass to the api.
@@ -1426,6 +1462,8 @@ class variable(object):
 
         # grab the variable locator and the function information if available.
         locator = variables.by(*filter(None, [fn, variable]))
+        if fn is None and not(interface.function.has(locator.defea)):
+            raise exceptions.FunctionNotFoundError(u"{:s}.set_size({!s}, {!s}, {:d}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), fn, cls.repr_locator(locator), size, locator.defea))
         cfunc = function(locator.defea) if fn is None else fn
 
         # only thing to do is to hand everything off to the set_width method.
