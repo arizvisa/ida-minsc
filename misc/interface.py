@@ -7798,6 +7798,11 @@ class tinfo(object):
     def names(cls, type, *names):
         '''Return the names for the fields within the given `type` or return a new `type` if any `names` are given.'''
         library, serialized, description = type.get_til(), type.serialize(), "{!s}".format(type)
+
+        # if we succeeded at serializing the type, then go ahead and unpack each
+        # field from it so that we can extract any names we find.
+        if not serialized:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.names({!r}{:s}) : Unable to serialize the specified type and unpack its individual fields.".format('.'.join([__name__, cls.__name__]), description, ", {:s}".format(', '.join(map("{!r}".format, names))) if names else ''))
         type, fields, cmt, fieldcmts, sclass = itertools.chain(serialized, [b'\x01', b'', b'', b'', getattr(idaapi, 'sc_unk', 0)][len(serialized) - 5:] if len(serialized) < 5 else [])
 
         # if we didn't get any names, then proceed to decode each field, verify that the
@@ -7816,12 +7821,17 @@ class tinfo(object):
         elif isinstance(items, (internal.types.string, bytes, bytearray)):
             encoded = bytes(items) if isinstance(items, (bytes, bytearray)) else items.encode('utf-8')
             return cls.get(library, type, encoded, cmt or fieldcmts)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.names({!s}, {!r}) : Unable to set the names for the given type information using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape(description, '"'), items, items.__class__.__name__))
+        raise internal.exceptions.InvalidParameterError(u"{:s}.names({!s}, {!r}) : Unable to set the names for the given type information using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape(description, '"'), items, items.__class__.__name__))
 
     @classmethod
     def comments(cls, type, *comments):
         '''Return the comments for the fields within the given `type` or return a new `type` if any `comments` are given.'''
         library, serialized, description = type.get_til(), type.serialize(), "{!s}".format(type)
+
+        # if we succeeded at serializing the type, then go ahead and unpack each
+        # field from it so that we can extract any names we find.
+        if not serialized:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.comments({!r}{:s}) : Unable to serialize the specified type and unpack its individual fields.".format('.'.join([__name__, cls.__name__]), description, ", {:s}".format(', '.join(map("{!r}".format, comments))) if comments else ''))
         type, fields, cmt, fieldcmts, sclass = itertools.chain(serialized, [b'\x01', b'', b'', b'', getattr(idaapi, 'sc_unk', 0)][len(serialized) - 5:] if len(serialized) < 5 else [])
 
         # if we didn't get any comments, then proceed to decode each field, verify that the
@@ -8243,12 +8253,16 @@ class tinfo(object):
         '''Set the type at the specified `ordinal` for a type `library` using the given `name` and serialized `type` information.'''
         description = "{!s}".format(type) if isinstance(type, idaapi.tinfo_t) else "{!r}".format(type)
         serialized, til = type.serialize() if isinstance(type, idaapi.tinfo_t) else type, cls.library(type) if library is None and isinstance(type, idaapi.tinfo_t) else library
+
+        # verify that we serialized the type, and then unpack all of its fields.
+        if not serialized:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to serialize the specified type and unpack its individual fields.".format('.'.join([__name__, cls.__name__]), cls.format_library(library) if library else library, ordinal, name, description, u", {!s}".format(*flags) if flags else ''))
         type, fields, cmt, fieldcmts, sclass = itertools.chain(serialized, [b'\x01', b'', b'', b'', getattr(idaapi, 'sc_unk', 0)][len(serialized) - 5:] if len(serialized) < 5 else [])
 
         # now we can allocate a slot for the ordinal within the type library if necessary.
         index = ordinal if ordinal and ordinal > 0 else idaapi.alloc_type_ordinals(til, 1)
         if index < 1:
-            raise internal.exceptions.DisassemblerError(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to allocate an ordinal within the specified type library.".format('.'.join([__name__, cls.__name__]), library, ordinal, name, description, u", {!s}".format(*flags) if flags else ''))
+            raise internal.exceptions.DisassemblerError(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to allocate an ordinal within the specified type library.".format('.'.join([__name__, cls.__name__]), cls.format_library(library) if library else library, ordinal, name, description, u", {!s}".format(*flags) if flags else ''))
 
         # set the default flags that we're going to use when using set_numbered_type.
         [flag] = flags if flags else [idaapi.NTF_CHKSYNC | idaapi.NTF_TYPE]
@@ -8271,21 +8285,21 @@ class tinfo(object):
         # if we got an error, then we need to delete the ordinal we just added
         # and then we can just raise an exception for the user to deal with.
         if ordinal <= idaapi.TERR_OK and not idaapi.del_numbered_type(library, ordinal):
-            logging.fatal(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to delete the recently added ordinal ({:d}) from the specified type library.".format('.'.join([__name__, cls.__name__]), library, ordinal, name, description, u", {!s}".format(*flags) if flags else '', index))
+            logging.fatal(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to delete the recently added ordinal ({:d}) from the specified type library.".format('.'.join([__name__, cls.__name__]), cls.format_library(library) if library else library, ordinal, name, description, u", {!s}".format(*flags) if flags else '', index))
 
         # now we can check the error code and log the error before returning it.
         error_name, error_description = cls.format_type_error(result)
         if result == getattr(idaapi, 'TERR_WRONGNAME', getattr(idaapi, 'TERR_TOOLONGNAME', -3)):
-            logging.info(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) with the given name ({!r}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), library, ordinal, name, description, u", {!s}".format(*flags) if flags else '', index, identifier, "{:s}({:d})".format(error_name, result) if result else "code ({:d})".format(result)))
+            logging.info(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) with the given name ({!r}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), cls.format_library(library) if library else library, ordinal, name, description, u", {!s}".format(*flags) if flags else '', index, identifier, "{:s}({:d})".format(error_name, result) if result else "code ({:d})".format(result)))
         else:
-            logging.info(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), library, ordinal, name, description, u", {!s}".format(*flags) if flags else '', ordinal, "{:s}({:d})".format(error_name, result) if result else "code ({:d})".format(result)))
+            logging.info(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), cls.format_library(library) if library else library, ordinal, name, description, u", {!s}".format(*flags) if flags else '', ordinal, "{:s}({:d})".format(error_name, result) if result else "code ({:d})".format(result)))
 
         # our result should be less than 0, so we bail here as a sanity-check.
         if result < 0:
             return result
 
         error_name, error_description = cls.format_type_error(result)
-        raise internal.exceptions.AssertionError(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Received an unexpected error {:s} that should have been less than {:d}.".format('.'.join([__name__, cls.__name__]), library, ordinal, name, description, u", {!s}".format(*flags) if flags else '', "{:s}({:d})".format(error_name, result) if error_name else "code ({:d})".format(result), 0))
+        raise internal.exceptions.AssertionError(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Received an unexpected error {:s} that should have been less than {:d}.".format('.'.join([__name__, cls.__name__]), cls.format_library(library) if library else library, ordinal, name, description, u", {!s}".format(*flags) if flags else '', "{:s}({:d})".format(error_name, result) if error_name else "code ({:d})".format(result), 0))
 
     @classmethod
     def get_named_type(cls, library, name, flags):
@@ -8506,7 +8520,7 @@ class tinfo(object):
     def lower_function_type(cls, type):
         '''If the given `type` has the high-level attribute (``idaapi.BFA_HIGH``), correct the types it depends on and return its lowered type.'''
         if type.is_correct() and not any([type.is_func(), type.is_funcptr()]):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.lower_function_type(\"{:s}\") : The specified type information ({!r}) is not a function and cannot be lowered.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{!s}".format(type)))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.lower_function_type({!s}) : The specified type information ({!r}) is not a function and cannot be lowered.".format('.'.join([__name__, cls.__name__]), cls.quoted(type), "{!s}".format(type)))
 
         # Create a table used to determine the string template that
         # we'll use for creating a "correct" placeholder type.
@@ -8532,7 +8546,7 @@ class tinfo(object):
             # Our type should have a name of some sort for the specific condition we're testing for.
             tname = internal.utils.string.of(item.get_type_name())
             if not tname:
-                logging.warning(u"{:s}.lower_function_type(\"{:s}\") : The specified type information ({!r}) has no name and cannot be added to the type library.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{!s}".format(item)))
+                logging.warning(u"{:s}.lower_function_type({!s}) : The specified type information ({!r}) has no name and cannot be added to the type library.".format('.'.join([__name__, cls.__name__]), cls.quoted(type), "{!s}".format(item)))
                 continue
 
             # After snagging it, we'll re-parse it use it to create a dummy type.
@@ -8543,14 +8557,17 @@ class tinfo(object):
             definition = builtins.next(available, "{!s} {{}}".format(item))
             ti = cls.parse(library, definition, idaapi.PT_SIL)
             if not ti:
-                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.lower_function_type(\"{:s}\") : The specified type information ({!r}) is an unsupported type and cannot be added to the type library as \"{:s}\".".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{!s}".format(item), definition))
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.lower_function_type({!s}) : The specified type information ({!r}) is an unsupported type and cannot be added to the type library as \"{:s}\".".format('.'.join([__name__, cls.__name__]), cls.quoted(type), "{!s}".format(item), definition))
 
             # Next we'll try and add it to the type library so that the function type is well-formed.
             ordinal = cls.set_numbered_type(library, idaapi.get_type_ordinal(library, internal.utils.string.to(tname)), tname, ti)
             results.append((ordinal, item, tname, definition))
 
         # Finally we will make a copy of the original type, and then we can actually lower it.
-        copy = cls.get(library, *type.serialize())
+        serialized = type.serialize()
+        if not serialized:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.lower_function_type({!s}) : Unable to serialize the specified type and unpack its individual fields.".format('.'.join([__name__, cls.__name__]), cls.quoted(type)))
+        copy = cls.get(library, *serialized)
         lowered = type if idaapi.lower_type(library, copy) < 0 else copy
 
         # Now we go through our results and check if we succeeded. If we didn't, then we need to complain about it.
@@ -8561,7 +8578,7 @@ class tinfo(object):
         for code, item, tname, string in results:
             if code > 0:
                 continue
-            logging.warning(u"{:s}.lower_function_type(\"{:s}\") : Encountered error {:s} while trying to attach the specified type information ({!r}) to the determined name \"{:s}\".".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{:s}({:d})".format(errors[code], code) if code in errors else "code ({:d})".format(code), "{!s}".format(string), internal.utils.string.escape(tname, '"')))
+            logging.warning(u"{:s}.lower_function_type({!s}) : Encountered error {:s} while trying to attach the specified type information ({!r}) to the determined name \"{:s}\".".format('.'.join([__name__, cls.__name__]), cls.quoted(type), "{:s}({:d})".format(errors[code], code) if code in errors else "code ({:d})".format(code), "{!s}".format(string), internal.utils.string.escape(tname, '"')))
         return lowered
 
     @classmethod
@@ -8605,6 +8622,8 @@ class tinfo(object):
     def anonymous_name(cls, type):
         '''Return the anonymous name for the specified `type`.'''
         serialized = type.serialize()
+        if not serialized:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.anonymous_name({!s}) : Unable to serialize the specified type and unpack its individual fields.".format('.'.join([__name__, cls.__name__]), cls.quoted(type)))
         defaults = [b'', b'', b'', b'', getattr(idaapi, 'sc_unk', 0), 0]
         type, fields, cmt, fields_cmt, sclass, ordinal = [item for item in itertools.chain(serialized, defaults[len(serialized) - len(defaults):])][:len(defaults)]
         return hashlib.md5(bytes().join([type, fields or b''])).hexdigest().upper()
