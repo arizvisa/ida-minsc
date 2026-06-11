@@ -742,10 +742,10 @@ class variables(object):
 
         # Get the variable locator so that we can use it to find the function if
         # we weren't given one. We complain if its address is not in a function.
-        locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
-        if fn is None and not(interface.function.has(locator.defea)):
+        locator = cls.by(*itertools.chain(args if fn is None else [fn], args[1:]))
+        if fn is None and not variable.has_location(locator):
             description = variable.repr_locator(locator)
-            raise exceptions.FunctionNotFoundError(u"{:s}.get({!s}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), description, locator.defea))
+            raise exceptions.DecompilerError(u"{:s}.get({!s}) : Unable to access the location for the specified variable due it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), description, idaapi.as_signed(locator.defea, interface.database.bits())))
 
         # Now we can use the locator to grab the function, or use the parameter
         # if we were actually given one. With that, we can grab its variables.
@@ -856,8 +856,8 @@ class variables(object):
         elif not isinstance(locator, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
             raise exceptions.InvalidTypeOrValueError(u"{:s}.by({!r}) : Unable to locate a variable with a locator type ({!s}) that is unsupported.".format('.'.join([__name__, cls.__name__]), locator, locator.__class__))
 
-        elif not(interface.function.has(locator.defea)):
-            raise exceptions.FunctionNotFoundError(u"{:s}.by({!s}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), varable.repr_locator(locator), locator.defea))
+        elif not variable.has_location(locator):
+            raise exceptions.DecompilerError(u"{:s}.by({!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), varable.repr_locator(locator), idaapi.as_signed(locator.defea, interface.database.bits())))
 
         cfunc = function(locator.defea)
         lvars = cls(locator.defea)
@@ -999,9 +999,9 @@ class variables(object):
         # the function and return the variable rendered to a string.
         if func is None and isinstance(arg, ida_hexrays_types.hexrays_var_types):
             locator = cls.by(arg)
-            if not(interface.function.has(locator.defea)):
+            if not variable.has_location(locator):
                 description = variable.repr_locator(locator)
-                raise exceptions.FunctionNotFoundError(u"{:s}.repr({!s}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), description, locator.defea))
+                raise exceptions.DecompilerError(u"{:s}.repr({!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), description, idaapi.as_signed(locator.defea, interface.database.bits())))
             ea = function.address(locator.defea)
             cfunc = function(ea)
             return cls.repr(cfunc, arg)
@@ -1238,10 +1238,10 @@ class variable(object):
         ea = locator.defea
 
         # First we need to make sure the address actually points to a function.
-        if not(interface.function.has(ea)):
-            raise exceptions.FunctionNotFoundError(u"{:s}.get_storage({!s}, {:d}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), cls.repr_locator(locator), size, ea))
+        if not cls.has_location(locator):
+            raise exceptions.DecompilerError(u"{:s}.get_storage({!s}, {:d}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), cls.repr_locator(locator), size, idaapi.as_signed(ea, interface.database.bits())))
         else:
-            fn = interface.function.by(locator.defea)
+            fn = interface.function.by(ea)
 
         # If this function has already been decompiled, then we can grab the
         # cached bytecode and copy out the decompiler stacksize for the frame.
@@ -1302,9 +1302,9 @@ class variable(object):
         lvarname = utils.string.of(lvar.name)
 
         # check that the locator actually belongs to a function.
-        if fn is None and not(interface.function.has(lvar.defea)):
+        if fn is None and not cls.has_location(lvar):
             description = cls.repr_locator(lvar)
-            raise exceptions.FunctionNotFoundError(u"{:s}.remove_name({!s}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), description, lvar.defea))
+            raise exceptions.DecompilerError(u"{:s}.remove_name({!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), description, idaapi.as_signed(lvar.defea, interface.database.bits())))
 
         # grab all information about the function containing the variable.
         cfunc = function(lvar.defea) if fn is None else fn
@@ -1357,8 +1357,8 @@ class variable(object):
         # grab the variable locator and use it to determine the function if we
         # weren't given one. after verifying, we can then get the decompilation.
         locator = variables.by(*filter(None, [fn, variable]))
-        if fn is None and not(interface.function.has(locator.defea)):
-            raise exceptions.FunctionNotFoundError(u"{:s}.set_name({!s}, {!s}, {!r}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), func, cls.repr_locator(locator), packed, locator.defea))
+        if fn is None and not cls.has_location(locator):
+            raise exceptions.DecompilerError(u"{:s}.set_name({!s}, {!s}, {!r}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x})".format('.'.join([__name__, cls.__name__]), func, cls.repr_locator(locator), packed, idaapi.as_signed(locator.defea, interface.database.bits())))
         cfunc = function(locator.defea) if fn is None else fn
 
         # use everything to build the lvar_saved_info_t that we pass to the api.
@@ -1384,8 +1384,8 @@ class variable(object):
         '''Remove the comment from the variable identified by the given `args`.'''
         fn = function(*args[:1]) if len(args) > 1 else None
         locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
-        if fn is None and not(interface.function.has(locator.defea)):
-            raise exceptions.FunctionNotFoundError(u"{:s}.remove_comment({!s}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), cls.repr_locator(locator), locator.defea))
+        if fn is None and not cls.has_location(locator):
+            raise exceptions.DecompilerError(u"{:s}.remove_comment({!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), cls.repr_locator(locator), idaapi.as_signed(locator.defea, interface.database.bits())))
         cfunc = function(locator.defea) if fn is None else fn
         return cls.set_comment(cfunc, locator, '')
 
@@ -1396,8 +1396,8 @@ class variable(object):
 
         # grab the variable locator and the function information if available.
         locator = variables.by(*filter(None, [fn, variable]))
-        if fn is None and not(interface.function.has(locator.defea)):
-            raise exceptions.FunctionNotFoundError(u"{:s}.set_comment({!s}, {!s}, {!r}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), fn, cls.repr_locator(locator), string, locator.defea))
+        if fn is None and not cls.has_location(locator):
+            raise exceptions.DecompilerError(u"{:s}.set_comment({!s}, {!s}, {!r}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), fn, cls.repr_locator(locator), string, idaapi.as_signed(locator.defea, interface.database.bits())))
         cfunc = function(locator.defea) if fn is None else fn
 
         # use everything to build the lvar_saved_info_t that we pass to the api.
@@ -1433,8 +1433,8 @@ class variable(object):
         '''Remove the type from the variable identified by the given `args`.'''
         fn = function(*args[:1]) if len(args) > 1 else None
         locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
-        if fn is None and not(interface.function.has(locator.defea)):
-            raise exceptions.FunctionNotFoundError(u"{:s}.remove_type({!s}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), cls.repr_locator(locator), locator.defea))
+        if fn is None and not cls.has_location(locator):
+            raise exceptions.DecompilerError(u"{:s}.remove_type({!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), cls.repr_locator(locator), idaapi.as_signed(locator.defea, interface.database.bits())))
         cfunc = function(locator.defea) if fn is None else fn
 
         # you really can't remove a type from a variable using the decompiler,
@@ -1452,9 +1452,9 @@ class variable(object):
 
         # grab the variable locator and entrypoint for the function owning it.
         locator = variables.by(*filter(None, [fn, variable]))
-        if fn is None and not(interface.function.has(locator.defea)):
+        if fn is None and not cls.has_location(locator):
             description = "{!s}".format(ti)
-            raise exceptions.FunctionNotFoundError(u"{:s}.set_type({!s}, {!s}, {!r}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), fn, cls.repr_locator(locator), description, locator.defea))
+            raise exceptions.DecompilerError(u"{:s}.set_type({!s}, {!s}, {!r}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), fn, cls.repr_locator(locator), description, idaapi.as_signed(locator.defea, interface.database.bits())))
         cfunc = function(locator.defea) if fn is None else fn
 
         # use everything to build the lvar_saved_info_t that we pass to the api.
@@ -1483,8 +1483,8 @@ class variable(object):
 
         # grab the variable locator and the function information if available.
         locator = variables.by(*filter(None, [fn, variable]))
-        if fn is None and not(interface.function.has(locator.defea)):
-            raise exceptions.FunctionNotFoundError(u"{:s}.set_size({!s}, {!s}, {:d}) : Unable to determine the function for the variable with the address ({:#x}) from the specified locator.".format('.'.join([__name__, cls.__name__]), fn, cls.repr_locator(locator), size, locator.defea))
+        if fn is None and not cls.has_location(locator):
+            raise exceptions.DecompilerError(u"{:s}.set_size({!s}, {!s}, {:d}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), fn, cls.repr_locator(locator), size, idaapi.as_signed(locator.defea, interface.database.bits())))
         cfunc = function(locator.defea) if fn is None else fn
 
         # only thing to do is to hand everything off to the set_width method.
