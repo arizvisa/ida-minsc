@@ -1507,9 +1507,11 @@ class convention(object):
         '__fastcall': idaapi.CM_CC_FASTCALL,
         '__pascal': idaapi.CM_CC_PASCAL,
 
+        # special conventions that we actually support
+        '__usercall': idaapi.CM_CC_SPECIAL,     # preserves stack
+        '__userpurge': idaapi.CM_CC_SPECIALP,   # purges stack
+
         # the following conventions are special, and aren't really well supported by us.
-        #'__usercall': idaapi.CM_CC_SPECIAL,     # preserves stack
-        #'__usercall': idaapi.CM_CC_SPECIALP,    # purges stack
         #'__usercall': idaapi.CM_CC_SPECIALE,    # includes ellipsis
     }
 
@@ -1522,9 +1524,15 @@ class convention(object):
         '__pascal': {idaapi.CM_CC_PASCAL},
         '__unknown': {idaapi.CM_CC_UNKNOWN, idaapi.CM_CC_INVALID},
 
-        # XXX: __usercall is special and we interpret it as either >= CM_CC_MANUAL or
-        #      > CM_CC_SWIFT on newer versions, but excluding CM_CC_GOLANG if it exists.
-        '__usercall': {cc & idaapi.CM_CC_MASK for cc in builtins.range(idaapi.CM_CC_SWIFT if hasattr(idaapi, 'CM_CC_SWIFT') else getattr(idaapi, 'CM_CC_MANUAL', 0x90), 0x100)},
+        # XXX: __usercall is special as it represents the prototype of both the
+        #      preserved stack and the the same kind with an ellipsis.
+        '__usercall': {idaapi.CM_CC_SPECIAL, idaapi.CM_CC_SPECIALE},
+        '__userpurge': {idaapi.CM_CC_SPECIALP},
+
+        # XXX: __userspecial is a catch-all which we interpret it as either
+        #      greater or equal than CM_CC_MANUAL or larger than CM_CC_SWIFT on
+        #      newer versions. we also exclude CM_CC_GOLANG if it exists.
+        '__userspecial': {cc & idaapi.CM_CC_MASK for cc in builtins.range(idaapi.CM_CC_SWIFT if hasattr(idaapi, 'CM_CC_SWIFT') else getattr(idaapi, 'CM_CC_MANUAL', 0x90), 0x100)},
     }
 
     # aliases that can resolve to one of our choices.
@@ -1535,7 +1543,8 @@ class convention(object):
         '__fastcall': ['fast', 'fastcall'],
         '__thiscall': ['this', 'thiscall'],
         idaapi.CM_CC_VOIDARG: ['void', 'voidarg'],
-        '__usercall': ['user'],
+        '__usercall': ['user', 'usercall'],
+        '__userpurge': ['purge', 'userpurge'],
         '__unknown': ['unknown'],
 
     # these are all integers that the user can alias if they want.
@@ -1544,19 +1553,19 @@ class convention(object):
     }
 
     # if CM_CC_GOLANG is defined, then add it and remove it from
-    # our __usercall set. we also need to add its alias too.
+    # our fake __userspecial set. we also need to add its alias too.
     if hasattr(idaapi, 'CM_CC_GOLANG'):
         available['__golang'] = idaapi.CM_CC_GOLANG
         choice['__golang'] = {idaapi.CM_CC_GOLANG}
-        choice['__usercall'] -= {idaapi.CM_CC_GOLANG}
+        choice['__userspecial'] -= {idaapi.CM_CC_GOLANG}
         aliases['__golang'] = ['go', 'golang']
 
     # if CM_CC_SWIFT is defined (8.3), then add it and remove it
-    # from __usercall sorta like how we handle CM_CC_GOLANG.
+    # from __userspecial sorta like how we handle CM_CC_GOLANG.
     if hasattr(idaapi, 'CM_CC_SWIFT'):
         available['__swiftcall'] = idaapi.CM_CC_SWIFT
         choice['__swiftcall'] = {idaapi.CM_CC_SWIFT}
-        choice['__usercall'] -= {idaapi.CM_CC_SWIFT}
+        choice['__userspecial'] -= {idaapi.CM_CC_SWIFT}
         aliases['__swiftcall'] = ['swift', 'swiftcall']
 
     # now we'll just do some functional tricks to update our
@@ -1619,6 +1628,11 @@ class convention(object):
     def user(cls, code):
         '''Return whether the given `code` is a user-specified calling convention.'''
         return code in cls.choice['__usercall']
+
+    @classmethod
+    def special(cls, code):
+        '''Return whether the given `code` is a special calling convention.'''
+        return code in cls.choice['__userspecial']
 
 class mangled(object):
     """
