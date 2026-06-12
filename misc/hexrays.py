@@ -1370,7 +1370,7 @@ class variable(object):
         ea, lvar = cfunc.entry_ea, variables.get(cfunc, locator)
         res = utils.string.of(lvar.name)
         if res != packed and not ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_NAME, lvarinfo):
-            raise exceptions.DisassemblerError(u"{:s}.set_name({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), packed, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_NAME, utils.string.of(lvarinfo.name), utils.string.escape(res, '"'), lvar.defea, lvar.defblk, lvar.width))
+            raise exceptions.DecompilerError(u"{:s}.set_name({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), packed, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_NAME, utils.string.of(lvarinfo.name), utils.string.escape(res, '"'), lvar.defea, lvar.defblk, lvar.width))
         return res
 
     @classmethod
@@ -1417,7 +1417,7 @@ class variable(object):
         ok = ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_CMT, lvarinfo)
         if not ok and not ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_CMT, lvarinfo):
             name = utils.string.of(lvar.name)
-            raise exceptions.DisassemblerError(u"{:s}.set_comment({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), string, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_CMT, utils.string.of(lvarinfo.cmt), utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
+            raise exceptions.DecompilerError(u"{:s}.set_comment({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), string, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_CMT, utils.string.of(lvarinfo.cmt), utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
         return res
 
     @classmethod
@@ -1467,7 +1467,7 @@ class variable(object):
         res = interface.tinfo.copy(lvar.tif)
         if not ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_TYPE, lvarinfo):
             name, description = utils.string.of(lvar.name), "{!s}".format(ti)
-            raise exceptions.DisassemblerError(u"{:s}.set_type({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), description, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_TYPE, description, utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
+            raise exceptions.DecompilerError(u"{:s}.set_type({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), description, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_TYPE, description, utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
         return res
 
     @classmethod
@@ -1493,7 +1493,7 @@ class variable(object):
         svw_flags = ida_hexrays.SVW_FLOAT if ti.is_float() else ida_hexrays.SVW_SOFT if not ti.is_well_defined() else ida_hexrays.SVW_INT
         if not lvar.set_width(size, svw_flags):
             name = utils.string.of(lvar.name)
-            raise exceptions.DisassemblerError(u"{:s}.set_size({:#x}, {:s}, {:d}) : Unable to call `{:s}({:d}, {:#x})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), size, utils.pycompat.fullname(lvar.set_width), size, svw_flags, utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
+            raise exceptions.DecompilerError(u"{:s}.set_size({:#x}, {:s}, {:d}) : Unable to call `{:s}({:d}, {:#x})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), size, utils.pycompat.fullname(lvar.set_width), size, svw_flags, utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
         return result
 
 class function(object):
@@ -1518,7 +1518,7 @@ class function(object):
             return func.cfunc if cached else cls(func.cfunc.entry_ea, cached=cached)
         elif isinstance(func, (types.integer, idaapi.func_t)):
             return cls.cached(func) if cls.has(func) and cached else cls.by(func)
-        elif isinstance(func, idaapi.lvar_locator_t):
+        elif isinstance(func, ida_hexrays_types.lvar_locator_t):
             return cls(func.defea, cached=cached)
         elif isinstance(func, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t, ida_hexrays_types.stkvar_ref_t)):
             return cls(func.mba.entry_ea, cached=cached)
@@ -1536,7 +1536,7 @@ class function(object):
         fn, argcount = int(ea), utils.pycompat.code.argcount(utils.pycompat.function.code(ida_hexrays.decompile))
         res = ida_hexrays.decompile(fn, failure) if argcount < 3 else ida_hexrays.decompile(fn, failure, defaults)
         if res is None:
-            raise exceptions.DisassemblerError(u"{:s}.by_address({:#x}, {:#x}): Unable to decompile function due to error {:#x} at address {:#x} ({:s}).".format('.'.join([__name__, 'function']), ea, defaults, failure.code, failure.errea, utils.string.of(failure.desc())))
+            raise exceptions.DecompilerError(u"{:s}.by_address({:#x}, {:#x}): Unable to decompile function due to error {:#x} at address {:#x} ({:s}).".format('.'.join([__name__, 'function']), ea, defaults, failure.code, failure.errea, utils.string.of(failure.desc())))
 
         # XXX: to ensure that the ctree is immediately available for the
         #      decompiled function, we use the get_pseudocode() method before
@@ -1557,7 +1557,7 @@ class function(object):
         res = ida_hexrays.decompile_func(func, failure, defaults)
         if res is None:
             ea = cls.address(func)
-            raise exceptions.DisassemblerError(u"{:s}.by_function({:#x}, {:#x}): Unable to decompile function due to error {:#x} at address {:#x} ({:s}).".format('.'.join([__name__, 'function']), ea, defaults, failure.code, failure.errea, utils.string.of(failure.desc())))
+            raise exceptions.DecompilerError(u"{:s}.by_function({:#x}, {:#x}): Unable to decompile function due to error {:#x} at address {:#x} ({:s}).".format('.'.join([__name__, 'function']), ea, defaults, failure.code, failure.errea, utils.string.of(failure.desc())))
 
         # XXX: to ensure that the ctree items are immediately available for the
         #      decompiled function, we use the get_pseudocode() method before
@@ -1760,7 +1760,7 @@ class code(object):
         # a graph so that we can use it for getting each microcode block.
         ok = mba.build_graph()
         if ok != ida_hexrays.MERR_OK:
-            raise exceptions.DisassemblerError(u"{:s}.blocks({:#x)) : Unable to build a control flow graph for the microcode at address {:#x} due to an error ({:d}).".format('.'.join([__name__, cls.__name__]), mba.entry_ea, mba.entry_ea, ok))
+            raise exceptions.DecompilerError(u"{:s}.blocks({:#x)) : Unable to build a control flow graph for the microcode at address {:#x} due to an error ({:d}).".format('.'.join([__name__, cls.__name__]), mba.entry_ea, mba.entry_ea, ok))
 
         # Now we use it and yield each serial and its block to the caller.
         G = mba.get_graph()
