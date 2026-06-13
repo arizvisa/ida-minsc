@@ -6436,7 +6436,7 @@ class decompilermonitor(object):
         fn = internal.hexrays.function.address(cfunc)
 
         # First unpack all the parameters so that we can decode the comments.
-        oldlocator, oldcomment = (None, '') if old is None else old.locator, old.comment
+        oldlocator, oldcomment = (None, '') if old is None else (old.locator, old.comment)
         newlocator, newcomment = new.locator, new.comment
         oldtags, newtags = (internal.comment.decode(comment or '') for comment in [oldcomment, newcomment])
 
