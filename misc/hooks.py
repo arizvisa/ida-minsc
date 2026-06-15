@@ -6251,16 +6251,20 @@ class decompilermonitor(object):
         # there are any already indexed tags. We have to do the exact same thing
         # checking whether it's indexed and decrementing it for the variables.
         for ea, itp, comment in oldcomments:
-            decoded = internal.comment.decode(comment or '')
+            tagged = internal.tags.reference.hexfunction.get((ea, itp), target=cfunc)
             if internal.tags.reference.hexfunction.has((ea, itp), target=cfunc):
-                [internal.tags.reference.hexfunction.decrement((ea, itp), name, target=cfunc) for name in decoded]
+                [internal.tags.reference.hexfunction.decrement((ea, itp), name, target=cfunc) for name in tagged]
             continue
 
+        # Now we need to go through the old variables and preserve the old type
+        # so that we can determine whether it gets incremented or not.
+        preserved = {}
         for locator, variable in oldvariables:
-            decoded = internal.comment.decode(variable.comment or '')
+            tagged = internal.tags.reference.hexvariable.get(locator, target=cfunc)
             if internal.tags.reference.hexvariable.has(locator, target=cfunc):
-                [internal.tags.reference.hexvariable.decrement(locator, name, target=cfunc) for name in decoded]
-            continue
+                [internal.tags.reference.hexvariable.decrement(locator, name, target=cfunc) for name in tagged]
+            id = locator.defea, locator.atype, locator.alocinfo
+            preserved[id] = variable, tagged
 
         # XXX: Is it safer to just erase the tagindex for the entire function?
 
@@ -6269,14 +6273,36 @@ class decompilermonitor(object):
         # in order to update the tag index with any new values that were added.
         for ea, itp, comment in newcomments:
             decoded = internal.comment.decode(comment or '')
-            if not internal.tags.reference.hexfunction.has((ea, itp), target=cfunc):
-                [internal.tags.reference.hexfunction.increment((ea, itp), name, target=cfunc) for name in decoded]
-            continue
+            [internal.tags.reference.hexfunction.increment((ea, itp), name, target=cfunc) for name in decoded]
 
+        # Next we go through all of the new variables and see if we can map it
+        # to one of the previous values if they're available. First grab the
+        # comments, decode them, and then increment their tag reference count.
         for locator, variable in newvariables:
             decoded = internal.comment.decode(variable.comment or '')
-            if not internal.tags.reference.hexvariable.has(locator, target=cfunc):
-                [internal.tags.reference.hexvariable.increment(locator, name, target=cfunc) for name in decoded]
+            [internal.tags.reference.hexvariable.increment(locator, name, target=cfunc) for name in decoded]
+
+            # Grab the previously preserved values for the variable.
+            id = locator.defea, locator.atype, locator.alocinfo
+            oldvariable, oldtagged = preserved[id] if id in preserved else (None, {})
+
+            # If the name is user-specified, or the variable had the "__name__"
+            # tag, then increment it so that the user-specified name is tagged.
+            name, comment, type = variable
+            if '__name__' in oldtagged or name.is_user_name:
+                internal.tags.reference.hexvariable.increment(locator, '__name__', target=cfunc)
+
+            # If the type was changed from the previous value or if the variable
+            # had already been tagged with "__typeinfo__, then we go and restore
+            # the reference count for it.
+
+            # FIXME: This is a little weird for the "func_printed" event, since
+            #        the event explicitly resets all of the variable types so
+            #        that we actually lose our ability to track what the user
+            #        did. This should be fixed by redefining the meaning of the
+            #        "__typeinfo__" tag so that the tag means something else.
+            if '__typeinfo__' in oldtagged or (oldvariable is not None and not interface.tinfo.same(type, oldvariable.type)):
+                internal.tags.reference.hexvariable.increment(locator, '__typeinfo__', target=cfunc)
             continue
         return
 
