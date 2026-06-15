@@ -1160,7 +1160,8 @@ class variable(object):
             elif atype == idaapi.ALOC_DIST:
                 F = lambda atype, item, offset, size: (offset, recurse(atype, (item, offset, size)))
                 iterable = ( F(atype, *item) for atype, item in alocinfo )
-                return "DIST({!s})".format({offset : item for offset, item in iterable})
+                dictionary = {offset : item for offset, item in iterable}
+                return "DIST({{{!s}}})".format(', '.join("{:d}: {!s}".format(offset, dictionary[offset]) for offset in sorted(dictionary)))
             elif atype == idaapi.ALOC_REG1:
                 locinfo, offset, size = alocinfo
                 return "REG1({:#x}{:+#x}, {:#0{:d}x})".format(offset, size, locinfo, 2 + 8)
