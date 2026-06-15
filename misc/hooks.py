@@ -5632,7 +5632,7 @@ class decompilermonitor_types(object):
 
     class lvar_locator_t(interface.namedtypedtuple):
         _fields = 'defea', 'atype', 'alocinfo'
-        _types = internal.types.integer, internal.types.integer, internal.types.object
+        _types = internal.types.integer, internal.types.integer, (internal.types.integer, internal.types.tuple)
         _formats = "{:#x}".format, "{:d}".format, "{!s}".format
 
     class lvar_name_t(interface.namedtypedtuple):
