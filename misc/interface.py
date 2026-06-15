@@ -7180,10 +7180,19 @@ class tinfo(object):
 
     # Our first user of process_location which handles any argloc_t items
     # that are stored within an iterator based around a vector.
-    process_items = lambda vectorator, table, process=process_location: [ process(vectorator[index].atype(), vectorator[index], table) for index in builtins.range(vectorator.size()) ]
+    def process_scattered_location(vectorator, table, process=process_location):
+        '''Given a `scattered_aloc_t` in `vectorator`, use the specified `table` to extract its raw parts into to a list, and return the data as a tuple.'''
+        result = []
+        for index in builtins.range(vectorator.size()):
+            atype = vectorator[index].atype()
+            part = argtype, packed = process(atype, vectorator[index], table)
+            argdata, argoff, argsize = packed
+            heapq.heappush(result, internal.utils.priority_tuple((argoff, argsize, argtype), part))
+        iterable = heapq.nsmallest(len(result), result)
+        return tuple(part for priority, part in iterable)
 
     # Now we can use these two closures to support scattered types.
-    location_table[idaapi.ALOC_DIST] = internal.utils.fcompose(operator.methodcaller('scattered'), lambda scatter_t, process=process_items, table=location_table: process(scatter_t, table))
+    location_table[idaapi.ALOC_DIST] = internal.utils.fcompose(operator.methodcaller('scattered'), lambda scattered_aloc_t, process=process_scattered_location, table=location_table: process(scattered_aloc_t, table))
 
     # Custom types are supported...but not really.
     location_table[idaapi.ALOC_CUSTOM] = operator.methodcaller('get_custom')
@@ -7284,9 +7293,9 @@ class tinfo(object):
         return locinfo
 
     # Now we can delete the closures we defined and its location_table, because
-    # they're already attached to the function that needs them.
+    # they're already attached to the only function that actually uses them.
     del(process_location)
-    del(process_items)
+    del(process_scattered_location)
 
     @classmethod
     def function_details(cls, func, *type):
