@@ -14432,7 +14432,7 @@ class name(object):
         # number of parameters for the names that we will be replacing. we also
         # store the indices for structures so that we can correct the name
         # ordering later.
-        push = utils.fcompose(utils.fgetattr('append'), utils.fpartial(utils.fpartial, operator.call))
+        push = utils.fcompose(utils.fgetattr('append'), utils.fpartial(utils.fpartial, getattr(operator, 'call', lambda F, *a, **k: F(*a, **k))))
         count, queue, sizes = 0, [(0, ti)], {}
 
         # consume the name index and parameter type from the queue so that we
