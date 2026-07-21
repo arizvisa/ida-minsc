@@ -724,7 +724,7 @@ class v9member(object):
             ida_string = res
 
         # Now we can actually rename the member using v9's `tinfo_t.rename_udm`.
-        terr = tinfo.rename_udm(mindex, ida_string, idaapi.ETF_FORCENAME)
+        terr = tinfo.rename_udm(mindex, ida_string, getattr(idaapi, 'ETF_FORCENAME', 0x20))
         if terr != idaapi.TERR_OK:
             errname, errdesc = interface.tinfo.format_type_error(terr)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
@@ -901,7 +901,7 @@ class v9member(object):
         return ti
 
     @classmethod
-    def set_typeinfo(cls, *args, flags=idaapi.ETF_COMPATIBLE):
+    def set_typeinfo(cls, *args, flags=getattr(idaapi, 'ETF_COMPATIBLE', 8)):
         '''Apply the type information in `info` to the specified member using the given `flags`.'''
 
         if len(args) not in {2, 3}:
@@ -4640,7 +4640,7 @@ class v9members(object):
 
         # Hopefully that is everything and we should only need to add the new
         # members to the structure from "newitems"
-        results, oldsize = [], interface.tinfo.size(ti)
+        results, oldsize, ETF_AUTONAME = [], interface.tinfo.size(ti), getattr(idaapi, 'ETF_AUTONAME', 0x40)
         for offset, item, packed in newitems:
             tinfo, msize, _, _, _ = packed
 
@@ -4660,7 +4660,7 @@ class v9members(object):
                 udm.size = 8 * msize
                 udm.name = utils.string.to(newnames[offset])
                 _, udm.type = ('', parsed) if isinstance(parsed, idaapi.tinfo_t) else parsed
-                err = ti.add_udm(udm, idaapi.ETF_AUTONAME, 1, -1) if union(ti) else ti.add_udm(udm, idaapi.ETF_AUTONAME)
+                err = ti.add_udm(udm, ETF_AUTONAME, 1, -1) if union(ti) else ti.add_udm(udm, ETF_AUTONAME)
 
             # Otherwise, go ahead and add the element using its attributes.
             else:
@@ -4671,7 +4671,7 @@ class v9members(object):
                 udm.size = 8 * msize
                 udm.name = utils.string.to(newnames[offset])
                 udm.type = interface.tinfo.copy(tinfo)
-                err = ti.add_udm(udm, idaapi.ETF_AUTONAME, 1, -1) if union(ti) else ti.add_udm(udm, idaapi.ETF_AUTONAME)
+                err = ti.add_udm(udm, ETF_AUTONAME, 1, -1) if union(ti) else ti.add_udm(udm, ETF_AUTONAME)
 
             # If we got an error of some kind then log the error we received.
             if err != idaapi.TERR_OK:
