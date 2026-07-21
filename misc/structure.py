@@ -207,7 +207,7 @@ class naming(object):
             ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
 
         # If our type is an identifier, then store and get the type from it.
-        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+        elif hasattr(ti, 'get_type_by_tid') and isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
             ti, sid = ti, type
 
         # If it's an internal structure, then get its backing type and its id.
