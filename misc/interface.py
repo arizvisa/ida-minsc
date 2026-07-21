@@ -11983,8 +11983,9 @@ class function(object):
     @classmethod
     def has(cls, func, *ea):
         '''Return if the address `func` is within a function (not external) or contains the address `ea`.'''
-        f = int(func)
-        fn = idaapi.get_func(f)
+        f = func if isinstance(func, idaapi.func_t) else int(func)
+        fn = f if isinstance(f, idaapi.func_t) else idaapi.get_func(f)
+        f = range.start(f) if isinstance(f, idaapi.func_t) else f
 
         # If the function address is not a function, then return false.
         if not fn:
