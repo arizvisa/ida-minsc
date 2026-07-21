@@ -6956,11 +6956,17 @@ class structure_t(object):
     @property
     def id(self):
         '''Return the identifier of the structure.'''
-        return self.ptr.id
+        owner = self
+        if hasattr(idaapi, 'struc_t') and isinstance(owner.ptr, idaapi.struc_t):
+            return owner.ptr.id
+        return owner.ptr.id
     @property
     def properties(self):
         '''Return the properties for the current structure.'''
-        return self.ptr.props
+        owner = self
+        if hasattr(idaapi, 'struc_t') and isinstance(owner.ptr, idaapi.struc_t):
+            return owner.ptr.props
+        return owner.ptr.props
     @property
     def members(self):
         '''Return the members belonging to the structure.'''
@@ -8397,6 +8403,8 @@ class members_t(object):
     def ptr(self):
         '''Return the pointer to the ``idaapi.member_t`` that contains all the members.'''
         owner = self.owner
+        if hasattr(idaapi, 'struc_t') and isinstance(owner.ptr, idaapi.struc_t):
+            return owner.ptr.members
         return owner.ptr.members
 
     ## Matching
