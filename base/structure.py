@@ -203,8 +203,15 @@ def select(**boolean):
     # wasn't any parameters given, then just avoid using them to get everything.
     if boolean:
         included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
-        return internal.tags.select.structures(required, included)
-    return internal.tags.select.structures()
+        iterable = internal.tags.select.structures(required, included)
+    else:
+        iterable = internal.tags.select.structures()
+
+    # FIXME: we need to check if the structure is a frame or has a base offset
+    #        stashed somewhere. not sure if it's _actually_ useful though.
+    for sid, res in iterable:
+        yield internal.structure.new(sid, 0), res
+    return
 
 @utils.multicase(string=(types.string, types.tuple))
 @utils.string.decorate_arguments('string', 'suffix')
