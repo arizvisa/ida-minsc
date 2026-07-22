@@ -8229,7 +8229,8 @@ class members_t(object):
         '''Iterate through all of the members in the structure that match the keyword specified by `type`.'''
         owner = self.owner
         if not type: type = {'predicate': lambda item: True}
-        listable = [member_t(owner, mindex) for _, mindex, _ in members.iterate(owner.ptr)]
+        iterable = v9members.iterate(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else members.iterate(owner.ptr)
+        listable = [member_t(owner, mindex) for _, mindex, _ in iterable]
         for key, value in type.items():
             listable = [item for item in self.__members_matcher.match(key, value, listable)]
         for item in listable: yield item
@@ -8292,20 +8293,19 @@ class members_t(object):
     def by(self, **type):
         '''Return the member that matches the keyword specified by `type`.'''
         searchstring = utils.string.kwargs(type)
-        owner = self.owner
+        cls, owner = self.__class__, self.owner
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
 
         listable = [item for item in self.iterate(**type)]
         if len(listable) > 1:
-            cls = self.__class__
             messages = ((u"[{:d}] {:x}{:+#x} {:s} '{:s}' {!r}".format(m.index, m.offset, m.size, "{!s}".format(m.typeinfo.dstr()).replace(' *', '*'), utils.string.escape(m.name, '\''), utils.string.repr(m.type))) for m in listable)
             [ logging.info(msg) for msg in messages ]
-            logging.warning(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join([__name__, cls.__name__]), owner.id, searchstring, len(listable), listable[0].index, listable[0].offset, listable[0].size, utils.string.escape(listable[0].fullname, '"'), utils.string.escape("{!s}".format(listable[0].typeinfo.dstr()).replace(' *', '*'), '"')))
+            logging.warning(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join([__name__, cls.__name__]), sid, searchstring, len(listable), listable[0].index, listable[0].offset, listable[0].size, utils.string.escape(listable[0].fullname, '"'), utils.string.escape("{!s}".format(listable[0].typeinfo.dstr()).replace(' *', '*'), '"')))
 
         iterable = (item for item in listable)
         res = next(iterable, None)
         if res is None:
-            cls = self.__class__
-            raise E.SearchResultsError(u"{:s}({:#x}).members.by({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), owner.id, searchstring))
+            raise E.SearchResultsError(u"{:s}({:#x}).members.by({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), sid, searchstring))
         return res
     @utils.multicase(name=types.string)
     @utils.string.decorate_arguments('name', 'suffix')
@@ -8324,9 +8324,10 @@ class members_t(object):
             offset, = (int(item) for item in offset)
         member = self.by_offset(offset)
         if (offset, size) != (member.offset, member.size):
-            cls = self.__class__
+            cls, owner = self.__class__, self.owner
+            sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
             message = "is a different size ({:d}) than requested".format(size) if member.offset == offset else "is not at the exact offset ({:#x}) as requested".format(offset)
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by({!s}) : The member ({:s}) at the given location ({:#x}<->{:#x}) {:s}.".format('.'.join([__name__, cls.__name__]), self.owner.id, location, member.name, member.left, member.right, message))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by({!s}) : The member ({:s}) at the given location ({:#x}<->{:#x}) {:s}.".format('.'.join([__name__, cls.__name__]), sid, location, member.name, member.left, member.right, message))
         return member
 
     @utils.multicase(name=(types.string, types.ordered))
@@ -8334,6 +8335,8 @@ class members_t(object):
     def has(self, name, *suffix):
         '''Return whether a member with the specified `name` exists.'''
         owner, string = self.owner, name if isinstance(name, types.ordered) else (name,)
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            return v9members.has_name(owner.ptr, tuple(itertools.chain(string, suffix)))
         return members.has_name(owner.ptr, tuple(itertools.chain(string, suffix)))
     @utils.multicase(location=interface.location_t)
     def has(self, location):
@@ -8347,8 +8350,50 @@ class members_t(object):
             [offset] = (int(item) for item in offset.symbols)
         owner, realoffset, realsize = self.owner, offset - self.baseoffset, size
 
-        # Now we can use it to get the list of candidates, then we can filter
-        # out the ones that don't align with the realoffset we were given.
+        # Then we collect all the candidate members that overlap with the
+        # realoffset we were given, and get the location of the realoffset with
+        # regards to the member. If the offset is exactly at the beginning of
+        # the member or any elements of the member, then grab their index.
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            candidates = (midx for sptr, midx, _ in v9members.at_offset(owner.ptr, 8 * realoffset))
+            iterable = ((midx, v9member.at(owner.ptr, midx, realoffset)) for midx in candidates if v9member.contains(owner.ptr, midx, 8 * realoffset))
+            filtered = [midx for midx, (index, moffset) in iterable if not moffset]
+
+            # Next we get the type for each member, and use that to figure out
+            # the element size (if it's an array) and the member size.
+            cls = self.__class__
+            for midx in filtered:
+                tinfo, utd, mindex, udm = v9members.by(owner.ptr, midx, caller=[__name__, cls.__name__, 'has'])
+                mtype, mbitoffset, mbits = interface.tinfo.copy(udm.type), udm.offset, udm.size
+                metype, _ = interface.tinfo.array(mtype) if mtype.is_array() else (mtype, 1)
+
+                # Get the element and member sizes by converting bits to bytes.
+                melement, (msize, msizeplus) = interface.tinfo.size(metype), divmod(mbits, 8)
+                msize = msize + 1 if msizeplus else msize
+                moffset, moffsetextra = divmod(mbitoffset, 8)
+                moffset = moffset + 1 if moffsetextra else moffset
+
+                # Next, we use the element and location sizes to calculate
+                # whether the location size is a multiple of the member exactly.
+                index, remainder = divmod(size, melement)
+                is_multiple = False if remainder else True
+
+                # Now we need to determine the boundaries that our location
+                # needs to reside in. If it's a variable-length structure and
+                # the member has no size, then anything larger than the array
+                # could match.
+                left, right = realoffset, realoffset + melement * index
+                is_variable = tinfo.is_varstruct() and mbits == 0
+
+                # If the size is a multiple of the element size, and the end of the
+                # location is within the boundaries of the member, then we got a match.
+                if is_multiple and size > 0 and any([is_variable, right <= moffset + msize]):
+                    return True
+                continue
+            return False
+
+        # Otherwise we can use it to get the list of candidates, then we can
+        # filter out those that don't align with the realoffset we were given.
         candidates = (mptr for sptr, _, mptr in members.at_offset(owner.ptr, realoffset))
         iterable = ((mptr, member.at(mptr, realoffset)) for mptr in candidates if member.contains(mptr, realoffset))
         filtered = [mptr for mptr, (index, moffset) in iterable if not moffset]
@@ -8359,10 +8404,11 @@ class members_t(object):
             retrieved = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
             melement, msize = get_data_elsize(mptr.id, mptr.flag, opinfo if retrieved else None), idaapi.get_member_size(mptr)
 
-            # Here, we verify that the parameter size is a multiple of the member's
-            # size, and that the size does not go outside the member's boundaries.
-            # This confirms that the location selects at least one of its elements.
-            index, remainder = divmod(realsize, melement)
+            # Here, we verify that the location size is a multiple of the member's
+            # size, and that the size does not go outside the member's boundaries
+            # unless it is a variable-length structure. This confirms that the
+            # location selects at least one of its elements.
+            index, remainder = divmod(size, melement)
             is_multiple = False if remainder else True
 
             left, right = realoffset, realoffset + melement * index
@@ -8370,7 +8416,7 @@ class members_t(object):
 
             # If the size is a multiple of the element size, and the end of the
             # location is within the boundaries of the member, then we got a match.
-            if is_multiple and realsize > 0 and any([is_variable, right <= mptr.soff + msize]):
+            if is_multiple and size > 0 and any([is_variable, right <= mptr.soff + msize]):
                 return True
             continue
         return False
@@ -8378,23 +8424,31 @@ class members_t(object):
     def has(self, offset):
         '''Return whether a member exists at the specified `offset`.'''
         owner, realoffset = self.owner, offset - self.baseoffset
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            return v9members.has_offset(owner.ptr, 8 * realoffset)
         return members.has_offset(owner.ptr, realoffset)
     @utils.multicase(start=types.integer, end=types.integer)
     def has(self, start, end):
         '''Return whether any members exist from the offset `start` to the offset `end`.'''
         owner = self.owner
         start, stop = (offset - self.baseoffset for offset in sorted([start, end]))
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            return v9members.has_bounds(owner.ptr, 8 * start, 8 * stop)
         return members.has_bounds(owner.ptr, start, stop)
     @utils.multicase(bounds=interface.bounds_t)
     def has(self, bounds):
         '''Return whether any members exist within the specified `bounds`.'''
         owner = self.owner
         start, stop = (offset - self.baseoffset for offset in sorted(bounds))
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            return v9members.has_bounds(owner.ptr, 8 * start, 8 * stop)
         return members.has_bounds(owner.ptr, start, stop)
     @utils.multicase(structure=(idaapi.struc_t, structure_t))
     def has(self, structure):
         '''Return whether any members uses the specified `structure` as a field or references it as a pointer.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+        cls, owner = self.__class__, self.owner
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
 
         # First, we get all the information for the structure parameter. We extract its id,
         # and then try to extract its type. We assume that its type is _always_ a structure.
@@ -8403,9 +8457,31 @@ class members_t(object):
         tinfo = address.type(candidate_id)
         stype = None if tinfo is None else interface.tinfo.structure(tinfo)
 
+        # If we're backed by an `idaapi.tinfo_t`, then we need to use a
+        # different namespace to match the types.
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            for mowner, midx, udm in v9members.iterate(owner.ptr):
+                mbitoffset, mbits, mtype = udm.offset, udm.size, interface.tinfo.copy(udm.type)
+
+                # Make sure that we could actually get the type information to
+                # compare against the member. Otherwise, skip it if we couldn't
+                if any([mtype is None, mowner is None]):
+                    continue
+
+                # Try to resolve the member's type to the structure it's based on. We use the
+                # exception to assign "None" as the candidate if we couldn't resolve it.
+                try: candidate = interface.tinfo.structure(mtype)
+                except (E.DisassemblerError, TypeError): candidate = None
+
+                # If there was a candidate and it actually matches, then we can return success.
+                if candidate and interface.tinfo.equals(stype, candidate):
+                    return True
+                continue
+            return False
+
         # Iterate through all of the members and check first if the type
         # identifier matches the structure that we were given as a parameter.
-        for sptr, midx, mptr in members.iterate(self.owner.id):
+        for sptr, midx, mptr in members.iterate(owner.ptr):
             opinfo = idaapi.opinfo_t()
             res = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
             if mptr.flag & idaapi.DT_TYPE == FF_STRUCT and res and res.tid == tid:
@@ -8431,8 +8507,9 @@ class members_t(object):
     def has(self, info):
         '''Return whether the types of any of the members are the same as the type information in `info`.'''
         owner = self.owner
-        for sptr, midx, mptr in members.iterate(owner.ptr):
-            mtype = member.get_typeinfo(mptr)
+        iterable = v9members.iterate(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else members.iterate(owner.ptr)
+        for sptr, midx, mptr in iterable:
+            mtype = interface.tinfo.copy(mptr.type) if isinstance(sptr, idaapi.tinfo_t) else member.get_typeinfo(mptr)
             if mtype is not None and interface.tinfo.equals(mtype, info):
                 return True
             continue
@@ -8443,14 +8520,18 @@ class members_t(object):
         '''Return the member with the specified `name`.'''
         owner, string = self.owner, name if isinstance(name, types.ordered) else (name,)
         res = utils.string.to(interface.tuplename(*itertools.chain(string, suffix)))
-        sptr, mindex, mptr = members.by_name(owner.ptr, res)
+        sptr, mindex, mptr = v9members.by_name(owner.ptr, res) if isinstance(owner.ptr, idaapi.tinfo_t) else members.by_name(owner.ptr, res)
         return member_t(owner, mindex)
     byname = utils.alias(by_name, 'members_t')
 
     def by_offset(self, offset):
         '''Return the member at the specified `offset` from the base offset of the structure.'''
         cls, owner, realoffset = self.__class__, self.owner, int(offset) - self.baseoffset
-        candidates = [item for item in members.in_offset(owner.ptr, realoffset)]
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            iterable = v9members.in_offset(owner.ptr, 8 * realoffset)
+        else:
+            iterable = members.in_offset(owner.ptr, realoffset)
+        candidates = [item for item in iterable]
 
         # If we only found one candidate, then that was it and we can return it.
         if len(candidates) == 1:
@@ -8465,20 +8546,34 @@ class members_t(object):
 
         # There's no reason that there should be more than one member, so abort if there is.
         # However, if there are no members then we can just raise an exception and be done.
-        left, size = self.baseoffset, idaapi.get_struc_size(owner.ptr)
-        description = "{:#x}".format(offset) if isinstance(offset, types.integer) else "{!s}".format(offset)
+        left, description = self.baseoffset, "{:#x}".format(offset) if isinstance(offset, types.integer) else "{!s}".format(realoffset)
 
-        if not members.contains(owner.ptr, offset):
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:s}) : Unable to locate a member at the specified offset ({:+#x}) of the {:s}.".format('.'.join([__name__, cls.__name__]), owner.id, description, int(offset), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure'))
+        # Use the backing type to figure out the namespace we need to use.
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            contained = v9members.contains(owner.ptr, 8 * realoffset)
+            sid = interface.tinfo.identifier(owner.ptr)
+            size = interface.tinfo.size(owner.ptr)
+        else:
+            contained = members.contains(owner.ptr, realoffset)
+            sid = owner.ptr.id
+            size = idaapi.get_struc_size(owner.ptr)
+
+        # Figure out which error prevented us from getting the specified member.
+        if not contained:
+            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_offset({:s}) : Requested offset ({:+#x}) is outside of the {:s} ({:#x}..{:#x}).".format('.'.join([__name__, cls.__name__]), sid, description, int(offset), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', left, left + size - 1))
         elif not size:
-            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_offset({:s}) : Requested offset ({:+#x}) cannot exist within the {:s} due to its size ({:d}).".format('.'.join([__name__, cls.__name__]), owner.id, description, int(offset), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', size))
-        raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_offset({:s}) : Requested offset ({:+#x}) is outside of the {:s} ({:#x}..{:#x}).".format('.'.join([__name__, cls.__name__]), owner.id, description, int(offset), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', left, left + size - 1))
+            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_offset({:s}) : Requested offset ({:+#x}) cannot exist within the {:s} due to its size ({:d}).".format('.'.join([__name__, cls.__name__]), sid, description, int(offset), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', size))
+        raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:s}) : Unable to locate a member at the specified offset ({:+#x}) of the {:s}.".format('.'.join([__name__, cls.__name__]), sid, description, int(offset), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure'))
     byoffset = utils.alias(by_offset, 'members_t')
 
     def by_realoffset(self, offset):
         '''Return the member at the specified `offset` of the structure.'''
         cls, owner, realoffset = self.__class__, self.owner, int(offset)
-        candidates = [item for item in members.in_offset(owner.ptr, realoffset)]
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            iterable = v9members.in_offset(owner.ptr, 8 * realoffset)
+        else:
+            iterable = members.in_offset(owner.ptr, realoffset)
+        candidates = [item for item in iterable]
 
         # If there was only one result, then there's nothing else to do but return it.
         if len(candidates) == 1:
@@ -8492,20 +8587,30 @@ class members_t(object):
             return member_t(owner, mindex)
 
         # Now we'll check our current state and figure out which exception needs raising.
-        left, size = self.baseoffset, idaapi.get_struc_size(owner.ptr)
-        description = "{:#x}".format(offset) if isinstance(offset, types.integer) else "{!s}".format(offset)
+        left, description = self.baseoffset, "{:#x}".format(offset) if isinstance(offset, types.integer) else "{!s}".format(offset)
 
-        if members.contains(owner.ptr, offset):
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:s}) : Unable to locate a member at the specified offset ({:+#x}) of the {:s}.".format('.'.join([__name__, cls.__name__]), owner.id, description, int(offset), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure'))
+        # Next we need to figure out the backing type so that we can choose the
+        # correct namespace and apis to use.
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            contained = v9members.contains(owner.ptr, 8 * realoffset)
+            sid = interface.tinfo.identifier(owner.ptr)
+            size = interface.tinfo.size(owner.ptr)
+        else:
+            contained = members.contains(owner.ptr, realoffset)
+            sid = owner.ptr.id
+            size = idaapi.get_struc_size(owner.ptr)
+
+        if not contained:
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:s}) : Unable to locate a member at the specified offset ({:+#x}) of the {:s}.".format('.'.join([__name__, cls.__name__]), sid, description, int(offset), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure'))
         elif not size:
-            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_realoffset({:s}) : Requested offset ({:+#x}) cannot exist within the {:s} due to its size ({:d}).".format('.'.join([__name__, cls.__name__]), owner.id, description, int(offset), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', size))
-        raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_realoffset({:s}) : Requested offset ({:+#x}) is outside of the {:s} ({:#x}..{:#x}).".format('.'.join([__name__, cls.__name__]), owner.id, description, int(offset), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', left, left + size - 1))
+            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_realoffset({:s}) : Requested offset ({:+#x}) cannot exist within the {:s} due to its size ({:d}).".format('.'.join([__name__, cls.__name__]), sid, description, int(offset), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', size))
+        raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_realoffset({:s}) : Requested offset ({:+#x}) is outside of the {:s} ({:#x}..{:#x}).".format('.'.join([__name__, cls.__name__]), sid, description, int(offset), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', left, left + size - 1))
     byrealoffset = utils.alias(by_realoffset, 'members_t')
 
     def by_identifier(self, id):
         '''Return the member in the structure that has the specified `id`.'''
         owner = self.owner
-        _, mindex, _ = members.by_identifier(owner.ptr, id)
+        _, mindex, _ = v9members.by_identifier(owner.ptr, id) if isinstance(owner.ptr, idaapi.tinfo_t) else members.by_identifier(owner.ptr, id)
         return member_t(owner, mindex)
     by_id = byid = byidentifier = utils.alias(by_identifier, 'members_t')
 
@@ -8513,25 +8618,40 @@ class members_t(object):
     def index(self, member):
         '''Return the index of the specified `member` within the structure.'''
         cls, owner = self.__class__, self.owner
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
         if not hasattr(member, 'id'):
-            raise E.InvalidParameterError(u"{:s}({:#x}).members.index({!r}) : An invalid type ({!s}) was specified as the member being requested.".format('.'.join([__name__, cls.__name__]), owner.id, member, member.__class__))
+            raise E.InvalidParameterError(u"{:s}({:#x}).members.index({!r}) : An invalid type ({!s}) was specified as the member being requested.".format('.'.join([__name__, cls.__name__]), sid, member, member.__class__))
         identifier = member.id
 
         # Iterate through all of the members and find the index that matches.
         try:
-            _, mindex, _ = members.by_identifier(owner.ptr, identifier)
+            if isinstance(owner.ptr, idaapi.tinfo_t):
+                packed = v9members.by_identifier(owner.ptr, identifier)
+            else:
+                packed = members.by_identifier(owner.ptr, identifier)
+            _, mindex, _ = packed
+
+        # If anything raised an exception, then try and get the full name of the
+        # member so that we can customize the exception that we re-raise.
         except E.MemberNotFoundError:
-            mfullname = member.fullname(getattr(member, 'ptr', member))
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member ({!s}) does not belong to the current {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), owner.id, "{:#x}".format(identifier) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member), mfullname, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', owner.id))
+            if isinstance(owner.ptr, idaapi.tinfo_t):
+                mfullname = v9member.fullname(identifier)
+            else:
+                mfullname = member.fullname(getattr(member, 'ptr', member))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member ({!s}) does not belong to the current {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, "{:#x}".format(identifier) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member), mfullname, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', sid))
         return mindex
 
     @utils.multicase(index=types.integer)
     def pop(self, index):
         '''Remove the member at the specified `index` of the structure.'''
         cls, owner, base = self.__class__, self.owner, self.baseoffset
-        results = members.remove_slice(owner.ptr, index, base)
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            results = v9members.remove_slice(owner.ptr, index, base)
+        else:
+            results = members.remove_slice(owner.ptr, index, base)
         if not results:
-            raise E.DisassemblerError(u"{:s}({:#x}).members.pop({:d}) : Unable to remove the member at index {:d} of the {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), owner.id, index, index, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', owner.id))
+            sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
+            raise E.DisassemblerError(u"{:s}({:#x}).members.pop({:d}) : Unable to remove the member at index {:d} of the {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, index, index, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', sid))
         [(mname, mtype, mlocation, mtypeinfo, mcomments)] = results
         return mname, mtype, mlocation, mtypeinfo
 
@@ -8548,14 +8668,26 @@ class members_t(object):
     @utils.string.decorate_arguments('name')
     def add(self, name, type):
         '''Append the specified member `name` with the given `type` to the end of the structure.'''
-        owner, sid = self.owner, self.owner.id
+        owner = self.owner
+        is_union = union(owner.ptr)
 
-        # If this is a union, then there is no offset and we need to use the quantity.
+        # If we're using an `idaapi.tinfo_t` as our backing type, then we need
+        # to use the correct namespaces. If it's a union, then we use the number
+        # of elements as the index. Otherwise, we use the size of the type.
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            if union(owner.ptr):
+                count = v9members.count(owner.ptr)
+                _, mindex, _ = v9members.add(owner.ptr, name, type, count)
+            else:
+                bitoffset = 8 * interface.tinfo.size(owner.ptr)
+                _, mindex, _ = v9members.add(owner.ptr, name, type, bitoffset, 0)
+            return member_t(owner, mindex)
+
+        # If this is a union, then there is no offset and we can use the
+        # quantity. Otherwise we use the size as the member location.
         if union(owner.ptr):
-            _, mindex, _ = members.add(owner.ptr, name, type, members.count(owner.ptr))
-
-        # Anything else and we can just use a base offset of 0 with
-        # the structure size as the location for the member to add.
+            count = members.count(owner.ptr)
+            _, mindex, _ = members.add(owner.ptr, name, type, count)
         else:
             size = idaapi.get_struc_size(owner.ptr)
             _, mindex, _ = members.add(owner.ptr, name, type, size, 0)
@@ -8564,7 +8696,8 @@ class members_t(object):
     @utils.string.decorate_arguments('name')
     def add(self, name, type, offset):
         '''Add a member at the specified `offset` of the structure with the given `name` and `type`.'''
-        owner, sid = self.owner, self.owner.id
+        cls, owner = self.__class__, self.owner
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
 
         # If this case is being used with a union, then we need
         # to abort. No such thing as an offset within a union.
@@ -8572,7 +8705,16 @@ class members_t(object):
             cls = self.__class__
             raise E.InvalidParameterError(u"{:s}({:#x}).members.add({!r}, {!s}, {:d}) : Unable to specify the index ({:d}) when adding the member \"{:s}\" to a {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, name, interface.tinfo.quoted(type) if isinstance(type, idaapi.tinfo_t) else "{!s}".format(type), offset, offset, utils.string.escape(name, '"'), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', sid))
 
-        # We explicitly trust whatever offset the user gives us.
+        elif isinstance(owner.ptr, idaapi.tinfo_t):
+            bitoffset = 8 * offset
+            if frame(owner.ptr):
+                mowner, mindex, mptr = v9members.add(owner.ptr, name, type, bitoffset, owner.baseoffset)
+            else:
+                mowner, mindex, mptr = v9members.add(owner.ptr, name, type, bitoffset, owner.baseoffset)
+            return member_t(owner, mindex)
+
+        # We explicitly trust whatever offset (in bytes) that the user gives us
+        # for frames or regular structure-like types.
         elif frame(sid):
             mowner, mindex, mptr = members.add(owner.ptr, name, type, offset, owner.baseoffset)
         else:
@@ -8583,22 +8725,36 @@ class members_t(object):
     def remove(self, offset):
         '''Remove the member at the specified `offset` of the structure.'''
         cls, owner = self.__class__, self.owner
-        items = [packed for packed in members.at_offset(owner.ptr, offset - self.baseoffset)]
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
+        realoffset = offset - self.baseoffset
+
+        # Figure out if we're using an `idaapi.tinfo_t` as the backing type, and
+        # choose the correct namespace to get all of the members at an offset.
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            items = [packed for packed in v9members.at_offset(owner.ptr, 8 * realoffset)]
+        else:
+            items = [packed for packed in members.at_offset(owner.ptr, realoffset)]
 
         # If there are no items or more than one at the requested offset than
         # we bail because of there being either no member or it's a union.
         if not items:
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to find a member at the specified offset ({:#x}) of the {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', owner.bounds))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to find a member at the specified offset ({:#x}) of the {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sid, offset, offset, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', owner.bounds))
 
         elif len(items) > 1:
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.remove({:+#x}) : Refusing to remove more than {:d} member{:s} ({:d}) at offset {:#x}.".format('.'.join([__name__, cls.__name__]), owner.id, offset, 1, '' if len(items) == 1 else 's', len(items), offset))
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.remove({:+#x}) : Refusing to remove more than {:d} member{:s} ({:d}) at offset {:#x}.".format('.'.join([__name__, cls.__name__]), sid, offset, 1, '' if len(items) == 1 else 's', len(items), offset))
 
         # Grab the single item out of our list of results, and remove it.
         [(mowner, mindex, mptr)] = items
-        results = members.remove_slice(owner.ptr, mindex, self.baseoffset)
+
+        if isinstance(mowner, idaapi.tinfo_t):
+            mbitoffset, results = mptr.offset, v9members.remove_slice(mowner, mindex, 8 * self.baseoffset)
+            res, extra = divmod(mbitoffset, 8)
+            moffset = res + 1 if extra else res
+        else:
+            moffset, results = mptr.soff, members.remove_slice(mowner, mindex, self.baseoffset)
+
         if not results:
-            moffset = mptr.soff
-            raise E.DisassemblerError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to remove the member at index {:d} of the {:s} for the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, mindex, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', self.baseoffset + moffset))
+            raise E.DisassemblerError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to remove the member at index {:d} of the {:s} for the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, offset, mindex, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', self.baseoffset + moffset))
 
         # Return whatever it was that we just removed.
         [(mname, mtype, mlocation, mtypeinfo, mcomments)] = results
@@ -8608,21 +8764,30 @@ class members_t(object):
         '''Remove the members from the structure within the specified `bounds`.'''
         owner, base = self.owner, self.baseoffset
         start, stop = bounds
-        removed = members.remove_bounds(owner.ptr, start, stop, base)
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            removed = v9members.remove_bounds(owner.ptr, 8 * start, 8 * stop, 8 * base)
+        else:
+            removed = members.remove_bounds(owner.ptr, start, stop, base)
         return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
     @utils.multicase(start=types.integer, stop=types.integer)
     def remove(self, start, stop):
         '''Remove the members of the structure from the offset `start` to `stop`.'''
         owner, base = self.owner, self.baseoffset
         # FIXME: this should remove overlapping members
-        removed = members.remove_bounds(owner.ptr, start, stop, base)
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            removed = v9members.remove_bounds(owner.ptr, 8 * start, 8 * stop, 8 * base)
+        else:
+            removed = members.remove_bounds(owner.ptr, start, stop, base)
         return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
     @utils.multicase(location=interface.location_t)
     def remove(self, location):
         '''Remove the members at the specified `location` of the structure.'''
         owner, base = self.owner, self.baseoffset
         start, stop = location.bounds
-        removed = members.remove_bounds(owner.ptr, start, stop, base)
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            removed = v9members.remove_bounds(owner.ptr, 8 * start, 8 * stop, 8 * base)
+        else:
+            removed = members.remove_bounds(owner.ptr, start, stop, base)
         return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
 
     ### Properties
@@ -8637,7 +8802,8 @@ class members_t(object):
         owner = self.owner
         if hasattr(idaapi, 'struc_t') and isinstance(owner.ptr, idaapi.struc_t):
             return owner.ptr.members
-        return owner.ptr.members
+        # FIXME: this property should probably be removed.
+        return self
 
     ## Matching
     __members_matcher = utils.matcher()
@@ -8724,44 +8890,68 @@ class members_t(object):
         '''Render all of the fields within the current structure.'''
         res, owner = [], self.owner
         base, mn, ms, mti, eoff = self.baseoffset, 0, 0, 0, self.baseoffset
-        for sptr, mindex, mptr in members.iterate(owner.ptr):
-            moffset, t = base if union(sptr) else base + mptr.soff, member.get_type(mptr, 0 if union(sptr) else base + mptr.soff)
+        iterable = v9members.iterate(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else members.iterate(owner.ptr)
+        for sptr, mindex, mptr in iterable:
+            if isinstance(sptr, idaapi.tinfo_t):
+                mbitoffset = mptr.offset
+                name, typeinfo, mbits, comment, tag = (F(sptr, mindex) for F in [v9member.get_name, v9member.get_typeinfo, lambda *a: mptr.size, v9member.get_comment, internal.tags.typeinfo_member.get])
+                moffset, moffsetextra = divmod(0 if union(sptr) else mbitoffset, 8)
+                msize, msizeextra = divmod(mbits, 8)
+                moffset = moffset + 1 if moffsetextra else moffset
+                msize = msize + 1 if msizeextra else msize
+                pythonic = v9member.get_type(sptr, mindex, base + moffset)
+            else:
+                moffset = 0 if union(sptr) else mptr.soff
+                name, typeinfo, msize, comment, tag = (F(mptr) for F in [member.get_name, member.get_typeinfo, idaapi.get_member_size, member.get_comment, internal.tags.member.get])
+                pythonic = member.get_type(mptr, base + moffset)
+
             res.append((-1, '', [None, moffset - eoff], None, eoff, moffset - eoff, '', {})) if eoff < moffset else None
-            name, ti, msize, comment, tag = (F(mptr) for F in [member.get_name, member.get_typeinfo, idaapi.get_member_size, member.get_comment, internal.tags.member.get])
-            res.append((mindex, name, t, ti, moffset, msize, comment or '', tag))
+            res.append((mindex, name, pythonic, typeinfo, moffset, msize, comment or '', tag))
             mn = max(mn, len(name))
-            ms = max(ms, len("{:+#x}".format(moffset - base)))
+            ms = max(ms, len("{:+#x}".format(moffset)))
             ms = max(ms, len("{:+#x}".format(msize)))
-            mti = max(mti, len("{!s}".format(ti.dstr()).replace(' *', '*')))
-            eoff = base + mptr.eoff
+            mti = max(mti, len("{!s}".format(typeinfo.dstr()).replace(' *', '*')))
+            eoff = moffset + msize
 
         mi = len("{:d}".format(len(self) - 1)) if len(self) else 1
 
         if len(self):
             mo = max(map(len, map("{:x}".format, [self.baseoffset, self[-1].offset + self[-1].size])))
-            return "{!r}\n{:s}".format(self.owner, '\n'.join("{:<{:d}s} {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s}{:s}".format('' if i < 0 else "[{:d}]".format(i), 2 + mi, o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*') if ti else '', mti, '' if i < 0 else utils.string.repr(n), mn + 2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else utils.string.to(c)) if c else '') for i, n, t, ti, o, s, c, T in res))
+            return "{!r}\n{:s}".format(self.owner, '\n'.join("{:<{:d}s} {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s}{:s}".format('' if i < 0 else "[{:d}]".format(i), 2 + mi, base + o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*') if ti else '', mti, '' if i < 0 else utils.string.repr(n), mn + 2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else utils.string.to(c)) if c else '') for i, n, t, ti, o, s, c, T in res))
         return "{!r}".format(self.owner)
 
     def __unicode__(self):
         '''Render all of the fields within the current structure.'''
         res, owner = [], self.owner
         base, mn, ms, mti, eoff = self.baseoffset, 0, 0, 0, self.baseoffset
+        iterable = v9members.iterate(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else members.iterate(owner.ptr)
         for sptr, mindex, mptr in members.iterate(owner.ptr):
-            moffset, t = base if union(sptr) else base + mptr.soff, member.get_type(mptr, 0 if union(sptr) else base + mptr.soff)
-            name, ti, msize, comment, tag = (F(mptr) for F in [member.get_name, member.get_typeinfo, idaapi.get_member_size, member.get_comment, internal.tags.member.get])
+            if isinstance(sptr, idaapi.tinfo_t):
+                mbitoffset = mptr.offset
+                name, typeinfo, mbits, comment, tag = (F(sptr, mindex) for F in [v9member.get_name, v9member.get_typeinfo, lambda *a: mptr.size, v9member.get_comment, internal.tags.typeinfo_member.get])
+                moffset, moffsetextra = divmod(0 if union(sptr) else mbitoffset, 8)
+                msize, msizeextra = divmod(mbits, 8)
+                moffset = moffset + 1 if moffsetextra else moffset
+                msize = msize + 1 if msizeextra else msize
+                pythonic = v9member.get_type(sptr, mindex, base + moffset)
+            else:
+                moffset = 0 if union(sptr) else mptr.soff
+                name, typeinfo, msize, comment, tag = (F(mptr) for F in [member.get_name, member.get_typeinfo, idaapi.get_member_size, member.get_comment, internal.tags.member.get])
+                pythonic = member.get_type(mptr, base + moffset)
+
             res.append((-1, '', [None, moffset - eoff], None, eoff, moffset - eoff, '', {})) if eoff < moffset else None
-            res.append((mindex, name, t, ti, moffset, msize, comment or '', tag))
+            res.append((mindex, name, pythonic, typeinfo, moffset, msize, comment or '', tag))
             mn = max(mn, len(name))
             ms = max(ms, len("{:+#x}".format(moffset - base)))
             ms = max(ms, len("{:+#x}".format(msize)))
-            mti = max(mti, len("{!s}".format(ti.dstr()).replace(' *', '*')))
-            eoff = base + mptr.eoff
+            mti = max(mti, len("{!s}".format(typeinfo.dstr()).replace(' *', '*')))
+            eoff = base + moffset + msize
 
         mi = len("{:d}".format(len(self) - 1)) if len(self) else 1
 
         if len(self):
             mo = max(map(len, map("{:x}".format, (self.baseoffset, self[-1].offset + self[-1].size))))
-            return u"{!r}\n{:s}".format(self.owner, '\n'.join("{:<{:d}s} {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s}{:s}".format('' if i < 0 else "[{:d}]".format(i), mi, o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*') if ti else '', mti, '' if i < 0 else utils.string.repr(n), mn + 2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else utils.string.to(c)) if c else '') for i, n, t, ti, o, s, c, T in res))
+            return u"{!r}\n{:s}".format(self.owner, '\n'.join("{:<{:d}s} {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s}{:s}".format('' if i < 0 else "[{:d}]".format(i), mi, base + o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*') if ti else '', mti, '' if i < 0 else utils.string.repr(n), mn + 2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else utils.string.to(c)) if c else '') for i, n, t, ti, o, s, c, T in res))
         return u"{!r}".format(self.owner)
 
     def __repr__(self):
@@ -8770,51 +8960,70 @@ class members_t(object):
     def __len__(self):
         '''Return the number of members within the structure.'''
         owner = self.owner
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            return v9members.count(owner.ptr)
         return members.count(owner.ptr)
 
     def __getitem__(self, index):
         '''Return the member at the specified `index`.'''
-        owner = self.owner
+        cls, owner = self.__class__, self.owner
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
+
+        # Check the backing type to figure out which namespace we should use.
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            membersnamespace = v9members
+        else:
+            membersnamespace = members
+
+        # Return the element at the specified index.
         if isinstance(index, types.integer):
-            index = members.count(owner.ptr) + index if index < 0 else index
-            _, mindex, _ = members.by_index(owner.ptr, index)
+            index = membersnamespace.count(owner.ptr) + index if index < 0 else index
+            _, mindex, _ = membersnamespace.by_index(owner.ptr, index)
             res = member_t(owner, mindex)
 
+        # Return the element with the specified name.
         elif isinstance(index, types.string):
-            _, mindex, _ = members.by_name(owner.ptr, index)
+            _, mindex, _ = membersnamespace.by_name(owner.ptr, index)
             res = member_t(owner, mindex)
 
+        # Return the elements for the specified slice.
         elif isinstance(index, slice):
-            left, right, layout = members.layout_getslice(owner.ptr, index)
+            left, right, layout = membersnamespace.layout_getslice(owner.ptr, index)
             iterable = (member_or_size for offset, member_or_size in layout)
-            iterable_packed = ((members.by_identifier(owner.ptr, member_or_size) if isinstance(member_or_size, idaapi.member_t) else member_or_size) for member_or_size in iterable)
+            iterable_packed = ((membersnamespace.by_identifier(owner.ptr, member_or_size) if isinstance(member_or_size, idaapi.member_t) or membersnamespace.has_identifier(owner.ptr, member_or_size) else member_or_size) for member_or_size in iterable)
             res = [(owner_index_member if isinstance(owner_index_member, types.integer) else member_t(owner, owner_index_member[1])) for owner_index_member in iterable_packed]
 
         else:
-            cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}).members.__getitem__({!r}) : An invalid type ({!s}) was specified for the index.".format('.'.join([__name__, cls.__name__]), owner.id, index, index.__class__))
+            raise E.InvalidParameterError(u"{:s}({:#x}).members.__getitem__({!r}) : An invalid type ({!s}) was specified for the index.".format('.'.join([__name__, cls.__name__]), sid, index, index.__class__))
 
         if res is None:
-            cls, where = self.__class__, "with the specified name (\"{:s}\")".format(index) if isinstance(index, types.string) else "at the given index ({:d})".format(index)
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.__getitem__({:d}) : Unable to find a member {:s}.".format('.'.join([__name__, cls.__name__]), owner.id, index, where))
+            where = "with the specified name (\"{:s}\")".format(index) if isinstance(index, types.string) else "at the given index ({:d})".format(index)
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.__getitem__({:d}) : Unable to find a member {:s}.".format('.'.join([__name__, cls.__name__]), sid, index, where))
         return res
 
     def __setitem__(self, index, item):
         '''Replace the member(s) within the specified `index` with a copy of the specified `item` or list of items.'''
         owner, base = self.owner, self.baseoffset
-        removed = members.layout_setslice(owner.ptr, index, item, base)
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            removed = v9members.layout_setslice(owner.ptr, index, item, 8 * base)
+        else:
+            removed = members.layout_setslice(owner.ptr, index, item, base)
         return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
 
     def __delitem__(self, index):
         '''Remove the member(s) at the specified `index` non-destructively.'''
         owner, base = self.owner, self.baseoffset
-        removed = members.clear_slice(owner.ptr, index, base)
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            removed = v9members.clear_slice(owner.ptr, index, 8 * base)
+        else:
+            removed = members.clear_slice(owner.ptr, index, base)
         return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
 
     def __iter__(self):
         '''Yield all the members within the structure.'''
         owner = self.owner
-        for sptr, mindex, mptr in members.iterate(owner.id):
+        iterable = v9members.iterate(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else members.iterate(owner.ptr)
+        for sptr, mindex, mptr in iterable:
             yield member_t(owner, mindex)
         return
 
@@ -8830,6 +9039,8 @@ class members_t(object):
         else:
             cls = self.__class__
             raise E.InvalidParameterError(u"{:s}({:#x}).members.__contains__({!r}) : Unable to find a member using the unsupported type {!s}.".format('.'.join([__name__, cls.__name__]), owner.id, other, other.__class__))
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            return v9members.has_identifier(owner.ptr, mid)
         return members.has_identifier(owner.ptr, mid)
 
     ## Serialization
