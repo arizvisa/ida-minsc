@@ -8877,13 +8877,28 @@ class members_t(object):
         """
         boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
 
+        # Grab the owner, and then figure out its identifier so that we can use
+        # it with `internal.tags.select` down below.
+        owner = self.owner
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
+
         # If we got something to filter the members with, unpack them from the
         # parameter and use them with `internal.tags.select`. Otherwise we can
         # avoid giving parameters to cause it to yield all the tagged results.
         if boolean:
             included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
-            return internal.tags.select.structure(self.owner.id, required, included)
-        return internal.tags.select.structure(self.owner.id)
+            iterable = internal.tags.select.structure(sid, required, included)
+        else:
+            iterable = internal.tags.select.structure(sid)
+
+        # Figure which namespace we'll be using to find the member information
+        # by checking the type of the owner pointer. Then we can use said
+        # information along with the owner to instantiate a `member_t` to yield.
+        membersnamespace = v9members if isinstance(owner.ptr, idaapi.tinfo_t) else members
+        for mid, res in iterable:
+            mowner, mindex, mptr = membersnamespace.by_identifier(owner.ptr, mid)
+            yield member_t(owner, mindex), res
+        return
 
     ### Private methods
     def __str__(self):
