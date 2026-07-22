@@ -6834,14 +6834,23 @@ class structure_t(object):
     __slots__ = ('__ptr__', '__name__', '__members__')
 
     def __init__(self, sptr, offset=0):
-        if not isinstance(sptr, (idaapi.struc_t, types.integer)):
+        if not isinstance(sptr, (getattr(idaapi, 'struc_t', idaapi.tinfo_t), idaapi.tinfo_t, types.integer)):
             cls = self.__class__
             raise E.InvalidParameterError(u"{:s}({!s}, offset={:+#x}) : Unable to instantiate a structure using the provided type ({!s}).".format('.'.join([__name__, cls.__name__]), sptr, offset, sptr))
 
         # Use the type of our parameter in order to get a proper
         # struc_t. If we didn't get one, then we likely got an identifier
         # that we need to use with idaapi.get_struc to get our sptr.
-        ptr = sptr if isinstance(sptr, idaapi.struc_t) else idaapi.get_struc(sptr)
+        ti = idaapi.tinfo_t()
+        if isinstance(sptr, idaapi.tinfo_t):
+            ptr = interface.tinfo.copy(sptr)
+        elif hasattr(idaapi, 'struc_t'):
+            ptr = sptr if isinstance(sptr, idaapi.struc_t) else idaapi.get_struc(sptr)
+        elif hasattr(ti, 'get_type_by_tid') and isinstance(sptr, types.integer) and ti.get_type_by_tid(sptr):
+            ptr = ti
+        else:
+            ptr = None
+
         if ptr is None:
             cls = self.__class__
             raise E.StructureNotFoundError(u"{:s}({!s}, offset={:+#x}) : Unable to locate the structure with the specified parameter ({!s}).".format('.'.join([__name__, cls.__name__]), sptr, offset, sptr))
@@ -6861,52 +6870,80 @@ class structure_t(object):
     def tag(self):
         '''Return a dictionary of the tags associated with the structure.'''
         owner = self.ptr
+        if isinstance(owner, idaapi.tinfo_t):
+            return internal.tags.typeinfo.get(owner)
         return internal.tags.structure.get(owner)
     @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key')
     def tag(self, key):
         '''Return the tag identified by `key` for the structure.'''
         owner = self.ptr
-        res = internal.tags.structure.get(owner)
+        if isinstance(owner, idaapi.tinfo_t):
+            res = internal.tags.typeinfo.get(owner)
+            sid = interface.tinfo.identifier(owner)
+        else:
+            res = internal.tags.structure.get(owner)
+            sid = owner.id
+
         if key in res:
             return res[key]
         cls = self.__class__
-        raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the structure {:s}.".format('.'.join([__name__, cls.__name__]), owner.id, key, utils.string.escape(key, '"'), utils.string.repr(self.name)))
+        raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the structure {:s}.".format('.'.join([__name__, cls.__name__]), sid, key, utils.string.escape(key, '"'), utils.string.repr(self.name)))
     @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the structure.'''
         owner = self.ptr
+        if isinstance(owner, idaapi.tinfo_t):
+            return internal.tags.typeinfo.set(owner, key, value)
         return internal.tags.structure.set(owner, key, value)
     @utils.multicase(key=types.string, none=types.none)
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Remove the tag identified by `key` from the structure.'''
         owner = self.ptr
+        if isinstance(owner, idaapi.tinfo_t):
+            return internal.tags.typeinfo.remove(owner, key, none)
         return internal.tags.structure.remove(owner, key, none)
 
     def destroy(self):
         '''Remove the structure from the database.'''
         owner = self.ptr
-        return idaapi.del_struc(owner)
+        if isinstance(owner, idaapi.tinfo_t):
+            cls, sid, til = self.__class__, interface.tinfo.identifier(owner), interface.tinfo.library(owner)
+            ordinal, name = interface.tinfo.ordinal(owner), utils.string.of(owner.get_type_name())
+            if ordinal > 0:
+                ok = idaapi.del_numbered_type(til, ordinal)
+            elif name:
+                ok = idaapi.del_named_type(til, name, idaapi.NTF_TYPE)
+            else:
+                raise E.InvalidParameterError(u"{:s}({:#x}).destroy() : Unable to locate the structure for the type {!s}.".format('.'.join([__name__, cls.__name__]), sid, interface.tinfo.quoted(owner)))
+            if not ok:
+                raise E.DisassemblerError(u"{:s}({:#x}).destroy() : Unable to delete the structure type{!s}{!s}{!s} from the type library {!s}.".format('.'.join([__name__, cls.__name__]), sid, " \"{:s}\"".format(utils.string.escape(name, '"')), " at the specified ordinal ({:d})".format(ordinal) if ordinal else '', '' if name or ordinal else " \"{:s}\"".format(interface.tinfo.quoted(owner)), interface.tinfo.format_library(til)))
+            return True
+
+        sid = owner.id
+        name = utils.string.of(idaapi.get_struc_name(sid))
+        if not idaapi.del_struc(owner):
+            raise E.DisassemblerError(u"{:s}({:#x}).destroy() : Unable to delete the specified structure \"{!s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, utils.string.escape(name, '"'), sid))
+        return True
 
     def field(self, offset):
         '''Return the member at the specified offset.'''
         return self.members.by_offset(offset + self.members.baseoffset)
 
-    def copy(self, name):
-        '''Copy members into the structure `name`.'''
-        raise NotImplementedError
-
     def contains(self, offset):
         '''Return whether the specified `offset` is contained by the structure.'''
         owner, res = self.ptr, self.members.baseoffset
-        cb = idaapi.get_struc_size(owner)
-        return res <= offset < res + cb
+        if isinstance(owner, idaapi.tinfo_t):
+            return v9members.contains(owner, offset)
+        return members.contains(owner, offset)
 
     def refs(self):
         '''Return the operand references from the database that reference this structure or its members.'''
         owner = self.ptr
+        if isinstance(owner, idaapi.tinfo_t):
+            return v9members.references(owner)
         return members.references(owner)
 
     def up(self):
@@ -6927,19 +6964,35 @@ class structure_t(object):
             cls = self.__class__
             raise E.DisassemblerError(u"{:s}({!r}).ptr : The structure with the name (\"{:s}\") is currently unavailable and was likely removed from the database.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
 
-        # Verify if our ptr is still within scope by verifying
-        # that its identifier is valid. Otherwise we need to use
-        # the name that we've cached to fetch it.
-        owner = ptr
-        identifier = owner.id if interface.node.identifier(owner.id) else idaapi.get_struc_id(name)
+        else:
+            owner = ptr
 
-        # Now we can check if we okay with returning the owner. We also
+        # Grab the identifier from the ptr, which could be an `idaapi.tinfo_t`,
+        # or an `idaapi.struc_t`. we check the type for `idaapi.tinfo_t` first,
+        # otherwise we verify if our ptr is still within scope by verifying its
+        # identifier. Otherwise, the `idaapi.struc_t` has been corrupted from
+        # underneath us and we need to use the name we grabbed earlier to fetch.
+        if isinstance(owner, idaapi.tinfo_t):
+            identifier = interface.tinfo.identifier(owner)
+        elif interface.node.identifier(owner.id):
+            identifier = owner.id
+        else:
+            identifier = idaapi.get_struc_id(name)
+
+        # Now we can check if we are okay with returning the owner. We also
         # update our cached name with whatever the current name is.
-        if identifier == owner.id:
+        if isinstance(owner, idaapi.tinfo_t):
+            result, self.__name__ = owner, naming.get(owner)
+
+        # This and the prior `interface.node.identifier` call is how we check
+        # that the identifier from the `idaapi.struc_t` is not corrupted. This
+        # can happen if there's an `idaapi.struc_t` that had its type deleted.
+        elif identifier == owner.id:
             result, self.__name__ = owner, naming.get(identifier)
 
-        # Otherwise we need to use the identifier to grab the
-        # sptr from the identifier we just grabbed.
+        # Otherwise, the `idaapi.struc_t` was corrupted and we need to use the
+        # identifier we determined to attempt to grab a valid one. We don't need
+        # to assign the name because we used it to get the structure identifier.
         else:
             result = self.__ptr__ = idaapi.get_struc(identifier)
 
@@ -6950,23 +7003,52 @@ class structure_t(object):
 
         # This means that we lost the race against SWIG, and it scoped
         # out our result before we got a chance to actually use it...
-        cls = self.__class__
-        raise E.DisassemblerError(u"{:s}({!r}).ptr : The structure with the name (\"{:s}\") is currently unavailable and was likely removed from the database.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
+        cls, sid = self.__class__, identifier
+        raise E.DisassemblerError(u"{:s}({!r}).ptr : The structure with the name (\"{:s}\") is currently unavailable and was likely removed from the database.".format('.'.join([__name__, cls.__name__]), sid, utils.string.escape(name, '"')))
 
     @property
     def id(self):
         '''Return the identifier of the structure.'''
-        owner = self
-        if hasattr(idaapi, 'struc_t') and isinstance(owner.ptr, idaapi.struc_t):
-            return owner.ptr.id
-        return owner.ptr.id
+        owner = self.ptr
+        if isinstance(owner, idaapi.tinfo_t):
+            return interface.tinfo.identifier(owner)
+        return owner.id
     @property
     def properties(self):
         '''Return the properties for the current structure.'''
-        owner = self
-        if hasattr(idaapi, 'struc_t') and isinstance(owner.ptr, idaapi.struc_t):
-            return owner.ptr.props
-        return owner.ptr.props
+        cls, owner = self.__class__, self.ptr
+        if not isinstance(owner, idaapi.tinfo_t):
+            return owner.props
+
+        # Otherwise, try and get the details so we can get the alignment.
+        udt, sid = idaapi.udt_type_data_t(), interface.tinfo.identifier(owner)
+        if not owner.get_udt_details(udt):
+            raise E.DisassemblerError(u"{:s}({:#x}).properties : Unable to get the details for the specified type {!s}.".format('.'.join([__name__, cls.__name__]), sid, interface.tinfo.quoted(owner)))
+        sda = max(udt.sda, 1) - 1
+
+        # Now we get the library information so we can check some of its flags.
+        til, ordinal = interface.tinfo.library(owner), interface.tinfo.ordinal(owner)
+
+        # Then we try and simulate the structure properties with a type.
+        SF_VAR = 1 if owner.is_varstruct() else 0                       # is variable size structure (varstruct)?
+        SF_UNION = 2 if union(owner) else 0                             # is a union?  varunions are prohibited!
+        SF_HASUNI = 4 if owner.has_union() else 0                       # has members of type "union"?
+        SF_NOLIST = 0 if idaapi.is_type_choosable(til, ordinal) else 8  # don't include in the chooser list
+        SF_TYPLIB = 0x10 if owner.is_from_subtil() else 0               # the structure comes from type library
+        SF_HIDDEN = 0                                                   # the structure is collapsed
+        SF_FRAME = 0x40 if frame(owner) else 0                          # the structure is a function frame
+        SF_ALIGN = (sda & 0x1F) * pow(2, 7)                             # alignment (shift amount: 0..31)
+        SF_GHOST = 0                                                    # ghost copy of a local type
+        SF_ASMTIL = 0                                                   # temporary: asmtil struct *-
+
+        # Now we can gather than and union them together.
+        flags = [
+            SF_VAR, SF_UNION, SF_HASUNI, SF_NOLIST,
+            SF_TYPLIB, SF_HIDDEN, SF_FRAME, SF_ALIGN,
+            SF_GHOST, SF_ASMTIL
+        ]
+        return functools.reduce(operator.or_, flags, 0)
+
     @property
     def members(self):
         '''Return the members belonging to the structure.'''
@@ -6988,14 +7070,15 @@ class structure_t(object):
         # go figure that sometimes IDAPython will return None when the structure
         # was deleted, so we need to check what it actually gave us.
         owner = ptr
-        res = naming.get(owner)
+        res, sid = naming.get(owner), interface.tinfo.identifier(owner) if isinstance(owner, idaapi.tinfo_t) else owner.id
         if res is not None:
-            return utils.string.of(res)
+            self.__name__ = res
+            return res
 
         # if the name is undefined, then we actually have to raise an exception.
         cls, name = self.__class__, self.__name__
         if name is None:
-            raise E.DisassemblerError(u"{:s}({:#x}).name : The structure with the identifier ({:#x}) is currently unavailable and was likely removed from the database.".format('.'.join([__name__, cls.__name__]), owner.id, owner.id))
+            raise E.DisassemblerError(u"{:s}({:#x}).name : The structure with the identifier ({:#x}) is currently unavailable and was likely removed from the database.".format('.'.join([__name__, cls.__name__]), sid, sid))
 
         # otherwise, we can return the one that's cached while logging a message.
         logging.critical(u"{:s}({!r}).name : Returning the cached name (\"{:s}\") for a structure that is unavailable and was likely removed from the database.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
@@ -7005,42 +7088,86 @@ class structure_t(object):
     @utils.string.decorate_arguments('string')
     def name(self, string):
         '''Set the name of the structure to `string`.'''
-        owner = self.ptr
+        cls, owner = self.__class__, self.ptr
+        sid = interface.tinfo.identifier(owner) if isinstance(owner, idaapi.tinfo_t) else owner.id
 
-        # flatten a tuple into a single string.
-        if isinstance(string, types.ordered):
-            string = interface.tuplename(*string)
-
-        # convert the specified string into a form that IDA can handle
+        # flatten a tuple into a single string, and then convert the specified
+        # string into a format that the disassembler can handle.
+        string = interface.tuplename(*string) if isinstance(string, types.ordered) else string
         ida_string = utils.string.to(string)
 
         # validate the name
         res = interface.name.identifier(ida_string[:])
         if ida_string and ida_string != res:
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).name({!r}) : Stripping invalid chars from structure name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), owner.id, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
+            logging.info(u"{:s}({:#x}).name({!r}) : Stripping invalid chars from structure name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), sid, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
 
-        # now we can set the name of the structure, and verify that the name was
-        # assigned properly.
-        oldname = naming.set(owner, ida_string)
-        assigned = naming.get(owner) or ''
-        if utils.string.of(assigned) != utils.string.of(ida_string):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).name({!r}) : The name ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), owner.id, string, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
+        # now we can set the name of the structure. after the name has been set,
+        # though, we need to re-fetch the type from the type library.
+        expected = ida_string
+        if isinstance(owner, idaapi.tinfo_t):
+            til, ordinal, name = interface.tinfo.library(owner), interface.tinfo.ordinal(owner), naming.get(owner) or owner.get_type_name()
+            if not any([ordinal, name]):
+                raise E.LocalTypeNotFoundError(u"{:s}({:#x}).name({!r}) : Refusing request to change the name for the type {!s} to \"{:s}\" due to a missing ordinal ({:d}) and name ({!r}).".format('.'.join([__name__, cls.__name__]), sid, string, internal.tinfo.quoted(owner), utils.string.escape(expected, '"'), ordinal, name))
+
+            # if the current name matches the expected name, then we don't have
+            # to do anything and can just abort what we were doing.
+            elif name == expected:
+                return expected
+
+            oldname = naming.set(owner, expected)
+
+            # we got an ordinal, so we can use that to get the new type.
+            if ordinal:
+                newowner = interface.tinfo.for_ordinal(ordinal, til)
+
+            # if the old name still exists, then renaming has failed.
+            elif interface.tinfo.has_name(name):
+                newowner = owner
+
+            # if the new name exists, then we succeeded at renaming and need to
+            # use the new name to grab the new type.
+            elif interface.tinfo.has_name(expected):
+                newowner = interface.tinfo.for_name(expected)
+
+            # any other case confuses us, so we need to quickly abort.
+            else:
+                raise E.LocalTypeNotFoundError(u"{:s}({:#x}).name({!r}) : Unable to find a matching local type with the original name \"{:s}\" or the changed name \"{:s}\".".format('.'.join([__name__, cls.__name__]), sid, string, utils.string.escape(oldname, '"'), utils.string.escape(expected, '"')))
+
+            # if the rename was successful and we found the new type, then we
+            # need to update our "ptr" attribute with the new renamed type and
+            # grab the name that was assigned from it.
+            self.__ptr__ = newowner
+            assigned = naming.get(newowner) or ''
+
+        # otherwise we're dealing with a `struc_t` which doesn't store a name
+        # that we need to refresh due to using an identifier exclusively.
+        else:
+            oldname = naming.set(owner, expected)
+            assigned = naming.get(owner) or ''
+
+        # if we successfully assigned the new name, then we need to update our
+        # cached name with it prior to returning the old name.
+        if assigned == expected:
+            self.__name__ = assigned
+            return oldname
+
+        # if they didn't match, then log a warning and return what was assigned.
+        logging.warning(u"{:s}({:#x}).name({!r}) : The name ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), sid, string, utils.string.repr(utils.string.of(assigned)), utils.string.repr(expected)))
         return assigned
 
     @property
     def comment(self, repeatable=True):
         '''Return the repeatable comment for the structure.'''
-        sid, owner = self.id, self.ptr
+        owner = self.ptr
         res = comment.get(owner, repeatable)
         return res or comment.get(self, not repeatable)
     @comment.setter
     @utils.string.decorate_arguments('value')
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment for the structure to `value`.'''
-        sid, owner = self.id, self.ptr
+        owner = self.ptr
+        sid = interface.tinfo.identifier(owner) if isinstance(owner, idaapi.tinfo_t) else owner.id
 
         # update the comment or remove it depending on the value.
         res = comment.set(owner, value, repeatable) if value else comment.remove(owner, repeatable)
@@ -7056,49 +7183,110 @@ class structure_t(object):
     def alignment(self):
         '''Return the alignment of the structure.'''
         owner, shift = self.ptr, pow(2, 7)
-        res, _ = divmod(owner.props & idaapi.SF_ALIGN, shift)
+        if not isinstance(owner, idaapi.tinfo_t):
+            res, _ = divmod(owner.props & idaapi.SF_ALIGN, shift)
+            return pow(2, res)
+
+        udt = idaapi.udt_type_data_t()
+        if not owner.get_udt_details(udt):
+            sid = interface.tinfo.identifier(owner)
+            raise E.DisassemblerError(u"{:s}({:#x}).alignment : Unable to get the details for the specified type {!s}.".format('.'.join([__name__, cls.__name__]), sid, interface.tinfo.quoted(owner)))
+
+        res = max(udt.sda, 1) - 1
         return pow(2, res)
 
     @alignment.setter
     def alignment(self, size):
         '''Modify the alignment of the structure to the specifyed `size`.'''
-        owner, shift = self.ptr, pow(2, 7)
+        cls, owner, shift = self.__class__, self.ptr, pow(2, 7)
         alignment, name = int(size), naming.get(owner)
+
+        # If we are processing an `idaapi.tinfo_t`, then we need to get the
+        # alignment and other things using an `idaapi.udt_type_data_t`.
+        if isinstance(owner, idaapi.tinfo_t):
+            udt = idaapi.udt_type_data_t()
+            sid = interface.tinfo.identifier(owner)
+
+            # Get the details, and then use them to get the alignment.
+            if not owner.get_udt_details(udt):
+                raise E.DisassemblerError(u"{:s}({:#x}).alignment({!s}) : Unable to get the details for the specified type {!s}.".format('.'.join([__name__, cls.__name__]), sid, size, interface.tinfo.quoted(owner)))
+            res = max(udt.sda, 1) - 1
+
+            # Figure out which power of 2 we want to set the alignment to.
+            e = math.floor(math.log(alignment, 2)) if alignment > 0 else 0
+            if alignment and pow(2, math.trunc(e)) != alignment:
+                raise E.InvalidParameterError(u"{:s}({:#x}).alignment({!s}) : Unable to change the alignment ({:+d}) for structure \"{:s}\" to an amount ({:d}) that is not a power of 2.".format('.'.join([__name__, cls.__name__]), sid, size, pow(2, res), utils.string.escape(name, '"'), alignment))
+
+            # Verify that the byte alignment we were given is a valid one.
+            elif not (0 <= math.trunc(e) < 32):
+                raise E.InvalidTypeOrValueError(u"{:s}({:#x}).alignment({!s}) : The requested alignment ({:+d}) for structure \"{:s}\" cannot be {:s} than {:s}.".format('.'.join([__name__, cls.__name__]), sid, size, pow(2, math.trunc(e)), utils.string.escape(name, '"'), 'smaller' if math.trunc(e) < 32 else 'larger', "{:d}".format(pow(2, 0 if math.trunc(e) < 32 else 31))))
+
+            # Now we can set the alignment to the exponent that we calculated.
+            ok = owner.set_udt_alignment(1 + math.trunc(e) if alignment else math.trunc(e))
+            if ok != idaapi.TERR_OK:
+                errname, errdesc = interface.tinfo.format_type_error(ok)
+                description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+                raise E.DisassemblerError(u"{:s}({:#x}).alignment({!s}) : Unable to set the alignment for structure \"{:s}\" to the specified power of 2 ({:d}) due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, size, utils.string.escape(name, '"'), math.trunc(e)))
+
+            return pow(2, res)
+
+        # Otherwise, we get and set the alignment for an `idaapi.struc_t`.
         res, _ = divmod(owner.props & idaapi.SF_ALIGN, shift)
-        e = math.floor(math.log(alignment, 2)) if alignment else 0
+        sid, e = owner.id, math.floor(math.log(alignment, 2)) if alignment else 0
         if pow(2, math.trunc(e)) != alignment:
-            cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}).alignment({!s}) : Unable to change the alignment ({:+d}) for structure \"{:s}\" to an amount ({:d}) that is not a power of 2.".format('.'.join([__name__, cls.__name__]), owner.id, size, pow(2, res), utils.string.escape(name, '"'), alignment))
+            raise E.InvalidParameterError(u"{:s}({:#x}).alignment({!s}) : Unable to change the alignment ({:+d}) for structure \"{:s}\" to an amount ({:d}) that is not a power of 2.".format('.'.join([__name__, cls.__name__]), sid, size, pow(2, res), utils.string.escape(name, '"'), alignment))
         elif not (0 <= math.trunc(e) < 32):
-            cls = self.__class__
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).alignment({!s}) : The requested alignment ({:+d}) for structure \"{:s}\" cannot be {:s} than {:s}.".format('.'.join([__name__, cls.__name__]), owner.id, size, pow(2, math.trunc(e)), utils.string.escape(name, '"'), 'smaller' if math.trunc(e) < 32 else 'larger', "{:d}".format(pow(2, 0 if math.trunc(e) < 32 else 31))))
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).alignment({!s}) : The requested alignment ({:+d}) for structure \"{:s}\" cannot be {:s} than {:s}.".format('.'.join([__name__, cls.__name__]), sid, size, pow(2, math.trunc(e)), utils.string.escape(name, '"'), 'smaller' if math.trunc(e) < 32 else 'larger', "{:d}".format(pow(2, 0 if math.trunc(e) < 32 else 31))))
         elif not idaapi.set_struc_align(owner, math.trunc(e)):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).alignment({!s}) : Unable to set the alignment for structure \"{:s}\" to the specified power of 2 ({:d}).".format('.'.join([__name__, cls.__name__]), owner.id, size, utils.string.escape(name, '"'), math.trunc(e)))
+            raise E.DisassemblerError(u"{:s}({:#x}).alignment({!s}) : Unable to set the alignment for structure \"{:s}\" to the specified power of 2 ({:d}).".format('.'.join([__name__, cls.__name__]), sid, size, utils.string.escape(name, '"'), math.trunc(e)))
         return pow(2, res)
 
     @property
     def size(self):
         '''Return the size of the structure.'''
-        return idaapi.get_struc_size(self.ptr)
+        owner = self.ptr
+        if isinstance(owner, idaapi.tinfo_t):
+            return interface.tinfo.size(owner)
+        return idaapi.get_struc_size(owner)
     @size.setter
     def size(self, size):
         '''Expand the structure to the new `size` that is specified.'''
-        owner, sid = self.ptr, self.ptr.id
-        sptr = idaapi.get_struc(owner.id)
-        if not sptr:
-            cls = self.__class__
-            raise E.StructureNotFoundError(u"{:s}({:#x}).size({:+d}) : Unable to find a structure using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, size, sid))
+        cls, owner = self.__class__, self.ptr
+        sid = interface.tinfo.identifier(owner) if isinstance(owner, idaapi.tinfo_t) else owner.id
 
-        res = idaapi.get_struc_size(sptr)
-        if not idaapi.expand_struc(sptr, 0, size - res, True):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).size({:+d}) : Unable to resize structure \"{:s}\" from {:#x} bytes to {:#x} bytes.".format('.'.join([__name__, cls.__name__]), sid, size, utils.string.escape(self.name, '"'), res, size))
+        # If we were given an `idaapi.tinfo_t`, then we need to grab its size,
+        # and then resize it. We also grab the structure name so we can log it.
+        if isinstance(owner, idaapi.tinfo_t):
+            res, name = interface.tinfo.size(owner), naming.get(owner)
 
-        res = idaapi.get_struc_size(sptr)
-        if res != size:
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).size({:+d}) : The size that was assigned to the structure ({:+d}) does not match what was requested ({:+d}).".format('.'.join([__name__, cls.__name__]), sid, size, res, size))
+            # Now we calculate the delta size, and then resize the thing.
+            before, after = v9members.index_before(owner, 0), v9members.index_after(owner, 0)
+            ok = owner.expand_udt(after if size < res else before, size - res, 0)
+            if ok != idaapi.TERR_OK:
+                errname, errdesc = interface.tinfo.format_type_error(ok)
+                description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+                raise E.DisassemblerError(u"{:s}({:#x}).size({:#x}) : Unable to resize structure \"{:s}\" from {:#x} bit{:s} to {:#x} bit{:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, size, utils.string.escape(name, '"'), res, '' if res == 1 else 's', size, '' if size == 1 else 's', description))
+
+            # Verify that the size was changed correctly.
+            new = interface.tinfo.size(owner)
+            if new != size:
+                logging.warning(u"{:s}({:#x}).size({:#x}) : The size ({:#x}) that was assigned to structure \"{:s}\" does not match what was requested ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, size, new, utils.string.escape(name, '"'), size))
+            return res
+
+        # First check that the identifier is pointing to a valid structure.
+        if not idaapi.get_struc(sid):
+            raise E.StructureNotFoundError(u"{:s}({:#x}).size({:#x}) : Unable to find a structure using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, size, sid))
+
+        # Then we can grab the original structure size and name. We use the size
+        # to calculate the difference between the current and desired size.
+        res, name = idaapi.get_struc_size(owner), naming.get(owner)
+        if not idaapi.expand_struc(owner, 0, size - res, True):
+            raise E.DisassemblerError(u"{:s}({:#x}).size({:#x}) : Unable to resize structure \"{:s}\" from {:#x} byte{:s} to {:#x} byte{:s}.".format('.'.join([__name__, cls.__name__]), sid, size, utils.string.escape(name, '"'), res, '' if res == 1 else 's', size, '' if size == 1 else 's'))
+
+        # Afterwards, we just need to verify the size was correctly updated.
+        new = idaapi.get_struc_size(owner)
+        if new != size:
+            logging.warning(u"{:s}({:#x}).size({:#x}) : The size ({:#x}) that was assigned to structure \"{:s}\" does not match what was requested ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, size, new, utils.string.escape(name, '"'), size))
         return res
 
     @property
@@ -7113,75 +7301,102 @@ class structure_t(object):
     @property
     def index(self):
         '''Return the index of the structure.'''
+        owner = self.ptr
+        if isinstance(owner, idaapi.tinfo_t):
+            return interface.tinfo.ordinal(owner)
         return idaapi.get_struc_idx(self.id)
     @index.setter
     def index(self, index):
         '''Set the index of the structure to `idx`.'''
-        owner = self.owner
+        cls, owner = self.__class__, self.ptr
+        sid = interface.tinfo.identifier(owner) if isinstance(owner, idaapi.tinfo_t) else owner.id
 
-        # first we need a `struc_t` for `idaapi.set_struc_idx`.
-        sid, sptr = owner.id, idaapi.get_struc(owner.id)
-        if not sptr:
-            cls = self.__class__
+        # if we're not using a structured type, then there's no way to change
+        # the ordinal number to something else. so here we need to totally bail.
+        if isinstance(owner, idaapi.tinfo_t):
+            name, ordinal = naming.get(owner), interface.tinfo.ordinal(owner)
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).index({:+d}) : Unable to change the index ({:+d}) for structure \"{:s}\" to the specified index ({:d}).".format('.'.join([__name__, cls.__name__]), sid, index, ordinal, utils.string.escape(name, '"'), index))
+
+        # First we ensure that the identifier is pointing to a valid structure.
+        if not idaapi.get_struc(sid):
             raise E.StructureNotFoundError(u"{:s}({:#x}).index({:+d}) : Unable to find a structure using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, index, sid))
 
         # now we can change the index for the structure.
-        res = idaapi.get_struc_idx(sptr.id)
-        if not idaapi.set_struc_idx(sptr, index):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).index({:+d}) : Unable to modify the index of structure \"{:s}\" from {:d} to index {:d}.".format('.'.join([__name__, cls.__name__]), sid, index, utils.string.escape(self.name, '"'), res, index))
+        res, name = idaapi.get_struc_idx(sid), naming.get(owner)
+        if not idaapi.set_struc_idx(owner, index):
+            raise E.DisassemblerError(u"{:s}({:#x}).index({:+d}) : Unable to modify the index of structure \"{:s}\" from {:d} to index {:d}.".format('.'.join([__name__, cls.__name__]), sid, index, utils.string.escape(name, '"'), res, index))
 
-        res = idaapi.get_struc_idx(sptr.id)
-        if res != index:
-            logging.info(u"{:s}({:#x}).index({:+d}) : The index that the structure was moved to ({:#x}) does not match what was requested ({:d}).".format('.'.join([__name__, cls.__name__]), sid, index, res, index))
+        new = idaapi.get_struc_idx(sid)
+        if new != index:
+            logging.info(u"{:s}({:#x}).index({:+d}) : The index that the structure was moved to ({:#x}) does not match what was requested ({:d}).".format('.'.join([__name__, cls.__name__]), sid, index, new, index))
         return res
     @property
     def ordinal(self):
         '''Return the ordinal number of the structure within the current type library.'''
         owner = self.ptr
+        if isinstance(owner, idaapi.tinfo_t):
+            return interface.tinfo.ordinal(owner)
         return max(0, owner.ordinal)
 
     @property
     def typeinfo(self):
         '''Return the type information of the current structure.'''
-        owner = self.ptr
-        ti = address.type(owner.id)
+        cls, owner = self.__class__, self.ptr
+        sid = interface.tinfo.identifier(owner) if isinstance(owner, idaapi.tinfo_t) else owner.id
 
-        # If there was no type information found for the member, then raise
-        # an exception to the caller because structures _are_ types and thus
-        # this should never fail.
+        # If our backing type is an `idaapi.tinfo_t` then we can just return it.
+        if isinstance(owner, idaapi.tinfo_t):
+            return owner
+
+        # Otherwise, we use the structure identifer to fetch the type. If there
+        # was no type information found for the member than raise an exception
+        # to the caller since structures _are_ types and should never fail.
+        name, ti = naming.get(owner), address.type(sid)
         if ti is None:
-            cls = self.__class__
-            raise E.MissingTypeOrAttribute(u"{:s}({:#x}).typeinfo : Unable to determine the type information for structure {:s}.".format('.'.join([__name__, cls.__name__]), owner.id, self.name))
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}).typeinfo : Unable to determine the type information for structure \"{:s}\".".format('.'.join([__name__, cls.__name__]), sid, utils.string.escape(name, '"')))
 
         # Otherwise it worked and we can return it to the caller.
         return ti
     @typeinfo.setter
     def typeinfo(self, info):
         '''Sets the type information of the current structure to `info`.'''
-        owner = self.ptr
+        cls, owner = self.__class__, self.ptr
+        sid = interface.tinfo.identifier(owner) if isinstance(owner, idaapi.tinfo_t) else owner.id
+
+        # If our backing type is an `idaapi.tinfo_t`, then we need to parse info
+        # to a type, and then we can deserialize from it, and then return it.
+        if isinstance(owner, idaapi.tinfo_t):
+            til, oldtype = interface.tinfo.library(owner), interface.tinfo.copy(owner)
+            newtype = info if isinstance(info, idaapi.tinfo_t) else interface.tinfo.parse(til, info, idaapi.PT_SIL)
+            name = naming.get(owner)
+
+            if not owner.deserialize(til, *newtype.serialize()):
+                raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to apply `{:s}` to structure \"{:s}\".".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(info), utils.pycompat.fullname(idaapi.tinfo_t), utils.string.escape(name, '"')))
+            return oldtype
+
+        # XXX: this property being assigned doesn't make sense... but it's a
+        #      remnant leftover from older versions of the disassembler. Perhaps
+        #      this should be culled from this class entirely...
         try:
-            # XXX: this doesn't make sense... but, it's a remnant leftover from
-            #      older remaining versions of the disassembler. Perhaps it
-            #      should be culled from this class entirely.
-            ti = address.type(owner.id, info)
+            ti = address.type(sid, info)
 
         # If we caught a TypeError, then we received a parsing error that
         # we should re-raise for the user.
         except E.InvalidTypeOrValueError:
-            cls = self.__class__
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), owner.id, utils.string.repr(info), info))
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration {!s}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(info), interface.tinfo.quoted(info)))
 
         # If we caught an exception trying to get the typeinfo for the
         # structure, then port it to our class and re-raise.
         except E.DisassemblerError:
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to apply `{:s}` to structure {:s}.".format('.'.join([__name__, cls.__name__]), owner.id, utils.string.repr(info), utils.pycompat.fullname(idaapi.tinfo_t), self.name))
-        return
+            name = naming.get(owner)
+            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to apply `{:s}` to structure \"{:s}\".".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(info), utils.pycompat.fullname(idaapi.tinfo_t), utils.string.escape(name, '"')))
+        return ti
 
     @property
     def realbounds(self):
         owner = self.ptr
+        if isinstance(owner, idaapi.tinfo_t):
+            return interface.bounds_t(0, interface.tinfo.size(owner))
         return interface.bounds_t(0, idaapi.get_struc_size(owner))
 
     @property
@@ -7194,6 +7409,8 @@ class structure_t(object):
     def location(self):
         '''Return the location of the entire structure.'''
         owner, offset = self.ptr, self.members.baseoffset
+        if isinstance(owner, idaapi.tinfo_t):
+            return interface.location_t(offset, interface.tinfo.size(owner))
         return interface.location_t(offset, idaapi.get_struc_size(owner))
 
     ### Private methods
@@ -7313,7 +7530,7 @@ class structure_t(object):
 
     ## operators
     def __operator__(self, operation, other):
-        cls, owner, offset = self.__class__, self.owner, self.members.baseoffset
+        cls, owner, offset = self.__class__, self.ptr, self.members.baseoffset
         if isinstance(other, types.integer):
             res = operation(offset, other)
         elif isinstance(other, member_t):
@@ -7323,8 +7540,9 @@ class structure_t(object):
         elif hasattr(other, '__int__'):
             res = operation(offset, int(other))
         else:
-            raise TypeError(u"{:s}({:#x}).__operator__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), owner.id, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
-        return cls(owner.ptr, offset=res)
+            sid = interface.tinfo.identifier(owner) if isinstance(owner, idaapi.tinfo_t) else owner.id
+            raise TypeError(u"{:s}({:#x}).__operator__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sid, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
+        return cls(owner, offset=res)
 
     # general arithmetic (adjusts base offset)
     def __add__(self, other):
@@ -7343,24 +7561,26 @@ class structure_t(object):
     # repetition and multiplication
     def __mul__(self, count):
         '''Return a list of structures with each member arranged contiguously as an array of `count` elements.'''
-        cls, owner = self.__class__, self.owner
+        cls, owner = self.__class__, self.ptr
         if not isinstance(count, types.integer):
             other, operation = count, operator.mul
-            raise TypeError(u"{:s}({:#x}).__mul__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), owner.id, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
+            sid = interface.tinfo.identifier(owner) if isinstance(owner, idaapi.tinfo_t) else owner.id
+            raise TypeError(u"{:s}({:#x}).__mul__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sid, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
 
         offset, size = self.members.baseoffset, self.size
         start, stop = sorted([size * count, 0])
-        return [ cls(owner.ptr, offset=offset + relative) for relative in range(start, stop, size) ]
+        return [ cls(owner, offset=offset + relative) for relative in range(start, stop, size) ]
 
     def __pow__(self, index):
         '''Return an instance of the structure with its offset adjusted similar to an array element at the specified `index`.'''
-        cls, owner = self.__class__, self.owner
+        cls, owner = self.__class__, self.ptr
         if not isinstance(index, (types.integer, types.float)):
             other, operation = index, operator.pow
-            raise TypeError(u"{:s}({:#x}).__pow__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), owner.id, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
+            sid = interface.tinfo.identifier(owner) if isinstance(owner, idaapi.tinfo_t) else owner.id
+            raise TypeError(u"{:s}({:#x}).__pow__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sid, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
 
         offset, relative = self.members.baseoffset, math.trunc(self.size * index)
-        return cls(owner.ptr, offset=offset + relative)
+        return cls(owner, offset=offset + relative)
 
     def __lshift__(self, count):
         '''Return an instance of the structure shifted `count` times to a lower address.'''
@@ -7383,18 +7603,18 @@ class structure_t(object):
     # operations
     def __abs__(self):
         '''Return an instance of the structure without an offset.'''
-        cls, owner = self.__class__, self.owner
-        return cls(owner.ptr)
+        cls, owner = self.__class__, self.ptr
+        return cls(owner)
     def __neg__(self):
         '''Return an instance of the structure with its offset negated.'''
-        cls, owner, offset = self.__class__, self.owner, self.members.baseoffset
-        return cls(owner.ptr, -offset)
+        cls, owner, offset = self.__class__, self.ptr, self.members.baseoffset
+        return cls(owner, -offset)
     def __invert__(self):
         '''Return an instance of the structure with its offset inverted.'''
-        cls, owner = self.__class__, self.owner
+        cls, owner = self.__class__, self.ptr
         offset, size = self.members.baseoffset, self.size
         res = offset + size
-        return cls(owner.ptr, -res)
+        return cls(owner, -res)
 
 class member_t(object):
     """
