@@ -442,11 +442,10 @@ class select_v0(object):
 
     @classmethod
     def structures(cls, *args, **kwargs):
-        '''Query the structures in the database and yield a tuple containing each structure and all of the `required` tags with any `included` ones.'''
+        '''Query the structures in the database and yield a tuple containing each structure identifier and all of the `required` tags with any `included` ones.'''
         if args or kwargs:
             for sid, res in query_v0.structures(*args, **kwargs):
-                item = internal.structure.new(sid, 0)
-                yield item, res
+                yield sid, res
             return
 
         # If nothing specified to filter the tags, then we need to filter the
@@ -455,100 +454,80 @@ class select_v0(object):
         for sid, res in query_v0.structures(*args, **kwargs):
             explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
             if explicit:
-                yield internal.structure.new(sid, 0), explicit
+                yield sid, explicit
             continue
         return
 
     @classmethod
     def structure(cls, sid, *args, **kwargs):
-        '''Query the members of the structure `sid` from the database and yield a tuple containing all the chosen tags.'''
+        '''Query the members of the structure `sid` from the database and yield a tuple containing the member identifier and all the chosen tags.'''
 
         # If we were given a structure_t or members_t, then preserve them and
         # extract the sid so that we can return items with the same base offset.
         if isinstance(sid, internal.structure.structure_t):
-            owner, sptr = sid, sid.ptr
+            sptr = sid.ptr
         elif isinstance(sid, internal.structure.members_t):
-            owner, sptr = sid.owner, sid.owner.ptr
+            sptr = sid.owner.ptr
         else:
-            owner = internal.structure.new(sid, 0)
-            sptr = owner.ptr
+            sptr = idaapi.get_struc(sid)
 
         # If we were given some args to use for selecting certain tags, then we
         # can just trust our query and only need to convert its member id
         # into one of our `internal.structure.member_t` types.
         if args or kwargs:
             for mid, res in query_v0.structure(sptr.id, *args, **kwargs):
-                mowner, mindex, mptr = internal.structure.members.by_identifier(sptr, mid)
-                yield internal.structure.member_t(owner, mindex), res
+                yield mid, res
             return
 
         # Otherwise we're being asked to yield everything but the empty tag and
         # any implicit tags. We also convert the member id into a `member_t`.
         for mid, res in query_v0.structure(sptr.id, *args, **kwargs):
-            mowner, mindex, mptr = internal.structure.members.by_identifier(sptr, mid)
             explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
             if explicit:
-                yield internal.structure.member_t(owner, mindex), explicit
+                yield mid, explicit
             continue
         return
 
     @classmethod
     def owners(cls, *args, **kwargs):
-        '''Query the members in the database and yield a tuple containing the owning structure and a set of the matching `required` tags with any `included` ones.'''
-        cache = {}
+        '''Query the members in the database and yield a tuple containing the owning structure identifier and a set of the matching `required` tags with any `included` ones.'''
 
         # If we were given some tags to select with, then we can just trust
         # whatever the query gives us whilst still yielding a `member_t`.
         if args or kwargs:
             for sid, res in query_v0.owners(*args, **kwargs):
-                owner = cache[sid] if sid in cache else cache.setdefault(sid, internal.structure.new(sid, 0))
-                yield owner, res
+                yield sid, res
             return
-
-        # FIXME: we should be using something other than an offset of 0 if the
-        #        structure belongs to a frame.
 
         # We weren't given any tags, meaning we are being asked to yield all of
         # them. So we filter out the empty tag and any implicit tags by default.
         for sid, res in query_v0.owners(*args, **kwargs):
             explicit = {tag for tag in res if tag and not tag.startswith('__')}
             if explicit:
-                owner = cache[sid] if sid in cache else cache.setdefault(sid, internal.structure.new(sid, 0))
-                yield owner, explicit
+                yield sid, explicit
             continue
         return
 
     @classmethod
     def members(cls, *args, **kwargs):
-        '''Query the members in the database and yield a tuple containing the member and all of the `required` tags with any `included` ones.'''
-        cache = {}
+        '''Query the members in the database and yield a tuple containing the member identifier and all of the `required` tags with any `included` ones.'''
 
         # If we were given some tags to select the members with, then we can
         # just return whatever the query gives us. We only need to convert the
         # member id to an actual member that can be returned.
         if args or kwargs:
             for mid, res in query_v0.members(*args, **kwargs):
-                mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
-
-                # FIXME: we should be detecting the frame base offset for the owner
-                #        in case the structure is a frame belonging to a function.
-                owner = cache[mowner.id] if mowner.id in cache else cache.setdefault(mowner.id, internal.structure.new(mowner.id, 0))
                 if res:
-                    yield owner.members[mindex], res
+                    yield mid, res
                 continue
             return
 
         # If no tags were provided, then we're supposed to yield all of them.
         # Still, be filter out the empty tag along with any implicit ones.
         for mid, res in query_v0.members(*args, **kwargs):
-            mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
-
-            # FIXME: we should be detecting the frame base offset for the owner
-            #        in case the structure is a frame belonging to a function.
             explicit = {tag for tag in res if tag and not tag.startswith('__')}
             if explicit:
-                owner = cache[mowner.id] if mowner.id in cache else cache.setdefault(mowner.id, internal.structure.new(mowner.id, 0))
-                yield owner.members[mindex], explicit
+                yield mid, explicit
             continue
         return
 
