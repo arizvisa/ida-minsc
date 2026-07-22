@@ -971,75 +971,60 @@ class select_v1(object):
 
     @classmethod
     def structures(cls, *args, **kwargs):
-        '''Query the structures in the database and yield a tuple containing each structure and all of the `required` tags with any `included` ones.'''
+        '''Query the structures in the database and yield a tuple containing each structure identifier and all of the `required` tags with any `included` ones.'''
         selection = True if any([args, kwargs]) else False
         for sid, used in query_v1.structures(*args, **kwargs):
             tags = structure.get(sid)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
             if selection:
-                yield internal.structure.new(sid, 0), selected
+                yield sid, selected
             elif explicit:
-                yield internal.structure.new(sid, 0), explicit
+                yield sid, explicit
             continue
         return
 
     @classmethod
     def owners(cls, *args, **kwargs):
-        '''Query the members in the database and yield a tuple containing the owning structure for the member and a set of the matching `required` tags with any `included` ones.'''
+        '''Query the members in the database and yield a tuple containing the owning structure identifier for the member and a set of the matching `required` tags with any `included` ones.'''
         selection = True if any([args, kwargs]) else False
-
-        # FIXME: we should be using an offset other than 0 if the structure
-        #        being yielded belongs to a frame.
         for sid, used in query_v1.owners(*args, **kwargs):
             explicit = {key for key in used if key and not key.startswith('__')}
             if selection:
-                yield internal.structure.new(sid, 0), used
+                yield sid, used
             elif explicit:
-                yield internal.structure.new(sid, 0), explicit
+                yield sid, explicit
             continue
         return
 
     @classmethod
     def members(cls, *args, **kwargs):
-        '''Query the members in the database and yield a tuple containing the member and a set of the matching `required` tags with any `included` ones.'''
-        cache, selection = {}, True if any([args, kwargs]) else False
+        '''Query the members in the database and yield a tuple containing the member identifier and a set of the matching `required` tags with any `included` ones.'''
+        selection = True if any([args, kwargs]) else False
 
-        # Go through each member from our query, and use it to get the structure
-        # that owns it. We can then instantiate a `structure_t`. We cache the
-        # result from this in case more than one member from the structure is
-        # being yielded.
+        # Go through each member from our query so that we can filter out the
+        # empty tag and any implicit ones.. Now we're left with explicit tags.
         for mid, used in query_v1.members(*args, **kwargs):
-            mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
-
-            # FIXME: we should be using an offset other than 0 if the owner of the
-            #        member being yielded is a frame for a function.
-            owner = cache[mowner.id] if mowner.id in cache else cache.setdefault(mowner.id, internal.structure.new(mowner.id, 0))
-
-            # Now we just need to filter out the empty tag and any implicit ones
-            # so that we're only left with explicit tags.
             explicit = {key for key in used if key and not key.startswith('__')}
             if selection:
-                yield owner.members[mindex], used
+                yield mid, used
             elif explicit:
-                yield owner.members[mindex], explicit
+                yield mid, explicit
             continue
         return
 
     @classmethod
     def structure(cls, sid, *args, **kwargs):
-        '''Query the members of the structure `sid` and yield a tuple containing each member and all of the `required` tags with any `included` ones.'''
-        selection, cache = True if any([args, kwargs]) else False, {}
+        '''Query the members of the structure `sid` and yield a tuple containing each member identifier and all of the `required` tags with any `included` ones.'''
+        selection = True if any([args, kwargs]) else False
         for mid, used in query_v1.structure(sid, *args, **kwargs):
             tags = member.get(mid)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
-            sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
-            mowner = cache[sptr.id] if sptr.id in cache else cache.setdefault(sptr.id, internal.structure.new(sptr.id, 0))
             if selection:
-                yield mowner.members[mindex], selected
+                yield mid, selected
             elif explicit:
-                yield mowner.members[mindex], explicit
+                yield mid, explicit
             continue
         return
 
