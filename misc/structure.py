@@ -4962,7 +4962,7 @@ class members(object):
             return False
 
         elif not result:
-            raise E.MemberNotFoundError(u"{:s}.by_identifier({!s}, {:#x}) : Unable to locate the member using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(sptr.id), identifier, identifier))
+            return False
 
         # Unpack the result and check the identifier of the owning structure.
         mptr, fullname, sptr_ = result
