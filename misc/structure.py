@@ -4609,13 +4609,13 @@ class v9members(object):
             errors = {mindex : (mowner, mutd, mindex, udm) for mowner, mutd, mindex, udm in iterable}
             for index in sorted(errors):
                 packed = errors[index]
-                logging.critical(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the selected {:s} from {:s} of {:s} for replacement.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, "member ({:#x})".format(mid) if interface.node.identifier(mid) else "gap of size {:#x}".format(mid), "index {:d}".format(index), type_description)) 
+                logging.critical(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the selected {:s} from {:s} of {:s} for replacement.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, "member ({:#x})".format(mid) if interface.node.identifier(mid) else "gap of size {:#x}".format(mid), "index {:d}".format(index), type_description))
 
         elif deleted != len(olditems):
             errors = {offset : (next(v9members.at_offset(ti, offset)) if v9members.has_offset(ti, offset) else None) for offset in olditems}
             for offset, mid in selected:
                 if errors.get(offset):
-                    logging.critical(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the selected {:s} from {:s} of {:s} for replacement.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, "member ({:#x})".format(mid) if interface.node.identifier(mid) else "gap of size {:#x}".format(mid), "offset {:+#x}".format(base + offset), type_description)) 
+                    logging.critical(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the selected {:s} from {:s} of {:s} for replacement.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, "member ({:#x})".format(mid) if interface.node.identifier(mid) else "gap of size {:#x}".format(mid), "offset {:+#x}".format(base + offset), type_description))
                 continue
 
         # If we didn't remove the items that we expected, then we should bail.
