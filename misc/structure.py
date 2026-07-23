@@ -1042,12 +1042,8 @@ class v9member(object):
         name = utils.string.of(udm.name)
         mtype = interface.tinfo.copy(udm.type)
         mbitoffset, mbits = 0 if union(tinfo) else udm.offset, udm.size
-        moffset, mextra = divmod(mbitoffset, 8)
-        moffset = 1 + moffset if mextra else moffset
-        msize, mextra = divmod(mbits, 8)
-        msize = 1 + msize if mextra else msize
-        ptype = interface.typemap.dissolvetype(mtype, int(offset) + moffset)
-        location = interface.location_t(int(offset) + moffset, msize)
+        ptype = interface.typemap.dissolvetype(mtype, mbitoffset if offset is None else int(offset))
+        location = interface.location_t(mbitoffset if offset is None else int(offset), mbits)
         type = interface.tinfo.copy(udm.type)
         comment, regular = utils.string.of(udm.cmt), udm.is_regcmt()
         return mid, name, ptype, location, type, (not regular, comment)
@@ -3406,7 +3402,7 @@ class v9members(object):
 
             # If the member is not a special member, then add it.
             if mid not in specials:
-                members[mindex if is_union else udm.offset] = v9member.packed(base, mid)
+                members[mindex if is_union else udm.offset] = v9member.packed(base + udm.offset, mid)
                 selected.append((mindex, udm.offset, mid))
             continue
 
@@ -3434,7 +3430,8 @@ class v9members(object):
         # get the indices to remove and reverse them so that we delete the
         # elements in reverse without the index changing.
         indices = sorted(builtins.range(*slice.indices(utd.size())))
-        iterable = ((mindex, v9member.packed(base, ti, mindex)) for mindex in indices[::-1])
+        iterable = utils.itermap(functools.partial(cls.by, ti), indices[::-1])
+        iterable = ((mindex, v9member.packed(base + udm.offset, mowner, mindex)) for mowner, _, mindex, udm in iterable)
         iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
         listable = [(mid, mname, mindex, moffset, msize) for mindex, mid, mname, mtype, (moffset, msize), mtypeinfo, mcomment in iterable if mid not in specials]
 
@@ -3586,7 +3583,7 @@ class v9members(object):
 
             # If the member is not a special member, then add it.
             if mid not in specials:
-                members[mindex if is_union else udm.offset] = v9member.packed(base, mid)
+                members[mindex if is_union else udm.offset] = v9member.packed(base + udm.offset, mid)
                 selected.append((mindex, udm.offset, mid))
             continue
 
@@ -3617,7 +3614,8 @@ class v9members(object):
             # We now need the indices to remove in reverse so that we can avoid
             # having to do any calculations for members that will be shifted.
             indices = builtins.range(*slice(lindex, rindex + 1).indices(utd.size()))
-            iterable = ((mindex, v9member.packed(base, ti, mindex)) for mindex in indices[::-1])
+            iterable = utils.itermap(functools.partial(cls.by, ti), indices[::-1])
+            iterable = ((mindex, v9member.packed(base + udm.offset, mowner, mindex)) for mowner, _, mindex, udm in iterable)
             iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
             listable = [(mid, mname, mindex, moffset, msize) for mindex, mid, mname, mtype, (moffset, msize), mtypeinfo, mcomment in iterable if mid not in specials]
 
@@ -3625,7 +3623,7 @@ class v9members(object):
         # is because all deletions or modifications to a union are destructive.
         else:
             indices = sorted(selected, key=operator.itemgetter(0))
-            iterable = ((mindex, v9member.packed(base, ti, mindex)) for mindex, moffset, mid in indices[::-1])
+            iterable = ((mindex, v9member.packed(base + moffset, ti, mindex)) for mindex, moffset, mid in indices[::-1])
             iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
             listable = [(mid, mname, mindex, moffset, msize) for mindex, mid, mname, mtype, (moffset, msize), mtypeinfo, mcomment in iterable if mid not in specials]
 
@@ -3793,7 +3791,7 @@ class v9members(object):
 
             # If the member is not a special member, then add it.
             if mid not in specials:
-                members[mindex if is_union else udm.offset] = v9member.packed(base, mid)
+                members[mindex if is_union else udm.offset] = v9member.packed(base + udm.offset, mid)
                 selected.append((mindex, udm.offset, mid))
             continue
 
@@ -3810,7 +3808,8 @@ class v9members(object):
         # Before deleting the members, use the slice to gather the indices that
         # will be cleared, and reverse them so that the indices won't change.
         indices = sorted(builtins.range(*slice.indices(utd.size())))
-        iterable = ((mindex, v9member.packed(base, ti, mindex)) for mindex in indices[::-1])
+        iterable = utils.itermap(functools.partial(cls.by, ti), indices[::-1])
+        iterable = ((mindex, v9member.packed(base + udm.offset, mowner, mindex)) for mowner, _, mindex, udm in iterable)
         iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
         listable = [(mid, mname, mindex, moffset, msize) for mindex, mid, mname, mtype, (moffset, msize), mtypeinfo, mcomment in iterable if mid not in specials]
 
@@ -3944,7 +3943,7 @@ class v9members(object):
 
             # If the member is not a special member, then add it.
             if mid not in specials:
-                members[mindex if is_union else udm.offset] = v9member.packed(base, mid)
+                members[mindex if is_union else udm.offset] = v9member.packed(base + udm.offset, mid)
                 selected.append((mindex, udm.offset, mid))
             continue
 
@@ -3981,7 +3980,8 @@ class v9members(object):
             eoff = mright[-1].offset + mright[-1].size if mright else size
 
             indices = builtins.range(*slice(lindex, rindex + 1).indices(utd.size()))
-            iterable = ((mindex, v9member.packed(base, ti, mindex)) for mindex in indices[::-1])
+            iterable = utils.itermap(functools.partial(cls.by, ti), indices[::-1])
+            iterable = ((mindex, v9member.packed(base + udm.offset, ti, mindex)) for mowner, _, mindex, udm in iterable)
             iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
             listable = [(mid, mname, mindex, moffset, msize) for mindex, mid, mname, mtype, (moffset, msize), mtypeinfo, mcomment in iterable if mid not in specials]
 
@@ -4342,11 +4342,11 @@ class v9members(object):
         for offset, mid in selected:
             if union(ti) and interface.node.identifier(mid):
                 _, _, mindex, _ = cls.by(mid)
-                olditems[mindex] = v9member.packed(base, mid)
+                olditems[mindex] = v9member.packed(base + offset, mid)
             elif interface.node.identifier(mid):
-                olditems[offset] = v9member.packed(base, mid)
+                olditems[offset] = v9member.packed(base + offset, mid)
             else:
-                olditems[offset] = idaapi.BADADDR, '', (), interface.location_t(offset, mid), None, (True, '')
+                olditems[offset] = idaapi.BADADDR, '', (), interface.location_t(base + offset, mid), None, (True, '')
             continue
 
         # Now we lay out each specific member that will be contiguously assigned
@@ -4662,7 +4662,7 @@ class v9members(object):
         mindex = v9members.index_after(ti, left)
         if delta > 0 and 0 <= mindex:
             iterable = (cls.by(ti, index) for index in range(mindex, count))
-            olditems.update({udm.offset : v9member.packed(base, mowner, index) for mowner, mutd, index, udm in iterable})
+            olditems.update({udm.offset : v9member.packed(base + udm.offset, mowner, index) for mowner, mutd, index, udm in iterable})
 
         # Hopefully that is everything and we should only need to add the new
         # members to the structure from "newitems"
