@@ -2496,10 +2496,12 @@ class v9members(object):
         else:
             sid = interface.tinfo.identifier(tinfo)
 
+        # Now we'll check if the identifier we were given points to a member,
+        # and that its identifier matches the identifier of the given type.
         ti = idaapi.tinfo_t()
-        if not ti.get_type_by_tid(identifier):
-            raise E.StructureNotFoundError(u"{:s}.by_identifier({!s}, {:#x}) : Unable to find the type for the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier, identifier))
-        return sid == interface.tinfo.identifier(ti)
+        if ti.get_type_by_tid(identifier):
+            return sid == interface.tinfo.identifier(ti)
+        return False
 
     @classmethod
     def has_name(cls, type, name):
