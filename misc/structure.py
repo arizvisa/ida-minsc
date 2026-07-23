@@ -3386,7 +3386,7 @@ class v9members(object):
         [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn else 0]
 
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
-        iterable = (next(v9members.at_offset(ti, moffset)) for moffset in iterable if v9members.has_offset(ti, moffset))
+        iterable = (next(v9members.at_offset(ti, 8 * moffset)) for moffset in iterable if v9members.has_offset(ti, 8 * moffset))
         specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, _, mindex, _ in iterable}
 
         # We now need to collect the members matching the specified slice so
@@ -3433,33 +3433,46 @@ class v9members(object):
         iterable = utils.itermap(functools.partial(cls.by, ti), indices[::-1])
         iterable = ((mindex, v9member.packed(base + udm.offset, mowner, mindex)) for mowner, _, mindex, udm in iterable)
         iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
-        listable = [(mid, mname, mindex, moffset, msize) for mindex, mid, mname, mtype, (moffset, msize), mtypeinfo, mcomment in iterable if mid not in specials]
+        listable = [(mid, mname, mindex, mbitoffset, mbits) for mindex, mid, mname, mtype, (mbitoffset, mbits), mtypeinfo, mcomment in iterable if mid not in specials]
 
         # Finally we can start asking the disassembler to delete each member
         # specified by our list of indices.
-        count, failed = 0, {moffset for moffset in []}
-        for mid, mname, mindex, moffset, msize in listable:
-            mkey = mindex if is_union else moffset - base
+        count, failed = 0, {mbitoffset for mbitoffset in []}
+        for mid, mname, mindex, mbitoffset, mbits in listable:
+            mkey = mindex if is_union else mbitoffset - base
             if mkey not in members:
                 continue
+            bits = 8 * interface.tinfo.size(ti)
 
             # Get the index for the member, and then we can just delete it.
-            location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
+            location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(mbitoffset + base)
             ok = ti.del_udm(mindex)
 
             if ok != idaapi.TERR_OK:
                 errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                 logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove member \"{:s}\" ({:#x}) at {:s} of the {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, utils.string.escape(mname, '"'), mid, location_description, type_description, description))
-                ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
+                ok, _ = idaapi.TERR_OK, failed.add((mid, mbitoffset))
 
-            elif not is_union and v9members.has_offset(ti, moffset - base) and not(next(cls.at_offset(ti, moffset - base))[-1].is_gap()):
+            # If we succeeded, but there's still a member at that offset..then
+            # something unexpected happened since it should've been removed.
+            elif not is_union and v9members.has_offset(ti, mbitoffset - base) and not(next(cls.at_offset(ti, mbitoffset - base))[-1].is_gap()):
                 logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Member \"{:s}\" ({:#x}) at {:s} of {:s} was not removed.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, utils.string.escape(mname, '"'), mid, location_description, type_description))
-                ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
+                ok, _ = idaapi.TERR_OK, failed.add((mid, mbitoffset))
 
             # If we succeeded and the type is a union, then update the count.
             elif is_union:
-                count += 1
+                ok, count = idaapi.TERR_OK, count + 1
+
+            # If the type was already reduced in size due to the removal of the
+            # selected member, then we don't have to do anything with it.
+            elif 8 * interface.tinfo.size(ti) == bits - mbits:
+                ok, count = idaapi.TERR_OK, count + 1
+
+            # Otherwise, we're going to be scanning for how to shrink the type.
+            # So, we need to grab the most recent copy of the udt details.
+            elif not ti.get_udt_details(utd):
+                raise E.DisassemblerError(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to get the details for the specified {:s} type.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, type_description))
 
             # If successful, then we can try to shrink the structure type. The
             # newer API, however, doesn't let you shrink the size of a gap
@@ -3469,15 +3482,15 @@ class v9members(object):
                 while index < utd.size() and utd[index].is_gap():
                     index += 1
                 logging.debug(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Adjusted index ({:d}) for reducing {:s} from member \"{:s}\" ({:#x}) at {:s} to index {:d}.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, mindex, type_description, utils.string.escape(mname, '"'), mid, location_description, index))
-                ok = ti.expand_udt(index, -msize // 8)
+                ok = ti.expand_udt(index, -mbits // 8)
                 count = count + 1 if ok == idaapi.TERR_OK else count
 
             # If we couldn't shrink the structure, then log a warning.
             if ok != idaapi.TERR_OK:
                 errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
-                logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove space ({:d}) from {:s} after removing member \"{:s}\" ({:#x}) at {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, msize, type_description, utils.string.escape(mname, '"'), mid, location_description, description))
-                ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
+                logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove space ({:d}) from {:s} after removing member \"{:s}\" ({:#x}) at {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, mbits, type_description, utils.string.escape(mname, '"'), mid, location_description, description))
+                ok, _ = idaapi.TERR_OK, failed.add((mid, mbitoffset))
             continue
 
         # If we tried to remove the elements but could not, then complain about
@@ -3498,9 +3511,9 @@ class v9members(object):
         # If the number of items removed matches what we expect, then we're
         # pretty much done here and can return what was removed.
         if is_union:
-            iterable = (members[mindex] for mindex, moffset, mid in selected if mindex in members)
+            iterable = (members[mindex] for mindex, mbitoffset, mid in selected if mindex in members)
         else:
-            iterable = (members[moffset] for mindex, moffset, mid in selected if moffset in members)
+            iterable = (members[mbitoffset] for mindex, mbitoffset, mid in selected if mbitoffset in members)
 
         if len(selected) == count:
             return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
@@ -3512,17 +3525,17 @@ class v9members(object):
         # Now we go through each selected member and verifying that it doesn't
         # exist. If it does, then we need to complain about it.
         removed = {mid for mid in []}
-        for mindex, moffset, mid in selected:
-            mkey = mindex if is_union else moffset
+        for mindex, mbitoffset, mid in selected:
+            mkey = mindex if is_union else mbitoffset
             if mkey not in members:
                 continue
 
-            _, mname, _, _, _ = members[mkey]
+            _, mname, _, _, _, _ = members[mkey]
 
             # Check if the member actually exists at the offset or index.
-            exists = v9members.has_index(ti, mindex) if is_union else v9members.has_offset(ti, moffset)
+            exists = v9members.has_index(ti, mindex) if is_union else v9members.has_offset(ti, mbitoffset)
             if exists:
-                location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(base + moffset)
+                location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(base + mbitoffset)
                 logging.debug(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove member \"{:s}\" at {:s} with id ({:#x}) from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, utils.string.escape(mname, '"'), location_description, mid, type_description, sid))
 
             # If it doesn't exist, then our removal was successful.
@@ -3533,7 +3546,7 @@ class v9members(object):
         # Finally we can complain about the members that we could not remove and
         # then return everything that we were successful at removing.
         logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove {:d} of {:s} from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, len(expected) - len(removed), "{:d} members".format(len(expected)) if len(expected) == 1 else "the expected {:d} members".format(len(expected)), type_description, sid))
-        iterable = (mindex for mindex, moffset, mid in selected if mid in removed) if is_union else (moffset for mindex, moffset, mid in selected if mid in removed)
+        iterable = (mindex for mindex, mbitoffset, mid in selected if mid in removed) if is_union else (mbitoffset for mindex, mbitoffset, mid in selected if mid in removed)
         iterable = (members[moffset_or_mindex] for moffset_or_mindex in iterable)
         return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
 
