@@ -727,11 +727,8 @@ class typemap(object):
             raise internal.exceptions.InvalidParameterError(u"{:s}.dissolvetype({!s}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), '' if offset is None else ", offset={:#x}".format(offset), type.__class__))
 
         # If our type is a structure type, then return an internal structure.
-        # FIXME: We should be emitting the actual structure for the type.
-        if ti.is_struct():
-            logging.warning(u"{:s}.dissolvetype({!s}{:s}) : Processing the specified structure type ({:#x}) as an array of bytes due to not being implemented yet.".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), '' if offset is None else ", offset={:#x}".format(offset), sid))
-            byte = builtins.int, 1
-            return [byte, tinfo.size(ti)]
+        if ti.is_struct() or ti.is_union():
+            return internal.structure.new(ti, offset or 0)
 
         # If our type is an array type, then get its base type and length so we
         # can return it as a list of things.
