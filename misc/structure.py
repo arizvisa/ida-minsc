@@ -1716,7 +1716,10 @@ class member(object):
         # then we'll need to figure out the offset and use it to calculate
         # the location. the member's offset is the parameter unless we're
         # a member of a union. if so, then we just use the parameter as-is.
-        moffset = int(offset) if is_union_member else int(offset) + mptr.soff
+        if offset is None:
+            moffset = 0 if is_union_member else mptr.soff
+        else:
+            moffset = int(offset)
         location = interface.location_t(moffset, msize)
 
         # snag both comment types so that we can include them in our result.
@@ -5606,6 +5609,7 @@ class members(object):
         selected, lindex, rindex, members, member_references = [], sptr.memqty, 0, {}, {}
         for mowner, mindex, mptr in cls.iterate(sptr, slice):
             lindex, rindex = min(mindex, lindex), max(mindex, rindex)
+            moffset = 0 if union(mowner) else mptr.soff
 
             # Capture the references for the member so that we can poke
             # the disassembler to update them after we remove the member.
@@ -5613,7 +5617,7 @@ class members(object):
 
             # If the field is not an important frame member, then add it.
             if mptr.id not in specials:
-                members[mptr.soff] = member.packed(base, mptr)
+                members[mptr.soff] = member.packed(base + moffset, mptr)
                 selected.append((mptr.soff, mptr))
             continue
 
@@ -5759,6 +5763,7 @@ class members(object):
         selected, lindex, rindex, members, references = [], sptr.memqty, 0, {}, {}
         for mowner, mindex, mptr in cls.at_bounds(sptr, start - base, stop - base):
             lindex, rindex = min(mindex, lindex), max(mindex, rindex)
+            moffset = 0 if union(mowner) else mptr.soff
 
             # Now we can gather the references for the member keyed by their
             # address so that we know which addresses will need to be updated.
@@ -5767,7 +5772,7 @@ class members(object):
 
             # Afterwards, as long as it's not a special member, we can add it.
             if mptr.id not in specials:
-                members[mptr.soff] = member.packed(base, mptr)
+                members[mptr.soff] = member.packed(base + moffset, mptr)
                 selected.append((mptr.soff, mptr))
             continue
 
@@ -5917,6 +5922,7 @@ class members(object):
         selected, lindex, rindex, members, references = [], sptr.memqty, 0, {}, {}
         for mowner, mindex, mptr in cls.iterate(sptr, slice):
             lindex, rindex = min(mindex, lindex), max(mindex, rindex)
+            moffset = 0 if union(mowner) else mptr.soff
 
             # Capture the references for the member so that we can poke the
             # disassembler to update its references after it gets deleted.
@@ -5925,7 +5931,7 @@ class members(object):
 
             # If the field is not a special field, then it's okay to add.
             if mptr.id not in specials:
-                members[mptr.soff] = member.packed(base, mptr)
+                members[mptr.soff] = member.packed(base + moffset, mptr)
                 selected.append((mptr.soff, mptr))
             continue
 
@@ -6041,6 +6047,7 @@ class members(object):
         selected, lindex, rindex, members, references = [], sptr.memqty, 0, {}, {}
         for mowner, mindex, mptr in cls.at_bounds(sptr, start - base, stop - base):
             lindex, rindex = min(mindex, lindex), max(mindex, rindex)
+            moffset = 0 if union(mowner) else mptr.soff
 
             # Only collect its references if it's a special frame member.
             if mptr.id not in specials:
@@ -6048,7 +6055,7 @@ class members(object):
 
             # If it's not a special field (from a frame), add it to our selection.
             if mptr.id not in specials:
-                members[mptr.soff] = member.packed(base, mptr)
+                members[mptr.soff] = member.packed(base + moffset, mptr)
                 selected.append((mptr.soff, mptr))
             continue
 
@@ -6298,7 +6305,7 @@ class members(object):
         # Before we do any serious damage to the union/structure, save the
         # selected member data that we plan on overwriting with our new layout.
         iterable = ((offset, mptr) for offset, mptr in selected if isinstance(mptr, idaapi.member_t))
-        olditems = {offset : member.packed(base, mptr) for offset, mptr in iterable}
+        olditems = {offset : member.packed(base + (0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff), mptr) for offset, mptr in iterable}
 
         # Now we can lay out each member that we're going to assign contiguously
         # and collect each offset along with their minimum attributes into a list.
@@ -6563,7 +6570,7 @@ class members(object):
         midx = idaapi.get_next_member_idx(sptr, left)
         if delta > 0 and 0 <= midx:
             iterable = (sptr.members[idx] for idx in range(midx, sptr.memqty))
-            olditems.update({mptr.soff : member.packed(base, mptr) for mptr in iterable})
+            olditems.update({mptr.soff : member.packed(base + (0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff), mptr) for mptr in iterable})
 
         # That should do it.. So, we should only need to add the newitems to the structure.
         results, oldsize = [], idaapi.get_struc_size(sptr)
