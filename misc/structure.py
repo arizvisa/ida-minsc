@@ -1041,9 +1041,13 @@ class v9member(object):
         mid = interface.tinfo.member_identifier(tinfo, mindex)
         name = utils.string.of(udm.name)
         mtype = interface.tinfo.copy(udm.type)
-        moffset = int(offset) if union(tinfo) else int(offset) + udm.offset
-        ptype = interface.typemap.dissolvetype(mtype, moffset)
-        location = interface.location_t(moffset, udm.size)
+        mbitoffset, mbits = 0 if union(tinfo) else udm.offset, udm.size
+        moffset, mextra = divmod(mbitoffset, 8)
+        moffset = 1 + moffset if mextra else moffset
+        msize, mextra = divmod(mbits, 8)
+        msize = 1 + msize if mextra else msize
+        ptype = interface.typemap.dissolvetype(mtype, int(offset) + moffset)
+        location = interface.location_t(int(offset) + moffset, msize)
         type = interface.tinfo.copy(udm.type)
         comment, regular = utils.string.of(udm.cmt), udm.is_regcmt()
         return mid, name, ptype, location, type, (not regular, comment)
@@ -7750,7 +7754,8 @@ class member_t(object):
         if isinstance(mowner.ptr, idaapi.tinfo_t):
             tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
             mbitoffset, mbits = udm.offset, udm.size
-            return mbits
+            msize, mextra = divmod(mbits, 8)
+            return msize + 1 if mextra else msize
         return member.size(self.ptr)
     @property
     def realoffset(self):
@@ -7759,7 +7764,8 @@ class member_t(object):
         if isinstance(mowner.ptr, idaapi.tinfo_t):
             tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
             mbitoffset, mbits = udm.offset, udm.size
-            return 0 if union(mowner.ptr) else mbitoffset
+            moffset, mextra = divmod(mbitoffset, 8)
+            return 0 if union(mowner.ptr) else moffset + 1 if mextra else moffset
         return 0 if union(mowner.ptr) else self.ptr.soff
 
     @property
@@ -7833,7 +7839,11 @@ class member_t(object):
         if isinstance(mowner.ptr, idaapi.tinfo_t):
             tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
             mbitoffset, mbits = 0 if union(tinfo) else udm.offset, udm.size
-            return interface.bounds_t(mbitoffset, mbitoffset + mbits)
+            moffset, moffsetex = divmod(mbitoffset, 8)
+            msize, msizeex = divmod(mbits, 8)
+            mleft = moffset + 1 if moffsetex else moffset
+            mright = mleft + msize + 1 if msizeex else mleft + msize
+            return interface.bounds_t(mleft, mright)
 
         # Otherwise, it's a plain `idaapi.member_t` and we can trust its fields.
         mptr = self.ptr
