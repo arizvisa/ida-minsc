@@ -1312,9 +1312,12 @@ class member(object):
     @classmethod
     def fullname(cls, mptr):
         '''Return the full name of the member given my `mptr` as a string.'''
-        Fnetnode = getattr(idaapi, 'ea2node', utils.fidentity)
-        netnode = Fnetnode(getattr(mptr, 'id', mptr))
-        return utils.string.of(internal.netnode.name.get(netnode) if internal.netnode.name.get(netnode) else '')
+        if not hasattr(idaapi, 'get_member_fullname'):
+            Fnetnode = getattr(idaapi, 'ea2node', utils.fidentity)
+            netnode = Fnetnode(getattr(mptr, 'id', mptr))
+            return utils.string.of(internal.netnode.name.get(netnode) if internal.netnode.name.get(netnode) else '')
+        res = idaapi.get_member_fullname(getattr(mptr, 'id', mptr))
+        return utils.string.of(res)
 
     @classmethod
     def set_name(cls, mptr, string):
