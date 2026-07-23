@@ -658,9 +658,20 @@ class typemap(object):
 
         # If our pythonic-type is a structure, then we extract its sptr and then
         # we can use the sptr to snag its identifier and the size of the structure.
-        elif isinstance(pythonType, (idaapi.struc_t, internal.structure.structure_t)):
-            sptr = pythonType if isinstance(pythonType, idaapi.struc_t) else pythonType.ptr
-            flag, typeid, sz = struc_flag(), sptr.id, idaapi.get_struc_size(sptr)
+        elif isinstance(pythonType, (getattr(idaapi, 'struc_t', internal.structure.structure_t), internal.structure.structure_t)):
+            if isinstance(pythonType, internal.structure.structure_t):
+                sptr = pythonType.ptr
+            elif hasattr(idaapi, 'struc_t') and isinstance(pythonType, idaapi.struc_t):
+                sptr = pythonType if isinstance(pythonType, idaapi.struc_t) else pythonType.ptr
+            else:
+                raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.resolve({!s}) : Unable the resolve the given type ({!s}) to a supported type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+
+            # If the backing is a tinfo_t, then get the identifier and size.
+            if isinstance(sptr, idaapi.tinfo_t):
+                sid, size = tinfo.identifier(sptr), tinfo.size(sptr)
+            else:
+                sid, size = sptr.id, idaapi.get_struc_size(sptr)
+            flag, typeid, sz = struc_flag(), sid, size
 
         # If we got a tuple here (since we processed it earlier), then this is because
         # we're using a variable-length structure. This really means that the structure
