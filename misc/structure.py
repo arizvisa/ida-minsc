@@ -7652,75 +7652,153 @@ class member_t(object):
     @utils.multicase()
     def tag(self):
         '''Return a dictionary of the tags associated with the member.'''
+        mowner, mindex = self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return internal.tags.typeinfo_member.get(mowner.ptr, mindex)
         return internal.tags.member.get(self.ptr)
     @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key')
     def tag(self, key):
         '''Return the tag identified by `key` for the member.'''
-        res = internal.tags.member.get(self.ptr)
+        cls, mowner, mindex = self.__class__, self.parent, self.index
+
+        # Figure out what type our owner is backed by and then choose the
+        # correct namespace to fetch the tags and info for the current member.
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            mid, mfullname = mowner.ptr.get_udm_tid(mindex), v9member.fullname(mowner.ptr, mindex)
+            res = internal.tags.typeinfo_member.get(mowner.ptr, mindex)
+        else:
+            mid, mfullname = self.ptr.id, member.fullname(self.ptr)
+            res = internal.tags.member.get(self.ptr)
+
+        # If the key is in our tags then we can return it. Otherwise we bail.
         if key in res:
             return res[key]
-        cls = self.__class__
-        raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, utils.string.escape(key, '"'), utils.string.repr(self.fullname)))
+        raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the member {:s}.".format('.'.join([__name__, cls.__name__]), mid, key, utils.string.escape(key, '"'), utils.string.repr(mfullname)))
     @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the member.'''
+        mowner, mindex = self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return internal.tags.typeinfo_member.set(mowner.ptr, mindex, key, value)
         return internal.tags.member.set(self.ptr, key, value)
     @utils.multicase(key=types.string, none=types.none)
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Remove the tag identified by `key` from the member.'''
+        mowner, mindex = self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return internal.tags.typeinfo_member.remove(mowner.ptr, mindex, key, none)
         return internal.tags.member.remove(self.ptr, key, none)
 
     def refs(self):
         '''Return the operand references from the database that reference this member.'''
+        mowner, mindex = self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return v9member.references(mowner.ptr, mindex)
         return member.references(self.ptr)
 
     ### Properties
     @property
     def ptr(self):
         '''Return the pointer of the ``idaapi.member_t``.'''
-        parent = self.__parent__
-        mowner, mindex, mptr = members.by_index(parent.ptr, self.__index__)
+        mowner, mindex = self.__parent__, self.__index__
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            mowner, mindex, mptr = v9members.by_index(mowner.ptr, mindex)
+        else:
+            mowner, mindex, mptr = members.by_index(mowner.ptr, mindex)
         return mptr
     @property
     def id(self):
         '''Return the identifier of the member.'''
-        mptr = self.ptr
-        return mptr.id
+        mowner, mindex = self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return mowner.ptr.get_udm_tid(mindex)
+        return self.ptr.id
     @property
     def properties(self):
         '''Return the properties for the current member.'''
-        mptr = self.ptr
-        return mptr.props
+        cls, mowner, mindex = self.__class__, self.parent, self.index
+        if not isinstance(mowner.ptr, idaapi.tinfo_t):
+            return self.ptr.props
+
+        # Otherwise, use the owner and index to get the member information.
+        tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'properties'])
+
+        # Then we'll use what we have to simulate the member properties.
+        MF_OK = 1 if tinfo.is_correct() else 0              # is the member ok? (always yes)
+        MF_UNIMEM = 2 if union(tinfo) else 0                # is a member of a union?
+        MF_HASUNI = 4 if tinfo.has_union() else 0           # has members of type "union"?
+        MF_BYTIL = 0                                        # the member was created due to the type system
+        MF_HASTI = 0x10                                     # has type information?
+        MF_BASECLASS = 0x20 if udm.is_baseclass() else 0    # a special member representing base class
+        MF_DTOR = 0x40 if udm.can_be_dtor() else 0          # a special member representing destructor
+        MF_DUPNAME = 0                                      # duplicate name resolved with _N suffix (N==soff)
+
+        # Join all of the flags together and return an integer.
+        flags = [MF_OK, MF_UNIMEM, MF_HASUNI, MF_BYTIL, MF_HASTI, MF_BASECLASS, MF_DTOR, MF_DUPNAME]
+        return functools.reduce(operator.or_, flags, 0)
     @property
     def size(self):
         '''Return the size of the member.'''
+        cls, mowner, mindex = self.__class__, self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
+            mbitoffset, mbits = udm.offset, udm.size
+            return mbits
         return member.size(self.ptr)
     @property
     def realoffset(self):
         '''Return the real offset of the member.'''
-        mptr, sptr = self.ptr, self.parent.ptr
-        return 0 if union(sptr) else mptr.soff
+        cls, mowner, mindex = self.__class__, self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
+            mbitoffset, mbits = udm.offset, udm.size
+            return 0 if union(mowner.ptr) else mbitoffset
+        return 0 if union(mowner.ptr) else self.ptr.soff
+
     @property
     def offset(self):
         '''Return the offset of the member.'''
-        parent = self.parent
-        return self.realoffset + parent.members.baseoffset
+        mowner, mindex = self.parent, self.index
+        return self.realoffset + mowner.members.baseoffset
     @property
     def flag(self):
         '''Return the "flag" attribute of the member.'''
+        mowner, mindex = self.parent, self.index
+
+        # Normally we just bail when the owner is backed by an `idaapi.tinfo_t`,
+        # but we can grab and return since this is just a "bytes.hpp" flag.
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            mtype = v9member.get_typeinfo(mowner.ptr, mindex)
+            pythonic = interface.typemap.dissolvetype(mtype)
+            flag, tid, nbytes = interface.typemap.resolve(pythonic)
+            return idaapi.as_uint32(flag & idaapi.DT_TYPE)
+
+        # Otherwise we can just return the flag field from the member property.
         res = self.ptr.flag
         return idaapi.as_uint32(res)
     @property
     def fullname(self):
         '''Return the fullname of the member.'''
-        res = idaapi.get_member_fullname(self.id)
-        return utils.string.of(res)
+        mowner, mindex = self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return v9member.fullname(mowner.ptr, mindex)
+        return member.fullname(self.ptr)
     @property
     def typeid(self):
         '''Return the identifier of the type of the member.'''
+        cls, mowner, mindex = self.__class__, self.parent, self.index
+
+        # Normally we just bail when the owner is backed by an `idaapi.tinfo_t`,
+        # but since this is a type id we can actually grab it and then return.
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            mtype = v9member.get_typeinfo(mowner.ptr, mindex)
+            return interface.tinfo.identifier(mtype)
+
+        # Otherwise, we need to retrieve the member information so that we can
+        # return the type identifier from the union.
         opinfo = idaapi.opinfo_t()
         res = idaapi.retrieve_member_info(self.ptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, self.ptr)
         if res:
@@ -7743,19 +7821,30 @@ class member_t(object):
     @property
     def realbounds(self):
         '''Return the real boundaries of the member.'''
-        sptr, mptr = self.parent.ptr, self.ptr
-        return interface.bounds_t(0 if union(sptr) else mptr.soff, mptr.eoff)
+        cls, mowner, mindex = self.__class__, self.parent, self.index
+
+        # If our owner is backed by an `idaapi.tinfo_t`, then we will need to
+        # get all of the member information. Then we can extract its dimensions,
+        # and calculate the `bounds_t` to return.
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
+            mbitoffset, mbits = 0 if union(tinfo) else udm.offset, udm.size
+            return interface.bounds_t(mbitoffset, mbitoffset + mbits)
+
+        # Otherwise, it's a plain `idaapi.member_t` and we can trust its fields.
+        mptr = self.ptr
+        return interface.bounds_t(0 if union(mowner.ptr) else mptr.soff, mptr.eoff)
     @property
     def bounds(self):
         '''Return the boundaries of the member.'''
-        parent = self.parent
-        bounds, base = self.realbounds, parent.members.baseoffset
+        mowner = self.parent
+        bounds, base = self.realbounds, mowner.members.baseoffset
         return operator.add(bounds, base)
     @property
     def location(self):
         '''Return the location of the member.'''
-        parent = self.parent
-        bounds, base = self.realbounds, parent.members.baseoffset
+        mowner = self.parent
+        bounds, base = self.realbounds, mowner.members.baseoffset
         left, right = bounds
         return interface.location_t(base + left, bounds.size)
     @property
@@ -7765,41 +7854,57 @@ class member_t(object):
     @property
     def dt_type(self):
         '''Return the `dt_type` attribute of the member.'''
-        res = self.ptr.flag & idaapi.DT_TYPE
-        return idaapi.as_uint32(res)
+        flag = self.flag
+        return idaapi.as_uint32(flag & idaapi.DT_TYPE)
     dtype = dt_type
 
     ## Readable/Writeable Properties
     @property
     def name(self):
         '''Return the name of the member as a string.'''
+        mowner, mindex = self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return v9member.get_name(mowner.ptr, mindex)
         return member.get_name(self.ptr)
     @name.setter
     @utils.string.decorate_arguments('string')
     def name(self, string):
         '''Set the name of the member to the specified `string`.'''
+        cls, mowner, mindex = self.__class__, self.parent, self.index
         string = interface.tuplename(*string) if isinstance(string, types.ordered) else string
 
         # Type safety is fucking valuable, and in python it's an after-thought.
-        if isinstance(string, (types.none, types.string)):
-            return member.set_name(self.ptr, string) if string else member.remove_name(self.ptr)
+        if not isinstance(string, (types.none, types.string)):
+            mid = mowner.ptr.get_udm_tid(mindex)
+            raise E.InvalidParameterError(u"{:s}({:#x}).name({!r}) : Unable to assign an unsupported type ({!s}) as the name for the member.".format('.'.join([__name__, cls.__name__]), mid, string, string.__class__))
 
-        cls = self.__class__
-        raise E.InvalidParameterError(u"{:s}({:#x}).name({!r}) : Unable to assign an unsupported type ({!s}) as the name for the member.".format('.'.join([__name__, cls.__name__]), self.id, string, string.__class__))
-
+        # If our owner is backed by an `idaapi.tinfo_t`, then we can go ahead
+        # and use the correct namespace. Otherwise fall back to the regular one.
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return v9member.set_name(mowner.ptr, mindex, string) if string else v9member.remove_name(mowner.ptr, mindex)
+        return member.set_name(self.ptr, string) if string else member.remove_name(self.ptr)
     @property
     def comment(self, repeatable=True):
         '''Return the repeatable comment of the member as a string.'''
+        mowner, mindex = self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return v9member.get_comment(mowner.ptr, mindex, repeatable)
         return member.get_comment(self.ptr, repeatable)
     @comment.setter
     @utils.string.decorate_arguments('string')
     def comment(self, string, repeatable=True):
         '''Set the repeatable comment of the member to the specified `string`.'''
+        mowner, mindex = self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return v9member.set_comment(mowner.ptr, mindex, string, repeatable)
         return member.set_comment(self.ptr, string, repeatable)
 
     @property
     def type(self):
         '''Return the type of the member in its pythonic form.'''
+        mowner, mindex = self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return v9member.get_type(mowner.ptr, mindex, self.offset)
         return member.get_type(self.ptr, self.offset)
     @type.setter
     def type(self, type):
@@ -7808,35 +7913,53 @@ class member_t(object):
         If the given `type` is pythonic, then assign it in a non-destructive manner.
         If the given `type` is an ``idaapi.tinfo_t``, then apply it to the member destructively.
         """
+        cls, mowner, mindex = self.__class__, self.parent, self.index
+
+        # if we were given anything other than a tinfo_t, then treat is as a
+        # pythonic type and assign it to the member.
         if not isinstance(type, (types.string, idaapi.tinfo_t)):
+            if isinstance(mowner.ptr, idaapi.tinfo_t):
+                return v9member.set_type(mowner.ptr, mindex, type)
             return member.set_type(self.ptr, type)
 
         # if we were given a tinfo_t or a string to use, then we just use the typeinfo
         # api, but ensure that we use the flags that allow it to destroy other members.
         info = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
         if info is None:
-            cls = self.__class__
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).type({!s}) : Unable to parse the specified type declaration ({!s}) for member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr("{!s}".format(type)), utils.string.repr(self.type), utils.string.escape("{!s}".format(self.name), '"')))
-        return member.set_typeinfo(self.ptr, info, idaapi.SET_MEMTI_MAY_DESTROY)
+            mid = mowner.ptr.get_udm_tid(mindex)
+            mfullname = v9member.fullname(mowner.ptr, mindex) if isinstance(mowner.ptr, idaapi.tinfo_t) else member.fullname(self.ptr)
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).type({!s}) : Unable to parse the specified type declaration ({!s}) for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr("{!s}".format(type)), utils.string.escape("{!s}".format(mfullname), '"')))
+
+        # now we need to figure out which namespace to set the type information
+        # with. since we're assigning an `idaapi.tinfo_t`, we set the flags so
+        # that the applied member type will destroy whatever is underneath it.
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return v9member.set_typeinfo(mowner.ptr, mindex, info, flags=idaapi.SET_MEMTI_MAY_DESTROY)
+        return member.set_typeinfo(self.ptr, info, flags=idaapi.SET_MEMTI_MAY_DESTROY)
 
     @property
     def typeinfo(self):
         '''Return the type information that has been applied to the member.'''
+        mowner, mindex = self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return v9member.get_typeinfo(mowner.ptr, mindex)
         return member.get_typeinfo(self.ptr)
-
     @typeinfo.setter
     def typeinfo(self, info):
         '''Set the type information of the member to `info` non-destructively.'''
-        mptr = self.ptr
+        cls, mowner, mindex = self.__class__, self.parent, self.index
 
         # Type safety is fucking valuable, and we are contractually obligated
         # to deliver an exception for anything that doesn't match our needs.
         if not isinstance(info, (idaapi.tinfo_t, types.none, types.string)):
-            cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), self.id, info if info is None else utils.string.repr(info), info.__class__))
+            mid = mowner.ptr.get_udm_tid(mindex) if isinstance(mowner.ptr, idaapi.tinfo_t) else self.ptr.id
+            raise E.InvalidParameterError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), mid, info if info is None else utils.string.repr(info), info.__class__))
 
         # If we're being asked to assign None to the type information, then we
         # remove it..Otherwise, we'll make a compatible attempt to assign it.
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return v9member.set_typeinfo(mowner.ptr, mindex, info) if info else v9member.remove_typeinfo(mowner.ptr, mindex)
+        sptr, mindex, mptr = members.by_index(mowner.ptr, mindex)
         return member.set_typeinfo(mptr, info) if info else member.remove_typeinfo(mptr)
 
     ### Private methods
@@ -7855,6 +7978,9 @@ class member_t(object):
 
     ## Hashable
     def __hash__(self):
+        mowner, mindex = self.parent, self.index
+        if isinstance(mowner.ptr, idaapi.tinfo_t):
+            return mowner.ptr.get_udm_tid(mindex)
         return self.ptr.id
     def __ne__(self, other):
         return not self.__eq__(other)
