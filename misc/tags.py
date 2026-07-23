@@ -2066,7 +2066,7 @@ class typeinfo(object):
             raise internal.exceptions.InvalidParameterError(u"{:s}({!r}, {!r}, {!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__, 'remove']), type, key, none if none is None else "{!r}".format(none), type.__class__))
 
         # Guard against a non-null value being used for a tag.
-        if value is not None:
+        if none is not None:
             raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}, {!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__, 'remove']), sid, key, none, utils.string.escape(key, '"'), none))
 
         # First check if the key is one of the supported implicit tags. These
