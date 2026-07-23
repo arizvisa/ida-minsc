@@ -830,6 +830,16 @@ class typemap(object):
         elif isinstance(pythonType, idaapi.tinfo_t):
             return tinfo.copy(pythonType)
 
+        # If it's a structure or a type, then snag the identifer and size of it
+        # so that we can create a type for it.
+        elif isinstance(pythonType, (getattr(idaapi, 'struc_t', internal.structure.structure_t), internal.structure.structure_t)):
+            sptr = pythonType.ptr if isinstance(pythonType, internal.structure.structure_t) else pythonType
+            ti = sptr if isinstance(sptr, idaapi.tinfo_t) else address.typeinfo(sptr.id)
+            is_union, is_frame = internal.structure.union(sptr), internal.structure.frame(sptr)
+            if ti is None:
+                raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.resolvetype({!s}) : Unable to determine the type for the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), pythonType, 'frame' if is_frame else 'union' if is_union else 'structure', sptr.id))
+            return ti
+
         # If it's a default type, then we'll be okay with the inverted table.
         elif pythonType in {bool, float, int, chr}:
             decl = cls.typeinfo_inverted[pythonType]
@@ -855,12 +865,7 @@ class typemap(object):
                 raise internal.exceptions.DisassemblerError(u"{:s}.resolvetype({!s}) : Unable the create a pointer for the given type ({!s}).".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
             return ti
 
-        # If it's a structure or a type, then snag the identifer and size of it
-        # so that we can create a type for it.
-        elif isinstance(pythonType, (idaapi.struc_t, internal.structure.structure_t)):
-            pass
-
-        raise internal.exceptions.InvalidParameterError(u"{:s}.resolvetype({!s}) : Unable the resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+        raise internal.exceptions.InvalidParameterError(u"{:s}.resolvetype({!s}) : Unable to resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
 
     @classmethod
     def update_refinfo(cls, identifier, flag):
