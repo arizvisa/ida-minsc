@@ -846,10 +846,10 @@ class v9member(object):
     @classmethod
     def get_type(cls, *args):
         '''Return the pythonic type of the specified member translated to the given `offset`.'''
-        if len(args) in {2, 3} and isinstance(args[0], internal.types.integer):
-            args, [offset] = args[:-1], [0] if len(args) < 3 else args[-1:]
-        elif len(args) in {3, 4}:
-            args, [offset] = args[:-1], [0] if len(args) < 4 else args[-1:]
+        if len(args) in {1, 2} and isinstance(args[0], internal.types.integer):
+            args, [offset] = args[:-1], [None] if len(args) < 2 else map(int, args[-1:])
+        elif len(args) in {2, 3}:
+            args, [offset] = args[:-1], [None] if len(args) < 3 else map(int, args[-1:])
         else:
             caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'get_type'])
             raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
@@ -857,8 +857,9 @@ class v9member(object):
         # Figure out the member and extract its type so that we can convert it
         # to a pythonic type using the `interface.typemap` namespace.
         tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_type'], args="{:#x}".format(offset))
-        moffset, mtype = udm.offset, interface.tinfo.copy(udm.type)
-        return interface.typemap.dissolvetype(mtype, moffset)
+        mbitoffset, mtype = udm.offset, interface.tinfo.copy(udm.type)
+        moffset = mbitoffset if offset is None else offset
+        return interface.typemap.dissolvetype(mtype, offset=moffset)
 
     @classmethod
     def set_type(cls, *args):
