@@ -227,10 +227,13 @@ class naming(object):
         else:
             raise E.InvalidParameterError(u"{:s}.get({!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
 
-        # If our structure backing is a local type, then use `get_tid_name`.
+        # If our structure backing is a local type, then use `get_tid_name`. If
+        # we couldn't get a name out of it, then give it the anonymous one.
         if isinstance(ti, idaapi.tinfo_t):
-            res = idaapi.get_tid_name(sid)
-            return utils.string.of(res)
+            res = idaapi.get_tid_name(sid) or ti.get_type_name()
+            if res:
+                return utils.string.of(res)
+            return"${:s}".format(interface.tinfo.anonymous_name(ti))
 
         # Otherwise, this is a `struc_t` and we need to use `get_struc_name`.
         res = idaapi.get_struc_name(sid)
