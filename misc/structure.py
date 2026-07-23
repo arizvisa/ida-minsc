@@ -230,7 +230,7 @@ class naming(object):
         # If our structure backing is a local type, then use `get_tid_name`.
         if isinstance(ti, idaapi.tinfo_t):
             res = idaapi.get_tid_name(sid)
-            return utils.string.of(res)
+            return utils.string.of(res or ti.get_type_name())
 
         # Otherwise, this is a `struc_t` and we need to use `get_struc_name`.
         res = idaapi.get_struc_name(sid)
