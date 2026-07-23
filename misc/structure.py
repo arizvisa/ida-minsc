@@ -847,9 +847,9 @@ class v9member(object):
     def get_type(cls, *args):
         '''Return the pythonic type of the specified member translated to the given `offset`.'''
         if len(args) in {2, 3} and isinstance(args[0], internal.types.integer):
-            args, [offset] = args[:-1], 0 if len(args) < 3 else args[-1:]
+            args, [offset] = args[:-1], [0] if len(args) < 3 else args[-1:]
         elif len(args) in {3, 4}:
-            args, [offset] = args[:-1], 0 if len(args) < 4 else args[-1:]
+            args, [offset] = args[:-1], [0] if len(args) < 4 else args[-1:]
         else:
             caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'get_type'])
             raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
