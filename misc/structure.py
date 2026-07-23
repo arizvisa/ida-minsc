@@ -911,15 +911,16 @@ class v9member(object):
 
         # Extract the parameters and the type that we're going to apply.
         [info], args = args[-1:], args[:-1]
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'set_typeinfo'])
-        caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'set_typeinfo'], args=[interface.tinfo.quoted(info), "flags={:#x}".format(flags)])
+        ti = info if isinstance(info, idaapi.tinfo_t) else interface.tinfo.parse(None, info, idaapi.PT_SIL)
+        mowner, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'set_typeinfo'])
+        caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'set_typeinfo'], args=["{!r}".format("{!s}".format(ti)), "flags={:#x}".format(flags)])
 
         # Now we can just use the parent type to change the member's type.
-        res, terr = interface.tinfo.copy(udm.type), tinfo.set_udm_type(mindex, info, flags)
+        res, terr = interface.tinfo.copy(udm.type), mowner.set_udm_type(mindex, ti, flags)
         if terr != idaapi.TERR_OK:
             errname, errdesc = interface.tinfo.format_type_error(terr)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
-            raise E.DisassemblerError(u"{:s} : Unable to assign the specified type {:s} to the {:s} member \"{:s}\" due to error {:s}.".format(caller_format, interface.tinfo.quoted(info), 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(fullname, '"'), description))
+            raise E.DisassemblerError(u"{:s} : Unable to assign the specified type {:s} to the {:s} member \"{:s}\" due to error {:s}.".format(caller_format, interface.tinfo.quoted(ti), 'union' if union(mowner) else 'frame' if frame(mowner) else 'structure', utils.string.escape(cls.fullname(mowner, mindex), '"'), description))
         return res
 
     @classmethod
