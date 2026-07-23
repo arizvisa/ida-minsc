@@ -5653,6 +5653,7 @@ class members(object):
             moffset = mindex = moffset_or_mindex
             if moffset_or_mindex not in members:
                 continue
+            size = idaapi.get_struc_size(sptr)
 
             # Go ahead, calculate the description, and then delete the member.
             location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
@@ -5669,9 +5670,15 @@ class members(object):
                 logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Member \"{:s}\" ({:#x}) at {:s} of {:s} was not removed ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', utils.string.escape(mname, '"'), mid, location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', mptr.id))
                 failed.add((mid, moffset))
 
-            # if we succeeded, then we can go ahead and attempt to shrink the structure.
-            elif ok and (True if is_union else idaapi.expand_struc(sptr, moffset, -msize)):
-                count += 1
+            # If the structure size changed exactly, then the removed elements
+            # have resulted in the structure being chopped.
+            elif idaapi.get_struc_size(sptr) == size - msize:
+                ok, count = idaapi.TERR_OK, count + 1
+
+            # if we succeeded then we can go ahead and attempt to shrink the
+            # structure. if it's a union, then we don't need to do anything.
+            elif is_union or idaapi.expand_struc(sptr, moffset, -msize):
+                ok, count = idaapi.TERR_OK, count + 1
 
             # if we couldn't shrink it, then we avoid updating the size and log a warning.
             else:
