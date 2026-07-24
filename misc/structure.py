@@ -7830,9 +7830,9 @@ class member_t(object):
         cls, mowner, mindex = self.__class__, self.parent, self.index
         if isinstance(mowner.ptr, idaapi.tinfo_t):
             tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
-            mbitoffset, mbits = udm.offset, udm.size
-            msize, mextra = divmod(mbits, 8)
-            return msize + 1 if mextra else msize
+            mbitlocation = interface.location_t(udm.offset, udm.size)
+            mbytelocation = _, msize = mbitlocation / 8
+            return msize
         return member.size(self.ptr)
     @property
     def realoffset(self):
@@ -7840,9 +7840,9 @@ class member_t(object):
         cls, mowner, mindex = self.__class__, self.parent, self.index
         if isinstance(mowner.ptr, idaapi.tinfo_t):
             tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
-            mbitoffset, mbits = udm.offset, udm.size
-            moffset, mextra = divmod(mbitoffset, 8)
-            return 0 if union(mowner.ptr) else moffset + 1 if mextra else moffset
+            mbitlocation = interface.location_t(udm.offset, udm.size)
+            mbytelocation = moffset, _ = mbitlocation / 8
+            return 0 if union(mowner.ptr) else moffset
         return 0 if union(mowner.ptr) else self.ptr.soff
 
     @property
