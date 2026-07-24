@@ -4359,14 +4359,14 @@ class v9members(object):
             raise E.InvalidParameterError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to replace the special member \"{:s}\" at index {:d} of the {:s} belonging to function {:#x}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mname, midx, type_description, ea))
 
         # This slice assignment will be destructive, so we need to calculate the
-        # original and new size before figuring out how to assign things.
-        iterable = (((offset, cls.by(mid) if interface.node.identifier(mid) else mid)) for offset, mid in selected)
-        iterable = ((packed if isinstance(packed, types.integer) else packed[-1].size) for offset, packed in iterable)
-        iterable = map(operator.itemgetter(0), (divmod(integer, 8) for integer in iterable))
+        # original and new size (bytes) before figuring how to assign things.
+        iterable = (((mbitoffset, cls.by(mid) if interface.node.identifier(mid) else mid)) for mbitoffset, mid in selected)
+        iterable = ((packed if isinstance(packed, types.integer) else packed[-1].size) for mbitoffset, packed in iterable)
+        iterable = utils.itermap(operator.itemgetter(0), (divmod(integer, 8) for integer in iterable))
         oldsize, newsize = (interface.contiguous.size(members) for members in [iterable, newlayout])
 
         # Now we lay out each member that's going to be contiguously assigned,
-        # and connect the offset along with their attributes into a list.
+        # and connect the offset (bytes) with their attributes into a list.
         iterable = interface.contiguous.layout(left // 8, newlayout, +1)
         if union(ti):
             layout = ((count + idx, item) for idx, (_, item) in enumerate(iterable))
@@ -4383,18 +4383,18 @@ class v9members(object):
         # data that we will be overwriting with our new layout. If the member is
         # a gap of empty space, then use it to simulate a packed member tuple.
         olditems = {}
-        for offset, mid in selected:
+        for mbitoffset, mid in selected:
             if union(ti) and interface.node.identifier(mid):
                 _, _, mindex, _ = cls.by(mid)
-                olditems[mindex] = v9member.packed(base + offset, mid)
+                olditems[mindex] = v9member.packed(0, mid)
             elif interface.node.identifier(mid):
-                olditems[offset] = v9member.packed(base + offset, mid)
+                olditems[mbitoffset] = v9member.packed(base + mbitoffset, mid)
             else:
-                olditems[offset] = idaapi.BADADDR, '', (), interface.location_t(base + offset, mid), None, (True, '')
+                olditems[mbitoffset] = idaapi.BADADDR, '', (), interface.location_t(base + mbitoffset, mid), None, (True, '')
             continue
 
         # Now we lay out each specific member that will be contiguously assigned
-        # and collect each offset along with its attributes into a list.
+        # and collect each offset (bytes) along with its attributes into a list.
         newitems, area_t = [], idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t
         for offset, item in layout:
             mtype = None
@@ -4460,7 +4460,7 @@ class v9members(object):
             if isinstance(mtype, idaapi.tinfo_t):
                 tinfo, msize, tid = mtype, interface.tinfo.size(mtype), interface.tinfo.identifier(mtype)
 
-            # If it's an integer, then this is just a size and nothing else.
+            # If it's an integer, then it's just a size (bytes) and that's all.
             elif isinstance(mtype, types.integer):
                 tinfo, msize, tid = None, mtype, idaapi.BADADDR
 
@@ -4613,9 +4613,9 @@ class v9members(object):
         # since removing a member changes the index and reorders everything. So,
         # we use the member identifier as a unique key.
         if union(ti):
-            res, identifiers = 0, {mid for offset, mid in selected if offset in olditems}
+            res, identifiers = 0, {mid for mindex, mid in selected if mindex in olditems}
             for mid in filter(v9member.has, identifiers):
-                mowner, mutd, mindex, udm = cls.by(mid)
+                mowner, _, mindex, udm = cls.by(mid)
 
                 # Unpack the member using the identifier, and smoke-check it.
                 ok = ti.del_udm(mindex) if interface.tinfo.identifier(mowner) == sid else idaapi.TERR_BAD_ARG
@@ -4641,7 +4641,7 @@ class v9members(object):
         # Otherwise, since we extracted all of the member information and the
         # references for the old items, we can delete the entire range.
         elif olditems:
-            [lindex, rindex] = [v9members.index_before(ti, left), v9members.index_after(ti, right)]
+            [lindex, rindex] = [v9members.index_before(ti, point) for point in [left, right]]
 
             ok = ti.del_udms(lindex, rindex)
             if ok != idaapi.TERR_OK:
@@ -4662,19 +4662,25 @@ class v9members(object):
             raise E.DisassemblerError(u"{:s}.layout_setslice({!s}, {!s}, {:s}{:s}{:s}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), "{!s}".format(slice), "[{:s}]".format(', '.join(iterable)), offset_description, ", withgaps={!s}".format(True if withgaps else False)))
         count = utd.size()
 
+        # Check if we're a union and the elements we deleted is not the same as
+        # what we expected. The `olditems` dict uses the bitoffset as its key.
         if union(ti) and deleted != len(olditems):
-            iterable = (cls.by(mid) for offset, mid in selected if offset in olditems if v9member.has(mid))
+            iterable = (cls.by(mid) for mindex, mid in selected if mindex in olditems if v9member.has(mid))
             errors = {mindex : (mowner, mutd, mindex, udm) for mowner, mutd, mindex, udm in iterable}
             for index in sorted(errors):
                 packed = errors[index]
                 logging.critical(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the selected {:s} from {:s} of {:s} for replacement.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, "member ({:#x})".format(mid) if interface.node.identifier(mid) else "gap of size {:#x}".format(mid), "index {:d}".format(index), type_description))
+            pass
 
+        # Check if we're a regular structure and that what we deleted is not
+        # what we expected. The `olditems` dict uses the bitoffset as its key.
         elif deleted != len(olditems):
-            errors = {offset : (next(v9members.at_offset(ti, offset)) if v9members.has_offset(ti, offset) else None) for offset in olditems}
-            for offset, mid in selected:
-                if errors.get(offset):
-                    logging.critical(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the selected {:s} from {:s} of {:s} for replacement.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, "member ({:#x})".format(mid) if interface.node.identifier(mid) else "gap of size {:#x}".format(mid), "offset {:+#x}".format(base + offset), type_description))
+            errors = {mbitoffset : (next(v9members.at_offset(ti, mbitoffset)) if v9members.has_offset(ti, mbitoffset) else None) for mbitoffset in olditems}
+            for mbitoffset, mid in selected:
+                if errors.get(mbitoffset):
+                    logging.critical(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the selected {:s} from {:s} of {:s} for replacement.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, "member ({:#x})".format(mid) if interface.node.identifier(mid) else "gap of size {:#x}".format(mid), "offset {:+#x}".format(base + mbitoffset // 8), type_description))
                 continue
+            pass
 
         # If we didn't remove the items that we expected, then we should bail.
         # FIXME: We should probably revert and restore the "olditems" that we've
@@ -4682,7 +4688,7 @@ class v9members(object):
         if deleted != len(olditems):
             raise E.DisassemblerError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Expected to remove {:d} {:s} member{:s}, but {:d} were removed.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, len(olditems), type_description, '' if len(olditems) == 1 else 's', deleted))
 
-        # Now we need to figure whether we're growing it, or shrinking it.
+        # Now we figure whether we're growing it, or shrinking it (bytes).
         size, delta = interface.tinfo.size(ti), 0 if union(ti) else newsize - oldsize
         _, mindex, _ = next(v9members.at_offset(ti, left)) if v9members.has_offset(ti, left) else (ti, -1, None)
 
@@ -4694,7 +4700,7 @@ class v9members(object):
                 index += 1
             mindex = index
 
-        # Now we can go and do our resize of the structure type.
+        # Now we can go and do our resize of the structure type (in bytes).
         ok = ti.expand_udt(mindex, delta) if 0 <= mindex < count and delta and left < size else idaapi.TERR_OK
         if ok != idaapi.TERR_OK:
             errname, errdesc = interface.tinfo.format_type_error(ok)
@@ -4706,7 +4712,7 @@ class v9members(object):
         mindex = v9members.index_after(ti, left)
         if delta > 0 and 0 <= mindex:
             iterable = (cls.by(ti, index) for index in range(mindex, count))
-            olditems.update({udm.offset : v9member.packed(base + udm.offset, mowner, index) for mowner, mutd, index, udm in iterable})
+            olditems.update({udm.offset : v9member.packed(base + udm.offset, mowner, index) for mowner, _, index, udm in iterable})
 
         # Hopefully that is everything and we should only need to add the new
         # members to the structure from "newitems"
@@ -4773,15 +4779,19 @@ class v9members(object):
 
         # The very last thing we need to do is to update the type member with
         # its metadata such as comments, type information, name, etc.
-        for offset, item, packed, mid in results:
+        for mkey, item, packed, mid in results:
             tinfo, msize, tid, mcomments, mrepr = packed
             mowner, mutd, mindex, udm = cls.by(mid)
             mcommenttype, mcomment = mcomments
 
+            mbitoffset = mkey
+            quotient, remainder = divmod(mbitoffset, 8)
+            moffset = 1 + quotient if remainder else quotient
+
             # First we'll verify that the owner of the member matches the type
             # that is being updated. Skip it if it's not.
             if sid != interface.tinfo.identifier(mowner):
-                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : The {:s} ({:#x}) owning the member ({:#x}) at {:s} that is attempting to be removed does not actually belong to us ({:#x}) and will not have its type information copied.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, interface.tinfo.identifier(mowner), mid, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), sid))
+                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : The {:s} ({:#x}) owning the member ({:#x}) at {:s} that is attempting to be removed does not actually belong to us ({:#x}) and will not have its type information copied.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, type_description, interface.tinfo.identifier(mowner), mid, "index {:d}".format(mkey) if union(ti) else "offset {:+#x}".format(base + moffset), sid))
                 continue
 
             # If our type is a string, then we convert it to a `idaapi.tinfo_t`.
@@ -4794,19 +4804,19 @@ class v9members(object):
             if ok != idaapi.TERR_OK:
                 errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
-                logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} type {!s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mid, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), type_description, sid, 'repeatable' if mcommenttype else 'non-repeatable', interface.tinfo.quoted(tinfo), description))
+                logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} type {!s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mid, "index {:d}".format(mkey) if union(ti) else "offset {:+#x}".format(base + moffset), type_description, sid, 'repeatable' if mcommenttype else 'non-repeatable', interface.tinfo.quoted(tinfo), description))
 
             ok = ti.set_udm_cmt(mindex, mcomment, mcommenttype) if mcomment else idaapi.TERR_OK
             if ok != idaapi.TERR_OK:
                 errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
-                logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} comment \"{:s}\" due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mid, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), type_description, sid, 'repeatable' if mcommenttype else 'non-repeatable', utils.string.escape(mcomment, '"'), description))
+                logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} comment \"{:s}\" due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mid, "index {:d}".format(mkey) if union(ti) else "offset {:+#x}".format(base + moffset), type_description, sid, 'repeatable' if mcommenttype else 'non-repeatable', utils.string.escape(mcomment, '"'), description))
 
             ok = ti.set_udm_repr(mindex, mrepr) if mrepr else idaapi.TERR_OK
             if ok != idaapi.TERR_OK:
                 errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
-                raise E.NotImplementedError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} representation {!r} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mid, "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset), type_description, sid, 'repeatable' if mcommenttype else 'non-repeatable', mrepr, description))
+                raise E.NotImplementedError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} representation {!r} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, mid, "index {:d}".format(mkey) if union(ti) else "offset {:+#x}".format(base + moffset), type_description, sid, 'repeatable' if mcommenttype else 'non-repeatable', mrepr, description))
             continue
 
         # Finally, the very last thing we need to do is to update any references
@@ -4820,14 +4830,14 @@ class v9members(object):
         # Next we'll grab all the identifiers for the members that we just
         # added so that we can filter them and figure out where they moved to.
         name = naming.get(ti)
-        oldmembers = {id : (name, offset) for offset, (id, name, _, location, _, _) in olditems.items()}
-        newmembers = {id : (v9member.get_name(id), offset) for offset, _, packed, id in results}
+        oldmembers = {id : (name, mbitoffset) for mbitoffset, (id, name, _, mbitlocation, _, _) in olditems.items()}
+        newmembers = {id : (v9member.get_name(id), mbitoffset) for mbitoffset, _, packed, id in results}
         oldmembers[sid] = name, oldsize
         newmembers[sid] = name, interface.tinfo.size(ti)
 
         # If we shifted any of the old members, then add their references too.
         if delta > 0:
-            newmembers.update({id : (name, offset + delta) for id, (name, offset) in oldmembers.items()})
+            newmembers.update({id : (name, delta + mbitoffset // 8) for id, (name, mbitoffset) in oldmembers.items()})
 
         # Grab the references that we used to step the autoqueue so that we can
         # compare both the new and old references to see how they were applied.
@@ -4853,12 +4863,12 @@ class v9members(object):
         # were lost during our assignment.
         for ea in oldrefs - newrefs:
             old_ea = old[ea]
-            oldname, oldoffset = oldmembers[old[ea]]
-            logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Reference at address {:#x} that was referencing {:s} \"{:s}\" ({:+#x}) was lost during assignment.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, ea, 'structure' if old_ea == sid else 'field', utils.string.escape(oldname, '"'), oldoffset))
+            oldname, oldbitoffset = oldmembers[old[ea]]
+            logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Reference at address {:#x} that was referencing {:s} \"{:s}\" ({:+#x}) was lost during assignment.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, ea, 'structure' if old_ea == sid else 'field', utils.string.escape(oldname, '"'), oldbitoffset // 8))
 
         # We are finally fucking done and just need to return everything that we
         # had removed from the structure type.
-        iterable = (olditems[offset] for offset, _ in selected if offset in olditems)
+        iterable = (olditems[mbitoffset] for mbitoffset, _ in selected if mbitoffset in olditems)
         return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
 
 class members(object):
