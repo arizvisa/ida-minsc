@@ -2337,7 +2337,7 @@ class v9members(object):
         elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
             ti, sid = address.type(type.id), type.id
         else:
-            raise E.InvalidParameterError(u"{:s}.add({!s}, {!r}, {!r}, {!s}{!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, name, "{!s}".format(typeinfo), location, "{:d}".format(*offset) if offset else '', type.__class__))
+            raise E.InvalidParameterError(u"{:s}.add({!s}, {!s}, {!r}, {!s}{!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, "{!r}".format(name) if isinstance(name, types.string) else name, "{!s}".format(typeinfo), location, "{:d}".format(*offset) if offset else '', type.__class__))
 
         # before doing anything, we need to know the base offset to make sense
         # of the location. so, we grab the function and unpack its base. we also
@@ -2347,6 +2347,14 @@ class v9members(object):
         ea = idaapi.get_func_by_frame(sid)
         fn = idaapi.get_func(ea)
         [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn and is_frame else 0]
+
+        # next we'll need to translate the location in order to make sense of
+        # the type of location we were given. this is because our type can be a
+        # structure, a frame, or a union.
+        count = cls.count(type)
+        index_or_offset = useroffset = int(location)
+        userindex = realoffset = index_or_offset if is_union else index_or_offset // 8
+        realindex = userindex if userindex <= count else count
 
         # start by figuring out whether we're adding a pythonic type or we were
         # given an `idaapi.tinfo_t`. Then we can store it in a type to use.
@@ -2360,21 +2368,35 @@ class v9members(object):
             mtype = interface.typemap.resolvetype(typeinfo)
             typeinfo_description = "{!s}".format(typeinfo)
 
+        # now we're ready to normalize the name since we support packed names
+        # with a numeric suffix.
+        packedname = interface.tuplename(*name) if isinstance(name, types.ordered) else name or ''
+        defaultname = v9member.default_name(ti, None, realindex if is_union else realoffset)
+        suffix = realindex if is_union else interface.function.frame_member_offset(fn, realoffset) if is_frame else realoffset
+
+        # then we need to verify that the name is valid in order to determine if
+        # we need to add a suffix or use a default name we weren't given one.
+        oldname = candidatename = packedname or defaultname
+        while cls.has_name(ti, candidatename):
+            candidatename = "{:s}_{:X}".format(candidatename, abs(suffix))
+        newname = candidatename
+
         # assign some descriptions for when we need to raise an exception.
         offset_description = ", bits({:+#x})".format(base) if offset else ''
-        location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(base + location)
+        location_description = "index {:d}".format(userindex) if is_union else "offset {:+#x}".format(useroffset)
         type_description = 'frame' if is_frame else 'union' if union(ti) else 'structure'
+        name_description = "{!s}".format(tuple(name)) if isinstance(name, types.ordered) else "{!r}".format(name)
 
         # if we're using a later disassembler version with the `tinfo_t.add_udm`
         # method, then we can use it to add the member. we start out by setting
         # each of the properties specified by the caller on the member type.
         if hasattr(ti, 'add_udm'):
             udm = udm_t()
-            udm.offset = 0 if is_union else location - base
+            udm.offset = 0 if is_union else useroffset
             udm.size = 8 * interface.tinfo.size(mtype)
-            udm.name = utils.string.to(name)
+            udm.name = utils.string.to(newname)
             if not udm.type.deserialize(til, *mtype.serialize()):
-                raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : Unable to copy the specified type ({!r}) into the member being added.".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description, "{!s}".format(mtype)))
+                raise E.DisassemblerError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : Unable to copy the specified type ({!r}) into the member being added.".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, "{!s}".format(mtype)))
             udm.cmt = utils.string.to('')
             udm.effalign, udm.tafld_bits, udm.fda = 0, 0, 0
 
@@ -2385,37 +2407,37 @@ class v9members(object):
             if ok != idaapi.TERR_OK:
                 errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
-                raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : Unable to add member \"{:s}\" at {:s} of the {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description, utils.string.escape(name, '"'), location_description, type_description, description))
+                raise E.DisassemblerError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : Unable to add member \"{:s}\" at {:s} of the {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, utils.string.escape(newname, '"'), location_description, type_description, description))
 
             # in order to search for the added member, we need to get the type
             # details. we will use these to find the member by name and index.
             utd = idaapi.udt_type_data_t()
             if not ti.get_udt_details(utd):
-                raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : Unable to get the details for the specified type ({:#x})".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description, sid))
+                raise E.DisassemblerError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : Unable to get the details for the specified type ({:#x})".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, sid))
 
             # in order to return the member location, we use the name that was
             # used in order to find the index for the member.
             key = udm_t()
-            key.name = utils.string.to(name)
+            key.name = utils.string.to(newname)
             mindex = utd.find_member(key, idaapi.STRMEM_NAME)
             if not(0 <= mindex < utd.size()):
-                raise E.MemberNotFoundError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : Unable to locate a member with the specified name \"{:s}\" for the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description, utils.string.escape(name, '"'), type_description, sid))
+                raise E.MemberNotFoundError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : Unable to locate a member with the specified name \"{:s}\" for the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, utils.string.escape(newname, '"'), type_description, sid))
 
             # next we use the index to get a populated instance of the udm
             # member type. once we got everything, we can return it.
             udm = udm_t()
             udm.offset = mindex
             if mindex != ti.find_udm(udm, idaapi.STRMEM_INDEX):
-                raise E.MemberNotFoundError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : Unable to find the member at index {:d} of the specified {!s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description, mindex, type_description, sid))
+                raise E.MemberNotFoundError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : Unable to find the member at index {:d} of the specified {!s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, mindex, type_description, sid))
             return ti, mindex, udm
 
         # if there isn't a `tinfo_t.add_udm` method, then we need to add the
         # member manually. before doing anything, we need the type details.
         utd = idaapi.udt_type_data_t()
         if not (ti.is_struct() or union(ti)):
-            raise E.InvalidTypeOrValueError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : The specified type ({:#x}) is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description, sid))
+            raise E.InvalidTypeOrValueError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : The specified type ({:#x}) is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, sid))
         elif not ti.get_udt_details(utd):
-            raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : Unable to get the details for the specified type ({:#x})".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description, sid))
+            raise E.DisassemblerError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : Unable to get the details for the specified type ({:#x})".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, sid))
 
         # if we are adding a member to a union, then we only need to make a copy
         # of the types, shift them at the given location, and then return.
@@ -2429,7 +2451,7 @@ class v9members(object):
                 newutd[mindex].size = utd[mindex].size
                 newutd[mindex].name = utd[mindex].name
                 if not newutd[mindex].type.deserialize(til, *utd[mindex].type.serialize()):
-                    raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : Unable to copy the specified type ({!r}) at index {:d} for a member being preserved.".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description, "{!s}".format(mtype), mindex))
+                    raise E.DisassemblerError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : Unable to copy the specified type ({!r}) at index {:d} for a member being preserved.".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, "{!s}".format(mtype), mindex))
                 newutd[mindex].cmt = utd[mindex].cmt
                 newutd[mindex].effalign = utd[mindex].effalign
                 newutd[mindex].tafld_bits = utd[mindex].tafld_bits
@@ -2437,9 +2459,9 @@ class v9members(object):
 
             # now we can assign the properties for our added member.
             newutd[location].size = 8 * interface.typeinfo.size(mtype)
-            newutd[location].name = utils.string.to(name)
+            newutd[location].name = utils.string.to(newname)
             if not newutd[location].type.deserialize(til, *utd[location].type.serialize()):
-                raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : Unable to copy the specified type ({!r}) at index {:d} for a member being preserved.".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description, "{!s}".format(mtype), mindex))
+                raise E.DisassemblerError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : Unable to copy the specified type ({!r}) at index {:d} for a member being preserved.".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, "{!s}".format(mtype), mindex))
             newutd[location].effalign = newutd[location].tafld_bits = newutd[location].fda = 0
 
             # then we can add the remaining members for the union.
@@ -2448,7 +2470,7 @@ class v9members(object):
                 newutd[1 + mindex].size = utd[mindex].size
                 newutd[1 + mindex].name = utd[mindex].name
                 if not newutd[1 + mindex].type.deserialize(til, *utd[mindex].type.serialize()):
-                    raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : Unable to copy the specified type ({!r}) at index {:d} for a member being preserved.".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description, "{!s}".format(mtype), mindex))
+                    raise E.DisassemblerError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : Unable to copy the specified type ({!r}) at index {:d} for a member being preserved.".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, "{!s}".format(mtype), mindex))
                 newutd[1 + mindex].cmt = utd[mindex].cmt
                 newutd[1 + mindex].effalign = utd[mindex].effalign
                 newutd[1 + mindex].tafld_bits = utd[mindex].tafld_bits
@@ -2459,7 +2481,7 @@ class v9members(object):
             udm = udm_t()
             udm.offset = location
             if mindex != ti.find_udm(udm, idaapi.STRMEM_INDEX):
-                raise E.MemberNotFoundError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : Unable to find the member at index {:d} of the specified {!s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description, mindex, type_description, sid))
+                raise E.MemberNotFoundError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : Unable to find the member at index {:d} of the specified {!s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, mindex, type_description, sid))
             return ti, mindex, udm
 
         # now we need to build a segment tree so that we can find out what slots
@@ -2471,7 +2493,7 @@ class v9members(object):
         # now we can search the intervals to figure out where we need to insert
         # the member in order to get it at the desired offset.
         left, right = location, location + 8 * interface.tinfo.size(mtype)
-        raise E.NotImplementedError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : Adding a member to a type in earlier versions of the disassembler is currently unsupported.".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description))
+        raise E.NotImplementedError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : Adding a member to a type in earlier versions of the disassembler is currently unsupported.".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description))
 
     @classmethod
     def contains(cls, type, offset):
