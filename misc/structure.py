@@ -8608,12 +8608,11 @@ class members_t(object):
                 tinfo, utd, mindex, udm = v9members.by(owner.ptr, midx, caller=[__name__, cls.__name__, 'has'])
                 mtype, mbitoffset, mbits = interface.tinfo.copy(udm.type), udm.offset, udm.size
                 metype, _ = interface.tinfo.array(mtype) if mtype.is_array() else (mtype, 1)
+                mbitlocation = interface.location_t(mbitoffset, mbits)
 
                 # Get the element and member sizes by converting bits to bytes.
-                melement, (msize, msizeplus) = interface.tinfo.size(metype), divmod(mbits, 8)
-                msize = msize + 1 if msizeplus else msize
-                moffset, moffsetextra = divmod(mbitoffset, 8)
-                moffset = moffset + 1 if moffsetextra else moffset
+                melement = interface.tinfo.size(metype)
+                mlocation = moffset, msize = mbitlocation / 8
 
                 # Next, we use the element and location sizes to calculate
                 # whether the location size is a multiple of the member exactly.
@@ -8646,18 +8645,18 @@ class members_t(object):
             retrieved = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
             melement, msize = get_data_elsize(mptr.id, mptr.flag, opinfo if retrieved else None), idaapi.get_member_size(mptr)
 
-            # Here, we verify that the location size is a multiple of the member's
-            # size, and that the size does not go outside the member's boundaries
-            # unless it is a variable-length structure. This confirms that the
-            # location selects at least one of its elements.
+            # Here we verify that the location size is a multiple of the
+            # member's size, and that the size does not go outside the member's
+            # boundaries unless it is a variable-length structure. This confirms
+            # that the location selects at least one of its elements.
             index, remainder = divmod(size, melement)
             is_multiple = False if remainder else True
 
             left, right = realoffset, realoffset + melement * index
             is_variable = owner.ptr.props & idaapi.SF_VAR and mptr.soff == mptr.eoff
 
-            # If the size is a multiple of the element size, and the end of the
-            # location is within the boundaries of the member, then we got a match.
+            # If size is a multiple of the element, and the end of the location
+            # is within the boundaries of the member, then we got a match.
             if is_multiple and size > 0 and any([is_variable, right <= mptr.soff + msize]):
                 return True
             continue
@@ -8703,7 +8702,7 @@ class members_t(object):
         # different namespace to match the types.
         if isinstance(owner.ptr, idaapi.tinfo_t):
             for mowner, midx, udm in v9members.iterate(owner.ptr):
-                mbitoffset, mbits, mtype = udm.offset, udm.size, interface.tinfo.copy(udm.type)
+                mbitlocation, mtype = interface.location_t(udm.offset, udm.size), interface.tinfo.copy(udm.type)
 
                 # Make sure that we could actually get the type information to
                 # compare against the member. Otherwise, skip it if we couldn't
@@ -8895,6 +8894,13 @@ class members_t(object):
             sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
             raise E.DisassemblerError(u"{:s}({:#x}).members.pop({:d}) : Unable to remove the member at index {:d} of the {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, index, index, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', sid))
         [(mname, mtype, mlocation, mtypeinfo, mcomments)] = results
+
+        # now we need to translate both the type and the location.
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            mbytelocation = (mlocation - base) / 8 + base
+            if isinstance(mtype, structure_t):
+                mtype.offset = int(mbytelocation)
+            return mname, mtype, mbytelocation, mtypeinfo
         return mname, mtype, mlocation, mtypeinfo
 
     @utils.multicase()
@@ -8918,21 +8924,21 @@ class members_t(object):
         # of elements as the index. Otherwise, we use the size of the type.
         if isinstance(owner.ptr, idaapi.tinfo_t):
             if union(owner.ptr):
-                count = v9members.count(owner.ptr)
-                _, mindex, _ = v9members.add(owner.ptr, name, type, count)
+                count = res = v9members.count(owner.ptr)
             else:
-                bitoffset = 8 * interface.tinfo.size(owner.ptr)
-                _, mindex, _ = v9members.add(owner.ptr, name, type, bitoffset, 0)
+                bitoffset = res = 8 * interface.tinfo.size(owner.ptr)
+
+            _, mindex, _ = v9members.add(owner.ptr, name, type, res)
             return member_t(owner, mindex)
 
         # If this is a union, then there is no offset and we can use the
         # quantity. Otherwise we use the size as the member location.
         if union(owner.ptr):
-            count = members.count(owner.ptr)
+            count = res = members.count(owner.ptr)
             _, mindex, _ = members.add(owner.ptr, name, type, count)
         else:
-            size = idaapi.get_struc_size(owner.ptr)
-            _, mindex, _ = members.add(owner.ptr, name, type, size, 0)
+            size = res = idaapi.get_struc_size(owner.ptr)
+        _, mindex, _ = members.add(owner.ptr, name, type, res)
         return member_t(owner, mindex)
     @utils.multicase(name=(types.string, types.ordered), offset=types.integer)
     @utils.string.decorate_arguments('name')
@@ -8966,9 +8972,9 @@ class members_t(object):
     @utils.multicase(offset=types.integer)
     def remove(self, offset):
         '''Remove the member at the specified `offset` of the structure.'''
-        cls, owner = self.__class__, self.owner
+        cls, owner, base = self.__class__, self.owner, self.baseoffset
         sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
-        realoffset = offset - self.baseoffset
+        realoffset = offset - base
 
         # Figure out if we're using an `idaapi.tinfo_t` as the backing type, and
         # choose the correct namespace to get all of the members at an offset.
@@ -8989,48 +8995,54 @@ class members_t(object):
         [(mowner, mindex, mptr)] = items
 
         if isinstance(mowner, idaapi.tinfo_t):
-            mbitoffset, results = mptr.offset, v9members.remove_slice(mowner, mindex, 8 * self.baseoffset)
-            res, extra = divmod(mbitoffset, 8)
-            moffset = res + 1 if extra else res
+            results = v9members.remove_slice(mowner, mindex, 8 * base)
+
+            # Now we need to scale the bitoffset we were given for the exception
+            # that might happen if we couldn't find any results.
+            quotient, remainder = divmod(mptr.offset, 8)
+            moffset = quotient + 1 if remainder else quotient
+
         else:
-            moffset, results = mptr.soff, members.remove_slice(mowner, mindex, self.baseoffset)
+            moffset, results = mptr.soff, members.remove_slice(mowner, mindex, base)
 
         if not results:
             raise E.DisassemblerError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to remove the member at index {:d} of the {:s} for the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, offset, mindex, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', self.baseoffset + moffset))
 
-        # Return whatever it was that we just removed.
+        # Return whatever it was that we just removed. If we are acting directly
+        # with an `idaapi.tinfo_t`, then we need to rescale it down to bytes.
         [(mname, mtype, mlocation, mtypeinfo, mcomments)] = results
+        if isinstance(mowner, idaapi.tinfo_t):
+            mbytelocation = mlocation / 8
+            if isinstance(mtype, structure_t):
+                mtype.offset = int(mbytelocation)
+            return mname, mtype, mbytelocation, mtypeinfo
         return mname, mtype, mlocation, mtypeinfo
     @utils.multicase(bounds=interface.bounds_t)
     def remove(self, bounds):
         '''Remove the members from the structure within the specified `bounds`.'''
-        owner, base = self.owner, self.baseoffset
-        start, stop = bounds
-        if isinstance(owner.ptr, idaapi.tinfo_t):
-            removed = v9members.remove_bounds(owner.ptr, 8 * start, 8 * stop, 8 * base)
-        else:
-            removed = members.remove_bounds(owner.ptr, start, stop, base)
-        return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
+        return self.remove(*bounds)
     @utils.multicase(start=types.integer, stop=types.integer)
     def remove(self, start, stop):
         '''Remove the members of the structure from the offset `start` to `stop`.'''
         owner, base = self.owner, self.baseoffset
         # FIXME: this should remove overlapping members
+
+        # If our backing type is an `idaapi.tinfo_t`, then everything is stored
+        # in bits and we need to rescale them down into bytes.
         if isinstance(owner.ptr, idaapi.tinfo_t):
             removed = v9members.remove_bounds(owner.ptr, 8 * start, 8 * stop, 8 * base)
-        else:
-            removed = members.remove_bounds(owner.ptr, start, stop, base)
+            iterable = ((mname, mtype, mbitlocation, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo, mcomments in removed)
+            iterable = ((mname, isinstance(mtype, structure_t), mtype, mbitlocation / 8, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo in iterable)
+            iterable = ((mname, mtype - mtype.offset + int(mlocation) if is_structure else mtype, mlocation, mtypeinfo) for mname, is_structure, mtype, mlocation, mtypeinfo in iterable)
+            return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo in iterable]
+
+        # Otherwise we just need to unpack and repack the fields being returned.
+        removed = members.remove_bounds(owner.ptr, start, stop, base)
         return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
     @utils.multicase(location=interface.location_t)
     def remove(self, location):
         '''Remove the members at the specified `location` of the structure.'''
-        owner, base = self.owner, self.baseoffset
-        start, stop = location.bounds
-        if isinstance(owner.ptr, idaapi.tinfo_t):
-            removed = v9members.remove_bounds(owner.ptr, 8 * start, 8 * stop, 8 * base)
-        else:
-            removed = members.remove_bounds(owner.ptr, start, stop, base)
-        return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
+        return self.remove(*location.bounds)
 
     ### Properties
     @property
@@ -9150,16 +9162,13 @@ class members_t(object):
         iterable = v9members.iterate(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else members.iterate(owner.ptr)
         for sptr, mindex, mptr in iterable:
             if isinstance(sptr, idaapi.tinfo_t):
-                mbitoffset = mptr.offset
                 name, typeinfo, mbits, comment, tag = (F(sptr, mindex) for F in [v9member.get_name, v9member.get_typeinfo, lambda *a: mptr.size, v9member.get_comment, internal.tags.typeinfo_member.get])
-                moffset, moffsetextra = divmod(0 if union(sptr) else mbitoffset, 8)
-                msize, msizeextra = divmod(mbits, 8)
-                moffset = moffset + 1 if moffsetextra else moffset
-                msize = msize + 1 if msizeextra else msize
+                mbitlocation = interface.location_t(0 if union(sptr) else mptr.offset, mbits)
+                mlocation = moffset, msize = mbitlocation / 8
                 pythonic = v9member.get_type(sptr, mindex, base + moffset)
             else:
-                moffset = 0 if union(sptr) else mptr.soff
                 name, typeinfo, msize, comment, tag = (F(mptr) for F in [member.get_name, member.get_typeinfo, idaapi.get_member_size, member.get_comment, internal.tags.member.get])
+                mlocation = moffset, msize = interface.location_t(0 if union(sptr) else mptr.soff, msize)
                 pythonic = member.get_type(mptr, base + moffset)
 
             res.append((-1, '', [None, moffset - eoff], None, eoff, moffset - eoff, '', {})) if eoff < moffset else None
@@ -9184,16 +9193,13 @@ class members_t(object):
         iterable = v9members.iterate(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else members.iterate(owner.ptr)
         for sptr, mindex, mptr in members.iterate(owner.ptr):
             if isinstance(sptr, idaapi.tinfo_t):
-                mbitoffset = mptr.offset
                 name, typeinfo, mbits, comment, tag = (F(sptr, mindex) for F in [v9member.get_name, v9member.get_typeinfo, lambda *a: mptr.size, v9member.get_comment, internal.tags.typeinfo_member.get])
-                moffset, moffsetextra = divmod(0 if union(sptr) else mbitoffset, 8)
-                msize, msizeextra = divmod(mbits, 8)
-                moffset = moffset + 1 if moffsetextra else moffset
-                msize = msize + 1 if msizeextra else msize
+                mbitlocation = interface.location_t(0 if union(sptr) else mptr.offset, mbits)
+                mlocation = moffset, msize = mbitlocation / 8
                 pythonic = v9member.get_type(sptr, mindex, base + moffset)
             else:
-                moffset = 0 if union(sptr) else mptr.soff
                 name, typeinfo, msize, comment, tag = (F(mptr) for F in [member.get_name, member.get_typeinfo, idaapi.get_member_size, member.get_comment, internal.tags.member.get])
+                mlocation = moffset, msize = interface.location_t(0 if union(sptr) else mptr.soff, msize)
                 pythonic = member.get_type(mptr, base + moffset)
 
             res.append((-1, '', [None, moffset - eoff], None, eoff, moffset - eoff, '', {})) if eoff < moffset else None
@@ -9248,7 +9254,11 @@ class members_t(object):
             left, right, layout = membersnamespace.layout_getslice(owner.ptr, index)
             iterable = (member_or_size for offset, member_or_size in layout)
             iterable_packed = ((membersnamespace.by_identifier(owner.ptr, member_or_size) if isinstance(member_or_size, idaapi.member_t) or membersnamespace.has_identifier(owner.ptr, member_or_size) else member_or_size) for member_or_size in iterable)
-            res = [(owner_index_member if isinstance(owner_index_member, types.integer) else member_t(owner, owner_index_member[1])) for owner_index_member in iterable_packed]
+            if isinstance(owner.ptr, idaapi.tinfo_t):
+                iterable_versioned = ((owner_index_member // 8 if isinstance(owner_index_member, types.integer) else owner_index_member) for owner_index_member in iterable_packed)
+            else:
+                iterable_versioned = (owner_index_member for owner_index_member in iterable_packed)
+            res = [(owner_index_member if isinstance(owner_index_member, types.integer) else member_t(owner, owner_index_member[1])) for owner_index_member in iterable_versioned]
 
         else:
             raise E.InvalidParameterError(u"{:s}({:#x}).members.__getitem__({!r}) : An invalid type ({!s}) was specified for the index.".format('.'.join([__name__, cls.__name__]), sid, index, index.__class__))
@@ -9260,20 +9270,49 @@ class members_t(object):
 
     def __setitem__(self, index, item):
         '''Replace the member(s) within the specified `index` with a copy of the specified `item` or list of items.'''
-        owner, base = self.owner, self.baseoffset
+        cls, owner, base = self.__class__, self.owner, self.baseoffset
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
+
+        # Start out by figuring out how many elements we currently contain.
+        count = v9members.count(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else members.count(owner.ptr)
+
+        # If we were given a single index, then turn it into a slice. We also
+        # convert our items into a list so we can do slice assignments.
+        if isinstance(index, types.integer):
+            realindex = count + index if index < 0 else index
+            if not (0 <= realindex < count):
+                description = 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure'
+                raise E.IndexOutOfBoundsError(u"{:s}({:#x}).members.__setitem__({:d}, {!r}) : The translated index ({:d}) is out of range ({:d}) for the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, index, item, realindex, count, description, sid))
+            index, item = slice(realindex, realindex + 1), [item]
+
+        # Slice assign things and make sure to scale the locations of the
+        # removed elements from bits into bytes.
         if isinstance(owner.ptr, idaapi.tinfo_t):
             removed = v9members.layout_setslice(owner.ptr, index, item, 8 * base)
-        else:
-            removed = members.layout_setslice(owner.ptr, index, item, base)
+            iterable = ((mname, mtype, mbitlocation, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo, mcomments in removed)
+            iterable = ((mname, isinstance(mtype, structure_t), mtype, (mbitlocation - base) / 8 + base, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo in iterable)
+            iterable = ((mname, mtype - mtype.offset + int(mlocation) if is_structure else mtype, mlocation, mtypeinfo) for mname, is_structure, mtype, mlocation, mtypeinfo in iterable)
+            return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo in iterable]
+
+        # Otherwise we can just do a regular slice assignment for the struc_t.
+        removed = members.layout_setslice(owner.ptr, index, item, base)
         return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
 
     def __delitem__(self, index):
         '''Remove the member(s) at the specified `index` non-destructively.'''
         owner, base = self.owner, self.baseoffset
+
+        # Convert the base into bits and clear out the slice. Then we need to
+        # ensure that we scale the locations of the removed elements into bits.
         if isinstance(owner.ptr, idaapi.tinfo_t):
             removed = v9members.clear_slice(owner.ptr, index, 8 * base)
-        else:
-            removed = members.clear_slice(owner.ptr, index, base)
+            iterable = ((mname, mtype, mbitlocation, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo, mcomments in removed)
+            iterable = ((mname, isinstance(mtype, structure_t), mtype, (mbitlocation - base) / 8 + base, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo in iterable)
+            iterable = ((mname, mtype - mtype.offset + int(mlocation) if is_structure else mtype, mlocation, mtypeinfo) for mname, is_structure, mtype, mlocation, mtypeinfo in iterable)
+            return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo in iterable]
+
+        # Otherwise, we can just use a regular structure and return the results.
+        removed = members.clear_slice(owner.ptr, index, base)
         return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
 
     def __iter__(self):
