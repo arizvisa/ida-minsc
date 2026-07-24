@@ -12941,6 +12941,20 @@ class bounds_t(integerish):
     def __invert__(self):
         return operator.neg(self)
 
+    def __truediv__(self, denomination):
+        '''Divide the members of the boundary by the specified `denomination` (floor and ceiling).'''
+        left, right = self
+        scaledleft = left // denomination
+        quotient, remainder = divmod(right, denomination)
+        scaledright = 1 + quotient if remainder else quotient
+        return self.__class__(scaledleft, scaledright)
+    __div__ = __truediv__
+
+    def __floordiv__(self, denomination):
+        '''Divide the members of the boundary by the specified `denomination` (floor).'''
+        left, right = self
+        return self.__class__(left // denomination, right // denomination)
+
 # FIXME: should probably be a register_t, but with the different attributes
 class partialregister_t(namedtypedtuple, symbol_t):
     _fields = 'register', 'position', 'bits'
@@ -13109,6 +13123,21 @@ class location_t(integerish):
         '''Return the boundary translated to the specified `index` of an array.'''
         offset, size = self
         return self.__class__(int(offset) + math.trunc(size * index), size)
+
+    def __truediv__(self, denomination):
+        '''Divide the members of the location by the specified `denomination` (ceiling).'''
+        offset, size = self
+        quotient, remainder = divmod(offset, denomination)
+        scaledoffset = 1 + quotient if remainder else quotient
+        quotient, remainder = divmod(size, denomination)
+        scaledsize = 1 + quotient if remainder else quotient
+        return self.__class__(scaledoffset, scaledsize)
+    __div__ = __truediv__
+
+    def __floordiv__(self, denomination):
+        '''Divide the members of the location by the specified `denomination` (floor).'''
+        offset, size = self
+        return self.__class__(offset // denomination, size // denomination)
 
 class phrase_t(integerish, symbol_t):
     """
