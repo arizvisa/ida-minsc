@@ -2361,7 +2361,7 @@ class v9members(object):
             typeinfo_description = "{!s}".format(typeinfo)
 
         # assign some descriptions for when we need to raise an exception.
-        offset_description = ", {:+#x}".format(*offset) if offset else ''
+        offset_description = ", bits({:+#x})".format(base) if offset else ''
         location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(base + location)
         type_description = 'frame' if is_frame else 'union' if union(ti) else 'structure'
 
@@ -2370,7 +2370,7 @@ class v9members(object):
         # each of the properties specified by the caller on the member type.
         if hasattr(ti, 'add_udm'):
             udm = udm_t()
-            udm.offset = 0 if is_union else location
+            udm.offset = 0 if is_union else location - base
             udm.size = 8 * interface.tinfo.size(mtype)
             udm.name = utils.string.to(name)
             if not udm.type.deserialize(til, *mtype.serialize()):
@@ -2466,11 +2466,11 @@ class v9members(object):
         # are available to determine the index for inserting the new member.
         # FIXME: if the specified location is not contiguous to the structure or
         #        its members, then we'll need to manually add a gap for it.
-        members, points = cls.intervals(ti, critique=lambda mowner, mutd, mindex, udm: not(udm.is_gap()))
+        members, points = cls.intervals(ti, critique=lambda mowner, _, mindex, udm: not(udm.is_gap()))
 
         # now we can search the intervals to figure out where we need to insert
         # the member in order to get it at the desired offset.
-        left, right = location, 8 * interface.tinfo.size(mtype)
+        left, right = location, location + 8 * interface.tinfo.size(mtype)
         raise E.NotImplementedError(u"{:s}.add({:#x}, {!r}, {!s}, {!s}{!s}) : Adding a member to a type in earlier versions of the disassembler is currently unsupported.".format('.'.join([__name__, cls.__name__]), sid, name, typeinfo_description, location, offset_description))
 
     @classmethod
