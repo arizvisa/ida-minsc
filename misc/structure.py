@@ -5830,6 +5830,7 @@ class members(object):
             moffset = mindex = moffset_or_mindex
             if moffset_or_mindex not in members:
                 continue
+            size = idaapi.get_struc_size(sptr)
 
             # Calculate the description of the location and delete the member.
             location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
@@ -5842,17 +5843,25 @@ class members(object):
                 logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove member \"{:s}\" ({:#x}) at {:s} of the {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', utils.string.escape(mname, '"'), mid, location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
                 failed.add((mid, moffset))
 
+            # If we succeeded, but there is still a member at that offset then
+            # something unexpected happened since we just removed the member.
             elif mptr:
                 logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Member \"{:s}\" ({:#x}) at {:s} of {:s} ({:#x}) was not removed ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', utils.string.escape(mname, '"'), mid, location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id, mptr.id))
                 failed.add((mid, moffset))
 
-            # If we succeeded, then we can go ahead and attempt to shrink the structure.
-            elif ok and (True if is_union else idaapi.expand_struc(sptr, moffset, -msize)):
-                count += 1
+            # If the removal of a member caused the structure size to be changed
+            # exactly, then we don't need to cull any bytes from the structure.
+            elif idaapi.get_struc_size(sptr) == size - msize:
+                ok, count = idaapi.TERR_OK, count + 1
+
+            # If we succeeded, then we can go ahead and shrink the structure. If
+            # it's a union, then we don't need to resize and can just pass it.
+            elif is_union or idaapi.expand_struc(sptr, moffset, -msize):
+                ok, count = idaapi.TERR_OK, count + 1
 
             # If we couldn't shrink it, then we avoid updating the size and log a warning.
             else:
-                logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove space ({:d}) at {:s} of {:s} ({:#x}) after removing member \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id, utils.string.escape(mname, '"'), mid))
+                logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove space ({:d}) at {:s} of {:s} ({:#x}) after removing member \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', msize, location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id, utils.string.escape(mname, '"'), mid))
                 failed.add((mid, moffset))
             continue
 
