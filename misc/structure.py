@@ -3807,7 +3807,7 @@ class v9members(object):
 
         # Now we can go through and gather the identifiers for each member.
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
-        iterable = (next(v9members.at_offset(ti, moffset)) for moffset in iterable if v9members.has_offset(ti, moffset))
+        iterable = (next(v9members.at_offset(ti, 8 * moffset)) for moffset in iterable if v9members.has_offset(ti, 8 * moffset))
         specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, _, mindex, _ in iterable}
 
         # Before clearing things, we stash them and gather the references for
@@ -3843,34 +3843,37 @@ class v9members(object):
         iterable = utils.itermap(functools.partial(cls.by, ti), indices[::-1])
         iterable = ((mindex, v9member.packed(base + udm.offset, mowner, mindex)) for mowner, _, mindex, udm in iterable)
         iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
-        listable = [(mid, mname, mindex, moffset, msize) for mindex, mid, mname, mtype, (moffset, msize), mtypeinfo, mcomment in iterable if mid not in specials]
+        listable = [(mid, mname, mindex, mbitoffset, mbits) for mindex, mid, mname, mtype, (mbitoffset, mbits), mtypeinfo, mcomment in iterable if mid not in specials]
 
         # We got everything, so we can start lasking the disassembler to delete
         # each member from our list of indices. This list has been sorted and
         # reversed so that clearing an index won't change any of the other ones.
-        count, failed = 0, {moffset for moffset in []}
-        for mid, mname, mindex, moffset, msize in listable:
-            mkey = mindex if is_union else moffset
+        count, failed = 0, {mbitoffset for mbitoffset in []}
+        for mid, mname, mindex, mbitoffset, mbits in listable:
+            mkey = mindex if is_union else mbitoffset - base
             if mkey not in members:
                 continue
 
             # Fetch the member index, and then we can go ahead and delete it.
-            location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
+            location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(mbitoffset + base)
             ok = ti.del_udm(mindex)
 
+            # If we couldn't delete it, then log a warning and track it.
             if ok != idaapi.TERR_OK:
                 errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
                 logging.warning(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to clear member \"{:s}\" ({:#x}) at {:s} of the {:s} due to error {!s}.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, utils.string.escape(mname, '"'), mid, location_description, type_description, description))
-                ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
+                ok, _ = idaapi.TERR_OK, failed.add((mid, mbitoffset))
 
-            elif not is_union and v9members.has_offset(ti, moffset) and not(next(cls.at_offset(ti, moffset))[-1].is_gap()):
+            # If we succeeded, then we check to see if there's still a member
+            # there. If there is, then we were lied to since it wasn't deleted.
+            elif not is_union and v9members.has_offset(ti, mbitoffset) and not(next(cls.at_offset(ti, mbitoffset))[-1].is_gap()):
                 logging.warning(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Member \"{:s}\" ({:#x}) at {:s} of {:s} was not cleared.".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, utils.string.escape(mname, '"'), mid, location_description, type_description))
-                ok, _ = idaapi.TERR_OK, failed.add((mid, moffset))
+                ok, _ = idaapi.TERR_OK, failed.add((mid, mbitoffset))
 
             # If we were successful, then it worked and we cleared the member.
             else:
-                count += 1
+                ok, count = idaapi.TERR_OK, count + 1
             continue
 
         # If there were no elements cleared, but some were selected then we log
@@ -3890,9 +3893,9 @@ class v9members(object):
         # If the number of elements cleared match what was selected, then we can
         # return everything that was cleared since we were successful.
         if is_union:
-            iterable = (members[mindex] for mindex, moffset, mid in selected if mindex in members)
+            iterable = (members[mindex] for mindex, _, _ in selected if mindex in members)
         else:
-            iterable = (members[moffset] for mindex, moffset, mid in selected if moffset in members)
+            iterable = (members[mbitoffset] for _, mbitoffset, _ in selected if mbitoffset in members)
 
         if len(selected) == count:
             return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
@@ -3905,17 +3908,17 @@ class v9members(object):
         # Go through each member so that we can verify that it doesn't exist. If
         # it does exist, then we collect the member so we can complain about it.
         cleared = {mid for mid in []}
-        for mindex, moffset, mid in selected:
-            mkey = mindex if is_union else moffset
+        for mindex, mbitoffset, mid in selected:
+            mkey = mindex if is_union else mbitoffset
             if mkey not in members:
                 continue
 
-            mid, mname, _, _, _ = members[mkey]
+            mid, mname, _, _, _, _ = members[mkey]
 
             # Check if the member actually exists at the offset or index.
-            exists = v9members.has_index(ti, mindex) if is_union else v9members.has_offset(ti, moffset)
+            exists = v9members.has_index(ti, mindex) if is_union else v9members.has_offset(ti, mbitoffset)
             if exists:
-                location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(base + moffset)
+                location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(base + mbitoffset)
                 logging.debug(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to clear member \"{:s}\" at {:s} with id ({:#x}) in the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, utils.string.escape(mname, '"'), location_description, mid, type_description, sid))
 
             # If it doesn't exist, then we successfully cleared the member.
@@ -3926,8 +3929,8 @@ class v9members(object):
         # Now we can complain about the non-cleared members so that we can
         # complain about it, and then return the ones we did actaully clear.
         logging.warning(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to clear {:d} of {:s} in the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, slice, offset_description, len(expected) - len(cleared), "{:d} members".format(len(expected)) if len(expected) == 1 else "the expected {:d} members".format(len(expected)), type_description, sid))
-        iterable = (mindex for mindex, moffset, mid in selected if mid in cleared) if is_union else (moffset for mindex, moffset, mid in selected if mid in cleared)
-        iterable = (members[moffset_or_mindex] for moffset_or_mindex in iterable)
+        iterable = (mindex for mindex, mbitoffset, mid in selected if mid in cleared) if is_union else (mbitoffset for mindex, mbitoffset, mid in selected if mid in cleared)
+        iterable = (members[mbitoffset_or_mindex] for mbitoffset_or_mindex in iterable)
         return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
 
     @classmethod
