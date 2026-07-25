@@ -8661,6 +8661,22 @@ class tinfo(object):
         if not tinfo:
             raise internal.exceptions.ItemNotFoundError(u"{:s}.identifier({!s}{:s}) : Unable to find the specified type within the current local types library.".format('.'.join([__name__, cls.__name__]), type_description, ", {!s}".format(*always) if always else ''))
 
+        # If we were given a structure or a member type, then we can extract it.
+        elif isinstance(type, internal.structure.structuretypes):
+            if isinstance(getattr(type, 'ptr', type), idaapi.tinfo_t):
+                return cls.identifier(type.ptr)
+            return type.id
+
+        elif isinstance(type, internal.structure.membertypes):
+            if isinstance(type, internal.structure.member_t) and isinstance(type.parent.ptr, idaapi.tinfo_t):
+                return cls.identifier(type.parent.ptr)
+            packed = idaapi.get_member_by_id(type.id)
+            if not packed:
+                raise internal.exceptions.ItemNotFoundError(u"{:s}.identifier({!s}{:s}) : Unable to find the type owning the specified member ({:#x}) within the current local types library.".format('.'.join([__name__, cls.__name__]), type_description, ", {!s}".format(*always) if always else '', type.id))
+
+            _, _, sptr = packed
+            return cls.identifier(sptr)
+
         # If we have a get_tid method, then use that since get_tinfo_tid is not
         # available via idapython...thanks to the fucks over at hex-rays.
         elif hasattr(tinfo, 'get_tid'):
