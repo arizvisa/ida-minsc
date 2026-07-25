@@ -12078,12 +12078,20 @@ class function(object):
         return None if ea == idaapi.BADADDR else idaapi.get_func(ea)
 
     @classmethod
-    def by_frame(cls, sptr):
+    def by_frame(cls, sptr, **caller):
         '''Return the ``idaapi.func_t`` for the function that owns the frame specified in `sptr`.'''
-        if sptr.props & idaapi.SF_FRAME:
-            ea = idaapi.get_func_by_frame(sptr.id)
-            return None if ea == idaapi.BADADDR else idaapi.get_func(ea)
-        return None
+        ti, frame = idaapi.tinfo_t(), getattr(sptr, 'ptr', sptr)
+        if hasattr(idaapi.tinfo_t, 'get_frame_func') and isinstance(frame, idaapi.tinfo_t):
+            ea = frame.get_frame_func()
+        elif hasattr(idaapi, 'get_func_by_frame') and isinstance(sptr, internal.types.integer):
+            ea = idaapi.get_func_by_frame(sptr)
+        elif hasattr(idaapi, 'get_func_by_frame'):
+            ea = idaapi.get_func_by_frame(frame.id) if internal.structure.frame(frame) else idaapi.BADADDR
+        elif isinstance(sptr, internal.types.integer) and ti.get_type_by_tid(sptr):
+            ea = ti.get_frame_func()
+        else:
+            raise cls.missing(sptr, **caller)
+        return None if ea == idaapi.BADADDR else idaapi.get_func(ea)
 
     @classmethod
     def by(cls, func, **caller):
@@ -12094,8 +12102,8 @@ class function(object):
             result = cls.by_address(int(func))
         elif isinstance(func, internal.types.string):
             result = cls.by_name(func)
-        elif isinstance(func, (idaapi.struc_t, internal.structure.structure_t)):
-            result = cls.by_frame(func if isinstance(func, idaapi.struc_t) else func.ptr)
+        elif isinstance(func, (internal.structure.structuretypes, idaapi.tinfo_t)):
+            result = cls.by_frame(func.ptr if isinstance(func, internal.structure.structure_t) else func, **caller)
         else:
             result = None
 
