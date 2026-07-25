@@ -530,7 +530,7 @@ class functions(object):
     #        chance that it might actually be better to check the frame size
     #        with `func_t.frsize` and see if it's larger than the result from
     #        the `get_frame_retsize` function.
-    __matcher__.combinator('frame', utils.fcompose(utils.fcompose, utils.fcondition(utils.finstance(internal.types.bool), utils.finstance(internal.types.string), utils.finstance(internal.types.integer))(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, utils.fpartial(operator.ne, idaapi.BADNODE))), utils.fcompose(internal.tags.select.owners, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, idaapi.get_func_by_frame, interface.function.by_address, utils.fcondition(utils.finstance(idaapi.func_t))(operator.attrgetter('frsize'), 0))), utils.fcompose(internal.types.set, utils.fcondition(utils.fcompose(utils.fpartial(utils.imap, utils.finstance(internal.types.string)), builtins.all))(utils.fcompose(internal.types.set, internal.tags.select.owners, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fpartial(utils.fpartial, operator.contains), utils.fpartial(utils.fcompose, idaapi.get_func_by_frame, interface.function.by_address, utils.fcondition(utils.finstance(idaapi.func_t))(operator.attrgetter('frsize'), 0))))))), interface.function.by_address, utils.fcondition(operator.truth)(operator.attrgetter('frame'), idaapi.BADADDR))
+    __matcher__.combinator('frame', utils.fcompose(utils.fcompose, utils.fcondition(utils.finstance(internal.types.bool), utils.finstance(internal.types.string), utils.finstance(internal.types.integer))(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, utils.fpartial(operator.ne, idaapi.BADNODE))), utils.fcompose(internal.tags.select.owners, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, interface.function.by_frame, utils.fcondition(utils.finstance(idaapi.func_t))(operator.attrgetter('frsize'), 0))), utils.fcompose(internal.types.set, utils.fcondition(utils.fcompose(utils.fpartial(utils.imap, utils.finstance(internal.types.string)), builtins.all))(utils.fcompose(internal.types.set, internal.tags.select.owners, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fpartial(utils.fpartial, operator.contains), utils.fpartial(utils.fcompose, interface.function.by_frame, utils.fcondition(utils.finstance(idaapi.func_t))(operator.attrgetter('frsize'), 0))))))), interface.function.by_address, utils.fcondition(operator.truth)(operator.attrgetter('frame'), idaapi.BADADDR))
 
     __matcher__.combinator('tagged', utils.fcompose(utils.fcompose, utils.fcondition(utils.finstance(internal.types.bool, internal.types.integer), utils.finstance(internal.types.string))(utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(internal.tags.select.database), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(internal.tags.select.database), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, utils.fcompose(operator.contains, operator.not_)))), utils.fcompose(internal.tags.select.database, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(internal.types.set, internal.tags.select.database, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)))))
     __matcher__.alias('tag', 'tagged'), __matcher__.alias('tags', 'tagged')
@@ -2821,7 +2821,7 @@ class address(object):
         if structure is not sptr:
             offset = structure.offset
         elif internal.structure.frame(sptr):
-            ea = idaapi.get_func_by_frame(sptr.id)
+            fn = interface.function.by_frame(sptr)
             offset = interface.function.frame_offset(ea)
         else:
             offset = 0
@@ -2833,7 +2833,7 @@ class address(object):
         mptr = member.ptr if isinstance(member, internal.structure.member_t) else member
         _, fullname, sptr = idaapi.get_member_by_id(mptr.id)
         size = internal.structure.member.size(mptr)
-        base = member.parent.offset if member is not mptr else interface.function.frame_offset(idaapi.get_func_by_frame(sptr.id)) if internal.structure.frame(sptr) else 0
+        base = member.parent.offset if member is not mptr else interface.function.frame_offset(interface.function.by_frame(sptr)) if internal.structure.frame(sptr) else 0
         if member is not mptr:
             offset = member.offset
         else:
