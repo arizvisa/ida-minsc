@@ -5019,9 +5019,11 @@ class node(object):
     @staticmethod
     def identifier(identifier):
         '''Return whether the provided `identifier` is actually valid or not.'''
+        if not isinstance(identifier, internal.types.integer):
+            return False
 
         # First use the latest official api to get the private range of identifiers.
-        if hasattr(idaapi, 'inf_get_privrange'):
+        elif hasattr(idaapi, 'inf_get_privrange'):
             res = idaapi.inf_get_privrange()
             return range.within(identifier, res)
 
