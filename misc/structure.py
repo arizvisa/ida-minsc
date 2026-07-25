@@ -6267,7 +6267,9 @@ class members(object):
         # contiguous. So we can simply include the index and return it.
         if union(sptr):
             sizes = [idaapi.get_member_size(mptr) for mptr in selected]
-            return min(sizes), max(sizes), [(mptr.soff, mptr) for mptr in selected]
+            if sizes:
+                return min(sizes), max(sizes), [(mptr.soff, mptr) for mptr in selected]
+            return 0, 0, []
 
         # Otherwise, we need to figure out the start and end offsets.
         if istart < istop:
