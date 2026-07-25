@@ -12123,19 +12123,39 @@ class function(object):
         '''Raise an exception related to the address in `ea` not pointing to a function.'''
         caller = caller.get('caller', [cls.__name__, 'by'])
         raise internal.exceptions.FunctionNotFoundError(u"{:s}({:#x}) : Unable to locate a function at the specified address ({:#x}).".format('.'.join(caller) if isinstance(caller, internal.types.list) else caller, ea, ea))
-    @internal.utils.multicase(frame=idaapi.struc_t)
+    @internal.utils.multicase(frame=idaapi.tinfo_t)
     @classmethod
     def missing(cls, frame, **caller):
         '''Raise an exception related to the structure in `frame` not being part of a function.'''
         caller = caller.get('caller', [cls.__name__, 'by'])
-        name = internal.utils.string.of(idaapi.get_struc_name(frame.id))
-        raise internal.exceptions.FunctionNotFoundError(u"{:s}({:#x}) : Unable to locate a function using a structure ({!s}) that is not a frame.".format('.'.join(caller) if isinstance(caller, internal.types.list) else caller, frame.id, internal.utils.string.repr(name)))
+        sid, is_frame = tinfo.identifier(frame), frame.is_frame()
+        name = internal.utils.string.of(idaapi.get_tid_name(sid) or frame.get_type_name())
+        frame_description = "{!s}".format(frame) if sid == idaapi.BADADDR else "{:#x}".format(sid)
+        raise internal.exceptions.FunctionNotFoundError(u"{:s}({!s}) : Unable to locate a function using the specified type \"{!s}\" ({:#x}){!s}.".format('.'.join(caller) if isinstance(caller, internal.types.list) else caller, frame_description, internal.utils.string.escape(name, '"'), sid, '' if is_frame else ' that is not a frame'))
     @internal.utils.multicase()
     @classmethod
     def missing(cls, unsupported, **caller):
         '''Raise an exception due to receiving an `unsupported` type.'''
+        owner = getattr(unsupported, 'ptr', unsupported)
+
+        # If we didn't get a structure, then we don't know what type this is.
+        if not isinstance(unsupported, internal.structure.structuretypes):
+            caller = caller.get('caller', [cls.__name__, 'by'])
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}({!r}) : Unable to locate a function using an unsupported type ({!s}).".format('.'.join(caller) if isinstance(caller, internal.types.list) else caller, unsupported, internal.utils.pycompat.fullname(unsupported.__class__)))
+
+        # Otherwise it's a structure of some kind. So we need to verify which
+        # variation it is. If it's an `idaapi.tinfo_t` then we can recurse.
+        if isinstance(owner, idaapi.tinfo_t):
+            raise cls.missing(owner, **caller)
+
+        # Grab the identifier, and try and grab all the structure information.
+        else:
+            sid = owner.id
+
         caller = caller.get('caller', [cls.__name__, 'by'])
-        raise internal.exceptions.FunctionNotFoundError(u"{:s}({!r}) : Unable to locate a function using an unsupported type ({!s}).".format('.'.join(caller) if isinstance(caller, internal.types.list) else caller, unsupported, internal.utils.pycompat.fullname(unsupported.__class__)))
+        name = internal.utils.string.of(idaapi.get_struc_name(sid) or internal.netnode.name.get(sid))
+        is_frame = True if owner.props & SF_FRAME else False
+        raise internal.exceptions.FunctionNotFoundError(u"{:s}({:#x}) : Unable to locate a function using the specified structure \"{!s}\" ({:#x}){!s}.".format('.'.join(caller) if isinstance(caller, internal.types.list) else caller, sid, internal.utils.string.escape(name, '"'), sid, '' if is_frame else ' that is not a frame'))
 
     @classmethod
     def owners(cls, ea):
