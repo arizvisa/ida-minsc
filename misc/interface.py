@@ -598,7 +598,7 @@ class typemap(object):
         # first use the type the user gave us to find the actual table containg
         # the sizes we want to look up, and then we extract the flag and typeid
         # from the table that we determined.
-        if isinstance(pythonType, ().__class__) and not isinstance(next(iter(pythonType)), (idaapi.struc_t, internal.structure.structure_t)):
+        if isinstance(pythonType, ().__class__) and not isinstance(next(iter(pythonType)), internal.structure.structuretypes):
             table = cls.typemap.get(builtins.next(item for item in pythonType), {})
 
             # First check if our pythonic type already exists in the table as a regular
@@ -811,7 +811,7 @@ class typemap(object):
 
         # If our pythonType is a tuple, with the first element being a type or
         # structure of some kind, then this is a variable-length structure.
-        elif isinstance(pythonType, internal.types.tuple) and isinstance(next(iter(pythonType)), (idaapi.struc_t, internal.structure.structure_t)):
+        elif isinstance(pythonType, internal.types.tuple) and isinstance(next(iter(pythonType)), internal.structure.structuretypes):
             raise NotImplementedError(u"{:s}.resolvetype({!s}) : Unable the return a type for the variable-length structure {!s}.".format('.'.join([__name__, cls.__name__]), pythonType, tinfo.quoted(element), count))
 
         # If a tuple and the first element is not a type or structure, then this
@@ -918,9 +918,9 @@ class typemap(object):
             return max(0, size) if isinstance(size, internal.types.integer) and len(pythonType) in {2, 3} else 0
 
         # If it's not a tuple, then it might be a structure to snag the size from.
-        elif hasattr(idaapi, 'struc_t') and isinstance(pythonType, (internal.structure.structure_t, idaapi.struc_t)):
+        elif isinstance(pythonType, internal.structure.structuretypes):
             sptr = pythonType if isinstance(pythonType, idaapi.struc_t) else pythonType.ptr
-            return idaapi.get_struc_size(sptr)
+            return tinfo.size(sptr) if isinstance(sptr, idaapi.tinfo_t) else idaapi.get_struc_size(sptr)
 
         # If the disassembler version does not support the structure API, then
         # we need to get the local type information for the structure.
