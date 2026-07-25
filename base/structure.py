@@ -292,7 +292,7 @@ def has(name, *suffix):
 def has(structure):
     '''Return whether the database includes the given `structure`.'''
     return has(structure.id)
-@utils.multicase(member=(idaapi.member_t, member_t))
+@utils.multicase(member=internal.structure.membertypes)
 def has(member):
     '''Return whether the database contains the structure used or referenced by the given `member.'''
     DT_TYPE, FF_STRUCT = idaapi.as_uint32(idaapi.DT_TYPE), idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
@@ -378,7 +378,7 @@ def by(id, **offset):
 def by(sptr, **offset):
     '''Return the structure for the specified `sptr`.'''
     return internal.structure.new(sptr.id, offset.get('offset', 0))
-@utils.multicase(member=(idaapi.member_t, member_t))
+@utils.multicase(member=internal.structure.membertypes)
 def by(member):
     '''Return the structure used by the given `member` or the type that it points to.'''
     DT_TYPE, FF_STRUCT = idaapi.as_uint32(idaapi.DT_TYPE), idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
@@ -878,7 +878,7 @@ def references(structure):
     '''Return the operand references that reference the given `structure` or its members.'''
     sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
     return internal.structure.members.references(sptr)
-@utils.multicase(member=(member_t, idaapi.member_t))
+@utils.multicase(member=internal.structure.membertypes)
 def references(member):
     '''Return the operand references that reference the specified `member`.'''
     mptr = member if isinstance(member, idaapi.member_t) else member.ptr
