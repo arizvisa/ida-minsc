@@ -115,7 +115,7 @@ __matcher__.combinator('members', utils.fcompose(utils.fcompose, utils.fconditio
 __matcher__.mapping('anonymous', operator.truth, 'name', operator.methodcaller('startswith', '$'))
 
 __matcher__.mapping('contiguous', functools.partial(operator.le, 0), operator.attrgetter('ptr'), utils.fcondition(internal.structure.union)(utils.fconstant(0), utils.fcompose(utils.fmap(utils.fcompose(operator.attrgetter('members'), functools.partial(functools.partial, operator.getitem)), utils.fcompose(operator.attrgetter('memqty'), builtins.range)), utils.funpack(builtins.map), utils.freverse(functools.partial(functools.reduce, lambda eoff, member: member.eoff if member.soff == eoff else -1), 0))))
-__matcher__.combinator('structure', utils.fcondition(utils.finstance(idaapi.struc_t, internal.structure.structure_t))(utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(filter, utils.finstance(idaapi.struc_t, internal.structure.structure_t)), utils.fpartial(utils.itermap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), 'id')
+__matcher__.combinator('structure', utils.fcondition(utils.finstance(internal.structure.structuretypes))(utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(filter, utils.finstance(internal.structure.structuretypes)), utils.fpartial(utils.itermap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), 'id')
 __matcher__.alias('structures', 'structure')
 __matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
 
@@ -288,7 +288,7 @@ def has(name, *suffix):
     string = name if isinstance(name, types.tuple) else (name,)
     res = utils.string.to(interface.tuplename(*(string + suffix)))
     return has(idaapi.get_struc_id(res))
-@utils.multicase(structure=(idaapi.struc_t, structure_t))
+@utils.multicase(structure=internal.structure.structuretypes)
 def has(structure):
     '''Return whether the database includes the given `structure`.'''
     return has(structure.id)
@@ -374,7 +374,7 @@ def by(id, **offset):
     if interface.node.identifier(id):
         return internal.structure.new(id, offset.get('offset', 0))
     return by_index(id, **offset)
-@utils.multicase(sptr=(idaapi.struc_t, structure_t))
+@utils.multicase(sptr=internal.structure.structuretypes)
 def by(sptr, **offset):
     '''Return the structure for the specified `sptr`.'''
     return internal.structure.new(sptr.id, offset.get('offset', 0))
@@ -501,7 +501,7 @@ def name(id):
         number, description = ("{:#x}".format(id), 'identifier') if interface.node.identifier(id) else ("{:d}".format(id), 'index')
         raise E.StructureNotFoundError(u"{:s}.name({:s}) : Unable to locate a structure with the specified {:s} ({:s}).".format(__name__, number, description, number))
     return utils.string.of(idaapi.get_struc_name(sptr.id))
-@utils.multicase(structure=(idaapi.struc_t, structure_t))
+@utils.multicase(structure=internal.structure.structuretypes)
 def name(structure):
     '''Return the name of the given `structure`.'''
     return name(structure.id)
@@ -531,7 +531,7 @@ def name(id, string, *suffix):
     if not ok:
         raise E.DisassemblerError(u"{:s}.name({:d}, {!r}) : Unable to set the name of the specified structure ({:#x}) to \"{:s}\".".format(__name__, id, string, id, utils.string.escape(utils.string.of(ida_string), '"')))
     return utils.string.of(res)
-@utils.multicase(structure=(idaapi.struc_t, structure_t), string=types.string)
+@utils.multicase(structure=internal.structure.structuretypes, string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(structure, string, *suffix):
     '''Set the name of the specified `structure` to `string`.'''
@@ -559,16 +559,16 @@ def comment(id, **repeatable):
         number, description = ("{:#x}".format(id), 'identifier') if interface.node.identifier(id) else ("{:d}".format(id), 'index')
         raise E.StructureNotFoundError(u"{:s}.comment({:s}{:s}) : Unable to locate a structure with the specified {:s} ({:s}).".format(__name__, number, u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', description, number))
     return internal.structure.comment.get(sptr, repeatable.get('repeatable', True))
-@utils.multicase(structure=(idaapi.struc_t, structure_t))
+@utils.multicase(structure=internal.structure.structuretypes)
 def comment(structure, **repeatable):
     '''Return the comment for the specified `structure`.'''
     return comment(structure.id, **repeatable)
-@utils.multicase(structure=(idaapi.struc_t, structure_t), string=types.string)
+@utils.multicase(structure=internal.structure.structuretypes, string=types.string)
 @utils.string.decorate_arguments('string')
 def comment(structure, string, **repeatable):
     '''Set the comment for the specified `structure` to `string`.'''
     return comment(structure.id, string, **repeatable)
-@utils.multicase(structure=(idaapi.struc_t, structure_t), none=types.none)
+@utils.multicase(structure=internal.structure.structuretypes, none=types.none)
 def comment(structure, none, **repeatable):
     '''Remove the comment from the specified `structure`.'''
     return comment(structure.id, none or '', **repeatable)
@@ -611,7 +611,7 @@ def index(id):
         number, description = ("{:#x}".format(id), 'identifier') if interface.node.identifier(id) else ("{:d}".format(id), 'index')
         raise E.StructureNotFoundError(u"{:s}.index({:s}) : Unable to locate a structure with the specified {:s} ({:s}).".format(__name__, number, description, number))
     return idaapi.get_struc_idx(sptr.id)
-@utils.multicase(structure=(idaapi.struc_t, structure_t))
+@utils.multicase(structure=internal.structure.structuretypes)
 def index(structure):
     '''Return the position of the specified `structure`.'''
     return index(structure.id)
@@ -627,7 +627,7 @@ def index(id, position):
     if not ok:
         raise E.DisassemblerError(u"{:s}.index({:#x}, {:d}) : Unable to set the index for the specified structure ({:#x}) to {:d}.".format(__name__, id, position, id, position))
     return res
-@utils.multicase(structure=(idaapi.struc_t, structure_t), position=types.integer)
+@utils.multicase(structure=internal.structure.structuretypes, position=types.integer)
 def index(structure, position):
     '''Move the specified `structure` to the specified `position` of the structure list.'''
     return index(structure.id, position)
@@ -642,7 +642,7 @@ def index(tinfo, position):
     structure = by(tinfo)
     return index(structure.ptr, position)
 
-@utils.multicase(structure=(idaapi.struc_t, structure_t))
+@utils.multicase(structure=internal.structure.structuretypes)
 def size(structure):
     '''Return the size of the specified `structure`.'''
     id = structure.id
@@ -701,7 +701,7 @@ class type(object):
         if not sptr:
             raise E.StructureNotFoundError(u"{:s}.union({:#x}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
         return cls.union(sptr)
-    @utils.multicase(structure=(idaapi.struc_t, structure_t))
+    @utils.multicase(structure=internal.structure.structuretypes)
     @classmethod
     def union(cls, structure):
         '''Return whether the provided `structure` is defined as a union.'''
@@ -723,7 +723,7 @@ class type(object):
         if not sptr:
             raise E.StructureNotFoundError(u"{:s}.frame({!r}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
         return cls.frame(sptr)
-    @utils.multicase(structure=(idaapi.struc_t, structure_t))
+    @utils.multicase(structure=internal.structure.structuretypes)
     @classmethod
     def frame(cls, structure):
         '''Return whether the provided `structure` is a frame or not.'''
@@ -739,7 +739,7 @@ class type(object):
         if not sptr:
             raise E.StructureNotFoundError(u"{:s}.listed({:#x}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
         return cls.listed(sptr)
-    @utils.multicase(structure=(idaapi.struc_t, structure_t))
+    @utils.multicase(structure=internal.structure.structuretypes)
     @classmethod
     def listed(cls, structure):
         '''Return whether the provided `structure` is listed.'''
@@ -767,7 +767,7 @@ class type(object):
     is_listed = utils.alias(listed, 'type')
 is_union, is_frame, is_listed = utils.alias(type.union, 'type'), utils.alias(type.frame, 'type'), utils.alias(type.listed, 'type')
 
-@utils.multicase(structure=(idaapi.struc_t, structure_t))
+@utils.multicase(structure=internal.structure.structuretypes)
 def remove(structure):
     '''Remove the specified `structure` from the database.'''
     sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
@@ -846,7 +846,7 @@ def up(id):
             raise E.StructureNotFoundError(u"{:s}.up({:#x}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
         raise E.StructureNotFoundError(u"{:s}.up({:d}) : Unable to find a structure at the specified index ({:d}).".format(__name__, id, id))
     return [reference_or_member for reference_or_member in internal.structure.xref.structure(sptr)]
-@utils.multicase(structure=(structure_t, idaapi.struc_t))
+@utils.multicase(structure=internal.structure.structuretypes)
 def up(structure):
     '''Return the structure members or references that use the given `structure`.'''
     sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
@@ -873,7 +873,7 @@ def references(id):
             raise E.StructureNotFoundError(u"{:s}.references({:#x}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
         raise E.StructureNotFoundError(u"{:s}.references({:d}) : Unable to find a structure at the specified index ({:d}).".format(__name__, id, id))
     return internal.structure.members.references(sptr)
-@utils.multicase(structure=(structure_t, idaapi.struc_t))
+@utils.multicase(structure=internal.structure.structuretypes)
 def references(structure):
     '''Return the operand references that reference the given `structure` or its members.'''
     sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
@@ -918,7 +918,7 @@ class members(object):
         if id == idaapi.BADADDR:
             raise E.StructureNotFoundError(u"{:s}.members({!r}) : Unable to locate a structure with the specified name.".format(__name__, utils.string.escape(res, '"')))
         return internal.structure.new(id, 0).members
-    @utils.multicase(sptr=(idaapi.struc_t, structure_t))
+    @utils.multicase(sptr=internal.structure.structuretypes)
     def __new__(cls, sptr):
         '''Return the members of the structure specified by `sptr`.'''
         offset = sptr.baseoffset if isinstance(sptr, structure_t) else 0
@@ -982,7 +982,7 @@ class members(object):
             offset += 0 if unionQ else msize
         return
 
-    @utils.multicase(structure=(idaapi.struc_t, idaapi.tinfo_t, structure_t, types.integer, types.string), offset=types.integer)
+    @utils.multicase(structure=(internal.structure.structuretypes, idaapi.tinfo_t, types.integer, types.string), offset=types.integer)
     @classmethod
     def fragment(cls, structure, offset, **base):
         '''Yield each member of the given `structure` from the specified `offset` as a tuple containing its attributes.'''
