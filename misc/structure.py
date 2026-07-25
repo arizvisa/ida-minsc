@@ -8417,6 +8417,10 @@ class member_t(object):
                 ok and logging.info(u"{:s}({:#x}, index={:d}): Applied the type information \"{!s}\" to the field \"{:s}\" with original type \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, typeinfo, utils.string.escape(fullname, '"'), utils.string.escape(original_typeinfo, '"')))
         return
 
+# This is just an alias to capture either of the members types that might be
+# available in the disassembler. This is intended to be used for defining cases.
+membertypes = (idaapi.member_t, member_t) if hasattr(idaapi, 'member_t') else (member_t,)
+
 class members_t(object):
     """
     This object is an abstraction around all the members belonging to
