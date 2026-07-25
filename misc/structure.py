@@ -9325,16 +9325,30 @@ class members_t(object):
 
     def __contains__(self, other):
         '''Return whether the `other` member is contained by this structure.'''
-        owner = self.owner
-        if isinstance(other, member_t):
+        cls, owner, base = self.__class__, self.owner, self.baseoffset
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
+
+        # If we were given another member, then we just needs its identifier.
+        if isinstance(other, (member_t, getattr(idaapi, 'member_t', member_t))):
             mid = other.id
-        elif hasattr(idaapi, 'member_t') and isinstance(other, idaapi.member_t):
-            mid = other.id
+
+        # If we were given an identifier, then we already know what to do.
         elif isinstance(other, types.integer) and interface.node.identifier(other):
             mid = other
+
+        # If we were given a type or a structure, then use our `members_t.has`.
+        elif isinstance(other, (idaapi.tinfo_t, structure_t, getattr(idaapi, 'struc_t', structure_t))):
+            return self.has(other)
+
+        # If we got a location for a field, then we can use `members_t.has` too.
+        elif isinstance(other, interface.location_t):
+            return self.has(other)
+
+        # If we're here, then we don't support the type the caller gave us.
         else:
-            cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}).members.__contains__({!r}) : Unable to find a member using the unsupported type {!s}.".format('.'.join([__name__, cls.__name__]), owner.id, other, other.__class__))
+            raise E.InvalidParameterError(u"{:s}({:#x}).members.__contains__({!r}) : Unable to find a member using the unsupported type {!s}.".format('.'.join([__name__, cls.__name__]), sid, other, other.__class__))
+
+        # Go ahead and check to see if we contain the determined identifier.
         if isinstance(owner.ptr, idaapi.tinfo_t):
             return v9members.has_identifier(owner.ptr, mid)
         return members.has_identifier(owner.ptr, mid)
