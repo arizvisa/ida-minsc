@@ -1235,9 +1235,9 @@ class member(object):
     @classmethod
     def has(cls, mid):
         '''Return whether a member with the specified `mid` exists within the database.'''
-        id = mid.id if isinstance(mid, (idaapi.member_t, member_t)) else int(mid)
+        id = mid.id if isinstance(mid, membertypes) else int(mid)
         if hasattr(idaapi, 'is_member_id'):
-            return idaapi.is_member_id(mid)
+            return idaapi.is_member_id(id)
         exists = interface.node.identifier(id) and idaapi.get_member_by_id(id) is not None
         return True if exists else False
 
@@ -1410,7 +1410,7 @@ class member(object):
         '''Return the default name for the member given by `mptr` belonging to the structure `sptr` at the given `offset` if provided.'''
         fmtVar, fmtArg, fmtField = (fmt.format for fmt in ["var_{:X}", "arg_{:X}", "field_{:X}"])
         fmtSpecial_s, fmtSpecial_r = (utils.fconstant(format) for format in [' s', ' r'])
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
 
         # To process the frame, we first need the address of the function
         # to get the func_t and the actual member offset to calculate with.
@@ -2089,7 +2089,7 @@ class v9members(object):
             return tinfo, utd, mindex, udm
 
         # If we got a member_t of some sort, then use its id to get the member.
-        elif hasattr(idaapi, 'member_t') and len(args) == 1 and isinstance(*itertools.chain(args, [(idaapi.member_t, member_t)])):
+        elif hasattr(idaapi, 'member_t') and len(args) == 1 and isinstance(*itertools.chain(args, [membertypes])):
             [res] = args
             return cls.by(res.id, **caller)
 
@@ -4455,7 +4455,7 @@ class v9members(object):
                 mcomments = (False, tinfo.get_type_cmt()) if rptcmt is None else (True, rptcmt)
 
             # If it's one of the member or structure types, then we can extract.
-            elif hasattr(idaapi, 'member_t') and isinstance(item, (member_t, idaapi.member_t)):
+            elif hasattr(idaapi, 'member_t') and isinstance(item, membertypes):
                 mptr = item if isinstance(item, idaapi.member_t) else item.ptr
                 mtype = member.get_typeinfo(mptr)
                 regcmt, rptcmt = member.get_comment(mptr, repeatable=False), member.get_comment(mptr, repeatable=True)
@@ -4626,7 +4626,7 @@ class v9members(object):
 
             # Only members that are non-anonymous get their name change logged.
             oldname, newname = original[offset], newnames[offset]
-            if isinstance(item, (idaapi.member_t, member_t)):
+            if isinstance(item, membertypes):
                 mowner, mindex, udm = v9members.by_identifier(mowner, item.id)
                 new_descr = "index {:d}".format(offset) if union(ti) else "offset {:+#x}".format(base + offset)
                 old_descr = "index {:d}".format(mindex) if union(ti) else "offset {:+#x}".format(base + udm.offset // 8)
@@ -4929,7 +4929,7 @@ class members(object):
     @classmethod
     def count(cls, sptr):
         '''Return the number of members belonging to the structure specified by `sptr`.'''
-        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr
+        sid = sptr.id if isinstance(sptr, structuretypes) else sptr
         res = idaapi.get_struc(sid)
         if not res:
             raise E.StructureNotFoundError(u"{:s}.count({!s}) : Unable to find a structure for the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(sid), sid))
@@ -4938,7 +4938,7 @@ class members(object):
     @classmethod
     def iterate(cls, sptr, *slice):
         '''Yield each member specified by `slice` from the structure identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         [selection] = slice if slice else [builtins.slice(None)]
         for index in range(*selection.indices(sptr.memqty)):
             mptr = sptr.get_member(index)
@@ -4948,7 +4948,7 @@ class members(object):
     @classmethod
     def index(cls, sptr, mptr):
         '''Return the index of the member `mptr` in the structure identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
 
         # We assume that the member actually belongs to the specified structure to
         # avoid having to do a get_member_by_id every time this gets called. If the
@@ -4983,7 +4983,7 @@ class members(object):
     @classmethod
     def index_after(cls, sptr, offset):
         '''Return the index of a member at the given `offset` or after from the structure identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         is_variable, size = sptr.props & idaapi.SF_VAR, idaapi.get_struc_size(sptr)
 
         # Grab the last member of the structure so that we can distinguish whether
@@ -5008,7 +5008,7 @@ class members(object):
     @classmethod
     def index_before(cls, sptr, offset):
         '''Return the index of a member at the given `offset` or before from the structure identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         is_variable, size = sptr.props & idaapi.SF_VAR, idaapi.get_struc_size(sptr)
 
         # First grab the ends of the structure. This is because newer versions of the
@@ -5040,7 +5040,7 @@ class members(object):
     @classmethod
     def contains(cls, sptr, offset):
         '''Return whether the given `offset` is within the boundaries of the structure identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         size, realoffset = idaapi.get_struc_size(sptr), int(offset)
 
         # If it's a variable-length structure, then we only need to check the
@@ -5052,7 +5052,7 @@ class members(object):
     @classmethod
     def has_identifier(cls, sptr, identifier):
         '''Return whether the member with the specified `identifier` belongs to the structure identified `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         result = idaapi.get_member_by_id(identifier)
 
         # If we couldn't find the structure, then there is no way for the
@@ -5070,14 +5070,14 @@ class members(object):
     @classmethod
     def has_name(cls, sptr, name):
         '''Return whether a member with the specified `name` exists within the structure identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         string = name if isinstance(name, types.ordered) else [name]
         return idaapi.get_member_by_name(sptr, utils.string.to(interface.tuplename(*string))) is not None
 
     @classmethod
     def has_offset(cls, sptr, offset):
         '''Return whether a member exists at the `offset` of the structure identified by `sptr`.'''
-        realoffset, sptr = int(offset), idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        realoffset, sptr = int(offset), idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         is_union, is_variable = union(sptr), True if sptr.props & idaapi.SF_VAR else False
 
         # First verify that the offset is within the bounds of the structure.
@@ -5111,7 +5111,7 @@ class members(object):
     def has_bounds(cls, sptr, start, stop):
         '''Return whether any members exist in the structure identified by `sptr` from the offset `start` to `stop`.'''
         get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         size, is_union, is_variable = idaapi.get_struc_size(sptr), union(sptr), True if sptr.props & idaapi.SF_VAR else False
         left, right = sorted(map(int, [start, stop]))
 
@@ -5154,7 +5154,7 @@ class members(object):
     @classmethod
     def by_identifier(cls, sptr, identifier):
         '''Return the member with the given `identifier` belonging to the structure identified by `sptr`.'''
-        sptr = sptr and idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = sptr and idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         identifier = identifier if isinstance(identifier, types.integer) else identifier.id
 
         # We can just ask the API to give us the member for the given identifier.
@@ -5203,7 +5203,7 @@ class members(object):
     @classmethod
     def by_index(cls, sptr, index):
         '''Return the member at the specified `index` of the structure identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         if not(0 <= index < sptr.memqty):
             is_union, sid = union(sptr), sptr.id if isinstance(sptr, idaapi.struc_t) else sptr
             raise E.MemberNotFoundError(u"{:s}.by_index({:#x}, {:d}) : Unable to find a member at the specified index ({:d}) of the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, index, index, 'union' if is_union else 'frame' if frame(sptr) else 'structure', sid))
@@ -5214,7 +5214,7 @@ class members(object):
     @classmethod
     def by_name(cls, sptr, name):
         '''Return the member with the given `name` belonging to the structure identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         string = name if isinstance(name, types.ordered) else [name]
         packed_string = interface.tuplename(*string)
         mptr = idaapi.get_member_by_name(sptr, utils.string.to(packed_string))
@@ -5247,7 +5247,7 @@ class members(object):
     @classmethod
     def at_offset(cls, sptr, offset):
         '''Yield the members at the specified `offset` of the structure or union identified by `sptr`.'''
-        realoffset, sptr = int(offset), idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        realoffset, sptr = int(offset), idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         size, is_union, is_variable = idaapi.get_struc_size(sptr), union(sptr), True if sptr.props & idaapi.SF_VAR else False
 
         # First verify that our structure can actually contain the offset and bail if it can't.
@@ -5313,7 +5313,7 @@ class members(object):
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
         FF_MASKSIZE = idaapi.as_uint32(idaapi.DT_TYPE)
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         candidates = [(sptr, mindex, mptr) for sptr, mindex, mptr in cls.at_offset(sptr, offset)]
 
         # XXX: We do special handling for unions so that we prioritize members that start
@@ -5396,7 +5396,7 @@ class members(object):
     @classmethod
     def at_bounds(cls, sptr, start, stop):
         '''Yield the members from the offset `start` to `stop` within the structure or union identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         size, is_union, is_variable = idaapi.get_struc_size(sptr), union(sptr), True if sptr.props & idaapi.SF_VAR else False
         left, right = sorted(map(int, [start, stop]))
 
@@ -5459,7 +5459,7 @@ class members(object):
     @classmethod
     def overlaps(cls, sptr, start, stop):
         '''Yield the members belong to the structure or union identified by `sptr` that overlap the given offset from `start` to `stop`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         size, is_union, is_variable = idaapi.get_struc_size(sptr), union(sptr), True if sptr.props & idaapi.SF_VAR else False
         left, right = sorted(map(int, [start, stop]))
 
@@ -5522,7 +5522,7 @@ class members(object):
     def references(cls, sptr):
         '''Return the structure members and operand references that reference the structure identified by `sptr`.'''
         Fnetnode = getattr(idaapi, 'ea2node', utils.fidentity)
-        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr
+        sid = sptr.id if isinstance(sptr, structuretypes) else sptr
 
         # First collect all of our identifiers referenced by this structure,
         # whilst making sure to include all the members too.
@@ -5673,7 +5673,7 @@ class members(object):
     @classmethod
     def remove_slice(cls, sptr, slice, *offset):
         '''Remove a `slice` of the members belonging to the structure or union identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         slice, size = slice if isinstance(slice, builtins.slice) else builtins.slice(slice, 1 + slice or None), idaapi.get_struc_size(sptr)
 
         # Determine if the structure is a frame so that we can avoid removing
@@ -5833,7 +5833,7 @@ class members(object):
     @classmethod
     def remove_bounds(cls, sptr, start, stop, *offset):
         '''Remove the members from the offset `start` to `stop` from the structure or union identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         start, stop, size = map(int, [start, stop, idaapi.get_struc_size(sptr)])
 
         # If the structure is a frame, then there's certain members
@@ -6002,7 +6002,7 @@ class members(object):
     @classmethod
     def clear_slice(cls, sptr, slice, *offset):
         '''Clear a `slice` of the members belonging to the structure or union identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         slice, size = slice if isinstance(slice, builtins.slice) else builtins.slice(slice, 1 + slice or None), idaapi.get_struc_size(sptr)
 
         # If our structure is a function frame, then we can't actually touch some of
@@ -6127,7 +6127,7 @@ class members(object):
     @classmethod
     def clear_bounds(cls, sptr, start, stop, *offset):
         '''Undefine the members from the offset `start` to `stop` in the structure or union identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         start, stop = map(int, [start, stop])
 
         # If our structure is a function frame, then we can't actually touch some of
@@ -6252,7 +6252,7 @@ class members(object):
     @classmethod
     def layout_getslice(cls, sptr, slice):
         '''Return a contiguous `slice` of the layout belonging to the structure identified by `sptr`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         is_variable, is_frame = (sptr.props & prop for prop in [idaapi.SF_VAR, idaapi.SF_FRAME])
 
         # Figure out the indices for the slice being selected. We will
@@ -6362,7 +6362,7 @@ class members(object):
     @classmethod
     def layout_setslice(cls, sptr, slice, layout, *offset):
         '''Update the contigious `slice` belonging to the structure identified by `sptr` with the specified `layout`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         is_variable, is_frame = (sptr.props & prop for prop in [idaapi.SF_VAR, idaapi.SF_FRAME])
 
         # Check if we're acting on a function frame and gets the function
@@ -6424,11 +6424,11 @@ class members(object):
                 mptr = msize
 
             # If it's one of the known member types, then we can extract the mptr.
-            elif isinstance(item, (member_t, idaapi.member_t)):
+            elif isinstance(item, membertypes):
                 mptr = item if isinstance(item, idaapi.member_t) else item.ptr
 
             # If it's structure-like, then we need to convert it into its sptr.
-            elif isinstance(item, (structure_t, members_t, idaapi.struc_t)):
+            elif isinstance(item, (structuretypes, members_t)):
                 owner = item.owner if isinstance(item, idaapi.member_t) else item
                 mptr = owner if isinstance(owner, idaapi.struc_t) else owner.ptr
 
@@ -6828,7 +6828,7 @@ class members(object):
     @classmethod
     def add(cls, sptr, name, type, location, *offset):
         '''Add a member to the structure identified by `sptr` with the given `name`, `type`, and `location`.'''
-        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
         set_member_tinfo = idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
 
         # First, we need to figure out the base offset in order to make sense of
@@ -7580,7 +7580,7 @@ class structure_t(object):
         return not self.__eq__(other)
 
     def __eq__(self, other):
-        if isinstance(other, (idaapi.struc_t, structure_t)):
+        if isinstance(other, structuretypes):
             return self.id == other.id
         return False
 
@@ -8903,7 +8903,7 @@ class members_t(object):
                 mfullname = v9member.fullname(identifier)
             else:
                 mfullname = member.fullname(getattr(member, 'ptr', member))
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member ({!s}) does not belong to the current {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, "{:#x}".format(identifier) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member), mfullname, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', sid))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member ({!s}) does not belong to the current {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, "{:#x}".format(identifier) if isinstance(member, membertypes) else "{!r}".format(member), mfullname, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', sid))
         return mindex
 
     @utils.multicase(index=types.integer)
@@ -9102,15 +9102,15 @@ class members_t(object):
     __members_matcher.mapping('named', operator.truth, 'ptr', member.has_name)
     __members_matcher.combinator('tagged', utils.fcompose(utils.fcompose, utils.fcondition(utils.finstance(internal.types.bool, internal.types.integer), utils.finstance(internal.types.string))(utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(internal.tags.select.members), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(internal.tags.select.members), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, utils.fcompose(operator.contains, operator.not_)))), utils.fcompose(internal.tags.select.members, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(internal.types.set, internal.tags.select.members, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)))), 'id')
     __members_matcher.alias('tag', 'tagged'), __members_matcher.alias('tags', 'tagged')
-    __members_matcher.combinator('type', utils.fcondition(utils.finstance(internal.types.bool, internal.types.integer), utils.finstance(idaapi.tinfo_t), utils.finstance(idaapi.struc_t, structure_t), utils.finstance(internal.types.unordered))(utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.fpartial(idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo, idaapi.tinfo_t()))), utils.fcompose(utils.fpartial(utils.fpartial, interface.tinfo.equals), utils.fpartial(utils.fcompose, member.get_typeinfo)), utils.fcompose(operator.attrgetter('id'), address.type, utils.fpartial(utils.fpartial, interface.tinfo.equals), utils.fpartial(utils.fcompose, member.get_typeinfo)), utils.fcompose(utils.fpartial(utils.itermap, utils.fcondition(utils.finstance(idaapi.struc_t, structure_t), utils.finstance(idaapi.tinfo_t))(utils.fcompose(operator.attrgetter('id'), address.type), utils.fidentity, utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('__class__'), operator.attrgetter('__name__')), utils.fidentity), utils.funpack(utils.fpartial("{:s} : Unable to match the requested filter (\"{:s}\") with an unsupported type \"{:s}\" ({!r}).".format, '.'.join([__name__, 'members_t']), 'type')), utils.fthrow(E.InvalidMatchTypeError)))), utils.fpartial(filter, None), utils.fpartial(utils.itermap, utils.fcompose(utils.fpartial(utils.fpartial, interface.tinfo.equals), utils.fpartial(utils.fcompose, member.get_typeinfo))), utils.funpack(utils.fthrough), utils.frpartial(utils.fcompose, any)), utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('__class__'), operator.attrgetter('__name__')), utils.fidentity), utils.funpack(utils.fpartial("{:s} : Unable to match the requested filter (\"{:s}\") with an unsupported type \"{:s}\" ({!r}).".format, '.'.join([__name__, 'members_t']), 'type')), utils.fthrow(E.InvalidMatchTypeError))), 'ptr')
+    __members_matcher.combinator('type', utils.fcondition(utils.finstance(internal.types.bool, internal.types.integer), utils.finstance(idaapi.tinfo_t), utils.finstance(structuretypes), utils.finstance(internal.types.unordered))(utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.fpartial(idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo, idaapi.tinfo_t()))), utils.fcompose(utils.fpartial(utils.fpartial, interface.tinfo.equals), utils.fpartial(utils.fcompose, member.get_typeinfo)), utils.fcompose(operator.attrgetter('id'), address.type, utils.fpartial(utils.fpartial, interface.tinfo.equals), utils.fpartial(utils.fcompose, member.get_typeinfo)), utils.fcompose(utils.fpartial(utils.itermap, utils.fcondition(utils.finstance(structuretypes), utils.finstance(idaapi.tinfo_t))(utils.fcompose(operator.attrgetter('id'), address.type), utils.fidentity, utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('__class__'), operator.attrgetter('__name__')), utils.fidentity), utils.funpack(utils.fpartial("{:s} : Unable to match the requested filter (\"{:s}\") with an unsupported type \"{:s}\" ({!r}).".format, '.'.join([__name__, 'members_t']), 'type')), utils.fthrow(E.InvalidMatchTypeError)))), utils.fpartial(filter, None), utils.fpartial(utils.itermap, utils.fcompose(utils.fpartial(utils.fpartial, interface.tinfo.equals), utils.fpartial(utils.fcompose, member.get_typeinfo))), utils.funpack(utils.fthrough), utils.frpartial(utils.fcompose, any)), utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('__class__'), operator.attrgetter('__name__')), utils.fidentity), utils.funpack(utils.fpartial("{:s} : Unable to match the requested filter (\"{:s}\") with an unsupported type \"{:s}\" ({!r}).".format, '.'.join([__name__, 'members_t']), 'type')), utils.fthrow(E.InvalidMatchTypeError))), 'ptr')
     __members_matcher.alias('typed', 'type'), __members_matcher.alias('types', 'type')
     __members_matcher.boolean('ge', operator.le, utils.fthrough(operator.attrgetter('offset'), utils.fcompose(operator.attrgetter('size'), utils.fpartial(operator.add, -1), utils.fpartial(max, 0))), utils.funpack(operator.add)), __members_matcher.alias('greater', 'ge')
     __members_matcher.boolean('gt', operator.lt, utils.fthrough(operator.attrgetter('offset'), utils.fcompose(operator.attrgetter('size'), utils.fpartial(operator.add, -1), utils.fpartial(max, 0))), utils.funpack(operator.add))
     __members_matcher.boolean('le', operator.ge, 'offset')
     __members_matcher.boolean('lt', operator.gt, 'offset'), __members_matcher.alias('less', 'lt')
-    __members_matcher.combinator('member', utils.fcondition(utils.finstance(idaapi.member_t, member_t))(utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(filter, utils.finstance(idaapi.member_t, member_t)), utils.fpartial(utils.itermap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), 'id')
+    __members_matcher.combinator('member', utils.fcondition(utils.finstance(membertypes))(utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(filter, utils.finstance(membertypes)), utils.fpartial(utils.itermap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), 'id')
     __members_matcher.alias('members', 'member')
-    __members_matcher.combinator('structure', utils.fcondition(utils.finstance(internal.types.string), utils.finstance(idaapi.struc_t, structure_t), utils.finstance(idaapi.tinfo_t), utils.finstance(internal.types.unordered))(utils.fcompose(idaapi.get_struc_id, utils.fcondition(utils.fpartial(operator.ne, idaapi.BADADDR))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, utils.fconstant(False)))), utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(operator.methodcaller('get_type_name'), idaapi.get_struc_id, utils.fcondition(utils.fpartial(operator.ne, idaapi.BADADDR))(utils.fidentity, None), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(utils.itermap, utils.fcondition(utils.finstance(internal.types.string), utils.finstance(idaapi.struc_t, structure_t), utils.finstance(idaapi.tinfo_t))(utils.fcompose(idaapi.get_struc_id, utils.fcondition(utils.fpartial(operator.ne, idaapi.BADADDR))(utils.fidentity, utils.fpartial(utils.fpartial, utils.fconstant(None)))), operator.attrgetter('id'), utils.fcompose(utils.fcatch(None)(None)(interface.tinfo.resolve), utils.fcondition(utils.fpartial(operator.ne, None))(utils.fcompose(operator.methodcaller('get_type_name'), idaapi.get_struc_id), utils.fidentity)), utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('__class__'), operator.attrgetter('__name__')), utils.fidentity), utils.funpack(utils.fpartial("{:s} : Unable to match the requested filter (\"{:s}\") with an unsupported type \"{:s}\" ({!r}).".format, '.'.join([__name__, 'members_t']), 'structure')), utils.fthrow(E.InvalidMatchTypeError)))), utils.fpartial(filter, utils.fpartial(operator.ne, None)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('__class__'), operator.attrgetter('__name__')), utils.fidentity), utils.funpack(utils.fpartial("{:s} : Unable to match the requested filter (\"{:s}\") with an unsupported type {:s} ({!r}).".format, '.'.join([__name__, 'members_t']), 'structure')), utils.fthrow(E.InvalidMatchTypeError))), 'ptr', member.get_typeinfo, utils.fcatch(None)(None)(interface.tinfo.structure), utils.fcondition(utils.finstance(idaapi.tinfo_t))(utils.fcompose(operator.methodcaller('get_type_name'), idaapi.get_struc_id), idaapi.BADADDR))
+    __members_matcher.combinator('structure', utils.fcondition(utils.finstance(internal.types.string), utils.finstance(structuretypes), utils.finstance(idaapi.tinfo_t), utils.finstance(internal.types.unordered))(utils.fcompose(idaapi.get_struc_id, utils.fcondition(utils.fpartial(operator.ne, idaapi.BADADDR))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, utils.fconstant(False)))), utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(operator.methodcaller('get_type_name'), idaapi.get_struc_id, utils.fcondition(utils.fpartial(operator.ne, idaapi.BADADDR))(utils.fidentity, None), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(utils.itermap, utils.fcondition(utils.finstance(internal.types.string), utils.finstance(structuretypes), utils.finstance(idaapi.tinfo_t))(utils.fcompose(idaapi.get_struc_id, utils.fcondition(utils.fpartial(operator.ne, idaapi.BADADDR))(utils.fidentity, utils.fpartial(utils.fpartial, utils.fconstant(None)))), operator.attrgetter('id'), utils.fcompose(utils.fcatch(None)(None)(interface.tinfo.resolve), utils.fcondition(utils.fpartial(operator.ne, None))(utils.fcompose(operator.methodcaller('get_type_name'), idaapi.get_struc_id), utils.fidentity)), utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('__class__'), operator.attrgetter('__name__')), utils.fidentity), utils.funpack(utils.fpartial("{:s} : Unable to match the requested filter (\"{:s}\") with an unsupported type \"{:s}\" ({!r}).".format, '.'.join([__name__, 'members_t']), 'structure')), utils.fthrow(E.InvalidMatchTypeError)))), utils.fpartial(filter, utils.fpartial(operator.ne, None)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('__class__'), operator.attrgetter('__name__')), utils.fidentity), utils.funpack(utils.fpartial("{:s} : Unable to match the requested filter (\"{:s}\") with an unsupported type {:s} ({!r}).".format, '.'.join([__name__, 'members_t']), 'structure')), utils.fthrow(E.InvalidMatchTypeError))), 'ptr', member.get_typeinfo, utils.fcatch(None)(None)(interface.tinfo.structure), utils.fcondition(utils.finstance(idaapi.tinfo_t))(utils.fcompose(operator.methodcaller('get_type_name'), idaapi.get_struc_id), idaapi.BADADDR))
     __members_matcher.alias('structures', 'structure'), __members_matcher.alias('struc', 'structure'),
     __members_matcher.mapping('arguments', operator.truth, 'ptr', utils.fcondition(utils.fcompose(operator.attrgetter('id'), idaapi.get_member_by_id, bool))(utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('id'), idaapi.get_member_by_id, operator.itemgetter(-1), operator.attrgetter('id'), idaapi.get_func_by_frame, utils.fcondition(utils.fcompose(idaapi.get_func, bool))(utils.fcompose(idaapi.get_func, idaapi.frame_off_args, functools.partial(functools.partial, operator.le)), functools.partial(functools.partial, utils.fconstant(False)))), operator.attrgetter('soff')), utils.funpack(utils.fapplyto())), utils.fconstant(False)))
     __members_matcher.alias('args', 'arguments'), __members_matcher.alias('parameters', 'arguments'),
