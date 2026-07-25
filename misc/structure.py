@@ -68,8 +68,11 @@ def by_identifier(identifier):
 
 def union(type):
     '''Return whether the structure in `type` is defined as a union.'''
+    ti = idaapi.tinfo_t()
     if isinstance(type, idaapi.tinfo_t):
         return type.is_union()
+    elif not hasattr(idaapi, 'get_struc') and isinstance(type, types.integer) and ti.get_type_by_tid(type):
+        return ti.is_union()
     elif isinstance(type, types.integer):
         sptr = idaapi.get_struc(type)
         if sptr is None:
@@ -80,15 +83,22 @@ def union(type):
 
 def frame(type):
     '''Return whether the structure in `type` belongs to a function as a frame.'''
+    ti, SF_FRAME = idaapi.tinfo_t(), getattr(idaapi, 'SF_FRAME', 0x40)
     if isinstance(type, idaapi.tinfo_t):
         return False if idaapi.__version__ < 8.5 else type.is_frame()
-    elif isinstance(type, types.integer):
+    elif not hasattr(idaapi, 'get_struc') and isinstance(type, types.integer) and ti.get_type_by_tid(type):
+        return False if idaapi.__version__ < 8.5 else ti.is_frame()
+    elif isinstance(type, types.integer) and idaapi.get_struc(type):
         sptr = idaapi.get_struc(type)
         if sptr is None:
             raise E.StructureNotFoundError(u"{:s}.frame({:#x}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, type, type))
-        type = idaapi.get_struc(type)
-    SF_FRAME = getattr(idaapi, 'SF_FRAME', 0x40)
-    return True if type.props & SF_FRAME else False
+        return True if sptr.props & SF_FRAME else False
+    elif isinstance(type, types.integer) and idaapi.get_member_by_id(type):
+        mptr, fullname, sptr = idaapi.get_member_by_id(type)
+        return True if sptr.props & SF_FRAME else False
+    elif hasattr(type, 'props'):
+        return True if type.props & SF_FRAME else False
+    return False
 
 def iterate():
     '''Iterate through the structures defined in the database.'''
