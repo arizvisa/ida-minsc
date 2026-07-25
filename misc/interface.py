@@ -7038,9 +7038,9 @@ class contiguous(object):
                 mowner, mindex, udm = internal.structure.v9members.by_identifier(item.parent.typeinfo, item.id)
                 result.append(internal.structure.new(tinfo.identifier(mowner), offset - (0 if internal.structure.union(mowner) else udm.offset)).members[mindex])
 
-            elif not v9 and isinstance(item, (internal.structure.structure_t, idaapi.struc_t, internal.structure.members_t)):
+            elif not v9 and isinstance(item, (internal.structure.structuretypes, internal.structure.members_t)):
                 result.append(internal.structure.new(item.owner.id, offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(item.id, offset))
-            elif not v9 and isinstance(item, (internal.structure.member_t, idaapi.member_t)):
+            elif not v9 and isinstance(item, internal.structure.membertypes):
                 mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id)
                 result.append(internal.structure.new(mowner.id, offset - (0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff)).members[mindex])
 
@@ -7065,9 +7065,9 @@ class contiguous(object):
                 mowner, mindex, udm = internal.structure.v9members.by_identifier(item.parent.typeinfo, item.id)
                 result.append(internal.structure.new(tinfo.identifier(mowner), offset - (0 if internal.structure.union(mowner) else udm.offset)).members[mindex])
 
-            elif not v9 and isinstance(item, (internal.structure.structure_t, idaapi.struc_t, internal.structure.members_t)):
+            elif not v9 and isinstance(item, (internal.structure.structuretypes, internal.structure.members_t)):
                 result.append(internal.structure.new(item.owner.id, offset).members if isinstance(item, internal.structure.members_t) else internal.structure.new(item.id, offset))
-            elif not v9 and isinstance(item, (internal.structure.member_t, idaapi.member_t)):
+            elif not v9 and isinstance(item, internal.structure.membertypes):
                 mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id)
                 result.append(internal.structure.new(mowner.id, offset - (0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff)).members[mindex])
 
@@ -8524,6 +8524,7 @@ class tinfo(object):
         for index, item in enumerate(rawitems):
             name, ti, storage = item
             ltype, linfo = storage
+
             location = cls.location(ti.get_size(), architecture, ltype, linfo)
 
             # Check to see if we got an error. We do this with a hack, by
@@ -8811,14 +8812,14 @@ class tinfo(object):
             serialized = cls.get_numbered_type(til, ordinal) if ordinal else ti.serialize()
             return cls.get(til, *serialized)
 
-        elif hasattr(idaapi, 'struc_t') and isinstance(identifier, (internal.structure.structure_t, idaapi.struc_t)):
+        elif hasattr(idaapi, 'struc_t') and isinstance(identifier, internal.types.structuretypes):
             sptr = identifier if isinstance(identifier, idaapi.struc_t) else idaapi.get_struc(identifier.id)
             stype = address.typeinfo(sptr.id)
             ordinal = cls.ordinal(stype)
             serialized = cls.get_numbered_type(til, ordinal) if ordinal else stype.serialize()
             return cls.get(til, *serialized)
 
-        elif hasattr(idaapi, 'member_t') and isinstance(identifier, (internal.structure.member_t, idaapi.member_t)):
+        elif hasattr(idaapi, 'member_t') and isinstance(identifier, internal.types.membertypes):
             (sptr, mindex, mptr) = (idaapi.get_struc(identifier.id), 0, identifier) if isinstance(identifier, idaapi.member_t) else internal.structure.members.by_identifier(None, identifier.id)
             mtype = internal.structure.member.get_typeinfo(mptr)
             ordinal = cls.ordinal(mtype)
