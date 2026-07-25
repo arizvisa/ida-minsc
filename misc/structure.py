@@ -26,12 +26,16 @@ def new(identifier, offset):
     return structure_t(identifier, offset)
 
 def has(id):
-    '''Return whether a structure with the specified `id` exists within the database.'''
+    '''Return whether a structure with the specified `id` or name exists within the database.'''
     tinfo = idaapi.tinfo_t()
-    if hasattr(idaapi, 'get_struc'):
+    if isinstance(id, types.integer) and hasattr(idaapi, 'get_struc'):
         return True if interface.node.identifier(id) and idaapi.get_struc(id) else False
-    elif interface.node.identifier(id) and tinfo.get_type_by_tid(id):
+    elif isinstance(id, types.string) and hasattr(idaapi, 'get_struc_id'):
+        return idaapi.get_struc_id(utils.string.to(id)) != idaapi.BADADDR
+    elif isinstance(id, types.integer) and interface.node.identifier(id) and tinfo.get_type_by_tid(id):
         return tinfo.is_struct() or tinfo.is_union()
+    elif isinstance(id, types.string) and interface.tinfo.has_name(id):
+        return interface.tinfo.for_name(id).is_udt()
     return False
 
 def by_index_or_identifier(index_or_identifier):
