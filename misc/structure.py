@@ -4447,7 +4447,7 @@ class v9members(object):
                 regcmt, rptcmt = member.get_comment(mptr, repeatable=False), member.get_comment(mptr, repeatable=True)
                 mcomments = (True, rptcmt) if rptcmt else (False, regcmt)
 
-            elif hasattr(idaapi, 'struc_t') and isinstance(item, (structure_t, members_t, idaapi.struc_t)):
+            elif hasattr(idaapi, 'struc_t') and isinstance(item, (structuretypes, members_t)):
                 owner = item.owner if isinstance(item, idaapi.member_t) else item
                 sptr = owner if isinstance(owner, idaapi.struc_t) else owner.ptr
                 mtype = address.type(sptr.id)
@@ -7738,6 +7738,10 @@ class structure_t(object):
         res = offset + size
         return cls(owner, -res)
 
+# This is just an alias to capture either of the structure types that are
+# available in the disassembler. This is intended to be used for defining cases.
+structuretypes = (idaapi.struc_t, structure_t) if hasattr(idaapi, 'struc_t') else (structure_t,)
+
 class member_t(object):
     """
     This object is an abstraction around a single member belonging to
@@ -8684,7 +8688,7 @@ class members_t(object):
         if isinstance(owner.ptr, idaapi.tinfo_t):
             return v9members.has_bounds(owner.ptr, 8 * start, 8 * stop)
         return members.has_bounds(owner.ptr, start, stop)
-    @utils.multicase(structure=(getattr(idaapi, 'struc_t', structure_t), structure_t))
+    @utils.multicase(structure=structuretypes)
     def has(self, structure):
         '''Return whether any members uses the specified `structure` as a field or references it as a pointer.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
