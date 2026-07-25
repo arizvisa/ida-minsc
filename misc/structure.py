@@ -8880,6 +8880,7 @@ class members_t(object):
     by_id = byid = byidentifier = utils.alias(by_identifier, 'members_t')
 
     ## Adding and removing members from a structure.
+    @utils.multicase(member=membertypes)
     def index(self, member):
         '''Return the index of the specified `member` within the structure.'''
         cls, owner = self.__class__, self.owner
@@ -8902,9 +8903,157 @@ class members_t(object):
             if isinstance(owner.ptr, idaapi.tinfo_t):
                 mfullname = v9member.fullname(identifier)
             else:
-                mfullname = member.fullname(getattr(member, 'ptr', member))
+                mfullname = internal.structure.member.fullname(getattr(member, 'ptr', member))
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member ({!s}) does not belong to the current {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, "{:#x}".format(identifier) if isinstance(member, membertypes) else "{!r}".format(member), mfullname, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', sid))
         return mindex
+    @utils.multicase(info=idaapi.tinfo_t)
+    def index(self, info):
+        '''Return the index of the first member using the type information specified in `info`.'''
+        cls, owner = self.__class__, self.owner
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
+        iterable = v9members.iterate(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else members.iterate(owner.ptr)
+        for sptr, midx, mptr in iterable:
+            mtype = interface.tinfo.copy(mptr.type) if isinstance(sptr, idaapi.tinfo_t) else member.get_typeinfo(mptr)
+            if mtype is not None and interface.tinfo.equals(mtype, info):
+                return midx
+            continue
+        raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!r}) : Unable to find a {:s} member that is using the specified type {!s}.".format('.'.join([__name__, cls.__name__]), sid, "{!s}".format(info), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', interface.tinfo.quoted(info)))
+    @utils.multicase(structure=structuretypes)
+    def index(self, structure):
+        '''Return the index of the first member using the specified `structure` as a field or referencing it as a pointer.'''
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+        cls, owner = self.__class__, self.owner
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
+
+        # Start by getting information about the structure parameter. This
+        # includes its id and the type which should always be a structure.
+        candidate_id = structure.id
+        tid = None if candidate_id == idaapi.BADADDR else candidate_id
+        tinfo = address.type(candidate_id)
+        stype = None if tinfo is None else interface.tinfo.structure(tinfo)
+
+        # If we're backed by an `idaapi.tinfo_t`, then we use the `v9members`
+        # namespace to extract and resolve the type of each member.
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            for mowner, midx, udm in v9members.iterate(owner.ptr):
+                mbitlocation, mtype = interface.location_t(udm.offset, udm.size), interface.tinfo.copy(udm.type)
+
+                # If we couldn't get any type from the member, then skip it.
+                if any([mtype is None, mowner is None]):
+                    continue
+
+                # Try and resolve the member's type to a structure of some sort.
+                try: candidate = interface.tinfo.structure(mtype)
+                except (E.DisassemblerError, TypeError): candidate = None
+
+                # If there was a candidate and it actually matches, then we can return success.
+                # If the candidate matches, then we can return the index.
+                if candidate and interface.tinfo.equals(stype, candidate):
+                    return midx
+                continue
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({:#x}) : Unable to find a {:s} member that is using the specified structure ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, sid, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', sid))
+
+        # Otherwise, we have to do it the old-fashioned way with the `members`
+        # namespace. We use it to iterate and retrieve the type information.
+        for sptr, midx, mptr in members.iterate(owner.ptr):
+            opinfo = idaapi.opinfo_t()
+            res = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+
+            # First do an exact match with the type id of the structure type.
+            if mptr.flag & idaapi.DT_TYPE == FF_STRUCT and res and res.tid == tid:
+                return midx
+
+            # Otherwise verify that we're able to compare the type information.
+            mtype = address.type(mptr.id)
+            if any([mtype is None, stype is None]):
+                continue
+
+            # Now we will try to resolve the type into its raw structure. If an
+            # exception occurs, then we basically move onto the next member.
+            try: candidate = interface.tinfo.structure(mtype)
+            except (E.DisassemblerError, TypeError): candidate = None
+
+            # If we got a matching candidate, then return the member index.
+            if candidate and interface.tinfo.equals(stype, candidate):
+                return midx
+            continue
+        raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({:#x}) : Unable to find a {:s} member that is using the specified structure ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, sid, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', sid))
+    @utils.multicase(location=interface.location_t)
+    def index(self, location):
+        '''Return the index of the first member matching the specified `location`.'''
+        cls, owner = self.__class__, self.owner
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
+
+        # Unpack the location and resolve any symbols so that it is an integer.
+        offset, size = location
+        if isinstance(offset, interface.symbol_t):
+            [offset] = (int(item) for item in offset.symbols)
+        realoffset, realsize = offset - self.baseoffset, size
+
+        # If we're using an `idaapi.tinfo_t` as the backing, then use the right
+        # namespace to collect all candidate members that overlap our offset.
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            candidates = (midx for sptr, midx, _ in v9members.at_offset(owner.ptr, 8 * realoffset))
+            iterable = ((midx, v9member.at(owner.ptr, midx, realoffset)) for midx in candidates if v9member.contains(owner.ptr, midx, 8 * realoffset))
+            filtered = [midx for midx, (index, moffset) in iterable if not moffset]
+
+            # Now we've filtered all the overlapping members and grabbed their
+            # indices. So, we can now explore each one for its type.
+            for midx in filtered:
+                tinfo, utd, mindex, udm = v9members.by(owner.ptr, midx, caller=[__name__, cls.__name__, 'index'])
+                mtype, mbitoffset, mbits = interface.tinfo.copy(udm.type), udm.offset, udm.size
+
+                # Get the type of the element from the array member type.
+                metype, _ = interface.tinfo.array(mtype) if mtype.is_array() else (mtype, 1)
+                mbitlocation = interface.location_t(mbitoffset, mbits)
+
+                # Reduce the scale of the location from the bits down into
+                # bytes. This will be used to fit the location we were given.
+                melement = interface.tinfo.size(metype)
+                mlocation = moffset, msize = mbitlocation / 8
+
+                # First check if the location size we were given is a multiple
+                # of the element size. Then we'll need to determine the
+                # boundaries that our location should be in. The other thing we
+                # need to know is if this is a variable-length structure.
+                index, remainder = divmod(size, melement)
+                is_multiple = False if remainder else True
+                left, right = realoffset, realoffset + melement * index
+                is_variable = tinfo.is_varstruct() and mbits == 0
+
+                # If the size is a multiple of the element size, and the end of the
+                # location is within the boundaries of the member, then we got a match.
+                if is_multiple and size > 0 and any([is_variable, right <= moffset + msize]):
+                    return midx
+                continue
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : Unable to find a {:s} member that is referenced by the specified location ({:s}).".format('.'.join([__name__, cls.__name__]), sid, location, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', location))
+
+        # Otherwise we use the other namespace to filter our candidates.
+        candidates = ((midx, mptr) for sptr, midx, mptr in members.at_offset(owner.ptr, realoffset))
+        iterable = ((midx, mptr, member.at(mptr, realoffset)) for midx, mptr in candidates if member.contains(mptr, realoffset))
+        filtered = [(midx, mptr) for midx, mptr, (index, moffset) in iterable if not moffset]
+        get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
+
+        # Then we can check each candidate against the size.
+        for midx, mptr in filtered:
+            opinfo = idaapi.opinfo_t()
+            retrieved = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+            melement, msize = get_data_elsize(mptr.id, mptr.flag, opinfo if retrieved else None), idaapi.get_member_size(mptr)
+
+            # Get the boundaries of the member, and figure out if the member is
+            # a multiple of the size from the location. We also verify if the
+            # member is a variable-length member that can go on indefinitely.
+            index, remainder = divmod(size, melement)
+            is_multiple = False if remainder else True
+            left, right = realoffset, realoffset + melement * index
+            is_variable = owner.ptr.props & idaapi.SF_VAR and mptr.soff == mptr.eoff
+
+            # If the size is a multiple of the element, and the location ending
+            # is within the member boundaries, then we're good and can return.
+            if is_multiple and size > 0 and any([is_variable, right <= mptr.soff + msize]):
+                return midx
+            continue
+        raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : Unable to find a {:s} member that is referenced by the specified location ({:s}).".format('.'.join([__name__, cls.__name__]), sid, location, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', location))
 
     @utils.multicase(index=types.integer)
     def pop(self, index):
