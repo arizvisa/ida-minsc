@@ -8684,7 +8684,7 @@ class members_t(object):
         if isinstance(owner.ptr, idaapi.tinfo_t):
             return v9members.has_bounds(owner.ptr, 8 * start, 8 * stop)
         return members.has_bounds(owner.ptr, start, stop)
-    @utils.multicase(structure=(idaapi.struc_t, structure_t))
+    @utils.multicase(structure=(getattr(idaapi, 'struc_t', structure_t), structure_t))
     def has(self, structure):
         '''Return whether any members uses the specified `structure` as a field or references it as a pointer.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
