@@ -4187,9 +4187,9 @@ class v9members(object):
         # contiguous. So we can simply include the index and return it.
         if union(ti):
             sizes = [udm.size for _, udm in selected]
-            iterable = ((udm.offset, interface.tinfo.member_identifier(ti, mindex)) for mindex, udm in selected)
+            iterable = [(mindex, interface.tinfo.member_identifier(ti, mindex)) for mindex, udm in selected]
             if sizes:
-                return min(sizes), max(sizes), [(moffset, mid) for moffset, mid in iterable]
+                return min(sizes), max(sizes), [(mindex, mid) for mindex, mid in iterable]
             return 0, 0, []
 
         # Otherwise, we need to figure out the start and end offsets.
