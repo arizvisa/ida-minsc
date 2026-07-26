@@ -627,10 +627,12 @@ def upgrade_members_v1():
     '''Upgrade the structure tags to the tagindex (v1).'''
     oldcount = newcount = 0
     for sptr in internal.structure.iterate():
-        for mowner, mindex, mptr in internal.structure.members.iterate(sptr):
-            res = internal.tags.member.get(mptr)
+        Fiterate_members = internal.structure.v9members.iterate if isinstance(sptr, idaapi.tinfo_t) else internal.structure.members.iterate
+        for mowner, mindex, mptr in Fiterate_members(sptr):
+            mid = mowner.get_udm_tid(mindex) if isinstance(mowner, idaapi.tinfo_t) else mid
+            res = internal.tags.typeinfo_member.get(mowner, mindex) if isinstance(mowner, idaapi.tinfo_t) else internal.tags.member.get(mptr)
             oldcount += len(res)
-            newcount += len([internal.tagindex.members.increment(mptr.id, name) for name in res])
+            newcount += len([internal.tagindex.members.increment(mid, name) for name in res])
         continue
     return oldcount, newcount
 
