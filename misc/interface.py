@@ -12449,6 +12449,16 @@ class function(object):
         return fn.fpd
 
     @classmethod
+    def has_frame(cls, func):
+        '''Return whether the function specified by `func` has a frame.'''
+        fn = func if isinstance(func, idaapi.func_t) else cls.by(func)
+        ti, ea = idaapi.tinfo_t(), range.start(fn)
+        if hasattr(ti, 'get_func_frame'):
+            return ti.get_func_frame(fn)
+        sptr = idaapi.get_frame(fn)
+        return sptr or fn.frame != idaapi.BADNODE
+
+    @classmethod
     def frame(cls, func, *offset):
         '''Return the frame belonging to the function `func`.'''
         fn = func if isinstance(func, idaapi.func_t) else cls.by(func)
