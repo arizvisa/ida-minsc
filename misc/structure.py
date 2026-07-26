@@ -1013,7 +1013,9 @@ class v9member(object):
         tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'contains'], args=["{:#x}".format(offset)])
         if union(tinfo):
             return 0 <= offset < udm.size
-        return udm.offset <= offset < udm.offset + udm.size
+        elif tinfo.is_varstruct() and udm.size == 0:
+            return udm.offset <= offset
+        return False if udm.size == 0 else udm.offset <= offset < udm.offset + udm.size
 
     @classmethod
     def element(cls, *args):
