@@ -46,11 +46,10 @@ def has(name, *suffix):
     res = (name,) + suffix
     string = interface.tuplename(*res)
     return True if interface.function.by_name(string) else False
-@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
+@utils.multicase(frame=(idaapi.tinfo_t, internal.structure.structuretypes))
 def has(frame):
     '''Return if the structure in `frame` belongs to a function.'''
-    sptr = frame if isinstance(frame, idaapi.struc_t) else frame.ptr
-    return True if interface.function.by_frame(sptr) else False
+    return True if interface.function.by_frame(frame) else False
 within = utils.alias(has)
 
 ## searching
@@ -97,10 +96,10 @@ def by(ea):
 def by(name, *suffix):
     '''Return the function with the specified `name`.'''
     return by_name(name, *suffix)
-@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
+@utils.multicase(frame=(idaapi.tinfo_t, internal.structure.structuretypes))
 def by(frame):
     '''Return the function that owns the specified `frame`.'''
-    res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
+    res = interface.function.by_frame(frame)
     if res is None:
         raise interface.function.missing(frame)
     return res
@@ -132,10 +131,10 @@ def offset(name, *suffix):
     func = interface.function.by(interface.tuplename(*res))
     ea = interface.range.start(func)
     return interface.address.offset(ea)
-@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
+@utils.multicase(frame=(idaapi.tinfo_t, internal.structure.structuretypes))
 def offset(frame):
     '''Return the offset from the base address of the database for the function that owns the specified `frame`.'''
-    res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
+    res = interface.function.by_frame(frame)
     if res is None:
         raise interface.function.missing(frame)
     ea = interface.range.start(res)
@@ -197,10 +196,10 @@ def name():
 def name(func):
     '''Return the name of the function `func`.'''
     return interface.function.name(func)
-@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
+@utils.multicase(frame=(idaapi.tinfo_t, internal.structure.structuretypes))
 def name(frame):
     '''Return the name of the function that is owned by the specified `frame`.'''
-    res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
+    res = interface.function.by_frame(frame)
     if res is None:
         raise interface.function.missing(frame)
     return interface.function.name(res)
@@ -330,10 +329,10 @@ def address(name, *suffix):
     res = (name,) + suffix
     res = interface.function.by(interface.tuplename(*res))
     return interface.range.start(res)
-@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
+@utils.multicase(frame=(idaapi.tinfo_t, internal.structure.structuretypes))
 def address(frame):
     '''Return the address for the entrypoint of the function that owns the specified `frame`.'''
-    res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
+    res = interface.function.by_frame(frame)
     if res is None:
         raise interface.function.missing(frame)
     return interface.range.start(res)
@@ -353,10 +352,10 @@ def bottom(func):
     '''Return the bottom address of the chunk for the entrypoint of the function `func`.'''
     fn = interface.function.by(func)
     return interface.range.end(fn)
-@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
+@utils.multicase(frame=(idaapi.tinfo_t, internal.structure.structuretypes))
 def bottom(frame):
     '''Return the bottom address of the chunk for the function with the specified `frame`.'''
-    res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
+    res = interface.function.by_frame(frame)
     if res is None:
         raise interface.function.missing(frame)
     return interface.range.end(res)
@@ -378,10 +377,10 @@ def leave(func):
         interface.fc_block_type_t.fcb_error
     )
     return tuple(database.address.prev(interface.range.end(item)) for item in fc if item.type in exit_types)
-@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
+@utils.multicase(frame=(idaapi.tinfo_t, internal.structure.structuretypes))
 def leave(frame):
     '''Return the exit-points of the function that owns the specified `frame`.'''
-    res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
+    res = interface.function.by_frame(frame)
     if res is None:
         raise interface.function.missing(frame)
     return leave(res)
