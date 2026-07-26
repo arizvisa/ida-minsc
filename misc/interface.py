@@ -502,6 +502,7 @@ class typemap(object):
     def dissolve(cls, flag, typeid, size, offset=None):
         '''Convert the specified `flag`, `typeid`, and `size` into a pythonic type at the optional `offset`.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+        get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
         dtype, dsize = flag & cls.FF_MASK, flag & cls.FF_MASKSIZE
         sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
         Fstring_encoding = idaapi.set_str_encoding_idx if hasattr(idaapi, 'set_str_encoding_idx') else lambda strtype, encoding_idx: (strtype & 0xffffff) | (encoding_idx << 24)
@@ -512,12 +513,19 @@ class typemap(object):
         # We have to do this explicit check because in some cases, the disassembler will
         # forget to set the FF_STRUCT flag but still assign a structure type identifier
         # to a member's opinfo_t. This way we can still pythonic-type all union members.
-        if (dsize == FF_STRUCT and isinstance(typeid, internal.types.integer) and idaapi.get_struc(typeid)) or (typeid is not None and idaapi.get_struc(typeid)):
-            sptr = idaapi.get_struc(typeid)
-            element, variableQ = idaapi.get_struc_size(sptr), sptr.props & idaapi.SF_VAR
+        if (dsize == FF_STRUCT and isinstance(typeid, internal.types.integer) and internal.structure.has(typeid)) or (typeid is not None and internal.structure.has(typeid)):
+            ti = idaapi.tinfo_t()
+            if hasattr(idaapi, 'get_struc'):
+                sptr = idaapi.get_struc(typeid)
+                element, variableQ = idaapi.get_struc_size(sptr), sptr.props & idaapi.SF_VAR
+                sid = sptr.id
+            elif ti.get_type_by_tid(typeid):
+                element, variableQ, sid = tinfo.size(ti), ti.is_varstruct(), tinfo.identifier(ti)
+            else:
+                raise internal.exceptions.StructureNotFoundError(u"{:s}.dissolve({:#x}, {:s}, {:+d}, {:+#x}) : Unable to locate a type matching the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), flag, "{:#x}".format(typeid) if isinstance(typeid, internal.types.integer) else "{!s}".format(typeid), size, offset, idaapi.BADADDR if typeid is None else typeid))
 
             # grab the structure_t and check the flags to figure out if we need to size it.
-            structure = internal.structure.new(sptr.id, 0 if offset is None else offset)
+            structure = internal.structure.new(sid, 0 if offset is None else offset)
             if element == size:
                 return structure
             elif element:
@@ -566,7 +574,7 @@ class typemap(object):
         # If the datatype size (sz) is not an integer, then we need to calculate
         # the size ourselves using the size parameter we were given and the element
         # size of the datatype as determined by the flags (DT_TYPE | MS_CLS).
-        elsize = idaapi.get_data_elsize(idaapi.BADADDR, flag, idaapi.opinfo_t())
+        elsize = get_data_elsize(idaapi.BADADDR, flag, idaapi.opinfo_t())
         if not isinstance(sz, internal.types.integer):
             res, extra = divmod(size, elsize) if elsize else (size, 0)
             count = res + 1 if extra else res
@@ -590,6 +598,7 @@ class typemap(object):
         '''Convert the provided `pythonType` into IDA's `(flag, typeid, size)`.'''
         struc_flag = idaapi.struflag if idaapi.__version__ < 7.0 else idaapi.stru_flag
         FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
+        get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
 
         sz, count = None, 1
 
@@ -658,11 +667,8 @@ class typemap(object):
 
         # If our pythonic-type is a structure, then we extract its sptr and then
         # we can use the sptr to snag its identifier and the size of the structure.
-        elif isinstance(pythonType, (getattr(idaapi, 'struc_t', internal.structure.structure_t), internal.structure.structure_t)):
-            if isinstance(pythonType, internal.structure.structuretypes):
-                sptr = getattr(pythonType, 'ptr', pythonType)
-            else:
-                raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.resolve({!s}) : Unable the resolve the given type ({!s}) to a supported type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+        elif isinstance(pythonType, internal.structure.structuretypes):
+            sptr = getattr(pythonType, 'ptr', pythonType)
 
             # If the backing is a tinfo_t, then get the identifier and size.
             if isinstance(sptr, idaapi.tinfo_t):
@@ -676,13 +682,16 @@ class typemap(object):
         # is actually being scaled to the size we were given (its variable-length).
         elif isinstance(pythonType, internal.types.tuple):
             t, size = pythonType
-            sptr = t.ptr if isinstance(t, internal.structure.structure_t) else t
-            flag, typeid = struc_flag(), sptr.id
+            sptr = getattr(t, 'ptr', t)
+            if isinstance(sptr, idaapi.tinfo_t):
+                flag, typeid, variableQ = struc_flag(), tinfo.identifier(sptr), sptr.is_varstruct()
+            else:
+                flag, typeid, variableQ = struc_flag(), sptr.id, sptr.props & getattr(idaapi, 'SF_VAR', 1)
 
             # But if we're not a variable-length structure (according to the flags),
             # then the pythonic type isn't actually valid. Since this could've been
             # an accident, we avoid erroring out by correcting the size and using it.
-            sz = size if sptr.props & getattr(idaapi, 'SF_VAR', 1) else idaapi.get_struc_size(sptr)
+            sz = size if variableQ else tinfo.size(sptr) if isinstance(sptr, idaapi.tinfo_t) else idaapi.get_struc_size(sptr)
 
         # Anything else should be the type's default value which gets assigned for
         # both the current database and architecture. Whatever type the user gives
@@ -710,7 +719,7 @@ class typemap(object):
             # calculate the correct size for the value returned by our table.
             opinfo, typeid = idaapi.opinfo_t(), idaapi.BADADDR if typeid < 0 else typeid
             opinfo.tid = typeid
-            return flag, typeid, idaapi.get_data_elsize(idaapi.BADADDR, flag, opinfo)
+            return flag, typeid, get_data_elsize(idaapi.BADADDR, flag, opinfo)
 
         # This is our catch-all so that we can compain about it to the user.
         else:
