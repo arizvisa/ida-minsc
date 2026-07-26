@@ -784,13 +784,13 @@ class variables(object):
         '''Return an ``ida_hexrays.lvar_locator_t`` for the variable overlapping the given `member` in the function `func`.'''
         mid = member.id if isinstance(member, idaapi.member_t) else member.ptr.id
         mptr, _, sptr = idaapi.get_member_by_id(mid)
-        ea = idaapi.get_func_by_frame(sptr.id)
+        fn = interface.function.by_frame(sptr)
 
         # now we need to use the member offset to get a location_t, and then we
         # translate that location from frame member to the hexrays stack
         # position. we include the size because we might miss it due to there
         # being no correlation between the disassembler and decompiler frames.
-        offset = interface.function.frame_offset(ea, mptr.soff)
+        offset = interface.function.frame_offset(fn, mptr.soff)
         location = interface.location_t(offset, internal.structure.member.size(mptr))
         return cls.by(func, location)
 
@@ -850,8 +850,8 @@ class variables(object):
         elif isinstance(locator, (idaapi.member_t, internal.structure.member_t)):
             mid = locator.id if isinstance(locator, idaapi.member_t) else locator.ptr.id
             mptr, _, sptr = idaapi.get_member_by_id(mid)
-            ea = idaapi.get_func_by_frame(sptr.id)
-            return cls.by_member(ea, mptr)
+            fn = interface.function.by_frame(sptr)
+            return cls.by_member(fn, mptr)
 
         elif not isinstance(locator, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
             raise exceptions.InvalidTypeOrValueError(u"{:s}.by({!r}) : Unable to locate a variable with a locator type ({!s}) that is unsupported.".format('.'.join([__name__, cls.__name__]), locator, locator.__class__))
@@ -902,8 +902,8 @@ class variables(object):
         elif isinstance(locator, (idaapi.member_t, internal.structure.member_t)):
             mid = member.id if isinstance(member, idaapi.member_t) else member.ptr.id
             mptr, _, sptr = idaapi.get_member_by_id(mid)
-            ea = idaapi.get_func_by_frame(sptr.id)
-            offset = interface.function.frame_offset(ea, mptr.soff)
+            fn = interface.function.by_frame(sptr)
+            offset = interface.function.frame_offset(fn, mptr.soff)
             loc = interface.location_t(offset, internal.structure.member.size(mptr))
             return cls.has(func, loc)
 
