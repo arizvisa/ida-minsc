@@ -683,9 +683,8 @@ class query_v1(object):
     @classmethod
     def structure(cls, sid, require=frozenset(), include=frozenset()):
         '''Yield the member id and tags for each member belonging to the structure `sid` which contain all the tags in `require` and include any from `include`.'''
-        struc_t = idaapi.struc_t, internal.structure.structure_t
         listable = sid if isinstance(sid, internal.types.ordered) else [sid]
-        sids = {(sid.id if isinstance(sid, struc_t) else int(sid)) for sid in listable}
+        sids = {(sid.id if isinstance(sid, internal.structure.structuretypes) else int(sid)) for sid in listable}
         rmask, imask = (cls.mask(names) for names in [require, include])
         requested, selection = rmask | imask, require or include
         for mid, used in internal.tagindex.members.structure(sids):
@@ -2451,7 +2450,7 @@ class member(object):
     @classmethod
     def get(cls, mptr):
         '''Return a dictionary containing the tags for the structure member `mptr`.'''
-        repeatable, mid = True, mptr.id if isinstance(mptr, (idaapi.member_t, internal.structure.member_t)) else int(mptr)
+        repeatable, mid = True, mptr.id if isinstance(mptr, internal.structure.membertypes) else int(mptr)
         mptr, fullname, sptr = idaapi.get_member_by_id(mid)
 
         # Grab the repeatable and non-repeatable comment.
@@ -2488,7 +2487,7 @@ class member(object):
         # If we belong to a frame, then we can trust the MF_HASTI property. We
         # can also use NSUP_TYPEINFO(0x3000) to confirm that type information of
         # some sort was applied. Although, it's not really that unnecessary.
-        if sptr.props & getattr(idaapi, 'SF_FRAME', 0x40):
+        if internal.structure.frame(sptr):
             ti, has_typeinfo = idaapi.tinfo_t(), mptr.flag & idaapi.MF_HASTI
             ok = idaapi.get_or_guess_member_tinfo2(mptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, mptr)
 
