@@ -7119,8 +7119,8 @@ class contiguous(object):
         # is part of a frame. if it is, then we calculate its actual offset.
         elif hasattr(idaapi, 'struc_t') and isinstance(item, (idaapi.struc_t, idaapi.member_t)):
             mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id) if isinstance(item, idaapi.member_t) else (item, 0, None)
-            ea, moffset = idaapi.get_func_by_frame(mowner.id), 0 if not mptr or mowner.props & idaapi.SF_UNION else mptr.soff
-            offset = function.frame_offset(ea, moffset) if mowner.props & idaapi.SF_FRAME and ea != idaapi.BADADDR else moffset
+            fn, moffset = function.by_frame(mowner), 0 if not mptr or mowner.props & idaapi.SF_UNION else mptr.soff
+            offset = function.frame_offset(fn, moffset) if mowner.props & idaapi.SF_FRAME and fn else moffset
 
         else:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.start({:s}) : Unable to determine the offset for the first item ({!r}) due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), item, item.__class__))
@@ -7158,8 +7158,8 @@ class contiguous(object):
         # check whether it's referencing a frame to calculate its real offset.
         elif hasattr(idaapi, 'struc_t') and isinstance(item, (idaapi.struc_t, idaapi.member_t)):
             mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id) if isinstance(item, idaapi.member_t) else (item, 0, None)
-            ea, moffset = idaapi.get_func_by_frame(mowner.id), mptr.eoff if mptr else idaapi.get_struc_size(item)
-            offset = function.frame_offset(ea, moffset) if mowner.props & idaapi.SF_FRAME and ea != idaapi.BADADDR else moffset
+            fn, moffset = function.by_frame(mowner), mptr.eoff if mptr else idaapi.get_struc_size(item)
+            offset = function.frame_offset(fn, moffset) if mowner.props & idaapi.SF_FRAME and fn else moffset
 
         else:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.stop({:s}) : Unable to determine the offset for the last item ({!r}) due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), item, item.__class__))
@@ -11892,21 +11892,12 @@ class xref(object):
 
                 # Try and fetch the frame's address (which should fail if not a frame),
                 # and then use it to get the func_t that owns the member.
-                ea = idaapi.get_func_by_frame(sptr.id)
-                func = idaapi.get_func(ea)
+                func = function.by_frame(sptr)
 
                 # If we were unable to get the function frame, then we're referencing a
                 # member from a different structure and we already have everything.
-                if ea == idaapi.BADADDR:
+                if not func:
                     sptr, soffset = sptr, 0
-
-                # If we couldn't grab the func, then we just bail.
-                elif not func:
-                    raise internal.exceptions.FunctionNotFoundError(u"{:s}.structure({:#x}) : Unable to locate the function for frame member {:#x} by address {:#x}.".format('.'.join([__name__, cls.__name__]), this.id, mptr.id, ea))
-
-                # If we couldn't grab the frame, then we bail on that too.
-                elif not idaapi.get_frame(func):
-                    raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.structure({:#x})) : The function at {:#x} for frame member {:#x} does not have a frame.".format('.'.join([__name__, cls.__name__]), this.id, ea, mptr.id))
 
                 # Otherwise we're referencing a frame member, and we need to figure out
                 # the structure and the base that we'll be creating its structure at.
