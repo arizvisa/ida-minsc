@@ -4487,7 +4487,7 @@ class address(object):
         entryframe = cls.pframe()
 
         if not isinstance(ea, internal.types.integer):
-            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}) : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea, ea.__class__))
+            raise internal.exceptions.InvalidParameterError(u"{:s}({!r}) : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea, ea.__class__))
 
         if ea == idaapi.BADADDR:
             raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}) : An invalid address ({:#x}) was specified.".format(entryframe.f_code.co_name, ea, ea))
