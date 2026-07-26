@@ -1306,9 +1306,8 @@ class member(object):
 
         # now we need to figure out the function and the boundaries of the frame
         # so that we can distinguish between variables, args, and preserved regs.
-        ea = idaapi.get_func_by_frame(sptr.id)
-        fn = idaapi.get_func(ea)
-        if ea == idaapi.BADADDR or not fn:
+        fn = interface.function.by_frame(sptr)
+        if not fn:
             return any(name.startswith(prefix) for prefix in {'arg_', 'var_'})
 
         # we're now free to figure out which the frame part that this member
@@ -1396,8 +1395,8 @@ class member(object):
 
         # if the sptr is a function frame, then this name varies based on which
         # "segment" the offset is located in (lvars, registers, or args).
-        ea = idaapi.get_func_by_frame(sptr.id)
-        if frame(sptr) and ea == idaapi.BADADDR:
+        fn = interface.function.by_frame(sptr)
+        if frame(sptr) and not fn:
             raise E.DisassemblerError(u"{:s}.remove_name({:#x}) : Unable to determine the function from the frame ({:#x}) containing the member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, None, sptr.id, utils.string.escape(internal.netnode.name.get(mptr.id), '"')))
 
         # otherwise, this is easy as we can just use mptr.soff to get the
@@ -1414,16 +1413,10 @@ class member(object):
 
         # To process the frame, we first need the address of the function
         # to get the func_t and the actual member offset to calculate with.
-        ea = idaapi.get_func_by_frame(sptr.id)
-        if ea == idaapi.BADADDR:
+        fn = interface.function.by_frame(sptr)
+        if not fn:
             fmt, moff = fmtField, mptr.get_soff() if mptr else sptr.memqty if union(sptr) else idaapi.get_struc_size(sptr)
             return fmt(*offset) if offset else fmt(moff)
-
-        # We need to figure out all of the attributes we need in order to
-        # calculate the position within a frame this includes the integer size.
-        fn = idaapi.get_func(ea)
-        if fn is None:
-            raise E.FunctionNotFoundError(u"{:s}.default_name({:#x}, {:#x}) : Unable to get the function at the specified address ({:#x}) which owns the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id if mptr else idaapi.BADNODE, ea, sptr.id))
 
         # Now we need to figure out where our member is. If it's within the
         # `func_t.frsize`, then we're a "var_" relative to `func_t.frsize`.
@@ -1755,10 +1748,10 @@ class member(object):
         mptr, fullname, owner = packed
 
         # Figure out whether we need check an xref list for a frame or just use the regular xrefs.
-        fn, is_union, is_frame = idaapi.get_func_by_frame(owner.id), union(owner), frame(owner)
+        fn, is_union, is_frame = interface.function.by_frame(owner), union(owner), frame(owner)
 
         # If it's a function frame, collect an xref list and return true if it's not empty.
-        if interface.node.identifier(owner.id) and is_frame and fn != idaapi.BADADDR:
+        if interface.node.identifier(owner.id) and is_frame and fn:
             iterable = (True for ea, opnum, xtype in interface.xref.frame(fn, mptr))
             return next(iterable, False)
 
@@ -1783,12 +1776,12 @@ class member(object):
         mptr, fullname, owner = packed
 
         # start out by grabbing attributes that we need to know about the structure.
-        fn, is_union, is_frame = idaapi.get_func_by_frame(owner.id), union(owner), frame(owner)
+        fn, is_union, is_frame = interface.function.by_frame(owner), union(owner), frame(owner)
 
         # if structure is a frame, then we need to build an xref list
         # to the member in order to return all of its references.
         #if interface.node.identifier(owner.id) and internal.netnode.name.get(Fnetnode(owner.id)).startswith('$ '):
-        if interface.node.identifier(owner.id) and is_frame and fn != idaapi.BADADDR:
+        if interface.node.identifier(owner.id) and is_frame and fn:
             results = []
 
             # now we can collect all the xrefs to the member within the function
@@ -2358,8 +2351,7 @@ class v9members(object):
         # assign some of the other properties so that we can check the type.
         is_variable, is_frame, is_union = ti.is_varstruct(), ti.is_frame() if hasattr(ti, 'is_frame') else False, union(ti)
 
-        ea = idaapi.get_func_by_frame(sid)
-        fn = idaapi.get_func(ea)
+        fn = interface.function.by_frame(sid)
         [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn and is_frame else 0]
 
         # next we'll need to translate the location in order to make sense of
@@ -3417,8 +3409,7 @@ class v9members(object):
         # First check if our type belongs to a frame so that we avoid removing
         # members that are treated specially by the disassembler. We also
         # calculate the base offset for the type if we were not given an offset.
-        ea = ti.get_frame_func() if hasattr(ti, 'get_frame_func') else idaapi.get_func_by_frame(sid)
-        fn = None if ea == idaapi.BADADDR else idaapi.get_func(ea)
+        fn = interface.function.by_frame(sid)
         [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn else 0]
 
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
@@ -3611,8 +3602,7 @@ class v9members(object):
         # First check if our type belongs to a frame so that we avoid removing
         # members that are treated specially by the disassembler. We also
         # calculate the base offset for the type if we were not given an offset.
-        ea = ti.get_frame_func() if hasattr(ti, 'get_frame_func') else idaapi.get_func_by_frame(sid)
-        fn = None if ea == idaapi.BADADDR else idaapi.get_func(ea)
+        fn = interface.function.by_frame(sid)
         [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn else 0]
 
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
@@ -3837,8 +3827,7 @@ class v9members(object):
         # Next we need to avoid members that are specially treated by the
         # disassembler. This only happens when our type is a frame. So, we first
         # check to see if the type is associated with a function.
-        ea = ti.get_frame_func() if hasattr(ti, 'get_frame_func') else idaapi.get_func_by_frame(sid)
-        fn = None if ea == idaapi.BADADDR else idaapi.get_func(ea)
+        fn = interface.function.by_frame(sid)
         [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn else 0]
 
         # Now we can go through and gather the identifiers for each member.
@@ -3993,8 +3982,7 @@ class v9members(object):
 
         # We need to know if our type belongs to a function (frame) so that we
         # don't mistakenly clear members specially treated by the disassembler.
-        ea = ti.get_frame_func() if hasattr(ti, 'get_frame_func') else idaapi.get_func_by_frame(sid)
-        fn = None if ea == idaapi.BADADDR else idaapi.get_func(ea)
+        fn = interface.function.by_frame(sid)
         [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn else 0]
 
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
@@ -4359,8 +4347,7 @@ class v9members(object):
 
         # If we are acting on a function frame, then get the function that it's
         # for. We use this to calculate the base offset if we weren't given one.
-        ea = ti.get_frame_func() if hasattr(ti, 'get_frame_func') else idaapi.get_func_by_frame(sid)
-        fn = idaapi.get_func(ea)
+        fn = interface.function.by_frame(sid)
         [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn and is_frame else 0]
 
         # Assign some descriptions for the parameters we were given that we will
@@ -5678,8 +5665,7 @@ class members(object):
 
         # Determine if the structure is a frame so that we can avoid removing
         # members that might interfere with how the disassembler uses it.
-        ea = idaapi.get_func_by_frame(sptr.id)
-        fn = None if ea == idaapi.BADADDR else idaapi.get_func(ea)
+        fn = interface.function.by_frame(sptr)
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
         specials = {idaapi.get_member(sptr, moffset).id for moffset in filter(functools.partial(idaapi.get_member, sptr), iterable)}
 
@@ -5838,8 +5824,7 @@ class members(object):
 
         # If the structure is a frame, then there's certain members
         # that we shouldn't delete because it will break the frame.
-        ea = idaapi.get_func_by_frame(sptr.id)
-        fn = None if ea == idaapi.BADADDR else idaapi.get_func(ea)
+        fn = interface.function.by_frame(sptr)
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
         specials = {idaapi.get_member(sptr, moffset).id for moffset in filter(functools.partial(idaapi.get_member, sptr), iterable)}
 
@@ -6007,8 +5992,7 @@ class members(object):
 
         # If our structure is a function frame, then we can't actually touch some of
         # the members. So, we check the frame ahead of time and skip over them later.
-        ea = idaapi.get_func_by_frame(sptr.id)
-        fn = idaapi.get_func(ea)
+        fn = interface.function.by_frame(sptr)
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
         specials = {idaapi.get_member(sptr, moffset).id for moffset in filter(functools.partial(idaapi.get_member, sptr), iterable)}
 
@@ -6132,8 +6116,7 @@ class members(object):
 
         # If our structure is a function frame, then we can't actually touch some of
         # the members. So, we check the frame ahead of time and skip over them later.
-        ea = idaapi.get_func_by_frame(sptr.id)
-        fn = idaapi.get_func(ea)
+        fn = interface.function.by_frame(sptr)
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
         specials = {idaapi.get_member(sptr, moffset).id for moffset in filter(functools.partial(idaapi.get_member, sptr), iterable)}
 
@@ -6367,8 +6350,7 @@ class members(object):
 
         # Check if we're acting on a function frame and gets the function
         # if so. We also calculate the base offset if we weren't given one.
-        ea = idaapi.get_func_by_frame(sptr.id)
-        fn = idaapi.get_func(ea)
+        fn = interface.function.by_frame(sptr)
         [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn and is_frame else 0]
 
         # Assign some constants and build some descriptions to help with logging.
@@ -6833,8 +6815,7 @@ class members(object):
 
         # First, we need to figure out the base offset in order to make sense of
         # the location. So, we grab the function and unpack the base if available.
-        ea = idaapi.get_func_by_frame(sptr.id)
-        fn = idaapi.get_func(ea)
+        fn = interface.function.by_frame(sptr)
         [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn and sptr.props & idaapi.SF_FRAME else 0]
         offset_description = ", {:#x}".format(base) if offset else ''
 
@@ -9322,9 +9303,9 @@ class members_t(object):
     __members_matcher.alias('members', 'member')
     __members_matcher.combinator('structure', utils.fcondition(utils.finstance(internal.types.string), utils.finstance(structuretypes), utils.finstance(idaapi.tinfo_t), utils.finstance(internal.types.unordered))(utils.fcompose(idaapi.get_struc_id, utils.fcondition(utils.fpartial(operator.ne, idaapi.BADADDR))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, utils.fconstant(False)))), utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(operator.methodcaller('get_type_name'), idaapi.get_struc_id, utils.fcondition(utils.fpartial(operator.ne, idaapi.BADADDR))(utils.fidentity, None), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(utils.itermap, utils.fcondition(utils.finstance(internal.types.string), utils.finstance(structuretypes), utils.finstance(idaapi.tinfo_t))(utils.fcompose(idaapi.get_struc_id, utils.fcondition(utils.fpartial(operator.ne, idaapi.BADADDR))(utils.fidentity, utils.fpartial(utils.fpartial, utils.fconstant(None)))), operator.attrgetter('id'), utils.fcompose(utils.fcatch(None)(None)(interface.tinfo.resolve), utils.fcondition(utils.fpartial(operator.ne, None))(utils.fcompose(operator.methodcaller('get_type_name'), idaapi.get_struc_id), utils.fidentity)), utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('__class__'), operator.attrgetter('__name__')), utils.fidentity), utils.funpack(utils.fpartial("{:s} : Unable to match the requested filter (\"{:s}\") with an unsupported type \"{:s}\" ({!r}).".format, '.'.join([__name__, 'members_t']), 'structure')), utils.fthrow(E.InvalidMatchTypeError)))), utils.fpartial(filter, utils.fpartial(operator.ne, None)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('__class__'), operator.attrgetter('__name__')), utils.fidentity), utils.funpack(utils.fpartial("{:s} : Unable to match the requested filter (\"{:s}\") with an unsupported type {:s} ({!r}).".format, '.'.join([__name__, 'members_t']), 'structure')), utils.fthrow(E.InvalidMatchTypeError))), 'ptr', member.get_typeinfo, utils.fcatch(None)(None)(interface.tinfo.structure), utils.fcondition(utils.finstance(idaapi.tinfo_t))(utils.fcompose(operator.methodcaller('get_type_name'), idaapi.get_struc_id), idaapi.BADADDR))
     __members_matcher.alias('structures', 'structure'), __members_matcher.alias('struc', 'structure'),
-    __members_matcher.mapping('arguments', operator.truth, 'ptr', utils.fcondition(utils.fcompose(operator.attrgetter('id'), idaapi.get_member_by_id, bool))(utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('id'), idaapi.get_member_by_id, operator.itemgetter(-1), operator.attrgetter('id'), idaapi.get_func_by_frame, utils.fcondition(utils.fcompose(idaapi.get_func, bool))(utils.fcompose(idaapi.get_func, idaapi.frame_off_args, functools.partial(functools.partial, operator.le)), functools.partial(functools.partial, utils.fconstant(False)))), operator.attrgetter('soff')), utils.funpack(utils.fapplyto())), utils.fconstant(False)))
+    __members_matcher.mapping('arguments', operator.truth, 'ptr', utils.fcondition(utils.fcompose(operator.attrgetter('id'), idaapi.get_member_by_id, bool))(utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('id'), idaapi.get_member_by_id, operator.itemgetter(-1), operator.attrgetter('id'), interface.function.by_frame, utils.fcondition(bool)(utils.fcompose(idaapi.frame_off_args, functools.partial(functools.partial, operator.le)), functools.partial(functools.partial, utils.fconstant(False)))), operator.attrgetter('soff')), utils.funpack(utils.fapplyto())), utils.fconstant(False)))
     __members_matcher.alias('args', 'arguments'), __members_matcher.alias('parameters', 'arguments'),
-    __members_matcher.mapping('locals', operator.truth, 'ptr', utils.fcondition(utils.fcompose(operator.attrgetter('id'), idaapi.get_member_by_id, bool))(utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('id'), idaapi.get_member_by_id, operator.itemgetter(-1), operator.attrgetter('id'), idaapi.get_func_by_frame, utils.fcondition(utils.fcompose(idaapi.get_func, bool))(utils.fcompose(idaapi.get_func, idaapi.frame_off_savregs, functools.partial(functools.partial, operator.gt)), functools.partial(functools.partial, utils.fconstant(False)))), operator.attrgetter('soff')), utils.funpack(utils.fapplyto())), utils.fconstant(False)))
+    __members_matcher.mapping('locals', operator.truth, 'ptr', utils.fcondition(utils.fcompose(operator.attrgetter('id'), idaapi.get_member_by_id, bool))(utils.fcompose(utils.fthrough(utils.fcompose(operator.attrgetter('id'), idaapi.get_member_by_id, operator.itemgetter(-1), operator.attrgetter('id'), interface.function.by_frame, utils.fcondition(bool)(utils.fcompose(idaapi.frame_off_savregs, functools.partial(functools.partial, operator.gt)), functools.partial(functools.partial, utils.fconstant(False)))), operator.attrgetter('soff')), utils.funpack(utils.fapplyto())), utils.fconstant(False)))
     __members_matcher.alias('lvars', 'locals'), __members_matcher.alias('variables', 'locals'),
     __members_matcher.mapping('referenced', operator.truth, 'ptr', member.has_references, bool)
     __members_matcher.predicate('predicate'), __members_matcher.predicate('pred')
