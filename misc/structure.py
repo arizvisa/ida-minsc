@@ -9256,8 +9256,139 @@ class members_t(object):
         return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
     @utils.multicase(location=interface.location_t)
     def remove(self, location):
-        '''Remove the members at the specified `location` of the structure.'''
-        return self.remove(*location.bounds)
+        '''Remove the member at the specified `location` of the structure.'''
+        cls, owner, base = self.__class__, self.owner, self.baseoffset
+        sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
+
+        # FIXME: The following code takes the given location and returns the
+        #        indices of every member that matches it. The intention was so
+        #        that we can track references and remove every matching member,
+        #        but since removing a member causes the structure to shift
+        #        around. This would be greatly simplified if we had utility
+        #        functions in `members` and `v9members` that implements the
+        #        ability to remove or clear members by index in bulk. Since we
+        #        don't, we cheat and use `members.by` and `v9members.by` with
+        #        the given location. You can find that at the end of this code.
+
+        # Extract the parts for the location that we're going to remove.
+        offset, size = location
+        if isinstance(offset, interface.symbol_t):
+            [offset] = (int(item) for item in offset)
+        realoffset, realsize = offset - self.baseoffset, size
+
+        # Figure out the backing type so we can figure the namespace to use. If
+        # we have a local type as the backing type, then use the v9 namespaces.
+        indices = []
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            candidates = (midx for sptr, midx, _ in v9members.at_offset(owner.ptr, 8 * realoffset))
+            iterable = ((midx, v9member.at(owner.ptr, midx, 8 * realoffset)) for midx in candidates if v9member.contains(owner.ptr, midx, 8 * realoffset))
+
+            # If any of these are not aligned across a multiple of our location,
+            # then go back through them and verify everything about it.
+            filtered = [midx for midx, (index, moffset) in iterable if not moffset]
+            for midx in filtered:
+                tinfo, utd, mindex, udm = v9members.by(owner.ptr, midx, caller=[__name__, cls.__name__, 'has'])
+                mtype, mbitoffset, mbits, mid = interface.tinfo.copy(udm.type), udm.offset, udm.size, interface.tinfo.member_identifier(tinfo, mindex)
+
+                # Now we take the member type and reduce it to just its element
+                # if it is an array. We also create a location for the member.
+                metype, _ = interface.tinfo.array(mtype) if mtype.is_array() else (mtype, 1)
+                mbitlocation = interface.location_t(mbitoffset, mbits)
+
+                # Then we grap the element size and scale down to bytes.
+                melement = interface.tinfo.size(metype)
+                mlocation = moffset, msize = mbitlocation / 8
+
+                # Now we need to check if the location size is a multiple of the
+                # element size, or if it's a variable-length member. We'll need
+                # this and the dimensions to see if the location matches.
+                index, remainder = divmod(size, melement)
+                is_multiple = False if remainder else True
+                left, right = realoffset, realoffset + melement * index
+                is_variable = tinfo.is_varstruct() and mbits == 0
+
+                # If we found a multiple, the size is non-zero, and the location
+                # is within bounds of the element, then we found a candidate.
+                if is_multiple and size > 0 and any([is_variable, right <= moffset + msize]):
+                    indices.append((mid, midx, mbitoffset))
+                continue
+
+            # Now we need to delete all of the indices that we gathered. So, we
+            # copy them into a variable representing our selection.
+            selected = sorted(indices, key=operator.itemgetter(1))[::-1]
+
+        # If we're using the older structure api, then use the right namespace.
+        else:
+            candidates = ((midx, mptr) for sptr, midx, mptr in members.at_offset(owner.ptr, realoffset))
+            iterable = ((midx, mptr, member.at(mptr, realoffset)) for midx, mptr in candidates if member.contains(mptr, realoffset))
+            get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
+
+            # First we filter the members that are a multiple of the location size.
+            # Before gathering the type information of each member, we filter them
+            # and discard the ones that are not lined up with our location.
+            filtered = [(midx, mptr) for midx, mptr, (index, moffset) in iterable if not moffset]
+            for midx, mptr in filtered:
+                opinfo, mid = idaapi.opinfo_t(), mptr.id
+                retrieved = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+                melement, msize = get_data_elsize(mptr.id, mptr.flag, opinfo if retrieved else None), idaapi.get_member_size(mptr)
+
+                # Now that we have the element type and member sizes, we need to
+                # check them against the location we were given. First we verify
+                # that it is actually a multiple of the member dimensions. Then we
+                # grab the boundaries and check if it's a variable-length member.
+                index, remainder = divmod(size, melement)
+                is_multiple = False if remainder else True
+                left, right = realoffset, realoffset + melement * index
+                is_variable = owner.ptr.props & idaapi.SF_VAR and mptr.soff == mptr.eoff
+
+                # If the dimensions are a multiple of the location, and we're still
+                # within boundaries, then gather up the index for removal.
+                if is_multiple and size > 0 and any([is_variable, right <= mptr.soff + msize]):
+                    indices.append((mid, midx, mptr.soff))
+                continue
+
+            # Now we can assign the gathered indices so that we can start
+            # removing the members that were selected.
+            selected = sorted(indices, key=operator.itemgetter(1))[::-1]
+
+        # If we didn't select anything, then raise an exception and abort.
+        if not selected:
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.remove({!s}) : Unable to find a {:s} member that is referenced by the specified location ({:s}).".format('.'.join([__name__, cls.__name__]), sid, location, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', location))
+
+        # FIXME: We have a list of indices, offsets, and member identifiers that
+        #        need to be removed. We should be able to use them to track any
+        #        references made in the database, but their removal would cause
+        #        all of the references in the structure to shift around. So we
+        #        avoid that and only remove an individual matching element.
+
+        # First we grab the member that fits the specified location so that we
+        # can grab its index so we can remove the member. For the record, this
+        # next method call should not fail if the above code was succesful.
+        mptr = self.by(location)
+        index = mptr.index
+
+        # Only thing left to do is to figure out which backing we're using to
+        # use the right namespace to remove the member.
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            removed = v9members.remove_slice(owner.ptr, index, base)
+        else:
+            removed = members.remove_slice(owner.ptr, index, base)
+
+        # If we didn't get any results, then something unexpected happened. This
+        # is unfortunate, and as such we are required to raise an exception.
+        if not removed:
+            raise E.DisassemblerError(u"{:s}({:#x}).members.remove({!s}) : Unable to remove the member for the given location ({:s}) at index {:d} of the {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, location, location, index, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', sid))
+
+        # Unpack the result that were removed, as there should be only one. If
+        # we're using the v9-backed type, we need to scale down the position
+        # information from bits to bytes before returning them to the caller.
+        if isinstance(owner.ptr, idaapi.tinfo_t):
+            iterable = ((mname, mtype, mbitlocation, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo, mcomments in removed)
+            iterable = ((mname, isinstance(mtype, structure_t), mtype, mbitlocation / 8, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo in iterable)
+            iterable = ((mname, mtype - mtype.offset + int(mlocation) if is_structure else mtype, mlocation, mtypeinfo) for mname, is_structure, mtype, mlocation, mtypeinfo in iterable)
+            return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo in iterable]
+
+        return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
 
     ### Properties
     @property
