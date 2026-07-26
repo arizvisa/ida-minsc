@@ -11927,6 +11927,9 @@ class xref(object):
         '''Yield each structure or frame member referencing the structure identified by `sptr` as a tuple composed of the offset and reference type, structure, or member.'''
         results, this = [], idaapi.get_struc(sptr if isinstance(sptr, internal.types.integer) else sptr.id)
 
+        # XXX: This function is only for the older structure api. The function
+        #      that follows, `xref.typeinfo`, is for the newer structure api.
+
         # Iterate through each reference for the structure to determine what it
         # was actually applied to. If the reference is an identifier, then we
         # need to know whether it's a structure or member identifier. For the
@@ -11993,6 +11996,9 @@ class xref(object):
         '''Yield each type referencing the specified `type` as a tuple composed of the offset and reference type.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         results, tid, owner = [], tinfo.identifier(type), tinfo.copy(type)
+
+        # XXX: This function is a reimplementation of the previous function,
+        #      `xref.structure`, so that we support the newer structure api.
 
         # Iterate through each reference to the type in order to determine what it was
         # actually applied to. If it's an identifier, then we need to figure out
