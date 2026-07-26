@@ -659,10 +659,8 @@ class typemap(object):
         # If our pythonic-type is a structure, then we extract its sptr and then
         # we can use the sptr to snag its identifier and the size of the structure.
         elif isinstance(pythonType, (getattr(idaapi, 'struc_t', internal.structure.structure_t), internal.structure.structure_t)):
-            if isinstance(pythonType, internal.structure.structure_t):
-                sptr = pythonType.ptr
-            elif hasattr(idaapi, 'struc_t') and isinstance(pythonType, idaapi.struc_t):
-                sptr = pythonType if isinstance(pythonType, idaapi.struc_t) else pythonType.ptr
+            if isinstance(pythonType, internal.structure.structuretypes):
+                sptr = getattr(pythonType, 'ptr', pythonType)
             else:
                 raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.resolve({!s}) : Unable the resolve the given type ({!s}) to a supported type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
 
@@ -843,8 +841,8 @@ class typemap(object):
 
         # If it's a structure or a type, then snag the identifer and size of it
         # so that we can create a type for it.
-        elif isinstance(pythonType, (getattr(idaapi, 'struc_t', internal.structure.structure_t), internal.structure.structure_t)):
-            sptr = pythonType.ptr if isinstance(pythonType, internal.structure.structure_t) else pythonType
+        elif isinstance(pythonType, internal.structure.structuretypes):
+            sptr = getattr(pythonType, 'ptr', pythonType)
             ti = sptr if isinstance(sptr, idaapi.tinfo_t) else address.typeinfo(sptr.id)
             is_union, is_frame = internal.structure.union(sptr), internal.structure.frame(sptr)
             if ti is None:
@@ -919,7 +917,7 @@ class typemap(object):
 
         # If it's not a tuple, then it might be a structure to snag the size from.
         elif isinstance(pythonType, internal.structure.structuretypes):
-            sptr = pythonType if isinstance(pythonType, idaapi.struc_t) else pythonType.ptr
+            sptr = getattr(pythonType, 'ptr', pythonType)
             return tinfo.size(sptr) if isinstance(sptr, idaapi.tinfo_t) else idaapi.get_struc_size(sptr)
 
         # If the disassembler version does not support the structure API, then
@@ -5449,7 +5447,7 @@ class strpath(object):
         # Anything else requires us to just check against the member's boundaries.
         def contains(sptr, mptr, offset):
             '''Return whether the given `mptr` contains the specified offset.'''
-            if sptr.props & SF_UNION:
+            if internal.structure.union(sptr):
                 return offset < mptr.eoff
             elif mptr.soff == mptr.eoff:
                 return mptr.eoff <= offset
@@ -5516,15 +5514,15 @@ class strpath(object):
         if any([0 <= offset < idaapi.get_struc_size(sptr), sptr.props & SF_VAR]):
             candidates = [mptr for mptr in members if contains(sptr, mptr, offset)]
         else:
-            candidates = members if sptr.props & SF_UNION else members[:1] if offset < 0 else members[-1:]
+            candidates = members if internal.structure.union(sptr) else members[:1] if offset < 0 else members[-1:]
 
         # We just need to return our candidates, and use the offset from wherever they
         # begin to translate the offset we were given so that it's relative to the
         # member. If we're a union, then the members start at 0 and our offset is always
         # going to be the same. No candidates, means we have no members to return.
         if candidates:
-            delta = 0 if sptr.props & SF_UNION else next(mptr.soff for mptr in candidates)
-            assert(sptr.props & SF_UNION or all(delta == mptr.soff for mptr in candidates))
+            delta = 0 if internal.structure.union(sptr) else next(mptr.soff for mptr in candidates)
+            assert(internal.structure.union(sptr) or all(delta == mptr.soff for mptr in candidates))
             return sptr, candidates, offset - delta
         return sptr, [], offset
 
@@ -5705,7 +5703,7 @@ class strpath(object):
                 # we need to fix it up so that it points to an actual member before reset.
                 elif mptr is None:
                     mptr = idaapi.get_member(sptr, offset)
-                    Fcollect((sptr, mptr, offset - (0 if sptr.props & SF_UNION else mptr.soff)))
+                    Fcollect((sptr, mptr, offset - (0 if internal.structure.union(sptr) else mptr.soff)))
                     sptr, mptr, offset = expected, item, 0
 
                 # If we're here, then our sptr doesn't match and we need to append our
@@ -5914,7 +5912,7 @@ class strpath(object):
             description = "{:s} ({:#x}) of size ({:#x})".format('union' if ti.is_union() else 'structure', sid, 8 * tinfo.size(ti))
         elif hasattr(sptr, 'id'):
             v9, ti, sid = False, None, sptr.id
-            description = "{:s} ({:#x}) of size ({:#x})".format('union' if sptr.props & SF_UNION else 'structure', sid, idaapi.get_struc_size(sptr))
+            description = "{:s} ({:#x}) of size ({:#x})".format('union' if internal.structure.union(sptr) else 'structure', sid, idaapi.get_struc_size(sptr))
         else:
             raise internal.exceptions.InvalidParameterError(formatlog(u"Unable to find the type for the specified identifier {:#x}".format(sid)))
         logging.debug(formatlog(u"Resolving path for the {:s} towards the offset {:+#x}.".format(description, offset)))
@@ -5933,7 +5931,7 @@ class strpath(object):
             elif v9 and isinstance(sptr, internal.types.integer) and node.identifier(sptr) and stype.get_type_by_tid(sptr):
                 stype, is_union, sid = stype, stype.is_union(), sptr
             elif not v9 and hasattr(sptr, 'props'):
-                stype, is_union, sid = sptr, sptr.props & SF_UNION, sptr.id
+                stype, is_union, sid = sptr, internal.structure.union(sptr), sptr.id
             else:
                 raise internal.exceptions.StructureNotFoundError(formatlog(u"Unable to find the type for the specified identifier ({!s})".format(sptr)))
 
@@ -6012,12 +6010,12 @@ class strpath(object):
             # they'll will need to compare the length of what they gave us with the
             # results we've been aggregating in order to determine what happened.
             elif v9:
-                description = 'union' if stype.is_union() else "{:+#x} structure".format(tinfo.size(stype))
+                description = 'union' if internal.structure.union(stype) else "{:+#x} structure".format(tinfo.size(stype))
                 message = "no valid candidates being chosen ({:s})".format(', '.join(map("{:#x}".format, (tinfo.member_identifier(stype, mptr) for mptr in candidates)))) if choice is None else "an invalid candidate ({:s}) being chosen".format("{:#x}".format(cid) if hasattr(choice, 'id') else "{!r}".format(choice))
                 raise internal.exceptions.MemberNotFoundError(formatlog(u"Path terminated at item {:d} (offset {:#x}{:+#x}) of {:s} ({:#x}) due to {:s}.".format(count, position, offset, description, sid, message)))
 
             else:
-                description = 'union' if sptr.props & SF_UNION else "{:+#x} structure".format(idaapi.get_struc_size(sptr.id))
+                description = 'union' if internal.structure.union(sptr) else "{:+#x} structure".format(idaapi.get_struc_size(sptr.id))
                 message = "no valid candidates being chosen ({:s})".format(', '.join(map("{:#x}".format, (mptr.id for mptr in candidates)))) if choice is None else "an invalid candidate ({:s}) being chosen".format("{:#x}".format(choice.id) if hasattr(choice, 'id') else "{!r}".format(choice))
                 raise internal.exceptions.MemberNotFoundError(formatlog(u"Path terminated at item {:d} (offset {:#x}{:+#x}) of {:s} ({:#x}) due to {:s}.".format(count, position, offset, description, sptr.id, message)))
 
@@ -6094,7 +6092,7 @@ class strpath(object):
 
                 # Now we'll update our state for error messages, and then transition to the next
                 # item while adjusting our offset so that way it points to the next member.
-                count, position = count + 1, position + (0 if sptr.props & SF_UNION else mptr.soff) + index * msize
+                count, position = count + 1, position + (0 if internal.structure.union(sptr) else mptr.soff) + index * msize
                 sptr, offset = idaapi.get_sptr(mptr), bytes
                 sid = sptr.id
 
@@ -6108,12 +6106,12 @@ class strpath(object):
             # Before we go, send the user off with a friendly message to thank them for their business.
             if mptr is None:
                 left, right = 0, idaapi.get_struc_size(sptr)
-                description = ' '.join(["{:s} ({:#x})".format('union' if sptr.props & SF_UNION else 'structure', sptr.id), "{:#x}..{:+#x}".format(left, right)])
+                description = ' '.join(["{:s} ({:#x})".format('union' if internal.structure.union(sptr) else 'structure', sptr.id), "{:#x}..{:+#x}".format(left, right)])
             else:
-                left, right = 0 if sptr.props & SF_UNION else mptr.soff, mptr.eoff
+                left, right = 0 if internal.structure.union(sptr) else mptr.soff, mptr.eoff
                 description = ' '.join(["field ({:#x})".format(mptr.id), "{:#x}..{:s}".format(left, "{:+#x}({:+#x})".format(right, idaapi.get_struc_size(sptr)) if mptr.soff == mptr.eoff else "{:+#x}".format(right))])
 
-            count, position = count + 1, position + (0 if sptr.props & SF_UNION else mptr.soff if mptr else 0)
+            count, position = count + 1, position + (0 if internal.structure.union(sptr) else mptr.soff if mptr else 0)
 
         # Now we need to figure the last item to collect to resolve the type.
         else:
@@ -6195,7 +6193,7 @@ class strpath(object):
             # don't care about validating this path because someone else should've.
             else:
                 sptr, mptr, offset = item
-                delta = sum([delta, 0 if sptr.props & SF_UNION else 0 if mptr is None else idaapi.get_struc_size(mptr) if mptr.id == sptr.id else mptr.soff, offset])
+                delta = sum([delta, 0 if internal.structure.union(sptr) else 0 if mptr is None else idaapi.get_struc_size(mptr) if mptr.id == sptr.id else mptr.soff, offset])
                 Fcollect((sptr, mptr, offset))
 
                 # If our path has actually stopped at a field, then we can just break out
@@ -6416,7 +6414,7 @@ class strpath(object):
 
         members = []
         for ti, sptr, mid in iterable:
-            if hasattr(sptr, 'props') and sptr.props & SF_UNION:
+            if hasattr(sptr, 'props') and internal.structure.union(sptr):
                 members.append(mid)
             elif ti and ti.is_union():
                 members.append(mid)
@@ -6728,7 +6726,7 @@ class strpath(object):
 
         # If the structure is a union, then our slice doesn't need to be
         # contiguous. So we can simply include the index and return it.
-        if sptr.props & idaapi.SF_UNION:
+        if internal.structure.union(sptr):
             results = [members[index] for index in indices]
             sizes = [idaapi.get_member_size(mptr) for mptr in results]
             return min(sizes), max(sizes), [(mptr.soff, mptr) for mptr in results]
@@ -7085,7 +7083,7 @@ class contiguous(object):
         if isinstance(item, type_has_offset):
             return True
         elif hasattr(idaapi, 'struc_t') and isinstance(item, idaapi.struc_t):
-            return True if item.props & idaapi.SF_FRAME else False
+            return True if internal.structure.frame(item) else False
         elif hasattr(idaapi, 'member_t') and isinstance(item, idaapi.member_t):
             return False if item.flag & getattr(idaapi, 'MF_UNIMEM', 2) else True
         return False
@@ -7119,8 +7117,8 @@ class contiguous(object):
         # is part of a frame. if it is, then we calculate its actual offset.
         elif hasattr(idaapi, 'struc_t') and isinstance(item, (idaapi.struc_t, idaapi.member_t)):
             mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id) if isinstance(item, idaapi.member_t) else (item, 0, None)
-            fn, moffset = function.by_frame(mowner), 0 if not mptr or mowner.props & idaapi.SF_UNION else mptr.soff
-            offset = function.frame_offset(fn, moffset) if mowner.props & idaapi.SF_FRAME and fn else moffset
+            fn, moffset = function.by_frame(mowner), 0 if not mptr or internal.structure.union(mowner) else mptr.soff
+            offset = function.frame_offset(fn, moffset) if internal.structure.frame(mowner) and fn else moffset
 
         else:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.start({:s}) : Unable to determine the offset for the first item ({!r}) due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), item, item.__class__))
@@ -7159,7 +7157,7 @@ class contiguous(object):
         elif hasattr(idaapi, 'struc_t') and isinstance(item, (idaapi.struc_t, idaapi.member_t)):
             mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id) if isinstance(item, idaapi.member_t) else (item, 0, None)
             fn, moffset = function.by_frame(mowner), mptr.eoff if mptr else idaapi.get_struc_size(item)
-            offset = function.frame_offset(fn, moffset) if mowner.props & idaapi.SF_FRAME and fn else moffset
+            offset = function.frame_offset(fn, moffset) if internal.structure.frame(mowner) and fn else moffset
 
         else:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.stop({:s}) : Unable to determine the offset for the last item ({!r}) due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), item, item.__class__))
@@ -8830,9 +8828,9 @@ class tinfo(object):
             serialized = cls.get_numbered_type(til, ordinal) if ordinal else ti.serialize()
             return cls.get(til, *serialized)
 
-        elif hasattr(idaapi, 'struc_t') and isinstance(identifier, internal.types.structuretypes):
-            sptr = identifier if isinstance(identifier, idaapi.struc_t) else idaapi.get_struc(identifier.id)
-            stype = address.typeinfo(sptr.id)
+        elif isinstance(identifier, internal.types.structuretypes):
+            sid = tinfo.identifier(identifier)
+            stype = address.typeinfo(sid)
             ordinal = cls.ordinal(stype)
             serialized = cls.get_numbered_type(til, ordinal) if ordinal else stype.serialize()
             return cls.get(til, *serialized)
@@ -8874,7 +8872,7 @@ class tinfo(object):
 
         # if we didn't get a struc_t, then this is a member that we need to unpack.
         # after we unpack the member and get its typeinfo, then we can get the ordinal.
-        elif sptr and not isinstance(sptr, idaapi.struc_t):
+        elif sptr and isinstance(sptr, internal.types.tuple):
             mptr, mname, mowner = sptr
             mtype = internal.structure.member.get_typeinfo(mptr)
             type_t, ordinal, fullname = mtype.get_decltype(), cls.ordinal(mtype, *library), internal.utils.string.of(mname)
@@ -12172,7 +12170,7 @@ class function(object):
 
         caller = caller.get('caller', [cls.__name__, 'by'])
         name = internal.utils.string.of(idaapi.get_struc_name(sid) or internal.netnode.name.get(sid))
-        is_frame = True if owner.props & SF_FRAME else False
+        is_frame = True if internal.structure.frame(owner) else False
         raise internal.exceptions.FunctionNotFoundError(u"{:s}({:#x}) : Unable to locate a function using the specified structure \"{!s}\" ({:#x}){!s}.".format('.'.join(caller) if isinstance(caller, internal.types.list) else caller, sid, internal.utils.string.escape(name, '"'), sid, '' if is_frame else ' that is not a frame'))
 
     @classmethod
@@ -12742,7 +12740,7 @@ def addressOfRuntimeOrStatic(func):
     `runtime` is a boolean returning true if the symbol is linked
     during runtime and `address` is the address of the entrypoint.
     """
-    fn = function.by_address(int(func)) if isinstance(func, internal.types.integer) or hasattr(func, '__int__') else function.by_name(func) if isinstance(func, internal.types.string) else function.by_frame(func) if isinstance(func, idaapi.struc_t) else func if isinstance(func, idaapi.func_t) else function.by(func)
+    fn = function.by_address(int(func)) if isinstance(func, internal.types.integer) or hasattr(func, '__int__') else function.by_name(func) if isinstance(func, internal.types.string) else function.by_frame(func) if isinstance(func, (idaapi.tinfo_t, internal.structure.structuretypes)) else func if isinstance(func, idaapi.func_t) else function.by(func)
 
     # If we were able to get the function, then we need to check if it was because
     # the function is external. We extract its address and make sure it exists.
@@ -13686,7 +13684,7 @@ class decode(object):
                 raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.union_bytes({:#x}, ...) : The type for the requested identifier ({:#x}) is not a {!s}.".format('.'.join([__name__, cls.__name__]), sid, sid, 'union'))
             ti = ti
 
-        elif not (ti.props & SF_UNION):
+        elif not internal.structure.union(ti):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.union_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) is not a `{:s}`.".format('.'.join([__name__, cls.__name__]), sid, internal.utils.pycompat.fullname(ti.__class__), sid, 'SF_UNION'))
 
         # Iterate through each union member and use their size to stash the
@@ -13747,7 +13745,7 @@ class decode(object):
                 raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fragment_bytes({:#x}, ...) : The type for the requested identifier ({:#x}) is a {!s}.".format('.'.join([__name__, cls.__name__]), sid, sid, 'union'))
             ti = ti
 
-        elif ti.props & SF_UNION:
+        elif internal.structure.union(ti):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fragment_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) is a `{:s}`.".format('.'.join([__name__, cls.__name__]), sid, internal.utils.pycompat.fullname(ti.__class__), sid, 'SF_UNION'))
 
         # Now we iterate through each member using the member size to consume
@@ -13791,7 +13789,7 @@ class decode(object):
                 mname = internal.structure.member.get_name(mptr)
                 msize = internal.structure.member.size(mptr)
                 mid = mptr.id
-                left, right = 0 if sptr.props & SF_UNION else mptr.soff, mptr.eoff
+                left, right = 0 if internal.structure.union(sptr) else mptr.soff, mptr.eoff
 
                 # First check our offset against the member boundaries in case there's an undefined
                 # field that contains unused data. If so, use the current offset as its key.
@@ -13837,8 +13835,7 @@ class decode(object):
         sptr = idaapi.get_struc(sid)
         if not sptr:
             raise internal.exceptions.StructureNotFoundError(u"{:s}.structure_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) was not found.".format('.'.join([__name__, cls.__name__]), sid, internal.utils.pycompat.fullname(sptr.__class__), sid))
-        SF_VAR, SF_UNION = getattr(idaapi, 'SF_VAR', 0x1), getattr(idaapi, 'SF_UNION', 0x2)
-        return cls.union_bytes(sptr, bytes) if sptr.props & SF_UNION else cls.fragment_bytes(sptr, bytes)
+        return cls.union_bytes(sptr, bytes) if internal.structure.union(sptr) else cls.fragment_bytes(sptr, bytes)
 
     @classmethod
     def typeinfo_bytes(cls, type, bytes):
