@@ -5733,7 +5733,13 @@ class strpath(object):
     @classmethod
     def fullname(cls, path, sep='.'):
         '''Return the given structure path as an easily-read string.'''
-        result, udm_t = [], idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+
+        # Unpack each member of the specified path. Despite the naming, if we're
+        # using the v9 version then each member is `(tinfo_t, mindex, offset)`.
+        # If `sptr` isn't a `tinfo_t`, then we're using the older structure api.
+        result = []
         for sptr, mptr, offset in path:
             if isinstance(sptr, (idaapi.tinfo_t, internal.types.integer)) and isinstance(mptr, internal.types.integer):
                 sid, mid, offset = sptr, mptr, offset
@@ -5784,10 +5790,11 @@ class strpath(object):
                 result.append(item)
                 continue
 
-            # otherwise, we can just figure it out using structure/members.
+            # otherwise, we can just figure it out using the older api which
+            # uses `idaapi.struc_t` and `idaapi.member_t`.
             elif mptr:
                 _, fullname, owner = idaapi.get_member_by_id(mptr.id)
-                name, msize, size = idaapi.get_member_name(mptr.id), idaapi.get_data_elsize(mptr.id, mptr.flag), idaapi.get_member_size(mptr)
+                name, msize, size = idaapi.get_member_name(mptr.id), get_data_elsize(mptr.id, mptr.flag), idaapi.get_member_size(mptr)
                 sname, oname = (idaapi.get_struc_name(ptr.id) for ptr in [sptr, owner])
                 arrayQ, hindex = msize != size, (size - 1) // msize
                 index, item = divmod(offset, msize) if arrayQ else (0, offset)
@@ -5806,6 +5813,7 @@ class strpath(object):
         MF_UNIMEM = getattr(idaapi, 'MF_UNIMEM', 0x2)
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
 
+        # If our `sptr` is an `idaapi.tinfo_t`, then we're using the v9 api.
         if isinstance(sptr, (idaapi.tinfo_t, internal.types.integer)) and isinstance(mptr, (internal.types.integer, internal.types.none)):
             sid, mid, offset = sptr, idaapi.BADADDR if mptr is None else mptr, offset
             tinfo_description = '.'.join([idaapi.tinfo_t.__module__, idaapi.tinfo_t.__name__] if hasattr(idaapi.tinfo_t, '__module__') else [idaapi.tinfo_t.__name__])
@@ -5866,7 +5874,7 @@ class strpath(object):
             member = "member_t({:#x}, {:#x}, \"{:s}\")".format(idaapi.BADADDR, mptr, internal.utils.string.escape(mname, '"'))
             return ' '.join(['(ERROR)', member, 'has no owner'])
 
-        # otherwise we can figure everything out using the structure/member api.
+        # otherwise we'll figure things out using the old structure/member api.
         sptr_t, mptr_t = idaapi.struc_t if sptr is None else sptr.__class__, idaapi.member_t if mptr is None else mptr.__class__
         sptr_description = '.'.join([sptr_t.__module__, sptr_t.__name__] if hasattr(sptr_t, '__module__') else [sptr_t.__name__])
         mptr_description = '.'.join([mptr_t.__module__, mptr_t.__name__] if hasattr(mptr_t, '__module__') else [mptr_t.__name__])
@@ -6727,6 +6735,9 @@ class strpath(object):
     def members(cls, sptr, slice):
         '''Select the contiguous members of the structure `sptr` using the given `slice` and return a tuple containing the start offset, stop offset, and ordered list containing each ``idaapi.member_t`` or each size.'''
         is_variable, is_frame = (sptr.props & prop for prop in [idaapi.SF_VAR, idaapi.SF_FRAME])
+
+        # This function is using the old structure api. The implementation that
+        # follows this one, `strpath.v9members` is for the newer one.
         members = [sptr.get_member(index) for index in builtins.range(sptr.memqty)]
         size = idaapi.get_struc_size(sptr)
         slice = slice if isinstance(slice, builtins.slice) else builtins.slice(slice, 1 + slice or None)
@@ -6807,6 +6818,9 @@ class strpath(object):
     def v9members(cls, type, slice):
         '''Select the contiguous members of the structure `type` using the given `slice` and return a tuple containing the start offset, stop offset, and ordered list containing each member id or each size.'''
         ti = idaapi.tinfo_t()
+
+        # This function is for the newer v9 structure api, the previously
+        # defined one, `strpath.members`, is for the old structure api.
         if isinstance(type, idaapi.tinfo_t):
             ti, sid = tinfo.copy(type), tinfo.identifier(type)
         elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
