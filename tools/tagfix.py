@@ -618,9 +618,10 @@ def upgrade_structures_v1():
     '''Upgrade the structure tags to the tagindex (v1).'''
     oldcount = newcount = 0
     for sptr in internal.structure.iterate():
-        res = internal.tags.structure.get(sptr)
+        res = internal.tags.typeinfo.get(sptr) if isinstance(sptr, idaapi.tinfo_t) else internal.tags.structure.get(sptr)
+        sid = internal.interface.tinfo.identifier(sptr)
         oldcount += len(res)
-        newcount += len([internal.tagindex.structure.increment(sptr.id, name) for name in res])
+        newcount += len([internal.tagindex.structure.increment(sid, name) for name in res])
     return oldcount, newcount
 
 def upgrade_members_v1():
