@@ -7597,11 +7597,11 @@ class set(object):
         # Now we can use the size and type to the right function to apply the determined type.
         flags = lookup[size]
         return cls.data(ea, size, flags)
-    @utils.multicase(ea=internal.types.integer, size=internal.types.integer, type=(internal.types.integer, internal.structure.structure_t, idaapi.struc_t))
+    @utils.multicase(ea=internal.types.integer, size=internal.types.integer, type=(internal.types.integer, idaapi.tinfo_t, internal.structure.structuretypes))
     @classmethod
     def data(cls, ea, size, type):
         '''Set the data at address `ea` to have the specified `size` using the flags or structure given in `type`.'''
-        res = type if isinstance(type, (internal.types.integer, idaapi.struc_t)) else type.ptr
+        is_struct = internal.structure.has(type) or isinstance(type, (idaapi.tinfo_t, internal.structure.structuretypes))
 
         # Set some constants for anything older than IDA 7.0
         if idaapi.__version__ < 7.0:
@@ -7618,20 +7618,21 @@ class set(object):
             create_data, create_struct, create_align = idaapi.create_data, idaapi.create_struct, idaapi.create_align
 
         # Check if we're supposed to create a struct and if we can actually create one.
-        if create_struct and isinstance(res, idaapi.struc_t):
-            ok = create_struct(ea, size, res.id)
+        if create_struct and is_struct:
+            tid = type if interface.node.identifier(type) else interface.tinfo.identifier(type)
+            ok = create_struct(ea, size, tid)
 
         # Check if we're supposed to create alignment and if can actually create it.
-        elif res == idaapi.FF_ALIGN and create_align:
+        elif type == idaapi.FF_ALIGN and create_align:
             ok = create_align(ea, size, 0)
 
-        # Check if we need to use older IDA logic which uses ida_bytes.do_data_ex.
+        # Check if we need to use older IDA logic which uses ida_byinftes.do_data_ex.
         elif idaapi.__version__ < 7.0:
-            ok = create_data(ea, FF_STRUCT if isinstance(res, idaapi.struc_t) else res, size, res.id if isinstance(res, idaapi.struc_t) else idaapi.BADADDR)
+            ok = create_data(ea, FF_STRUCT if isinstance(type, internal.structure.structuretypes) else type, size, type.id if isinstance(type, internal.structure.structuretypes) else idaapi.BADADDR)
 
         # Anything else is just regular data that we can fall back to ida_bytes.create_data.
         else:
-            ok = idaapi.create_data(ea, res, size, idaapi.BADADDR)
+            ok = idaapi.create_data(ea, type, size, idaapi.BADADDR)
 
         # Return our new size if we were successful.
         return interface.address.size(ea) if ok else 0
