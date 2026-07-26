@@ -527,10 +527,10 @@ class xref(object):
 
             # If we're using a type, then this is a tuple containing the
             # information needed to select the specified type member.
-            # FIXME: return a structure `member_t` rather than its position.
             elif v9:
                 tinfo, utd, mindex, udm = reference_or_member
-                yield tinfo, mindex
+                owner = structure_t(tinfo, offset=offset) if offset else structure_t(tinfo)
+                yield owner if 0 <= mindex < utd.size() else owner.members[mindex]
 
             # Otherwise it is a tuple for a structure alias or a member, and we
             # need to use it to yield a structure_t or member_t with the index.
