@@ -971,13 +971,13 @@ class variables(object):
                 raise exceptions.InvalidTypeOrValueError(u"{:s}.address({!r}) : Unable to fetch a location from a member ({:#x}) that does not belong to a frame ({:#x}).".format('.'.join([__name__, cls.__name__]), locator, mptr.id, mowner.sid))
 
             # First we figure out what function this member is associated with.
-            ea, sid = idaapi.get_func_by_frame(mowner.id), mowner.id
-            if ea == idaapi.BADADDR:
+            fn, sid = interface.function.by_frame(mowner), interface.tinfo.identifier(mowner)
+            if not fn:
                 raise exceptions.InvalidTypeOrValueError(u"{:s}.address({!r}) : Unable to determine the address of the function that owns the specified frame ({:#x}).".format('.'.join([__name__, cls.__name__]), locator, sid))
 
             # Now we can grab its variables, and figure out what index
             # represents the `idaapi.member_t` that we have.
-            lvars = cls(ea if cfunc is None else cfunc)
+            lvars = cls(fn if cfunc is None else cfunc)
             index = lvars.find_stkvar(mptr.soff, internal.structure.member.size(mptr))
 
             # We now have an index we can use. If we don't, then we need to
