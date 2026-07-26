@@ -526,8 +526,10 @@ class xref(object):
                 yield reference
 
             # If we're using a type, then this is a tuple containing the
-            # information needed to select the specified type member.
-            elif v9:
+            # information needed to select the specified type member. However,
+            # if the tuple length is less than 4, then frames are still using
+            # the old structure api. So, we pass these through to the last case.
+            elif v9 and len(reference_or_member) == 4:
                 tinfo, utd, mindex, udm = reference_or_member
                 owner = structure_t(tinfo, offset=offset) if offset else structure_t(tinfo)
                 yield owner if 0 <= mindex < utd.size() else owner.members[mindex]
