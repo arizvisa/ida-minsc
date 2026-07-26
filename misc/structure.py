@@ -7773,7 +7773,7 @@ class member_t(object):
         # Figure out what type our owner is backed by and then choose the
         # correct namespace to fetch the tags and info for the current member.
         if isinstance(mowner.ptr, idaapi.tinfo_t):
-            mid, mfullname = mowner.ptr.get_udm_tid(mindex), v9member.fullname(mowner.ptr, mindex)
+            mid, mfullname = interface.tinfo.member_identifier(mowner.ptr, mindex), v9member.fullname(mowner.ptr, mindex)
             res = internal.tags.typeinfo_member.get(mowner.ptr, mindex)
         else:
             mid, mfullname = self.ptr.id, member.fullname(self.ptr)
@@ -7822,7 +7822,7 @@ class member_t(object):
         '''Return the identifier of the member.'''
         mowner, mindex = self.parent, self.index
         if isinstance(mowner.ptr, idaapi.tinfo_t):
-            return mowner.ptr.get_udm_tid(mindex)
+            return interface.tinfo.member_identifier(mowner.ptr, mindex)
         return self.ptr.id
     @property
     def properties(self):
@@ -7989,7 +7989,7 @@ class member_t(object):
 
         # Type safety is fucking valuable, and in python it's an after-thought.
         if not isinstance(string, (types.none, types.string)):
-            mid = mowner.ptr.get_udm_tid(mindex)
+            mid = interface.tinfo.member_identifier(mowner.ptr, mindex)
             raise E.InvalidParameterError(u"{:s}({:#x}).name({!r}) : Unable to assign an unsupported type ({!s}) as the name for the member.".format('.'.join([__name__, cls.__name__]), mid, string, string.__class__))
 
         # If our owner is backed by an `idaapi.tinfo_t`, then we can go ahead
@@ -8040,7 +8040,7 @@ class member_t(object):
         # api, but ensure that we use the flags that allow it to destroy other members.
         info = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
         if info is None:
-            mid = mowner.ptr.get_udm_tid(mindex)
+            mid = interface.tinfo.member_identifier(mowner.ptr, mindex)
             mfullname = v9member.fullname(mowner.ptr, mindex) if isinstance(mowner.ptr, idaapi.tinfo_t) else member.fullname(self.ptr)
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}).type({!s}) : Unable to parse the specified type declaration ({!s}) for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr("{!s}".format(type)), utils.string.escape("{!s}".format(mfullname), '"')))
 
@@ -8066,7 +8066,7 @@ class member_t(object):
         # Type safety is fucking valuable, and we are contractually obligated
         # to deliver an exception for anything that doesn't match our needs.
         if not isinstance(info, (idaapi.tinfo_t, types.none, types.string)):
-            mid = mowner.ptr.get_udm_tid(mindex) if isinstance(mowner.ptr, idaapi.tinfo_t) else self.ptr.id
+            mid = interface.tinfo.member_identifier(mowner.ptr, mindex) if isinstance(mowner.ptr, idaapi.tinfo_t) else self.ptr.id
             raise E.InvalidParameterError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), mid, info if info is None else utils.string.repr(info), info.__class__))
 
         # If we're being asked to assign None to the type information, then we
@@ -8094,7 +8094,7 @@ class member_t(object):
     def __hash__(self):
         mowner, mindex = self.parent, self.index
         if isinstance(mowner.ptr, idaapi.tinfo_t):
-            return mowner.ptr.get_udm_tid(mindex)
+            return interface.tinfo.member_identifier(mowner.ptr, mindex)
         return self.ptr.id
     def __ne__(self, other):
         return not self.__eq__(other)
