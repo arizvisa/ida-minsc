@@ -856,25 +856,68 @@ def up(name, *suffix):
     '''Return the structure members or references that use the structure with the specified `name`.'''
     string = name if isinstance(name, types.ordered) else (name,)
     res = interface.tuplename(*tuple(itertools.chain(string, suffix)))
-    sid = idaapi.get_struc_id(utils.string.to(res))
-    if sid == idaapi.BADADDR:
-        raise E.StructureNotFoundError(u"{:s}.up({:s}) : Unable to find a structure using the name \"{:s}\".".format(__name__, ', '.join(map("{!r}".format, itertools.chain(name if isinstance(name, types.ordered) else [name], suffix))), utils.string.escape(res, '"')))
-    sptr = idaapi.get_struc(sid)
+
+    # If we don't have the `struc_t` available, then we're using the new
+    # structure api which is based on `idaapi.tinfo_t`. So, we start by getting
+    # the type and then verifying that it actually is a structure.
+    if not hasattr(idaapi, 'struc_t'):
+        ti = interface.tinfo.for_name(res)
+        if not ti:
+            raise E.StructureNotFoundError(u"{:s}.up({:s}) : Unable to find a structure using the specified name \"{:s}\".".format(__name__, ', '.join(map("{!r}".format, itertools.chain(name if isinstance(name, types.ordered) else [name], suffix))), utils.string.escape(res, '"')))
+        elif not ti.is_udt():
+            raise E.InvalidTypeOrValueError(u"{:s}.up({:s}) : The type returned for the specified name \"{:s}\" is not a structure or a union.".format(__name__, ', '.join(map("{!r}".format, itertools.chain(name if isinstance(name, types.ordered) else [name], suffix))), utils.string.escape(res, '"')))
+
+        # Just pass this through to `xref.structure` which supports both.
+        sptr = ti
+
+    # Otherwise, we need to use the older structure api which requires us to use
+    # the name to get an identifier that we can check the references of.
+    else:
+        sid = idaapi.get_struc_id(utils.string.to(res))
+        if sid == idaapi.BADADDR:
+            raise E.StructureNotFoundError(u"{:s}.up({:s}) : Unable to find a structure using the name \"{:s}\".".format(__name__, ', '.join(map("{!r}".format, itertools.chain(name if isinstance(name, types.ordered) else [name], suffix))), utils.string.escape(res, '"')))
+        sptr = idaapi.get_struc(sid)
     return [reference_or_member for reference_or_member in internal.structure.xref.structure(sptr)]
 @utils.multicase(id=types.integer)
 def up(id):
     '''Return the structure members or references that use the structure with the specified `index` or `id`.'''
-    sid = id if interface.node.identifier(id) else idaapi.get_struc_by_idx(id)
+    if interface.node.identifier(id):
+        sid = id
+
+    # If we weren't given an identifier, then we were given an index which
+    # depends on whether we're using the old or new structure api.
+    elif hasattr(idaapi, 'get_struc_by_idx'):
+        sid = idaapi.get_struc_by_idx(id)
+    elif interface.tinfo.has_ordinal(id):
+        ti = interface.tinfo.for_ordinal(id)
+        sid = interface.tinfo.identifier(ti)
+    else:
+        sid = idaapi.BADADDR
+
+    # If we error'd out, then figure out what we were given to throw an error.
+    if sid == idaapi.BADADDR:
+        if interface.node.identifier(id):
+            raise E.StructureNotFoundError(u"{:s}.up({:#x}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
+        raise E.StructureNotFoundError(u"{:s}.up({:d}) : Unable to find a structure at the specified index ({:d}).".format(__name__, id, id))
+
+    # If we can't use the old structure api, then we need to grab the type and
+    # then return the references to it using the regular `xref.structure` api.
+    if not hasattr(idaapi, 'struc_t'):
+        ordinal = interface.tinfo.by_identifier(id)
+        ti = interface.tinfo.for_ordinal(ordinal)
+        return [reference_or_member for reference_or_member in internal.structure.xref.structure(ti)]
+
+    # Otherwise, we can just go and use the old structure api.
     sptr = idaapi.get_struc(sid)
     if not sptr:
         if interface.node.identifier(sid):
             raise E.StructureNotFoundError(u"{:s}.up({:#x}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
         raise E.StructureNotFoundError(u"{:s}.up({:d}) : Unable to find a structure at the specified index ({:d}).".format(__name__, id, id))
     return [reference_or_member for reference_or_member in internal.structure.xref.structure(sptr)]
-@utils.multicase(structure=internal.structure.structuretypes)
+@utils.multicase(structure=(idaapi.tinfo_t, internal.structure.structuretypes))
 def up(structure):
     '''Return the structure members or references that use the given `structure`.'''
-    sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
+    sptr = structure if isinstance(structure, idaapi.tinfo_t) else getattr(structure, 'ptr', structure)
     return [reference_or_member for reference_or_member in internal.structure.xref.structure(sptr)]
 
 @utils.multicase(name=types.string)
