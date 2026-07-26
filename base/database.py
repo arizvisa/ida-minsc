@@ -2826,18 +2826,20 @@ class address(object):
         else:
             offset = 0
         return interface.bounds_t(offset, offset + size)
-    @utils.multicase(member=(idaapi.member_t, internal.structure.member_t))
+    @utils.multicase(member=internal.structure.membertypes)
     @classmethod
     def bounds(cls, member):
         '''Return the bounds of the specified `member` as a tuple formatted as `(left, right)`.'''
-        mptr = member.ptr if isinstance(member, internal.structure.member_t) else member
-        _, fullname, sptr = idaapi.get_member_by_id(mptr.id)
-        size = internal.structure.member.size(mptr)
-        base = member.parent.offset if member is not mptr else interface.function.frame_offset(interface.function.by_frame(sptr)) if internal.structure.frame(sptr) else 0
-        if member is not mptr:
+        if isinstance(member, internal.structure.member_t) and isinstance(member.parent.ptr, idaapi.tinfo_t):
+            owner = member.parent.ptr
+            size = internal.structure.v9member.size(owner, member.index) // 8
             offset = member.offset
         else:
-            offset = base + mptr.soff
+            mptr = member.ptr if isinstance(member, internal.structure.member_t) else member
+            _, fullname, sptr = idaapi.get_member_by_id(mptr.id)
+            base = member.parent.offset if member is not mptr else interface.function.frame_offset(interface.function.by_frame(sptr)) if internal.structure.frame(sptr) else 0
+            offset = 0 if internal.structure.union(sptr) else base + mptr.soff if member is mptr else member.offset
+            size = internal.structure.member.size(mptr)
         return interface.bounds_t(offset, offset + size)
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
