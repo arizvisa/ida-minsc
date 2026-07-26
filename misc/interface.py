@@ -12452,11 +12452,19 @@ class function(object):
     def frame(cls, func, *offset):
         '''Return the frame belonging to the function `func`.'''
         fn = func if isinstance(func, idaapi.func_t) else cls.by(func)
+        ti, ea, base = idaapi.tinfo_t(), range.start(fn), next(itertools.chain(offset, [0]))
+
+        # If we can use the type to get the frame, then use that.
+        if hasattr(ti, 'get_func_frame'):
+            if not ti.get_func_frame(fn):
+                raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.frame({:#x}) : The specified function ({:#x}) does not have a frame.".format('.'.join([__name__, cls.__name__]), ea, ea))
+            return internal.structure.new(ti, cls.frame_offset(fn) + base)
+
+        # Otherwise we use the methodology for older versions.
         sptr = idaapi.get_frame(fn)
         if fn.frame == idaapi.BADNODE or not sptr:
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.frame({:#x}) : The specified function does not have a frame.".format('.'.join([__name__, cls.__name__]), range.start(fn)))
-        base = itertools.chain(offset, [0])
-        return internal.structure.new(sptr.id, cls.frame_offset(fn) + next(base))
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.frame({:#x}) : The specified function ({:#x}) does not have a frame.".format('.'.join([__name__, cls.__name__]), ea, ea))
+        return internal.structure.new(sptr.id, cls.frame_offset(fn) + base)
 
     @classmethod
     def name(cls, func):
