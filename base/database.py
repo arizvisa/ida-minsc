@@ -2812,12 +2812,12 @@ class address(object):
         '''Return the bounds of the specified `location` as a tuple formatted as `(left, right)`.'''
         ea, size = location
         return interface.bounds_t(ea, ea + size)
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t))
+    @utils.multicase(structure=internal.structure.structuretypes)
     @classmethod
     def bounds(cls, structure):
         '''Return the bounds of the specified `structure` as a tuple formatted as `(left, right)`.'''
         sptr = structure.ptr if isinstance(structure, internal.structure.structure_t) else structure
-        size = idaapi.get_struc_size(sptr)
+        size = interface.tinfo.size(sptr) if isinstance(sptr, idaapi.tinfo_t) else idaapi.get_struc_size(sptr)
         if structure is not sptr:
             offset = structure.offset
         elif internal.structure.frame(sptr):
@@ -5882,22 +5882,32 @@ class types(object):
         if not info:
             raise E.ItemNotFoundError(u"{:s}.by({!r}, {:s}) : No type was found with the name \"{:s}\" in the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), utils.string.escape(name, '"')))
         return info
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t))
+    @utils.multicase(structure=(internal.structure.structuretypes, internal.structure.membertypes))
     @classmethod
     def by(cls, structure):
         '''Return the type for the given `structure` from the current type library.'''
         ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
-        identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
+        if isinstance(ptr, idaapi.tinfo_t):
+            return ptr
+        elif isinstance(structure, internal.structure.member_t) and isinstance(structure.owner.ptr, idaapi.tinfo_t):
+            return structure.owner.ptr
+        else:
+            identifier = interface.tinfo.identifier(structure)
         info = interface.tinfo.for_identifier(identifier)
         if not info:
             raise E.ItemNotFoundError(u"{:s}.by({!s}, {:s}) : No type was found with the given identifier ({:#x}) in the current type library.".format('.'.join([__name__, cls.__name__]), structure, identifier))
         return info
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), library=idaapi.til_t)
+    @utils.multicase(structure=(internal.structure.structuretypes, internal.structure.membertypes), library=idaapi.til_t)
     @classmethod
     def by(cls, structure, library):
         '''Return the type for the given `structure` from the specified type `library`.'''
         ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
-        identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
+        if isinstance(ptr, idaapi.tinfo_t):
+            return ptr
+        elif isinstance(structure, internal.structure.member_t) and isinstance(structure.owner.ptr, idaapi.tinfo_t):
+            return structure.owner.ptr
+        else:
+            identifier = interface.tinfo.identifier(structure)
         info = interface.tinfo.for_identifier(identifier, library)
         if not info:
             raise E.ItemNotFoundError(u"{:s}.by({!s}, {:s}) : No type was found with the given identifier ({:#x}) in the specified type library.".format('.'.join([__name__, cls.__name__]), structure, interface.tinfo.format_library(library), identifier))
@@ -5967,19 +5977,17 @@ class types(object):
     def has(cls, name, library):
         '''Return whether a type `library` has a type with the specified `name`.'''
         return interface.tinfo.has_name(name, library)
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t))
+    @utils.multicase(structure=(internal.structure.structuretypes, internal.structure.membertypes))
     @classmethod
     def has(cls, structure):
         '''Return whether the current type library has a type for the specified `structure`.'''
-        ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
-        identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
+        identifier = interface.tinfo.identifier(structure)
         return interface.tinfo.has_struc_enum(identifier)
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), library=idaapi.til_t)
+    @utils.multicase(structure=(internal.structure.structuretypes, internal.structure.membertypes), library=idaapi.til_t)
     @classmethod
     def has(cls, structure, library):
         '''Return whether a type `library` has a type for the specified `structure`.'''
-        ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
-        identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
+        identifier = interface.tinfo.identifier(structure)
         return interface.tinfo.has_struc_enum(identifier, library)
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
@@ -6134,22 +6142,30 @@ class types(object):
         if not ordinal:
             raise E.ItemNotFoundError(u"{:s}.ordinal({!r}, {:s}) : Unable to find a type with the name \"{:s}\" in the specifed type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), utils.string.escape(name, '"')))
         return ordinal
-    @utils.multicase(structure=(internal.types.integer, idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t))
+    @utils.multicase(structure=(internal.types.integer, internal.structure.structuretypes, internal.structure.membertypes))
     @classmethod
     def ordinal(cls, structure):
         '''Return the ordinal number for the given `structure` from the current type library.'''
-        ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
-        identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
+        if interface.node.identifier(structure):
+            identifier = structure
+        elif not isinstance(structure, internal.types.integer):
+            identifier = interface.tinfo.identifier(structure)
+        else:
+            raise E.ItemNotFoundError(u"{:s}.ordinal({!s}) : Unable to find the ordinal n the current type library for the specified invalid identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), structure, structure))
         ordinal = interface.tinfo.by_identifier(identifier)
         if not ordinal:
             raise E.ItemNotFoundError(u"{:s}.ordinal({!s}) : Unable to find the ordinal ({:d}) for identifier {:#x} in the current type library.".format('.'.join([__name__, cls.__name__]), structure, ordinal, identifier))
         return ordinal
-    @utils.multicase(structure=(internal.types.integer, idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), library=idaapi.til_t)
+    @utils.multicase(structure=(internal.types.integer, internal.structure.structuretypes, internal.structure.membertypes), library=idaapi.til_t)
     @classmethod
     def ordinal(cls, structure, library):
         '''Return the ordinal number for the given `structure` from the specified type `library`.'''
-        ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
-        identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
+        if interface.node.identifier(structure):
+            identifier = structure
+        elif not isinstance(structure, internal.types.integer):
+            identifier = interface.tinfo.identifier(structure)
+        else:
+            raise E.ItemNotFoundError(u"{:s}.ordinal({!s}, {:s}) : Unable to find the ordinal n the current type library for the specified invalid identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), structure, interface.tinfo.format_library(library), structure))
         ordinal = interface.tinfo.by_identifier(identifier, library)
         if not ordinal:
             raise E.ItemNotFoundError(u"{:s}.ordinal({!s}, {:s}) : Unable to find the ordinal ({:d}) for identifier {:#x} in the specified type library.".format('.'.join([__name__, cls.__name__]), structure, interface.tinfo.format_library(library), ordinal, identifier))
@@ -6211,12 +6227,11 @@ class types(object):
         if not info:
             raise E.ItemNotFoundError(u"{:s}.get({!r}, {:s}{:s}) : Unable to find a type with the name \"{:s}\" in the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), ", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.string.escape(name, '"')))
         return info
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t))
+    @utils.multicase(structure=(internal.structure.structuretypes, internal.structure.membertypes))
     @classmethod
     def get(cls, structure):
         '''Get the type for the given `structure` from the current type library and return it.'''
-        ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
-        identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
+        identifier = interface.tinfo.identifier(structure)
         ordinal = interface.tinfo.by_identifier(identifier)
         if not ordinal:
             raise E.ItemNotFoundError(u"{:s}.get({!s}) : Unable to find the ordinal ({:d}) for identifier {:#x} in the current type library.".format('.'.join([__name__, cls.__name__]), structure, ordinal, identifier))
@@ -6224,12 +6239,11 @@ class types(object):
         if not info:
             raise E.ItemNotFoundError(u"{:s}.get({!s}) : Unable to return the type at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), structure, ordinal))
         return info
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), library=idaapi.til_t)
+    @utils.multicase(structure=(internal.structure.structuretypes, internal.structure.membertypes), library=idaapi.til_t)
     @classmethod
     def get(cls, structure, library):
         '''Get the type for the given `structure` from a type `library` and return it.'''
-        ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
-        identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
+        identifier = interface.tinfo.identifier(structure)
         ordinal = interface.tinfo.by_identifier(identifier, library)
         if not ordinal:
             raise E.ItemNotFoundError(u"{:s}.get({!s}, {:s}) : Unable to find the ordinal ({:d}) for identifier {:#x} in the specified type library.".format('.'.join([__name__, cls.__name__]), structure, interface.tinfo.format_library(library), ordinal, identifier))
@@ -6571,7 +6585,7 @@ class types(object):
         if not res:
             raise E.ItemNotFoundError(u"{:s}.size({!r}) : No type was found with the name \"{:s}\" in the current type library.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
         return res.get_size()
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t))
+    @utils.multicase(structure=(internal.structure.structuretypes, internal.structure.membertypes))
     @classmethod
     def size(cls, structure):
         '''Return the size of the type for the given `structure` or member.'''
@@ -6600,12 +6614,12 @@ class types(object):
             raise E.DisassemblerError(u"{:s}.dereference(\"{:s}\") : Unable to get the pointer type data from the given type ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
         return interface.tinfo.concretize(pi.obj_type)
 
-    @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t, internal.types.string))
+    @utils.multicase(type=(idaapi.tinfo_t, internal.structure.structuretypes, internal.structure.membertypes, internal.types.string))
     @classmethod
     def pointer(cls, type):
         '''Return a pointer that references the specified `type`.'''
         return cls.pointer(type, 0, 0)
-    @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t, internal.types.string), size=internal.types.integer)
+    @utils.multicase(type=(idaapi.tinfo_t, internal.structure.structuretypes, internal.structure.membertypes, internal.types.string), size=internal.types.integer)
     @classmethod
     def pointer(cls, type, size):
         '''Return a pointer of `size` bytes that references the specified `type`.'''
@@ -6615,12 +6629,20 @@ class types(object):
     def pointer(cls, target, attributes, **fields):
         '''Return a pointer that references the specified `target` type and includes any extended attributes.'''
         return cls.pointer(target, 0, attributes, **fields)
-    @utils.multicase(structure=(internal.types.integer, idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), size=internal.types.integer, attributes=(internal.types.integer, internal.types.string, internal.types.unordered))
+    @utils.multicase(structure=(internal.types.integer, internal.structure.structuretypes, internal.structure.membertypes), size=internal.types.integer, attributes=(internal.types.integer, internal.types.string, internal.types.unordered))
     @classmethod
     def pointer(cls, structure, size, attributes, **fields):
         '''Return a pointer of `size` bytes that references the specified `structure` and includes any extended `attributes`.'''
-        ptr = structure if isinstance(structure, (idaapi.struc_t, idaapi.member_t)) else structure.ptr
-        ti = interface.address.typeinfo(ptr.id) if isinstance(ptr, idaapi.struc_t) else internal.structure.member.get_typeinfo(ptr)
+        if interface.node.identifier(structure):
+            ti = interface.address.typeinfo(structure)
+        elif isinstance(structure, internal.structure.structuretypes):
+            sptr = getattr(structure, 'ptr', structure)
+            if isinstance(sptr, idaapi.tinfo_t):
+                return cls.pointer(sptr, size, attributes, **fields)
+            ti = interface.address.typeinfo(sptr.id)
+        else:
+            owner, mptr = structure.parent, structure
+            ti = internal.structure.v9member.get_typeinfo(owner.ptr, mptr.index) if isinstance(owner.ptr, idaapi.tinfo_t) else internal.structure.member.get_typeinfo(mptr)
         return cls.pointer(ti, size, attributes, **fields)
     @utils.multicase(string=internal.types.string, size=internal.types.integer, attributes=(internal.types.integer, internal.types.string, internal.types.unordered))
     @classmethod
@@ -6694,16 +6716,17 @@ class types(object):
     def array(cls, info):
         '''Return a tuple containing the element type and length of the array specified by `info`.'''
         return interface.tinfo.array(info)
-    @utils.multicase(element=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, internal.types.string), length=internal.types.integer)
+    @utils.multicase(element=(idaapi.tinfo_t, internal.structure.structuretypes, internal.types.string), length=internal.types.integer)
     @classmethod
     def array(cls, element, length):
         '''Return an array composed of the given `element` and `length`.'''
         return cls.array(element, length, 0)
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t), length=internal.types.integer, base=internal.types.integer)
+    @utils.multicase(structure=internal.structure.structuretypes, length=internal.types.integer, base=internal.types.integer)
     @classmethod
     def array(cls, structure, length, base):
         '''Return an array composed of the given `structure` and `length` with a specified `base`.'''
-        ti = interface.address.typeinfo(structure.id)
+        ptr = getattr(structure, 'ptr', structure)
+        ti = ptr if isinstance(ptr, idaapi.tinfo_t) else interface.address.typeinfo(ptr.id)
         return cls.array(ti, length, base)
     @utils.multicase(string=internal.types.string, length=internal.types.integer, base=internal.types.integer)
     @classmethod
@@ -8238,7 +8261,7 @@ class set(object):
             return get.float.double(ea)
     f = float   # XXX: ns alias
 
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t))
+    @utils.multicase(structure=internal.structure.structuretypes)
     @classmethod
     def structure(cls, structure):
         '''Set the data at the current address to the specified `structure`.'''
@@ -8249,18 +8272,23 @@ class set(object):
     def structure(cls, name, *suffix):
         '''Set the data at the current address to the structure with the given `name`.'''
         return cls.structure(ui.current.address(), name, *suffix)
-    @utils.multicase(ea=internal.types.integer, structure=(idaapi.struc_t, internal.structure.structure_t))
+    @utils.multicase(ea=internal.types.integer, structure=internal.structure.structuretypes)
     @classmethod
     def structure(cls, ea, structure):
         '''Set the data at address `ea` to the specified `structure`.'''
-        sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
+        sptr = getattr(structure, 'ptr', structure)
+        if isinstance(sptr, idaapi.tinfo_t):
+            return cls.structure(ea, sptr, interface.tinfo.size(sptr))
         return cls.structure(ea, sptr, idaapi.get_struc_size(sptr))
-    @utils.multicase(ea=internal.types.integer, structure=(idaapi.struc_t, internal.structure.structure_t), size=internal.types.integer)
+    @utils.multicase(ea=internal.types.integer, structure=(internal.structure.structuretypes, idaapi.tinfo_t), size=internal.types.integer)
     @classmethod
     def structure(cls, ea, structure, size):
         '''Set the data at address `ea` to the specified `structure` of `size` bytes.'''
-        sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
-        result = cls.data(ea, size, type=sptr)
+        sptr = getattr(structure, 'ptr', structure)
+        if isinstance(sptr, idaapi.tinfo_t):
+            result = cls.data(ea, size, type=interface.tinfo.identifier(sptr))
+        else:
+            result = cls.data(ea, size, type=sptr)
         if not result:
             raise E.DisassemblerError(u"{:s}.structure({:#x}, {:#x}, {:+d}) : Unable to apply the given structure ({:#x}) with size ({:+d}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, sptr.id, size, sptr.id, size, ea))
         return get.structure(ea, sptr, result)
@@ -9317,20 +9345,22 @@ class get(object):
         '''Return the decoded fields of the structure at address `ea` as a dictionary.'''
         sid = type.structure.id(interface.address.head(ea))
         return cls.structure(ea, sid, **byteorder)
-    @utils.multicase(ea=internal.types.integer, structure=(internal.structure.structure_t, idaapi.tinfo_t, internal.types.string, internal.types.integer))
+    @utils.multicase(ea=internal.types.integer, structure=(idaapi.tinfo_t, internal.types.string, internal.types.integer))
     @classmethod
     def structure(cls, ea, structure, **byteorder):
         '''Return the decoded fields of the given `structure` from the address `ea` as a dictionary.'''
         st = _structure.by(structure)
         return cls.structure(ea, st.ptr, **byteorder)
-    @utils.multicase(ea=internal.types.integer, sptr=idaapi.struc_t)
+    @utils.multicase(ea=internal.types.integer, structure=internal.structure.structuretypes)
     @classmethod
-    def structure(cls, ea, sptr, **byteorder):
-        '''Return a dictionary containing the decoded fields of the structure represented by `sptr` using the data at address `ea`.'''
+    def structure(cls, ea, structure, **byteorder):
+        '''Return a dictionary containing the decoded fields of the specified `structure` using the data at address `ea`.'''
+        sptr, sid = getattr(structure, 'ptr', structure), structure.id
         if not _structure.has(sptr):
-            raise E.StructureNotFoundError(u"{:s}.structure({:#x}, {:#x}{:s}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, ea, sptr.id, u", {:s}".format(utils.string.kwargs(byteorder)) if byteorder else '', sptr.id))
+            raise E.StructureNotFoundError(u"{:s}.structure({:#x}, {:#x}{:s}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, ea, sid, u", {:s}".format(utils.string.kwargs(byteorder)) if byteorder else '', sid))
         expected, size = _structure.size(sptr), interface.address.size(ea)
-        return cls.structure(ea, sptr, size if sptr.props & idaapi.SF_VAR else expected, **byteorder)
+        variableQ = sptr.is_varstruct() if isinstance(sptr, idaapi.tinfo_t) else sptr.props & idaapi.SF_VAR
+        return cls.structure(ea, sptr, size if variableQ else expected, **byteorder)
     @utils.multicase(ea=internal.types.integer, structure=(idaapi.tinfo_t, internal.types.integer, internal.types.string), size=internal.types.integer)
     @classmethod
     def structure(cls, ea, structure, size, **byteorder):
@@ -9348,21 +9378,26 @@ class get(object):
         # The user has been warned if necessary, so we can now hand things off to the real implementation.
         sptr = st.ptr
         return cls.structure(ea, sptr, size, **byteorder)
-    @utils.multicase(ea=internal.types.integer, sptr=(idaapi.struc_t, internal.structure.structure_t), size=internal.types.integer)
+    @utils.multicase(ea=internal.types.integer, sptr=internal.structure.structuretypes, size=internal.types.integer)
     @classmethod
     def structure(cls, ea, sptr, size, **byteorder):
         '''Return a dictionary containing the decoded fields of the structure `sptr` using `size` bytes from the data at address `ea`.'''
-        expected, sptr = idaapi.get_struc_size(sptr.id), sptr if isinstance(sptr, idaapi.struc_t) else sptr.ptr
+        sid = interface.tinfo.identifier(sptr)
+        if isinstance(sptr, internal.structure.structure_t) and isinstance(sptr.ptr, idaapi.tinfo_t):
+            expected = interface.tinfo.size(sptr.ptr)
+        else:
+            expected = idaapi.get_struc_size(sptr.id)
+
         if size < expected:
-            logging.warning(u"{:s}.structure({:#x}, {:#x}, {:+#x}) : The requested size ({:+d}) is smaller than the size of the structure ({:+d}) and will result in the result being partially initialized.".format('.'.join([__name__, cls.__name__]), ea, sptr.id, size, size, expected))
+            logging.warning(u"{:s}.structure({:#x}, {:#x}, {:+#x}) : The requested size ({:+d}) is smaller than the size of the structure ({:+d}) and will result in the result being partially initialized.".format('.'.join([__name__, cls.__name__]), ea, sid, size, size, expected))
 
         elif size != expected and not sptr.props & idaapi.SF_VAR:
-            logging.warning(u"{:s}.structure({:#x}, {:#x}, {:+#x}) : The requested size ({:+d}) is larger than the size of the structure ({:+d}) and will result in {:+d} byte{:s} being discarded.".format('.'.join([__name__, cls.__name__]), ea, sptr.id, size, size, expected, size - expected, '' if size - expected == 1 else 's'))
+            logging.warning(u"{:s}.structure({:#x}, {:#x}, {:+#x}) : The requested size ({:+d}) is larger than the size of the structure ({:+d}) and will result in {:+d} byte{:s} being discarded.".format('.'.join([__name__, cls.__name__]), ea, sid, size, size, expected, size - expected, '' if size - expected == 1 else 's'))
 
         # Now we can just read the data from the database and then decode our structure using it.
         bytes = interface.address.read(ea, size)
-        fields = interface.decode.structure_bytes(sptr.id, bytes)
-        return interface.decode.structure(sptr.id, fields, **byteorder)
+        fields = interface.decode.structure_bytes(sid, bytes)
+        return interface.decode.structure(sid, fields, **byteorder)
     @utils.multicase(name=internal.types.string)
     @classmethod
     def structure(cls, name, *suffix, **byteorder):
