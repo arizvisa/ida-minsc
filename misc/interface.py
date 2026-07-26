@@ -12007,9 +12007,42 @@ class xref(object):
             if node.identifier(xrfrom):
                 mid, xowner, utd, udm = xrfrom, idaapi.tinfo_t(), idaapi.udt_type_data_t(), udm_t()
 
-                # figure out the type id for the referenced member, get its
-                # details, and then use it to figure out the member's index.
-                if not xowner.get_type_by_tid(mid):
+                # If the member identifier is referencing a frame member, but
+                # we're using an older version of the disassembler, then we need
+                # to fall back to the older structure api.
+                if internal.structure.frame(mid) and idaapi.__version__ < 8.5:
+                    mpack = idaapi.get_member_by_id(mid)
+
+                    # If we couldn't get the member with its identifier, but we
+                    # can directly get a `struc_t` from it, then we have direct
+                    # id to the structure, so we yield it without the member.
+                    if mpack is None and idaapi.get_struc(mid):
+                        logging.info(u"{:s}.typeinfo({:#x}) : Skipping reference to the specified structure ({:#x}) from the aliased structure identified by {:#x}.".format('.'.join([__name__, cls.__name__]), tid, tid, mid))
+                        packed = idaapi.get_struc(mid), None
+                        yield mpack, packed
+                        continue
+
+                    elif mpack is None:
+                        raise internal.exceptions.MemberNotFoundError(u"{:s}.typeinfo({:#x}) : Unable to locate the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), tid, mid))
+
+                    # Now we unpack things and get the function that owns it.
+                    # This shouldn't fail but we sanity check it anyways.
+                    mptr, name, sptr = mpack
+
+                    func = function.by_frame(sptr)
+                    if not func:
+                        raise internal.exceptions.FunctionNotFoundError(u"{:s}.typeinfo({:#x}) : Unable to locate the function owning the frame identified by {:#x}.".format('.'.join([__name__, cls.__name__]), tid, mid))
+
+                    # Now we need to figure out the structure and base that it
+                    # will be created at. Then we yield the packed information.
+                    sptr, soffset = idaapi.get_frame(func), function.frame_offset(func)
+                    packed = sptr, mptr
+                    yield soffset, packed
+                    continue
+
+                # Otherwise, we can use the referenced member identifier to get
+                # the owning type, its details, and then the member index.
+                elif not xowner.get_type_by_tid(mid):
                     raise internal.exceptions.StructureNotFoundError(u"{:s}.typeinfo({:#x}) : Unable to locate the type owning the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), tid, mid))
 
                 elif not xowner.get_udt_details(utd):
