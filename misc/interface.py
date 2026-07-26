@@ -8648,6 +8648,16 @@ class tinfo(object):
         '''Return whether the given structure, union, or enumeration `identifier` is associated with a type in the specified type `library`.'''
         identifier = identifier if isinstance(identifier, internal.types.integer) else identifier.id
 
+        # This function is only necessary for the older structure api which can
+        # be desynchronized with the type library. So, if there is no structure
+        # api then we fall back to the one based on the `idaapi.tinfo_t` type.
+
+        # If there is no `struc_t`, then get the ordinal for the identifier and
+        # then verify that it exists in the local types library.
+        if not hasattr(idaapi, 'struc_t'):
+            ordinal = cls.by_identifier(identifier, *library)
+            return cls.has_ordinal(ordinal, *library)
+
         # if the identifier is not a structure/union, then check if it's an enumeration.
         sptr = idaapi.get_struc(identifier)
         if not sptr and idaapi.get_enum_idx(identifier) == idaapi.BADADDR:
@@ -8716,6 +8726,10 @@ class tinfo(object):
         # exception since we have no way to process this on earlier than v8.4.
         elif not tinfo.is_sue():
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.identifier({!s}{:s}) : Unable to return an identifier for the specified type due to it not being a structure, union, or enumeration.".format('.'.join([__name__, cls.__name__]), type_description, ", {!s}".format(*always) if always else ''))
+
+        # XXX: If we got here, then we're using the old structure api since
+        #      newer versions of the disassembler have the `tinfo.get_tid`
+        #      method or the `ìdaapi.get_tinfo_tid` function.
 
         # If we got a typedef, then we need to continuously resolve it until we
         # get to a type (structure or union) that matches the type name.
@@ -8832,6 +8846,7 @@ class tinfo(object):
             serialized = cls.get_numbered_type(til, ordinal) if ordinal else identifier.serialize()
             return cls.get(til, *serialized)
 
+        # identifier -> struc_t -> ordinal -> get_numbered_type
         elif hasattr(idaapi, 'get_struc') and isinstance(identifier, internal.types.integer) and idaapi.get_struc(identifier):
             sptr = idaapi.get_struc(identifier)
             stype = address.typeinfo(sptr.id)
@@ -8839,6 +8854,7 @@ class tinfo(object):
             serialized = cls.get_numbered_type(til, ordinal) if ordinal else stype.serialize()
             return cls.get(til, *serialized)
 
+        # identifer -> member tuple -> type -> ordinal -> get_numbered_type
         elif hasattr(idaapi, 'get_member_by_id') and isinstance(identifier, internal.types.integer) and idaapi.get_member_by_id(identifier):
             (sptr, mindex, mptr) = internal.structure.members.by_identifier(None, identifier)
             mtype = internal.structure.member.get_typeinfo(mptr)
@@ -8846,11 +8862,13 @@ class tinfo(object):
             serialized = cls.get_numbered_type(til, ordinal) if ordinal else mtype.serialize()
             return cls.get(til, *serialized)
 
+        # identifier -> tinfo_t -> serialize -> get_numbered_type
         elif isinstance(identifier, internal.types.integer) and ti.get_type_by_tid(identifier):
             ordinal = cls.ordinal(ti)
             serialized = cls.get_numbered_type(til, ordinal) if ordinal else ti.serialize()
             return cls.get(til, *serialized)
 
+        # identifer -> address typeinfo -> ordinal -> get_numbered_type
         elif isinstance(identifier, internal.types.structuretypes):
             sid = tinfo.identifier(identifier)
             stype = address.typeinfo(sid)
@@ -8858,6 +8876,7 @@ class tinfo(object):
             serialized = cls.get_numbered_type(til, ordinal) if ordinal else stype.serialize()
             return cls.get(til, *serialized)
 
+        # id property -> member tuple -> get_typeinfo -> ordinal -> get_numbered_type
         elif hasattr(idaapi, 'member_t') and isinstance(identifier, internal.types.membertypes):
             (sptr, mindex, mptr) = (idaapi.get_struc(identifier.id), 0, identifier) if isinstance(identifier, idaapi.member_t) else internal.structure.members.by_identifier(None, identifier.id)
             mtype = internal.structure.member.get_typeinfo(mptr)
@@ -8865,12 +8884,21 @@ class tinfo(object):
             serialized = cls.get_numbered_type(til, ordinal) if ordinal else mtype.serialize()
             return cls.get(til, *serialized)
 
+        # id property -> get_type_by_tid -> get_typeinfo -> ordinal -> get_numbered_type
+        elif isinstance(identifier, internal.types.membertypes) and ti.get_type_by_tid(identifier.id):
+            mtype = internal.structure.v9member.get_typeinfo(ti, identifier.index)
+            ordinal = cls.ordinal(mtype)
+            serialized = cls.get_numbered_type(til, ordinal) if ordinal else mtype.serialize()
+            return cls.get(til, *serialized)
+
+        # identifier -> enum name -> ordinal -> get_numbered_type
         elif hasattr(idaapi, 'get_enum_idx') and isinstance(identifier, internal.types.integer) and idaapi.get_enum_idx(identifier) != idaapi.BADADDR:
             fullname = idaapi.get_enum_name(identifier)
             ordinal = idaapi.get_ordinal_from_idb_type(internal.utils.string.to(fullname), bytes(bytearray([idaapi.BT_COMPLEX | idaapi.BTMT_ENUM])))
             serialized = tinfo.get_numbered_type(til, ordinal)
             return cls.get(til, *serialized)
 
+        # fail.
         elif isinstance(identifier, internal.types.integer):
             raise internal.exceptions.DisassemblerError(u"{:s}.at_identifier({:#x}) : Unable to find the type for the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), identifier, identifier))
         raise internal.exceptions.InvalidParameterError(u"{:s}.at_identifier({:#x}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), identifier, identifier.__class__))
@@ -8888,7 +8916,26 @@ class tinfo(object):
         '''Return the ordinal for the type associated with an `identifier` from the specified type `library`.'''
         identifier = identifier if isinstance(identifier, internal.types.integer) else identifier.id
 
-        # first determine whether the identifier belongs to a structure/union/enumeration.
+        # if we don't have a `struc_t`, then we need to use the identifier to
+        # fetch a type from the local types library and return its ordinal.
+        ti = idaapi.tinfo_t()
+        if not hasattr(idaapi, 'struc_t'):
+            if not ti.get_type_by_tid(identifier):
+                raise internal.exceptions.LocalTypeNotFoundError(u"{:s}.by({:#x}) : Unable to locate the type from the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), identifier, identifier))
+
+            # now we can just grab the ordinal and return it if we got one.
+            ordinal = cls.ordinal(ti, *library)
+            if ordinal:
+                return ordinal
+
+            # otherwise we need to raise an excception here.
+            fullname = internal.utils.string.of(idaapi.get_tid_name(identifier) or ti.get_type_name())
+            description = {idaapi.BTMT_STRUCT: 'structure', idaapi.BTMT_UNION: 'union', idaapi.BTMT_ENUM: 'enumeration'}
+            NotFoundException = internal.exceptions.StructureNotFoundError if ti.is_struct() else internal.exceptions.EnumerationNotFoundError if ti.is_enum() else internal.exceptions.MemberNotFoundError
+            raise NotFoundException(u"{:s}.by_identifier({:#x}) : Unable to locate the type information associated with the {:s} named \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, description.get(type_t, "identifier ({:#x})".format(identifier)), internal.utils.string.escape(fullname, '"')))
+
+        # otherwise we're using the older structure api and we need to determine
+        # whether the identifier belongs to a structure/union/enumeration.
         sptr = idaapi.get_struc(identifier) or idaapi.get_member_by_id(identifier)
         if not sptr and idaapi.get_enum_idx(identifier) == idaapi.BADADDR:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.by({:#x}) : Unable to determine whether the given identifier ({:#x}) is a structure, union, or enumeration.".format('.'.join([__name__, cls.__name__]), identifier, identifier))
