@@ -38,6 +38,23 @@ def has(id):
         return interface.tinfo.for_name(id).is_udt()
     return False
 
+def has_member(id):
+    '''Return whether a structure member with the specified `id` exists within the database.'''
+    tinfo, utd, udm_t = idaapi.tinfo_t(), idaapi.udt_type_data_t(), idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+    if not interface.node.identifier(id):
+        return False
+    elif hasattr(idaapi, 'is_member_id') and idaapi.is_member_id(id):
+        return True
+    elif hasattr(idaapi, 'get_struc') and idaapi.get_struc(id):
+        return False
+    elif hasattr(idaapi, 'get_member_by_id') and idaapi.get_member_by_id(id):
+        return True
+    elif not tinfo.get_type_by_tid(id) or not tinfo.is_udt() or not tinfo.get_udt_details(utd):
+        return False
+    elif 0 <= tinfo.get_udm_by_tid(udm_t(), id) < utd.size():
+        return True
+    return False
+
 def by_index_or_identifier(index_or_identifier):
     '''Return the structure at the specified `index_or_identifier` from the database.'''
     tinfo = idaapi.tinfo_t()
