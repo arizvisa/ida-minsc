@@ -8759,7 +8759,20 @@ class tinfo(object):
         type_description = "{:d}".format(type) if isinstance(type, internal.types.integer) else "{!r}".format("{!s}".format(type))
         key_description = "{:d}".format(index_or_name) if isinstance(index_or_name, internal.types.integer) else "{!r}".format(index_or_name)
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
-        tinfo = cls.for_ordinal(type) if isinstance(type, internal.types.integer) else cls.for_name(type) if isinstance(type, internal.types.string) else cls.concretize(type)
+
+        # We first need to figure out what we were given and use it to get the
+        # type. An integer means we look up by ordinal, a string means we create
+        # a reference for its name, and anything else just needs to be
+        # concretized...but if we concretize a frame it causes the type to act
+        # all sorts of fucked up. So we skip over concretizing frame types.
+        if isinstance(type, internal.types.integer):
+            tinfo = cls.for_ordinal(type)
+        elif isinstance(type, internal.types.string):
+            tinfo = cls.for_name(type)
+        elif internal.structure.frame(type):
+            tinfo = cls.copy(type)
+        else:
+            tinfo = cls.concretize(type)
 
         # If it's not a type that we can return an identifier for, then raise an
         # exception since we have no way to process this on earlier than v8.4.
