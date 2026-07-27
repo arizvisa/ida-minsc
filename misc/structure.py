@@ -1074,13 +1074,12 @@ class v9member(object):
         iterable = (ea for ea, iscode, xtype in interface.xref.to(mid, idaapi.XREF_ALL))
         return next((True for ea in iterable if not interface.node.identifier(ea)), False)
 
-    # FIXME: this function needs to be comprehensively checked to ensure that it
-    #        actually works like `member.references` that it's based on.
     @classmethod
     def references(cls, *args):
         '''Return a list of all the operand references in the database for the specified member.'''
         FF_STROFF = idaapi.stroff_flag() if hasattr(idaapi, 'stroff_flag') else idaapi.stroffflag()
         FF_STKVAR = idaapi.stkvar_flag() if hasattr(idaapi, 'stkvar_flag') else idaapi.stkvarflag()
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
         owner, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'references'])
         oid, mid = interface.tinfo.identifier(owner), interface.tinfo.member_identifier(owner, mindex)
@@ -1088,7 +1087,9 @@ class v9member(object):
 
         # if the type belongs to a frame, then we need to specially handle it.
         if interface.node.identifier(oid) and is_frame and fn != idaapi.BADADDR:
-            raise NotImplementedError
+            # FIXME: this needs to be implemented whenever i get a license to v9
+            #        of the disassembler. god fucking damn you, hexrays.
+            raise E.UnsupportedCapability(u"{:s}.references({:#x}, {:d}) Unable to get the references for the given frame member ({:#x}) due to the disassembler not supporting frames based on `{:s}`.".format('.'.join([__name__, cls.__name__]), oid, mindex, mid, utils.pycompat.fullname(idaapi.tinfo_t)))
 
         # otherwise we just grab all of the references, and then recursively
         # walk through each one to figure out the parent types using our type.
@@ -1107,6 +1108,13 @@ class v9member(object):
                 if isinstance(item, interface.ref_t):
                     continue
 
+                # if we didn't get a 4-element tuple, then this is a frame but
+                # in an old version of the disassembler that is still using the
+                # old structure api. we basically skip it because it's a frame.
+                if len(item) != 4:
+                    continue
+
+                # otherwise, it has 4-elements and it represents a type member.
                 mowner, mudt, mindex, mudm = item
                 if frame(mowner):
                     continue
@@ -1150,7 +1158,7 @@ class v9member(object):
             flags, access = interface.address.flags(ea, idaapi.MS_0TYPE|idaapi.MS_1TYPE), [item.access for item in interface.instruction.access(ea)]
             listable = [(opnum, operand, address.opinfo(ea, opnum)) for opnum, operand in enumerate(address.operands(ea)) if address.opinfo(ea, opnum)]
 
-            # if there are some stack operands the figure the correct one out.
+            # if there are some stack operands then figure the correct one out.
             if flags & FF_STKVAR in {FF_STKVAR, idaapi.FF_0STK, idaapi.FF_1STK}:
                 logging.debug(u"{:s}.references({:#x}) : Found {:s} reference at {:#x} to member ({:#x}) with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, 'FF_STKVAR', ea, mid, address.flags(ea)))
                 masks = [(idaapi.MS_0TYPE, idaapi.FF_0STK), (idaapi.MS_1TYPE, idaapi.FF_1STK)]
