@@ -735,14 +735,14 @@ class v9member(object):
     def fullname(cls, *args):
         '''Return the full name of the specified member as a string.'''
         tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'fullname'])
-        tname, mname = tinfo.get_type_name(), udm.name
+        tname, mname = naming.get(tinfo), udm.name
         return '.'.join(map(utils.string.of, [tname, mname]))
 
     @classmethod
     def set_name(cls, *args):
         '''Set the name of the specified member to a string and return the original name.'''
         tinfo, utd, mindex, udm = v9members.by(*args[:-1], caller=[__name__, cls.__name__, 'set_name'], args="{!r}".format(*args[-1:]))
-        tname, mname = tinfo.get_type_name(), udm.name
+        tname, mname = naming.get(tinfo), udm.name
         fullname = '.'.join(map(utils.string.of, [tname, mname]))
 
         # Extract the string from the specified parameters.
@@ -779,7 +779,7 @@ class v9member(object):
     def remove_name(cls, *args):
         '''Reset the name for the specified member specified by `mid` and return the original name.'''
         tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'remove_name'])
-        mid, tname, mname = interface.tinfo.member_identifier(tinfo, mindex), tinfo.get_type_name(), udm.name
+        mid, tname, mname = interface.tinfo.member_identifier(tinfo, mindex), naming.get(tinfo), udm.name
         fullname = '.'.join(map(utils.string.of, [tname, mname]))
         default = cls.default_name(mid, udm.offset)
         return cls.set_name(mid, default)
@@ -799,7 +799,7 @@ class v9member(object):
                 caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'default_name'], args=["{:+#x}".format(moffset)])
                 raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, offset, interface.tinfo.identifier(tinfo)))
             udm, offset = None, abs(mindex) if union(tinfo) else int(moffset)
-            mid, tname, mname = idaapi.BADNODE, tinfo.get_type_name(), None
+            mid, tname, mname = idaapi.BADNODE, naming.get(tinfo), None
 
         # If we weren't given a member, then we need to figure it out ourselves.
         elif len(args) in {2, 3} and args[1] in {None, idaapi.BADADDR} and isinstance(args[0], (idaapi.tinfo_t, types.integer)):
@@ -827,12 +827,12 @@ class v9member(object):
         # an offset, then cull it out since the member index was specified.
         elif (len(args) == 1 and isinstance(args[0], types.integer) and interface.node.identifier(args[0])) or (len(args) == 2 and isinstance(args[0], idaapi.tinfo_t)):
             tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'default_name'])
-            mid, tname, mname = interface.tinfo.member_identifier(tinfo, mindex), tinfo.get_type_name(), utils.string.of(udm.name)
+            mid, tname, mname = interface.tinfo.member_identifier(tinfo, mindex), naming.get(tinfo), utils.string.of(udm.name)
             offset, _ = divmod(udm.offset, 8) if udm else mindex if union(tinfo) else (tinfo.get_size(), 0)
 
         elif (len(args) == 2 and isinstance(args[0], types.integer) and interface.node.identifier(args[0])) or (len(args) == 3 and isinstance(args[0], idaapi.tinfo_t)):
             tinfo, utd, mindex, udm = v9members.by(*args[:-1], caller=[__name__, cls.__name__, 'default_name'], args=["{:#x}".format(*args[-1:])])
-            mid, tname, mname = interface.tinfo.member_identifier(tinfo, mindex), tinfo.get_type_name(), utils.string.of(udm.name)
+            mid, tname, mname = interface.tinfo.member_identifier(tinfo, mindex), naming.get(tinfo), utils.string.of(udm.name)
             [offset] = args[-1:]
 
         else:
