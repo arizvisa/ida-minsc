@@ -260,11 +260,19 @@ class naming(object):
 
         # If our structure backing is a local type, then use `get_tid_name`. If
         # we couldn't get a name out of it, then give it the anonymous one.
-        if isinstance(ti, idaapi.tinfo_t):
+        if isinstance(ti, idaapi.tinfo_t) and not frame(ti):
             res = idaapi.get_tid_name(sid) or ti.get_type_name()
             if res:
                 return utils.string.of(res)
             return"${:s}".format(interface.tinfo.anonymous_name(ti))
+
+        # If it's still a `tinfo_t`, then it's a frame where we need to name it
+        # according to the function that owns it. For compatibility purposes, we
+        # simulate the name given by older versions of the disassembler.
+        elif isinstance(ti, idaapi.tinfo_t):
+            fn = interface.function.by_frame(ti)
+            ea = interface.range.start (fn)
+            return "$ F{:X}".format(ea)
 
         # Otherwise, this is a `struc_t` and we need to use `get_struc_name`.
         res = idaapi.get_struc_name(sid)
