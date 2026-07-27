@@ -1528,8 +1528,12 @@ class member(object):
     def has_typeinfo(cls, mptr):
         '''Return whether there is type information applied to the member in `mptr`.'''
         get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
-        ti, mid = idaapi.tinfo_t(), mptr if isinstance(mptr, internal.types.integer) else mptr.id
-        return True if get_tinfo(ti, mid) else False
+        if isinstance(mptr, internal.types.integer):
+            ti, mid = idaapi.tinfo_t(), mptr
+            return True if get_tinfo(ti, mid) else False
+        get_member_tinfo = (lambda ti, mptr: idaapi.get_member_tinfo2(mptr, ti)) if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
+        ti = idaapi.tinfo_t()
+        return True if get_member_tinfo(ti, mptr) else False
 
     @classmethod
     def get_typeinfo(cls, mptr):
@@ -1569,7 +1573,7 @@ class member(object):
             raise E.InvalidParameterError(u"{:s}.set_typeinfo({:#x}, {!s}) : Unable to assign an unsupported type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), mptr.id, info if info is None else utils.string.repr(info), info.__class__))
 
         # We first need to collect the correct APIs depending on the disassembler version.
-        get_member_tinfo = idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
+        get_member_tinfo = (lambda ti, mptr: idaapi.get_member_tinfo2(mptr, ti)) if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
         set_member_tinfo = idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
 
         # Now we need to forcefully convert our parameter to a `tinfo_t`.
@@ -1615,7 +1619,7 @@ class member(object):
         # First we need to grab the original type, but only if it was explicitly assigned
         # by the user. This is because our regular api _always_ guesses the type, and
         # whenever applying or clearing the member's type we want to remain honest.
-        get_member_tinfo = idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
+        get_member_tinfo = (lambda ti, mptr: idaapi.get_member_tinfo2(mptr, ti)) if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
         original = ti if get_member_tinfo(ti, mptr) else None
 
         # Then we need the sptr for the member so that we can actually remove the type.
