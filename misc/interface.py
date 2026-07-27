@@ -11714,22 +11714,34 @@ class xref(object):
             addr = next(ea, addr)
         return
 
-    @internal.utils.multicase(ea=internal.types.integer, mptr=idaapi.member_t)
-    @classmethod
-    def frame(cls, ea, mptr):
-        '''Yield each operand reference to the member `mptr` in the frame belonging to the function containing the address `ea`.'''
-        fn = idaapi.get_func(ea)
-        if not fn:
-            return
-        for opref in cls.frame(fn, mptr):
-            yield opref
-        return
-    @internal.utils.multicase(func=idaapi.func_t, mptr=idaapi.member_t)
     @classmethod
     def frame(cls, func, mptr):
         '''Yield each operand reference to the frame member `mptr` belonging to the function `func`.'''
+        frame = function.frame(func)
         xl = idaapi.xreflist_t()
-        idaapi.build_stkvar_xrefs(xl, func, mptr)
+
+        # If our frame is backed by an `idaapi.tinfo_t`, then we need to figure
+        # out the boundaries of the member. Our member can be an index, an
+        # identifier, or a `member_t` with an "id" property.
+        if isinstance(frame.ptr, idaapi.tinfo_t):
+            mid = mptr if isinstance(mptr, internal.types.integer) else getattr(mptr, 'id', mptr)
+            tinfo, utd, mindex, udm = internal.structure.v9members.by(*[mid] if node.identifier(mid) else [frame.ptr, mid])
+
+            lbits, rbits = udm.offset, udm.offset + udm.size
+            left, _ = divmod(rbits, 8)
+            right, remainder = divmod(rbits, 8)
+
+            idaapi.build_stkvar_xrefs(xl, func, left, right + 1 if remainder else right)
+
+        # If we're using structure-based frames for the older api, then convert
+        # our parameter to an identifier and use it to get a `member_t`.
+        else:
+            mid = mptr if isinstance(mptr, internal.types.integer) else getattr(mptr, 'id', mptr)
+            mptr, _, _ = idaapi.get_member_by_id(mid)
+
+            idaapi.build_stkvar_xrefs(xl, func, mptr)
+
+        # Now we have an `idaapi.xreflist_t` that we can just iterate through.
         for xr in xl:
             yield xr.ea, int(xr.opnum), xr.type
         return
