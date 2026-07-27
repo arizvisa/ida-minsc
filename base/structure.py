@@ -926,6 +926,18 @@ def references(name, *suffix):
     '''Return the operand references that reference the structure with the specified `name`.'''
     string = name if isinstance(name, types.ordered) else (name,)
     res = interface.tuplename(*tuple(itertools.chain(string, suffix)))
+
+    # If there's no `struc_t`, then we're using a version of the disassembler
+    # that requires using the `tinfo_t`-backed version of the structure api.
+    if not hasattr(idaapi, 'struc_t'):
+        ti = interface.tinfo.for_name(res)
+        if not ti:
+            raise E.StructureNotFoundError(u"{:s}.references({:s}) : Unable to find a structure using the specified name \"{:s}\".".format(__name__, ', '.join(map("{!r}".format, itertools.chain(name if isinstance(name, types.ordered) else [name], suffix))), utils.string.escape(res, '"')))
+        elif not ti.is_udt():
+            raise E.InvalidTypeOrValueError(u"{:s}.references({:s}) : The type returned for the specified name \"{:s}\" is not a structure or a union.".format(__name__, ', '.join(map("{!r}".format, itertools.chain(name if isinstance(name, types.ordered) else [name], suffix))), utils.string.escape(res, '"')))
+        return internal.structure.v9members.references(ti)
+
+    # Otherwise we can go ahead and use the older structure api to do things.
     sid = idaapi.get_struc_id(utils.string.to(res))
     if sid == idaapi.BADADDR:
         raise E.StructureNotFoundError(u"{:s}.references({:s}) : Unable to find a structure using the name \"{:s}\".".format(__name__, ', '.join(map("{!r}".format, itertools.chain(name if isinstance(name, types.ordered) else [name], suffix))), utils.string.escape(res, '"')))
@@ -934,22 +946,59 @@ def references(name, *suffix):
 @utils.multicase(id=types.integer)
 def references(id):
     '''Return the operand references that reference the structure with the given `id` or index.'''
-    sid = id if interface.node.identifier(id) else idaapi.get_struc_by_idx(id)
-    sptr = idaapi.get_struc(sid)
+    if interface.node.identifier(id):
+        sid = id
+    elif hasattr(idaapi, 'get_struc_by_idx'):
+        sid = idaapi.get_struc_by_idx(id)
+    elif interface.tinfo.has_ordinal(id):
+        ti = interface.tinfo.for_ordinal(id)
+        sid = interface.tinfo.identifier(ti)
+    else:
+        sid = idaapi.BADADDR
+
+    # Now we have an identifier that we need to check. If it's an error value,
+    # then we need to distinguish whether it's an identifier or an index.
+    if sid == idaapi.BADADDR:
+        if interface.node.identifier(id):
+            raise E.StructureNotFoundError(u"{:s}.references({:#x}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
+        raise E.StructureNotFoundError(u"{:s}.references({:d}) : Unable to find a structure at the specified index ({:d}).".format(__name__, id, id))
+
+    # Check if the `struc_t` exists to check if the old structure api is
+    # available. If it doesn't exist, then we need to grab the type and return
+    # the references to it using the regular `member.references` api.
+    if not hasattr(idaapi, 'struc_t'):
+        ordinal = interface.tinfo.by_identifier(id)
+        ti = interface.tinfo.for_ordinal(ordinal)
+        return internal.structure.v9members.references(ti)
+
+    # Otherwise we can just go ahead and use the old structure api. Since we can
+    # be given any kind of identifier, we check if it's a structure first. If
+    # that failed, then we can try to see if it belongs to a member.
+    sptr = idaapi.get_struc(sid) or idaapi.get_member_by_id(sid)
     if not sptr:
         if interface.node.identifier(sid):
             raise E.StructureNotFoundError(u"{:s}.references({:#x}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
         raise E.StructureNotFoundError(u"{:s}.references({:d}) : Unable to find a structure at the specified index ({:d}).".format(__name__, id, id))
+
+    # If we got a tuple back, then we can just go and unpack the mptr from it so
+    # that we can use it with the `internal.structure.member.references` api.
+    elif isinstance(sptr, internal.types.tuple):
+        mptr, fullname, sptr = sptr
+        return internal.structure.member.references(mptr)
     return internal.structure.members.references(sptr)
-@utils.multicase(structure=internal.structure.structuretypes)
+@utils.multicase(structure=(idaapi.tinfo_t, internal.structure.structuretypes))
 def references(structure):
     '''Return the operand references that reference the given `structure` or its members.'''
-    sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
+    sptr = getattr(structure, 'ptr', structure)
+    if isinstance(sptr, idaapi.tinfo_t):
+        return internal.structure.v9members.references(sptr)
     return internal.structure.members.references(sptr)
 @utils.multicase(member=internal.structure.membertypes)
 def references(member):
     '''Return the operand references that reference the specified `member`.'''
-    mptr = member if isinstance(member, idaapi.member_t) else member.ptr
+    if isinstance(member, internal.structure.member_t) and isinstance(member.parent.ptr, idaapi.tinfo_t):
+        return internal.structure.v9member.references(member.id)
+    mptr = getattr(member, 'ptr', member)
     return internal.structure.member.references(mptr)
 refs = utils.alias(references)
 
