@@ -907,8 +907,9 @@ class v9member(object):
         # XXX: in later versions of the disassembler, all members will have the
         #      type information unless the member is a gap. so, we only return
         #      true if it is not a gap and not a primitive type.
+
         ti = interface.tinfo.copy(udm.type)
-        return False if udm.is_gap() else ti.has_details()
+        return False if udm.is_gap() or interface.tinfo.primitive(ti) else True
 
     @classmethod
     def get_typeinfo(cls, *args):
