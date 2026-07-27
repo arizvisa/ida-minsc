@@ -8688,7 +8688,19 @@ class tinfo(object):
     def identifier(cls, type, *always):
         '''Return the identifier for the specified `type` from the current type library.'''
         type_description = "{:d}".format(type) if isinstance(type, internal.types.integer) else "{!r}".format("{!s}".format(type))
-        tinfo = cls.for_ordinal(type) if isinstance(type, internal.types.integer) else cls.for_name(type) if isinstance(type, internal.types.string) else cls.concretize(type)
+
+        # We need to figure out how to get a type based on what we're given. So,
+        # integers are used as ordinals, strings require just a named reference,
+        # and everything other than frames needs to be concretized. Frames get
+        # to keep their ordinals since removing them causes it to act fucked.
+        if isinstance(type, internal.types.integer):
+            tinfo = cls.for_ordinal(type)
+        elif isinstance(type, internal.types.string):
+            tinfo = cls.for_name(type)
+        elif internal.structure.frame(type):
+            tinfo = cls.copy(type)
+        else:
+            tinfo = cls.concretize(type)
 
         # If we couldn't get the type using what we were given, then we abort.
         if not tinfo:
