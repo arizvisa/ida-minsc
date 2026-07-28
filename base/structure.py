@@ -140,8 +140,8 @@ def iterate(string, *suffix):
 @utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def iterate(**type):
     '''Iterate through all of the structures that match the keyword specified by `type`.'''
-    for index, item in __iterate__(**type):
-        yield index, item
+    for _, item in __iterate__(**type):
+        yield item
     return
 
 @utils.multicase(string=types.string)
@@ -154,7 +154,7 @@ def list(string, *suffix):
 @utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def list(**type):
     '''List all the structures within the database that match the keyword specified by `type`.'''
-    listable = [(index, item) for index, item in iterate(**type)]
+    listable = [(index, item) for index, item in __iterate__(**type)]
 
     maxindex = max(builtins.map(utils.fcompose(operator.itemgetter(0), "{:d}".format, len), listable) if listable else [1])
     maxname = max(builtins.map(utils.fcompose(operator.itemgetter(-1), operator.attrgetter('name'), utils.fdefault(''), len), listable) if listable else [1])
@@ -489,7 +489,7 @@ def by(**type):
     '''Return the structure matching the keyword specified by `type`.'''
     searchstring = utils.string.kwargs(type)
 
-    listable = [(index, item) for index, item in iterate(**type)]
+    listable = [(index, item) for index, item in __iterate__(**type)]
     if len(listable) > 1:
         messages = ((u"[{:d}] {:s}".format(index, st.name)) for index, st in listable)
         [ logging.info(msg) for msg in messages ]
