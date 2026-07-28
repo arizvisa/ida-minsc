@@ -157,21 +157,29 @@ class query_v0(object):
         iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
         included = {key for key in iterable}
 
+        # first we need to figure out which structure api we can use.
+        if idaapi.__version__ < 8.5:
+            Fget_structure_tag = lambda sptr: structure.get(sptr)
+            Fget_structure_identifier = lambda sptr: sptr.id
+        else:
+            Fget_structure_tag = lambda tinfo: typeinfo.get(tinfo)
+            Fget_structure_identifier = lambda tinfo: interface.tinfo.identifier(tinfo)
+
         # user doesn't want anything specific, so yield all of them and their tags.
         if not(required or included):
             for _, sptr in internal.structure.iterate():
-                content = structure.get(sptr)
+                content = Fget_structure_tag(sptr)
 
                 # if the structure had some content (tags), then we have a match
                 # and can yield the structure and its content to the user.
                 if content:
-                    yield sptr.id, content
+                    yield Fget_structure_identifier(sptr), content
                 continue
             return
 
         # now we just slowly iterate through our structures looking for any matches.
         for _, sptr in internal.structure.iterate():
-            content = structure.get(sptr)
+            content = Fget_structure_tag(sptr)
 
             # included is the equivalent of Or(|) and yields the structure if any of the tagnames are used.
             collected = {key : value for key, value in content.items() if key in included}
@@ -183,7 +191,7 @@ class query_v0(object):
                 else: continue
 
             # that's all folks.. yield it if you got it.
-            if collected: yield sptr.id, collected
+            if collected: yield Fget_structure_identifier(sptr), collected
         return
 
     @classmethod
@@ -194,19 +202,29 @@ class query_v0(object):
         iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
         included = {key for key in iterable}
 
+        # First we need to figure out which structure api we can use.
+        if idaapi.__version__ < 8.5:
+            Fiterate_members = internal.structure.members.iterate
+            Fget_member_tag = lambda sptr, mindex, mptr: member.get(mptr)
+            Fget_member_identifier = lambda sptr, mindex, mptr: mptr.id
+        else:
+            Fiterate_members = internal.structure.v9members.iterate
+            Fget_member_tag = lambda mowner, mindex, udm: typeinfo_member.get(mowner, mindex)
+            Fget_member_identifier = lambda mowner, mindex, udm: mowner.get_udm_tid(mindex)
+
         # If there were no tags to filter with, then we're being asked to yield
         # everything. so, we do just that for every member in the structure.
         if not(required or included):
-            for mowner, mindex, mptr in internal.structure.members.iterate(sid):
-                content = member.get(mptr)
+            for mowner, mindex, mptr in Fiterate_members(sid):
+                content = Fget_member_tag(mowner, mindex, mptr)
                 if content:
-                    yield mptr.id, content
+                    yield Fget_member_identifier(mowner, mindex, mptr), content
                 continue
             return
 
         # Otherwise, we iterate through the structure and yield its members.
-        for mowner, mindex, mptr in internal.structure.members.iterate(sid):
-            content = member.get(mptr)
+        for mowner, mindex, mptr in Fiterate_members(sid):
+            content = Fget_member_tag(mowner, mindex, mptr)
 
             # Start out by collecting any tagnames that should be included which is similar to Or(|).
             collected = {key : value for key, value in content.items() if key in included}
@@ -218,7 +236,7 @@ class query_v0(object):
                 else: continue
 
             # Easy to do and easy to yield.
-            if collected: yield mptr.id, collected
+            if collected: yield Fget_member_identifier(mowner, mindex, mptr), collected
         return
 
     @classmethod
@@ -233,17 +251,23 @@ class query_v0(object):
         # the members tags for every single structure that we can find.
         if not(required or included):
             for _, sptr in internal.structure.iterate():
-                iterable = (member.get(mptr) for mowner, mindex, mptr in internal.structure.members.iterate(sptr.id))
+                if isinstance(sptr, idaapi.tinfo_t):
+                    iterable = (typeinfo_member.get(mowner, mindex) for mowner, mindex, mptr in internal.structure.v9members.iterate(sptr))
+                else:
+                    iterable = (member.get(mptr) for mowner, mindex, mptr in internal.structure.members.iterate(sptr))
                 names = {tag for tag in itertools.chain(*iterable)}
                 if names:
-                    yield sptr.id, names
+                    yield interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id, names
                 continue
             return
 
         # If we were given something to query the members of each structure
         # with, then we first grab the tags for every single structure member.
         for _, sptr in internal.structure.iterate():
-            iterable = (member.get(mptr) for mowner, mindex, mptr in internal.structure.members.iterate(sptr.id))
+            if isinstance(sptr, idaapi.tinfo_t):
+                iterable = (typeinfo_member.get(mowner, mindex) for mowner, mindex, mptr in internal.structure.v9members.iterate(sptr))
+            else:
+                iterable = (member.get(mptr) for mowner, mindex, mptr in internal.structure.members.iterate(sptr))
             names = {tag for tag in itertools.chain(*iterable)}
 
             # Then we select any of the tag names that we were asked to include.
@@ -257,7 +281,7 @@ class query_v0(object):
 
             # If we have anything left, then it is worth yielding to the caller.
             if collected:
-                yield sptr.id, collected
+                yield interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id, collected
             continue
         return
 
@@ -273,13 +297,19 @@ class query_v0(object):
         # every tag that we find.
         if not(required or included):
             for _, sptr in internal.structure.iterate():
-                for mowner, mindex, mptr in internal.structure.members.iterate(sptr.id):
-                    content = member.get(mptr)
+                if isinstance(sptr, idaapi.tinfo_t):
+                    Fiterate_members = internal.structure.v9members.iterate
+                else:
+                    Fiterate_members = internal.structure.members.iterate
+
+                # Iterate through the members using the matching namespace.
+                for mowner, mindex, mptr in Fiterate_members(sid):
+                    content = typeinfo_member.get(mowner, mindex) if isinstance(mowner, idaapi.tinfo_t) else member.get(mptr)
 
                     # If there's content for the member, then yield it.
                     # Otherwise we can continue to the next one.
                     if content:
-                        yield mptr.id, content
+                        yield mowner.get_udm_tid(mindex) if isinstance(mowner, idaapi.tinfo_t) else mptr.id, content
                     continue
                 continue
             return
@@ -287,8 +317,14 @@ class query_v0(object):
         # If we were given something to query the members of each structure
         # with, then we first grab the tags for every single structure member.
         for _, sptr in internal.structure.iterate():
-            for mowner, mindex, mptr in internal.structure.members.iterate(sptr.id):
-                content = member.get(mptr)
+            if isinstance(sptr, idaapi.tinfo_t):
+                Fiterate_members = internal.structure.v9members.iterate
+            else:
+                Fiterate_members = internal.structure.members.iterate
+
+            # Iterate through the members using the correct namespace.
+            for mowner, mindex, mptr in Fiterate_members(sptr):
+                content = typeinfo_member.get(mowner, mindex) if isinstance(mowner, idaapi.tinfo_t) else member.get(mptr)
 
                 # Filter our tags for any that were specified to be included.
                 collected = {key : value for key, value in content.items() if key in included}
@@ -302,7 +338,7 @@ class query_v0(object):
 
                 # Check if our filtering left us some results and yield them.
                 if collected:
-                    yield mptr.id, collected
+                    yield mowner.get_udm_tid(mindex) if isinstance(mowner, idaapi.tinfo_t) else mptr.id, collected
                 continue
             continue
         return
