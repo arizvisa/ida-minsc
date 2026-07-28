@@ -121,6 +121,15 @@ __matcher__.combinator('structure', utils.fcondition(utils.finstance(internal.st
 __matcher__.alias('structures', 'structure')
 __matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
 
+@utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
+def __iterate__(**type):
+    if not type: type = {'predicate': lambda item: True}
+    iterable = ((index, sptr) for index, sptr in internal.structure.iterate())
+    listable = [(index, internal.structure.new(sptr, 0)) for index, sptr in iterable]
+    for key, value in type.items():
+        listable = [item for item in __matcher__.match(key, value, listable)]
+    for item in listable: yield item
+
 @utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def iterate(string, *suffix):
@@ -131,12 +140,9 @@ def iterate(string, *suffix):
 @utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def iterate(**type):
     '''Iterate through all of the structures that match the keyword specified by `type`.'''
-    if not type: type = {'predicate': lambda item: True}
-    iterable = ((index, sptr) for index, sptr in internal.structure.iterate())
-    listable = [(index, internal.structure.new(sptr, 0)) for index, sptr in iterable]
-    for key, value in type.items():
-        listable = [item for item in __matcher__.match(key, value, listable)]
-    for item in listable: yield item
+    for index, item in __iterate__(**type):
+        yield index, item
+    return
 
 @utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
