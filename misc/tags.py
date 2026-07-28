@@ -485,8 +485,7 @@ class select_v0(object):
             return
 
         # If nothing specified to filter the tags, then we need to filter the
-        # empty tag and any dunder-prefixed tags from our query. We also need to
-        # convert the structure id into an `internal.structure.structure_t`.
+        # empty tag and any dunder-prefixed tags from our query.
         for sid, res in query_v0.structures(*args, **kwargs):
             explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
             if explicit:
@@ -497,27 +496,14 @@ class select_v0(object):
     @classmethod
     def structure(cls, sid, *args, **kwargs):
         '''Query the members of the structure `sid` from the database and yield a tuple containing the member identifier and all the chosen tags.'''
-
-        # If we were given a structure_t or members_t, then preserve them and
-        # extract the sid so that we can return items with the same base offset.
-        if isinstance(sid, internal.structure.structure_t):
-            sptr = sid.ptr
-        elif isinstance(sid, internal.structure.members_t):
-            sptr = sid.owner.ptr
-        else:
-            sptr = idaapi.get_struc(sid)
-
-        # If we were given some args to use for selecting certain tags, then we
-        # can just trust our query and only need to convert its member id
-        # into one of our `internal.structure.member_t` types.
         if args or kwargs:
-            for mid, res in query_v0.structure(sptr.id, *args, **kwargs):
+            for mid, res in query_v0.structure(sid, *args, **kwargs):
                 yield mid, res
             return
 
         # Otherwise we're being asked to yield everything but the empty tag and
         # any implicit tags. We also convert the member id into a `member_t`.
-        for mid, res in query_v0.structure(sptr.id, *args, **kwargs):
+        for mid, res in query_v0.structure(sid, *args, **kwargs):
             explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
             if explicit:
                 yield mid, explicit
@@ -527,9 +513,6 @@ class select_v0(object):
     @classmethod
     def owners(cls, *args, **kwargs):
         '''Query the members in the database and yield a tuple containing the owning structure identifier and a set of the matching `required` tags with any `included` ones.'''
-
-        # If we were given some tags to select with, then we can just trust
-        # whatever the query gives us whilst still yielding a `member_t`.
         if args or kwargs:
             for sid, res in query_v0.owners(*args, **kwargs):
                 yield sid, res
