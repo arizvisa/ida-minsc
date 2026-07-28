@@ -55,7 +55,7 @@ The different types that one can filter structures with are the following:
     `union` - Match structures that are defined as a union
     `library` - Match structures that originate from a type library
     `variable` - Match structures that have a variable-size
-    `parent` - Filter structures that are not nested as members of other structures
+    `parent` - Match structures that are nested (true) or not (false) as members of other structures
     `tagged` - Filter structures for any with the specified tag(s)
     `members` - Filter structures for any containing members with the specified tag(s)
     `count` - Filter structures by the number of members
@@ -86,23 +86,25 @@ logging = logging.getLogger(__name__)
 structure_t, member_t = internal.structure.structure_t, internal.structure.member_t
 
 __matcher__ = utils.matcher()
-__matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(-1), 'name')
-__matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), operator.itemgetter(-1), 'name')
+__matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(-1), internal.structure.naming.get)
+__matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), operator.itemgetter(-1), internal.structure.naming.get)
 __matcher__.attribute('index', operator.itemgetter(0))
 __matcher__.attribute('identifier', operator.itemgetter(-1), 'id'), __matcher__.alias('id', 'identifier')
-__matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(-1), 'name')
-__matcher__.combinator('name', utils.fcondition(utils.finstance(types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(utils.itermap, operator.methodcaller('lower')), types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(-1), 'name', operator.methodcaller('lower'))
-__matcher__.combinator('size', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(-1), 'ptr', idaapi.get_struc_size)
-__matcher__.boolean('ge', operator.le, operator.itemgetter(-1), 'ptr', idaapi.get_struc_size)
-__matcher__.boolean('gt', operator.lt, operator.itemgetter(-1), 'ptr', idaapi.get_struc_size), __matcher__.alias('greater', 'gt')
-__matcher__.boolean('le', operator.ge, operator.itemgetter(-1), 'ptr', idaapi.get_struc_size)
-__matcher__.boolean('lt', operator.gt, operator.itemgetter(-1), 'ptr', idaapi.get_struc_size), __matcher__.alias('less', 'lt')
+__matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(-1), internal.structure.naming.get)
+__matcher__.combinator('name', utils.fcondition(utils.finstance(types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(utils.itermap, operator.methodcaller('lower')), types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(-1), internal.structure.naming.get, operator.methodcaller('lower'))
+__matcher__.combinator('size', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(-1), 'ptr', utils.fcondition(utils.finstance(idaapi.tinfo_t))(interface.tinfo.size, idaapi.get_struc_size))
+__matcher__.boolean('ge', operator.le, operator.itemgetter(-1), utils.fcondition(utils.finstance(idaapi.tinfo_t))(interface.tinfo.size, idaapi.get_struc_size))
+__matcher__.boolean('gt', operator.lt, operator.itemgetter(-1), utils.fcondition(utils.finstance(idaapi.tinfo_t))(interface.tinfo.size, idaapi.get_struc_size)), __matcher__.alias('greater', 'gt')
+__matcher__.boolean('le', operator.ge, operator.itemgetter(-1), utils.fcondition(utils.finstance(idaapi.tinfo_t))(interface.tinfo.size, idaapi.get_struc_size))
+__matcher__.boolean('lt', operator.gt, operator.itemgetter(-1), utils.fcondition(utils.finstance(idaapi.tinfo_t))(interface.tinfo.size, idaapi.get_struc_size)), __matcher__.alias('less', 'lt')
 __matcher__.mapping('visible', operator.not_, operator.itemgetter(-1), 'ptr', 'props', functools.partial(operator.and_, getattr(idaapi, 'SF_NOLIST', 0x8)))
 __matcher__.mapping('folded', operator.truth, operator.itemgetter(-1), 'ptr', 'props', functools.partial(operator.and_, getattr(idaapi, 'SF_HIDDEN', 0x20)))
-__matcher__.mapping('union', operator.truth, operator.itemgetter(-1), 'ptr', 'props', functools.partial(operator.and_, getattr(idaapi, 'SF_UNION', 0x2)))
+__matcher__.mapping('union', operator.truth, operator.itemgetter(-1), 'ptr', internal.structure.union)
 __matcher__.mapping('library', operator.truth, operator.itemgetter(-1), 'ptr', 'props', functools.partial(operator.and_, getattr(idaapi, 'SF_GHOST', 0x1000) | getattr(idaapi, 'SF_TYPLIB', 0x10)))
-__matcher__.mapping('variable', operator.truth, operator.itemgetter(-1), 'ptr', 'props', functools.partial(operator.and_, idaapi.SF_VAR))
-__matcher__.mapping('parent', operator.not_, operator.itemgetter(-1), 'id', interface.xref.to, functools.partial(builtins.map, operator.itemgetter(0)), functools.partial(builtins.filter, idaapi.get_member_by_id), functools.partial(builtins.map, utils.fcompose(idaapi.get_member_by_id, operator.itemgetter(2))), functools.partial(builtins.filter, utils.fcompose(internal.structure.frame, operator.not_)), types.list)
+__matcher__.mapping('variable', operator.truth, operator.itemgetter(-1), 'ptr', utils.fcondition(utils.finstance(idaapi.tinfo_t))(operator.methodcaller('is_varstruct'), utils.fcompose(operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_VAR', 1)))))
+
+# FIXME: is it better to rename this to "nested" which makes much more sense?
+__matcher__.mapping('parent', operator.truth, operator.itemgetter(-1), 'ptr', utils.fcondition(utils.finstance(idaapi.tinfo_t))(utils.fcompose(interface.tinfo.identifier, interface.xref.to, functools.partial(utils.itermap, operator.itemgetter(0)), functools.partial(utils.iterfilter, internal.structure.has_member), functools.partial(utils.itermap, utils.fcompose(internal.structure.v9members.by, operator.itemgetter(0)))), utils.fcompose(operator.attrgetter('id'), interface.xref.to, functools.partial(utils.itermap, operator.itemgetter(0)), functools.partial(utils.iterfilter, internal.structure.has_member), functools.partial(utils.itermap, utils.fcompose(idaapi.get_member_by_id, operator.itemgetter(2)) if hasattr(idaapi, 'get_member_by_id') else utils.fconstant(idaapi.BADADDR)))), functools.partial(utils.iterfilter, utils.fcompose(internal.structure.frame, operator.not_)), types.list)
 __matcher__.combinator('count', utils.fcondition(utils.finstance(internal.types.unordered), utils.finstance(internal.types.bool))(utils.fcompose(internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, utils.fpartial(operator.lt, 0))), utils.fcompose(utils.fpartial(utils.fpartial, operator.eq))), operator.itemgetter(-1), operator.attrgetter('members'), utils.icount)
 
 __matcher__.combinator('tagged', utils.fcompose(utils.fcompose, utils.fcondition(utils.finstance(internal.types.bool, internal.types.integer), utils.finstance(internal.types.string))(utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(internal.tags.select.structures), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(internal.tags.select.structures), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, utils.fcompose(operator.contains, operator.not_)))), utils.fcompose(internal.tags.select.structures, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(internal.types.set, internal.tags.select.structures, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)))), operator.itemgetter(-1), 'id')
@@ -112,10 +114,10 @@ __matcher__.combinator('members', utils.fcompose(utils.fcompose, utils.fconditio
 # FIXME: should we split the names up by namespace ('::') and check each
 #        one to figure out if its an anonymous name? we could also verify
 #        that the character set (ucase hex) and length (32) is correct.
-__matcher__.mapping('anonymous', operator.truth, operator.itemgetter(-1), 'name', operator.methodcaller('startswith', '$'))
+__matcher__.mapping('anonymous', operator.truth, operator.itemgetter(-1), internal.structure.naming.get, operator.methodcaller('startswith', '$'))
 
-__matcher__.mapping('contiguous', functools.partial(operator.le, 0), operator.itemgetter(-1), 'ptr', utils.fcondition(internal.structure.union)(utils.fconstant(0), utils.fcompose(utils.fmap(utils.fcompose(operator.attrgetter('members'), functools.partial(functools.partial, operator.getitem)), utils.fcompose(operator.attrgetter('memqty'), builtins.range)), utils.funpack(builtins.map), utils.freverse(functools.partial(functools.reduce, lambda eoff, member: member.eoff if member.soff == eoff else -1), 0))))
-__matcher__.combinator('structure', utils.fcondition(utils.finstance(internal.structure.structuretypes))(utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(filter, utils.finstance(internal.structure.structuretypes)), utils.fpartial(utils.itermap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(-1), 'id')
+__matcher__.mapping('contiguous', functools.partial(operator.le, 0), operator.itemgetter(-1), utils.fcondition(internal.structure.union)(utils.fconstant(0), utils.fcompose(utils.fmap(utils.fcompose(operator.attrgetter('members'), functools.partial(functools.partial, operator.getitem)), utils.fcompose(operator.attrgetter('ptr'), utils.fcondition(utils.finstance(idaapi.tinfo_t))(internal.structure.v9members.count, internal.structure.members.count), builtins.range)), utils.funpack(builtins.map), utils.freverse(functools.partial(functools.reduce, lambda right, member: member.right if member.left == right else -1), 0))))
+__matcher__.combinator('structure', utils.fcondition(utils.finstance(internal.structure.structuretypes))(utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(utils.iterfilter, utils.finstance(internal.structure.structuretypes)), utils.fpartial(utils.itermap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(-1), 'id')
 __matcher__.alias('structures', 'structure')
 __matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
 
