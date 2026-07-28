@@ -7721,6 +7721,14 @@ class tinfo(object):
         if not isinstance(type, idaapi.tinfo_t):
             return type
 
+        # If we were given a frame, though, then we log a warning and return a
+        # copy since `replace_ordinal_typerefs` causes them to act funny.
+        elif internal.structure.frame(type):
+            fn = function.by_frame(type)
+            ea = range.start(fn)
+            logging.warning(u"{:s}.concretize({!r}{!s}) : Returning a non-concrete type for the frame belonging to the function at {:#x}.".format('.'.join([cls.__name__, cls.__name__]), "{!s}".format(type), ", {:s}".format(tinfo.format_library(*library)) if library else '', ea))
+            return cls.copy(type, *library)
+
         # First we need to figure out what library the type is from.
         [til] = library if library else [cls.library(type)]
 
@@ -7732,7 +7740,7 @@ class tinfo(object):
         # internal function and is intended to be abstracted away from the user.
         if res < 0:
             description = "{:s}<{:s}>".format(internal.utils.pycompat.fullname(til.__class__), til.desc or '') if til and til.desc else "{!s}".format(til)
-            logging.debug(u"{:s}.concretize({!r}, {!s}) : Returning the non-concrete type for \"{!s}\" due to an error being returned (error {:d}).".format('.'.join([cls.__name__, cls.__name__]), "{!s}".format(type), description, internal.utils.string.escape("{!s}".format(type), '"'), res))
+            logging.debug(u"{:s}.concretize({!r}{!s}) : Returning the non-concrete type for \"{!s}\" due to an error being returned (error {:d}).".format('.'.join([cls.__name__, cls.__name__]), "{!s}".format(type), ", {:s}".format(tinfo.format_library(*library)) if library else '', internal.utils.string.escape("{!s}".format(type), '"'), res))
         return type if res < 0 else new
 
     @classmethod
