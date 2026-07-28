@@ -122,6 +122,24 @@ def frame(type):
 
 def iterate():
     '''Iterate through the structures defined in the database.'''
+    iterable = interface.tinfo.iterate()
+
+    # If we're using a newer version of the disassembler, then the iterating
+    # through the structures is the exact same as iterating through the local
+    # types, just with some additional filtering for structures and unions.
+    # XXX: We use the ordinal to generate a reference type because the target
+    #      type doesn't actually have an identifier attached to it. So, since
+    #      all of our functionality comes from assuming that there's a unique
+    #      identifier we avoid using the target type for anything other than
+    #      verifying its well-formedness and that it's a structure/union.
+    if not hasattr(idaapi, 'get_first_struc_idx'):
+        for ordinal, name, ti in iterable:
+            if ti and not ti.empty() and ti.is_udt():
+                yield ordinal, interface.tinfo.for_ordinal(ordinal)
+            continue
+        return
+
+    # Otherwise we can just use the old structure interface to yield each one.
     res = idaapi.get_first_struc_idx()
     if res == idaapi.BADADDR: return
 
