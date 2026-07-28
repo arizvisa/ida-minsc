@@ -7697,21 +7697,22 @@ class tinfo(object):
     @classmethod
     def copy(cls, type, *library):
         '''Return a copy of the given `type` from the specified type library.'''
+        [til] = library if library else [cls.library(type)]
         if isinstance(type, idaapi.tinfo_t) and hasattr(type, 'copy'):
             return type.copy()
 
         # First try and determine the type library that is needed for deserialization.
         elif isinstance(type, idaapi.tinfo_t):
             ti = idaapi.tinfo_t()
-            [til] = library if library else [cls.library(type)]
 
             # Now we serialize the type, and then deserialize it afterwards.
             serialized = type.serialize()
             if not ti.deserialize(til, *serialized):
                 description = "{:s}<{:s}>".format(internal.utils.pycompat.fullname(til.__class__), til.desc or '') if til and til.desc else "{!s}".format(til)
-                raise internal.exceptions.DisassemblerError(u"{:s}.copy({!r}, {:s}) : Unable to use the serialized information from the type ({!r}) to make a copy of it.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), description, serialized))
+                raise internal.exceptions.DisassemblerError(u"{:s}.copy({!r}{!s}) : Unable to use the serialized information from the type ({!r}) to make a copy of it.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ", {:s}".format(description) if library else '', serialized))
             return ti
-        return
+        description = "{:s}<{:s}>".format(internal.utils.pycompat.fullname(til.__class__), til.desc or '') if til and til.desc else "{!s}".format(til)
+        raise internal.exceptions.InvalidParameterError(u"{:s}.copy({!s}{!s}) : Unable to make a copy for the specified type due to it being an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(type) if isinstance(type, internal.types.integer) else "{!r}".format(type), ", {:s}".format(description) if library else '', type.__class__))
 
     @classmethod
     def concretize(cls, type, *library):
