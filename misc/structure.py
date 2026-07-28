@@ -930,7 +930,7 @@ class v9member(object):
         '''Apply the pythonic `type` at the given `offset` to the specified member.'''
         if len(args) in {2, 3} and isinstance(args[0], internal.types.integer):
             args, [type, offset] = args[:1], itertools.chain(args[1:], [0]) if len(args) < 3 else args[1:]
-        elif len(args) in {4, 5}:
+        elif len(args) in {3, 4}:
             args, [type, offset] = args[:2], itertools.chain(args[2:], [0]) if len(args) < 5 else args[2:]
         else:
             caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'get_type'])
