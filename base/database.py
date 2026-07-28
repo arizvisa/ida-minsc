@@ -677,7 +677,7 @@ class functions(object):
             # any flags that might be useful
             ftagged = '-' if not tags else '*' if any(not item.startswith('__') for item in tags) else '+'
             ftyped = 'D' if function.type.decompiled(ea) else '-' if not interface.function.has_typeinfo(func) else 'T' if interface.node.aflags(ea, idaapi.AFL_USERTI) else 't'
-            fframe = '?' if function.type.problem(ea, getattr(idaapi, 'PR_BADSTACK', 0xb)) else 'v' if idaapi.get_frame(ea) and Fcount_lvars(func) else '-'
+            fframe = '?' if function.type.problem(ea, getattr(idaapi, 'PR_BADSTACK', 0xb)) else 'v' if interface.function.has_frame(ea) and Fcount_lvars(func) else '-'
             fgeneral = 'J' if func.flags & idaapi.FUNC_THUNK else 'L' if func.flags & idaapi.FUNC_LIB else 'S' if func.flags & idaapi.FUNC_STATICDEF else 'F'
             flags = itertools.chain(fgeneral, fframe, ftyped, ftagged)
 
