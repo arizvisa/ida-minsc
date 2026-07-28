@@ -159,7 +159,7 @@ class query_v0(object):
 
         # user doesn't want anything specific, so yield all of them and their tags.
         if not(required or included):
-            for sptr in internal.structure.iterate():
+            for _, sptr in internal.structure.iterate():
                 content = structure.get(sptr)
 
                 # if the structure had some content (tags), then we have a match
@@ -170,7 +170,7 @@ class query_v0(object):
             return
 
         # now we just slowly iterate through our structures looking for any matches.
-        for sptr in internal.structure.iterate():
+        for _, sptr in internal.structure.iterate():
             content = structure.get(sptr)
 
             # included is the equivalent of Or(|) and yields the structure if any of the tagnames are used.
@@ -232,7 +232,7 @@ class query_v0(object):
         # If we weren't given anything to query with, then we need to yield
         # the members tags for every single structure that we can find.
         if not(required or included):
-            for sptr in internal.structure.iterate():
+            for _, sptr in internal.structure.iterate():
                 iterable = (member.get(mptr) for mowner, mindex, mptr in internal.structure.members.iterate(sptr.id))
                 names = {tag for tag in itertools.chain(*iterable)}
                 if names:
@@ -242,7 +242,7 @@ class query_v0(object):
 
         # If we were given something to query the members of each structure
         # with, then we first grab the tags for every single structure member.
-        for sptr in internal.structure.iterate():
+        for _, sptr in internal.structure.iterate():
             iterable = (member.get(mptr) for mowner, mindex, mptr in internal.structure.members.iterate(sptr.id))
             names = {tag for tag in itertools.chain(*iterable)}
 
@@ -272,7 +272,7 @@ class query_v0(object):
         # If there were no parameters to filter with, then we can just yield
         # every tag that we find.
         if not(required or included):
-            for sptr in internal.structure.iterate():
+            for _, sptr in internal.structure.iterate():
                 for mowner, mindex, mptr in internal.structure.members.iterate(sptr.id):
                     content = member.get(mptr)
 
@@ -286,7 +286,7 @@ class query_v0(object):
 
         # If we were given something to query the members of each structure
         # with, then we first grab the tags for every single structure member.
-        for sptr in internal.structure.iterate():
+        for _, sptr in internal.structure.iterate():
             for mowner, mindex, mptr in internal.structure.members.iterate(sptr.id):
                 content = member.get(mptr)
 
