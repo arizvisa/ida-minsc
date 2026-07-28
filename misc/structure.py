@@ -36,6 +36,8 @@ def has(id):
         return tinfo.is_struct() or tinfo.is_union()
     elif isinstance(id, types.string) and interface.tinfo.has_name(id):
         return interface.tinfo.for_name(id).is_udt()
+    elif isinstance(id, structuretypes):
+        return has(id.id)
     return False
 
 def has_member(id):
