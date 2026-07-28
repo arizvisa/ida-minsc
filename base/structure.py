@@ -130,7 +130,7 @@ def iterate(string, *suffix):
 def iterate(**type):
     '''Iterate through all of the structures that match the keyword specified by `type`.'''
     if not type: type = {'predicate': lambda item: True}
-    iterable = ((idaapi.get_struc_idx(sptr.id), sptr) for sptr in internal.structure.iterate())
+    iterable = ((index, sptr) for index, sptr in internal.structure.iterate())
     listable = [(index, internal.structure.new(sptr, 0)) for index, sptr in iterable]
     for key, value in type.items():
         listable = [item for item in __matcher__.match(key, value, listable)]
