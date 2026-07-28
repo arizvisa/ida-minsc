@@ -617,7 +617,7 @@ def upgrade_functions_v1():
 def upgrade_structures_v1():
     '''Upgrade the structure tags to the tagindex (v1).'''
     oldcount = newcount = 0
-    for sptr in internal.structure.iterate():
+    for _, sptr in internal.structure.iterate():
         res = internal.tags.typeinfo.get(sptr) if isinstance(sptr, idaapi.tinfo_t) else internal.tags.structure.get(sptr)
         sid = internal.interface.tinfo.identifier(sptr)
         oldcount += len(res)
@@ -627,7 +627,7 @@ def upgrade_structures_v1():
 def upgrade_members_v1():
     '''Upgrade the structure tags to the tagindex (v1).'''
     oldcount = newcount = 0
-    for sptr in internal.structure.iterate():
+    for _, sptr in internal.structure.iterate():
         Fiterate_members = internal.structure.v9members.iterate if isinstance(sptr, idaapi.tinfo_t) else internal.structure.members.iterate
         for mowner, mindex, mptr in Fiterate_members(sptr):
             mid = mowner.get_udm_tid(mindex) if isinstance(mowner, idaapi.tinfo_t) else mid
@@ -829,7 +829,7 @@ class relocate_schema_v1(object):
         logging.info("{:s}.__migrate_structures({!s}, {!s}) : Copying structures for schema \"{:s}\" to \"{:s}\".".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, internal.utils.string.escape(schema_descr, '"'), internal.utils.string.escape(dest_descr, '"')))
 
         results = []
-        for sptr in internal.structure.iterate():
+        for _, sptr in internal.structure.iterate():
             snode = dnode = sid = sptr.id
 
             for tagname, nodeinterface in schema.localinterfaces.items():
@@ -904,7 +904,7 @@ class relocate_schema_v1(object):
         logging.info("{:s}.__erase_structures({!s}) : Removing functions for schema \"{:s}\".".format('.'.join([__name__, cls.__name__]), schema_descr, internal.utils.string.escape(schema_descr, '"')))
 
         results = []
-        for sptr in internal.structure.iterate():
+        for _, sptr in internal.structure.iterate():
             snode = sid = sptr.id
             for tagname, nodeinterface in schema.localinterfaces.items():
                 stag = getattr(schema, tagname)
