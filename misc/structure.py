@@ -2226,11 +2226,26 @@ class v9members(object):
     def iterate(cls, type, *slice):
         '''Yield each member specified by `slice` from the structure identified by `sptr`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
-        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+
+        # Use whatever it was we were given to get the type and its identifier.
+        tinfo = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            tinfo, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and tinfo.get_type_by_tid(type):
+            tinfo, sid = tinfo, type
+        elif isinstance(type, structure_t):
+            tinfo, sid = address.type(type.id), type.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            tinfo, sid = address.type(type.id), type.id
+        else:
+            raise E.InvalidParameterError(u"{:s}.iterate({!s}, {!r}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{!r}".format(type), slice, type.__class__))
+
+        # Next we get the details for the type that we received or determined.
+        utd = idaapi.udt_type_data_t()
         if not (tinfo.is_struct() or union(tinfo)):
-            raise E.InvalidTypeOrValueError(u"{:s}.iterate({!s}, {!r}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), slice))
+            raise E.InvalidTypeOrValueError(u"{:s}.iterate({!s}, {!r}) : The specified type ({:#x}) is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), slice, sid))
         elif not tinfo.get_udt_details(utd):
-            raise E.DisassemblerError(u"{:s}.iterate({!s}, {!r}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), slice))
+            raise E.DisassemblerError(u"{:s}.iterate({!s}, {!r}) : Unable to get the details for the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), slice, sid))
 
         # Figure out what was selected from the slice and yield each member.
         [selection] = slice if slice else [builtins.slice(None)]
