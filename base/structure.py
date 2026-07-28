@@ -86,36 +86,36 @@ logging = logging.getLogger(__name__)
 structure_t, member_t = internal.structure.structure_t, internal.structure.member_t
 
 __matcher__ = utils.matcher()
-__matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
-__matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), 'name')
-__matcher__.attribute('index', 'id', idaapi.get_struc_idx)
-__matcher__.attribute('identifier', 'id'), __matcher__.alias('id', 'identifier')
-__matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
-__matcher__.combinator('name', utils.fcondition(utils.finstance(types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(utils.itermap, operator.methodcaller('lower')), types.set, utils.fpartial(utils.fpartial, operator.contains))), 'name', operator.methodcaller('lower'))
-__matcher__.combinator('size', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.attrgetter('ptr'), idaapi.get_struc_size)
-__matcher__.boolean('ge', operator.le, operator.attrgetter('ptr'), idaapi.get_struc_size)
-__matcher__.boolean('gt', operator.lt, operator.attrgetter('ptr'), idaapi.get_struc_size), __matcher__.alias('greater', 'gt')
-__matcher__.boolean('le', operator.ge, operator.attrgetter('ptr'), idaapi.get_struc_size)
-__matcher__.boolean('lt', operator.gt, operator.attrgetter('ptr'), idaapi.get_struc_size), __matcher__.alias('less', 'lt')
-__matcher__.mapping('visible', operator.not_, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_NOLIST', 0x8)))
-__matcher__.mapping('folded', operator.truth, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_HIDDEN', 0x20)))
-__matcher__.mapping('union', operator.truth, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_UNION', 0x2)))
-__matcher__.mapping('library', operator.truth, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_GHOST', 0x1000) | getattr(idaapi, 'SF_TYPLIB', 0x10)))
-__matcher__.mapping('variable', operator.truth, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, idaapi.SF_VAR))
-__matcher__.mapping('parent', operator.not_, operator.attrgetter('ptr'), operator.attrgetter('id'), interface.xref.to, functools.partial(builtins.map, operator.itemgetter(0)), functools.partial(builtins.filter, idaapi.get_member_by_id), functools.partial(builtins.map, utils.fcompose(idaapi.get_member_by_id, operator.itemgetter(2))), functools.partial(builtins.filter, utils.fcompose(internal.structure.frame, operator.not_)), types.list)
-__matcher__.combinator('count', utils.fcondition(utils.finstance(internal.types.unordered), utils.finstance(internal.types.bool))(utils.fcompose(internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, utils.fpartial(operator.lt, 0))), utils.fcompose(utils.fpartial(utils.fpartial, operator.eq))), operator.attrgetter('members'), utils.icount)
+__matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(-1), 'name')
+__matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), operator.itemgetter(-1), 'name')
+__matcher__.attribute('index', operator.itemgetter(0))
+__matcher__.attribute('identifier', operator.itemgetter(-1), 'id'), __matcher__.alias('id', 'identifier')
+__matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(-1), 'name')
+__matcher__.combinator('name', utils.fcondition(utils.finstance(types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(utils.itermap, operator.methodcaller('lower')), types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(-1), 'name', operator.methodcaller('lower'))
+__matcher__.combinator('size', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(-1), 'ptr', idaapi.get_struc_size)
+__matcher__.boolean('ge', operator.le, operator.itemgetter(-1), 'ptr', idaapi.get_struc_size)
+__matcher__.boolean('gt', operator.lt, operator.itemgetter(-1), 'ptr', idaapi.get_struc_size), __matcher__.alias('greater', 'gt')
+__matcher__.boolean('le', operator.ge, operator.itemgetter(-1), 'ptr', idaapi.get_struc_size)
+__matcher__.boolean('lt', operator.gt, operator.itemgetter(-1), 'ptr', idaapi.get_struc_size), __matcher__.alias('less', 'lt')
+__matcher__.mapping('visible', operator.not_, operator.itemgetter(-1), 'ptr', 'props', functools.partial(operator.and_, getattr(idaapi, 'SF_NOLIST', 0x8)))
+__matcher__.mapping('folded', operator.truth, operator.itemgetter(-1), 'ptr', 'props', functools.partial(operator.and_, getattr(idaapi, 'SF_HIDDEN', 0x20)))
+__matcher__.mapping('union', operator.truth, operator.itemgetter(-1), 'ptr', 'props', functools.partial(operator.and_, getattr(idaapi, 'SF_UNION', 0x2)))
+__matcher__.mapping('library', operator.truth, operator.itemgetter(-1), 'ptr', 'props', functools.partial(operator.and_, getattr(idaapi, 'SF_GHOST', 0x1000) | getattr(idaapi, 'SF_TYPLIB', 0x10)))
+__matcher__.mapping('variable', operator.truth, operator.itemgetter(-1), 'ptr', 'props', functools.partial(operator.and_, idaapi.SF_VAR))
+__matcher__.mapping('parent', operator.not_, operator.itemgetter(-1), 'id', interface.xref.to, functools.partial(builtins.map, operator.itemgetter(0)), functools.partial(builtins.filter, idaapi.get_member_by_id), functools.partial(builtins.map, utils.fcompose(idaapi.get_member_by_id, operator.itemgetter(2))), functools.partial(builtins.filter, utils.fcompose(internal.structure.frame, operator.not_)), types.list)
+__matcher__.combinator('count', utils.fcondition(utils.finstance(internal.types.unordered), utils.finstance(internal.types.bool))(utils.fcompose(internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, utils.fpartial(operator.lt, 0))), utils.fcompose(utils.fpartial(utils.fpartial, operator.eq))), operator.itemgetter(-1), operator.attrgetter('members'), utils.icount)
 
-__matcher__.combinator('tagged', utils.fcompose(utils.fcompose, utils.fcondition(utils.finstance(internal.types.bool, internal.types.integer), utils.finstance(internal.types.string))(utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(internal.tags.select.structures), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(internal.tags.select.structures), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, utils.fcompose(operator.contains, operator.not_)))), utils.fcompose(internal.tags.select.structures, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(internal.types.set, internal.tags.select.structures, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)))), 'id')
+__matcher__.combinator('tagged', utils.fcompose(utils.fcompose, utils.fcondition(utils.finstance(internal.types.bool, internal.types.integer), utils.finstance(internal.types.string))(utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(internal.tags.select.structures), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(internal.tags.select.structures), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, utils.fcompose(operator.contains, operator.not_)))), utils.fcompose(internal.tags.select.structures, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(internal.types.set, internal.tags.select.structures, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)))), operator.itemgetter(-1), 'id')
 __matcher__.alias('tag', 'tagged'), __matcher__.alias('tags', 'tagged')
-__matcher__.combinator('members', utils.fcompose(utils.fcompose, utils.fcondition(utils.finstance(internal.types.bool, internal.types.integer), utils.finstance(internal.types.string))(utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(internal.tags.select.owners), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(internal.tags.select.owners), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, utils.fcompose(operator.contains, operator.not_)))), utils.fcompose(internal.tags.select.owners, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(internal.types.set, internal.tags.select.owners, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)))), 'id')
+__matcher__.combinator('members', utils.fcompose(utils.fcompose, utils.fcondition(utils.finstance(internal.types.bool, internal.types.integer), utils.finstance(internal.types.string))(utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(internal.tags.select.owners), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(internal.tags.select.owners), utils.fpartial(utils.imap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, utils.fcompose(operator.contains, operator.not_)))), utils.fcompose(internal.tags.select.owners, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(internal.types.set, internal.tags.select.owners, utils.fpartial(utils.itermap, operator.itemgetter(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)))), operator.itemgetter(-1), 'id')
 
 # FIXME: should we split the names up by namespace ('::') and check each
 #        one to figure out if its an anonymous name? we could also verify
 #        that the character set (ucase hex) and length (32) is correct.
-__matcher__.mapping('anonymous', operator.truth, 'name', operator.methodcaller('startswith', '$'))
+__matcher__.mapping('anonymous', operator.truth, operator.itemgetter(-1), 'name', operator.methodcaller('startswith', '$'))
 
-__matcher__.mapping('contiguous', functools.partial(operator.le, 0), operator.attrgetter('ptr'), utils.fcondition(internal.structure.union)(utils.fconstant(0), utils.fcompose(utils.fmap(utils.fcompose(operator.attrgetter('members'), functools.partial(functools.partial, operator.getitem)), utils.fcompose(operator.attrgetter('memqty'), builtins.range)), utils.funpack(builtins.map), utils.freverse(functools.partial(functools.reduce, lambda eoff, member: member.eoff if member.soff == eoff else -1), 0))))
-__matcher__.combinator('structure', utils.fcondition(utils.finstance(internal.structure.structuretypes))(utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(filter, utils.finstance(internal.structure.structuretypes)), utils.fpartial(utils.itermap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), 'id')
+__matcher__.mapping('contiguous', functools.partial(operator.le, 0), operator.itemgetter(-1), 'ptr', utils.fcondition(internal.structure.union)(utils.fconstant(0), utils.fcompose(utils.fmap(utils.fcompose(operator.attrgetter('members'), functools.partial(functools.partial, operator.getitem)), utils.fcompose(operator.attrgetter('memqty'), builtins.range)), utils.funpack(builtins.map), utils.freverse(functools.partial(functools.reduce, lambda eoff, member: member.eoff if member.soff == eoff else -1), 0))))
+__matcher__.combinator('structure', utils.fcondition(utils.finstance(internal.structure.structuretypes))(utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(filter, utils.finstance(internal.structure.structuretypes)), utils.fpartial(utils.itermap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(-1), 'id')
 __matcher__.alias('structures', 'structure')
 __matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
 
@@ -130,8 +130,8 @@ def iterate(string, *suffix):
 def iterate(**type):
     '''Iterate through all of the structures that match the keyword specified by `type`.'''
     if not type: type = {'predicate': lambda item: True}
-    iterable = (sptr.id for sptr in internal.structure.iterate())
-    listable = [internal.structure.new(sid, 0) for sid in iterable]
+    iterable = ((idaapi.get_struc_idx(sptr.id), sptr) for sptr in internal.structure.iterate())
+    listable = [(index, internal.structure.new(sptr, 0)) for index, sptr in iterable]
     for key, value in type.items():
         listable = [item for item in __matcher__.match(key, value, listable)]
     for item in listable: yield item
@@ -146,16 +146,16 @@ def list(string, *suffix):
 @utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def list(**type):
     '''List all the structures within the database that match the keyword specified by `type`.'''
-    listable = [item for item in iterate(**type)]
+    listable = [(index, item) for index, item in iterate(**type)]
 
-    maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), listable) if listable else [1])
-    maxname = max(builtins.map(utils.fcompose(operator.attrgetter('name'), utils.fdefault(''), len), listable) if listable else [1])
-    maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:+#x}".format, len), listable) if listable else [1])
+    maxindex = max(builtins.map(utils.fcompose(operator.itemgetter(0), "{:d}".format, len), listable) if listable else [1])
+    maxname = max(builtins.map(utils.fcompose(operator.itemgetter(-1), operator.attrgetter('name'), utils.fdefault(''), len), listable) if listable else [1])
+    maxsize = max(builtins.map(utils.fcompose(operator.itemgetter(-1), operator.attrgetter('size'), "{:+#x}".format, len), listable) if listable else [1])
 
     SF_TYPELIB = getattr(idaapi, 'SF_TYPLIB', 0x10) | getattr(idaapi, 'SF_GHOST', 0x1000)
     SF_NOLIST = getattr(idaapi, 'SF_NOLIST', 0x8)
     SF_HIDDEN = getattr(idaapi, 'SF_HIDDEN', 0x20)
-    for item in listable:
+    for index, item in listable:
         sptr, tags = item.ptr, item.tag()
 
         [tags.pop(name, None) for name in ['__name__', '__typeinfo__']]
@@ -481,14 +481,14 @@ def by(**type):
     '''Return the structure matching the keyword specified by `type`.'''
     searchstring = utils.string.kwargs(type)
 
-    listable = [item for item in iterate(**type)]
+    listable = [(index, item) for index, item in iterate(**type)]
     if len(listable) > 1:
-        messages = ((u"[{:d}] {:s}".format(idaapi.get_struc_idx(st.id), st.name)) for i, st in enumerate(listable))
+        messages = ((u"[{:d}] {:s}".format(index, st.name)) for index, st in listable)
         [ logging.info(msg) for msg in messages ]
         logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, returning the first one {!s}.".format(__name__, searchstring, len(listable), listable[0]))
 
-    iterable = (item for item in listable)
-    res = next(iterable, None)
+    iterable = ((index, item) for (index, item) in listable)
+    _, res = next(iterable, None)
     if res is None:
         raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
