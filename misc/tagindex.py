@@ -1984,37 +1984,62 @@ class members(counted):
     @classmethod
     def hascount(cls, node, mid, position, *tag):
         '''Return whether the reference count in the member `mid` exists for the tag at `position` of the netnode specified by `node`.'''
-        sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+        if idaapi.__version__ < 8.5:
+            sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+            sid = sptr.id
+        else:
+            sptr, mindex, mptr = internal.structure.v9members.by_identifier(mid)
+            sid = interface.tinfo.identifier(sptr)
         countnode, counttag = netnode.get(sptr.id), cls.counttag
         return super(members, cls).hascount(countnode, mid, position, tag=counttag)
 
     @classmethod
     def getcount(cls, node, mid, position, *tag):
         '''Return the reference count for the tag at `position` in the member `mid` of the netnode specified by `node`.'''
-        sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
-        countnode, counttag = netnode.get(sptr.id), cls.counttag
+        if idaapi.__version__ < 8.5:
+            sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+            sid = sptr.id
+        else:
+            sptr, mindex, mptr = internal.structure.v9members.by_identifier(mid)
+            sid = interface.tinfo.identifier(sptr)
+        countnode, counttag = netnode.get(sid), cls.counttag
         return super(members, cls).getcount(countnode, mid, position, tag=counttag)
 
     @classmethod
     def setcount(cls, node, mid, position, count, *tag):
         '''Set the reference count for the tag at `position` in the member `mid` of the netnode specified by `node` to `count`.'''
-        sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
-        countnode, counttag = netnode.get(sptr.id), cls.counttag
+        if idaapi.__version__ < 8.5:
+            sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+            sid = sptr.id
+        else:
+            sptr, mindex, mptr = internal.structure.v9members.by_identifier(mid)
+            sid = interface.tinfo.identifier(sptr)
+        countnode, counttag = netnode.get(sid), cls.counttag
         return super(members, cls).setcount(countnode, mid, position, count, tag=counttag)
 
     @classmethod
     def getusage(cls, node, mid, tag):
         '''Return the usage mask for the tags used by the members of structure owning the member `mid`.'''
-        sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+        if idaapi.__version__ < 8.5:
+            sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+            sid = sptr.id
+        else:
+            sptr, mindex, mptr = internal.structure.v9members.by_identifier(mid)
+            sid = interface.tinfo.identifier(sptr)
         usagenode, usagetag = cls.node(), cls.usagetag
-        return super(members, cls).getusage(usagenode, sptr.id, tag=usagetag)
+        return super(members, cls).getusage(usagenode, sid, tag=usagetag)
 
     @classmethod
     def setusage(cls, node, mid, used, tag):
         '''Set the usage mask for the tags used by the members of structure owning the member `mid` to the integer in `used`.'''
-        sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+        if idaapi.__version__ < 8.5:
+            sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+            sid = sptr.id
+        else:
+            sptr, mindex, mptr = internal.structure.v9members.by_identifier(mid)
+            sid = interface.tinfo.identifier(sptr)
         usagenode, usagetag = cls.node(), cls.usagetag
-        return super(members, cls).setusage(usagenode, sptr.id, used, tag=usagetag)
+        return super(members, cls).setusage(usagenode, sid, used, tag=usagetag)
 
     ## regular methods that we only override to hide any arguments that we can
     ## figure out by ourselves.
@@ -2076,8 +2101,19 @@ class members(counted):
         '''Yield the member id and mask for each member of the structures in `sids`.'''
         iterable = sids if isinstance(sids, types.unordered) else [sids]
         selected = {sid for sid in iterable}
-        iterable = itertools.chain(*map(internal.structure.members.iterate, selected))
-        identifiers = ((sptr.id, mptr.id) for sptr, mindex, mptr in iterable)
+
+        # if we're using an older disassembler with the older structure apis,
+        # then we can just go ahead and use them to get the member identifiers.
+        if idaapi.__version__ < 8.5:
+            iterable = itertools.chain(*map(internal.structure.members.iterate, selected))
+            identifiers = ((sptr.id, mptr.id) for sptr, mindex, mptr in iterable)
+
+        # otherwise we use the v9 api to iterate through all the members.
+        else:
+            iterable = itertools.chain(*map(internal.structure.v9members.iterate, selected))
+            identifiers = ((interface.tinfo.identifier(sptr), interface.tinfo.member_identifier(sptr, mindex)) for sptr, mindex, mptr in iterable)
+
+        # select all of the member identifiers matching the selected types.
         requested = {mid for mowner, mid in identifiers if mowner in selected}
 
         # now that we have a set of requested member ids, we can iterate through
@@ -2131,17 +2167,21 @@ class members(counted):
 
         members = []
         for index, (mid, integer) in enumerate(items):
-            if internal.structure.member.has(mid):
+            if not internal.structure.member.has(mid):
+                mptr, fullname = None, u'<REMOVED>'
+            elif idaapi.__version__ < 8.5:
                 sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
                 fullname = internal.structure.member.fullname(mptr)
             else:
-                mptr, fullname = None, u'<REMOVED>'
+                sptr, mindex, mptr = internal.structure.v9members.by_identifier(mid)
+                fullname = internal.structure.v9member.fullname(sptr, mindex)
+                mptr = mindex
             names = tags.names(integer)
-            members.append((index, mid, mptr, integer, fullname, names))
+            members.append((index, sptr, mid, mptr, integer, fullname, names))
 
-        maxname = max(len(name) for _, _, _, _, name, _ in members) if members else 0
-        maxtags = max(len("{!s}".format(names)) for _, _, _, _, _, names in members) if members else 0
-        iterable = [','.join(map("{:d}".format, tags.explode(integer))) for _, _, _, integer, fullname, _ in members if Fmatch(fullname)]
+        maxname = max(len(name) for _, _, _, _, _, name, _ in members) if members else 0
+        maxtags = max(len("{!s}".format(names)) for _, _, _, _, _, _, names in members) if members else 0
+        iterable = [','.join(map("{:d}".format, tags.explode(integer))) for _, _, _, _, integer, fullname, _ in members if Fmatch(fullname)]
         maxpositions = max(map(len, iterable)) if members else 0
 
         lines = []
@@ -2151,9 +2191,15 @@ class members(counted):
         #        reference counts.
 
         lines.append(u"Structure members with tags:")
-        for index, mid, mptr, integer, fullname, names in members:
-            if not Fmatch(fullname): continue
-            iterable = (internal.structure.member.get_comment(mptr, boolean) for boolean in [True, False]) if mptr else ()
+        for index, mowner, mid, mptr, integer, fullname, names in members:
+            if not Fmatch(fullname):
+                continue
+            elif mptr is None:
+                iterable = ()
+            elif isinstance(mowner, idaapi.tinfo_t):
+                iterable = (internal.structure.v9member.get_comment(mowner, mptr, boolean) for boolean in [True, False])
+            else:
+                iterable = (internal.structure.member.get_comment(mptr, boolean) for boolean in [True, False])
             filtered = [comment for comment in filter(None, iterable)]
             exploded = ','.join(map("{:d}".format, tags.explode(integer)))
             lines.append("[{:#x}] {:<{:d}s} : {:<{:d}s} : {:<{:d}s}{:s}".format(mid, fullname, maxname, exploded, maxpositions, "{!s}".format(names), maxtags, " // {!s}".format(filtered) if filtered else ''))
