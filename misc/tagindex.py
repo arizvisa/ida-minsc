@@ -2369,11 +2369,18 @@ class structure(schema):
 
         res = []
         for index, (sid, integer) in enumerate(items):
-            if internal.structure.has(sid):
+            ti = idaapi.tinfo_t()
+            if not internal.structure.has(sid):
+                sptr = None
+            elif hasattr(idaapi, 'get_struc'):
                 sptr = idaapi.get_struc(sid)
-                fullname = internal.structure.naming.get(sptr)
+            elif ti.get_type_by_tid(sid):
+                sptr = ti
             else:
-                sptr, fullname = None, u'<REMOVED>'
+                res.append((index, sid, None, integer, u'<MISSING>', tags.names(integer)))
+                continue
+
+            fullname = internal.structure.naming.get(sptr) if sptr else u'<REMOVED>'
             names = tags.names(integer)
             res.append((index, sid, sptr, integer, fullname, names))
 
@@ -3292,7 +3299,7 @@ class hexvariable(counted):
 
         # this encoding is used for storing arbitrarily-sized data by allocating
         # an index in the "locinfotag" table, and then serializing the data and
-        # then writing it. specifically, this is used by the `ALOC_DIST` type. 
+        # then writing it. specifically, this is used by the `ALOC_DIST` type.
         elif encoding == 5:
             res = cls.locinfo_raw(integer & wordmask)
 
