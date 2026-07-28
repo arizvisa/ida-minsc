@@ -2815,7 +2815,7 @@ class structurenaming(changingchanged):
         # Otherwise, we need to check if we were given a frame. Normally, the
         # user shouldn't be able to rename a frame structure as the disassembler
         # won't really like it, but we support doing this anyways.
-        if sptr.props & idaapi.SF_FRAME:
+        if internal.structure.frame(sptr):
             prefix, suffix = name.split(' ', 1) if name.startswith('$ ') else ('', name)
             return prefix == '$' and all(digit in '0123456789ABCDEF' for digit in suffix.upper())
 
@@ -2856,11 +2856,11 @@ class structurenaming(changingchanged):
 
         # If the flags for the structure suggest that it's unlisted, then we
         # treat it as untracked since the user wouldn't normally see it.
-        elif sptr.props & idaapi.SF_NOLIST:
+        elif hasattr(sptr, 'props') and sptr.props & idaapi.SF_NOLIST:
             return False
 
         # If it's a frame, then it is also unlisted and untracked.
-        elif sptr.props & idaapi.SF_FRAME:
+        elif internal.structure.frame(sptr):
             return False
 
         # Next we need to check if the structure was copied from the type
@@ -2868,7 +2868,7 @@ class structurenaming(changingchanged):
         # tracking it since it is owned by the disassembler. We used to care
         # about SF_GHOST types, but since the disassembler is getting rid of
         # these in v9.0, we stick to only things from the type library.
-        elif sptr.props & getattr(idaapi, 'SF_TYPLIB', 0):
+        elif hasattr(sptr, 'props') and sptr.props & getattr(idaapi, 'SF_TYPLIB', 0):
             return False
         return True
 
@@ -2881,25 +2881,26 @@ class structurenaming(changingchanged):
         # Grab the structure from the database using its id and then check if it
         # belongs to a frame. If it does, then we can ignore it entirely.
         sptr = internal.structure.by_identifier(struc_id)
-        if sptr.props & idaapi.SF_FRAME:
+        if internal.structure.frame(sptr):
             return logging.debug(u"{:s}.created({:#x}) : Ignoring structurenaming.created event for structure {:#x} (is a frame).".format('.'.join([__name__, cls.__name__]), struc_id, struc_id))
         logging.debug(u"{:s}.created({:#x}) : Received structurenaming.created event for structure {:#x}.".format('.'.join([__name__, cls.__name__]), struc_id, struc_id))
+        sid = interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
 
         # All we need to do is grab its name and check if it's a general name or
         # a user-specified one. We also check that the structure is listed,
         # since if it isn't then it's technically nameless. If we discover it is
         # listed and a user-specified name, then we can go ahead and increment
         # its reference count for the "__name__" tag.
-        name = internal.structure.naming.get(sptr)
-        if not cls.is_general_name(sptr.id, name) and not sptr.props & idaapi.SF_NOLIST:
-            internal.tags.reference.structure.increment(sptr.id, '__name__')
+        name, listedQ = internal.structure.naming.get(sptr), not sptr.props & idaapi.SF_NOLIST if hasattr(sptr, 'props') else True
+        if not cls.is_general_name(sid, name) and listedQ:
+            internal.tags.reference.structure.increment(sid, '__name__')
 
         # Next we need to increment the "__typeinfo__" tag. We don't have a real
         # way of distinguishing whether a structure has been created by the user
         # or the disassembler, so we rely on whether the structure was created
         # at the same time as the database or after the analysis has completed.
-        if cls.is_tracked(sptr.id, name):
-            internal.tags.reference.structure.increment(sptr.id, '__typeinfo__')
+        if cls.is_tracked(sid, name):
+            internal.tags.reference.structure.increment(sid, '__typeinfo__')
         return
 
     # XXX: the following is not implemented because as it turns out, the event
@@ -3003,7 +3004,7 @@ class structurenaming(changingchanged):
 
         # Unpack the structure id, and then use it to regrab the structure from
         # the database. If it doesn't exist, then abort and don't do anything.
-        sid, sptr = sptr.id, internal.structure.by_identifier(sptr.id) if internal.structure.has(sptr.id) else None
+        sid, sptr = sptr.id, internal.structure.by_identifier(sptr.id) if internal.structure.has(sptr) else None
         if not sptr:
             logging.warning(u"{:s}.renamed({:#x}) : Received structurenaming.renamed event for an unknown structure ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, "{!r}".format(oldname), "{!r}".format(newname), sid))
             return
@@ -3273,7 +3274,7 @@ class members(membertagscommon):
         # succeed since we just checked the member id up above. We use this to
         # determine whether the member belongs to a frame or a structure.
         mowner, mindex, mptr = internal.structure.members.by_identifier(None, member_id)
-        if mowner.props & idaapi.SF_FRAME:
+        if internal.structure.frame(mowner):
             return logging.debug(u"{:s}.changing({:#x}, {!s}, {!r}) : Ignoring members.changing event for a {:s} comment on member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), member_id, repeatable, newcmt, 'repeatable' if repeatable else 'non-repeatable', member_id))
         return super(members, cls).changing(mptr.id, repeatable, newcmt)
 
@@ -3286,7 +3287,7 @@ class members(membertagscommon):
         # Now we can grab the member that had its comment changed and its parent
         # structure using the identifier that we had just verified.
         mowner, mindex, mptr = internal.structure.members.by_identifier(None, member_id)
-        if mowner.props & idaapi.SF_FRAME:
+        if internal.structure.frame(mowner):
             return logging.debug(u"{:s}.changed({:#x}, {!s}) : Ignoring members.changed event for a {:s} comment on member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), member_id, repeatable, 'repeatable' if repeatable else 'non-repeatable', member_id))
         return super(members, cls).changed(mptr.id, repeatable)
 
@@ -3313,7 +3314,7 @@ class framemembers(members):
         # Now try and grab the member using its identifier. This should always
         # succeed since we just checked the member id up above.
         mowner, mindex, mptr = internal.structure.members.by_identifier(None, member_id)
-        if not mowner.props & idaapi.SF_FRAME:
+        if not internal.structure.frame(mowner):
             return logging.debug(u"{:s}.changing({:#x}, {!s}, {!r}) : Ignoring framemembers.changing event for a {:s} comment on member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), member_id, repeatable, newcmt, 'repeatable' if repeatable else 'non-repeatable', member_id))
         return super(members, cls).changing(mptr.id, repeatable, newcmt)
 
@@ -3326,7 +3327,7 @@ class framemembers(members):
         # Now we can grab the member that had its comment changed and its parent
         # by using the identifier that we just verified.
         mowner, mindex, mptr = internal.structure.members.by_identifier(None, member_id)
-        if not mowner.props & idaapi.SF_FRAME:
+        if not internal.structure.frame(mowner):
             return logging.debug(u"{:s}.changed({:#x}, {!s}) : Ignoring framemembers.changed event for a {:s} comment on member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), member_id, repeatable, 'repeatable' if repeatable else 'non-repeatable', member_id))
         return super(members, cls).changed(mptr.id, repeatable)
 
@@ -3456,11 +3457,11 @@ class memberscope(memberscopecommon):
     @classmethod
     def created(cls, sptr, mptr):
         '''struc_member_created(sptr, mptr)'''
-        if not internal.structure.has(sptr.id):
+        if not internal.structure.has(sptr):
             return logging.debug(u"{:s}.created({:#x}, {:#x}) : Ignoring memberscope.created event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, sptr.id))
-        elif not internal.structure.member.has(mptr.id):
+        elif not internal.structure.member.has(mptr):
             return logging.debug(u"{:s}.created({:#x}, {:#x}) : Ignoring memberscope.created event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
-        elif sptr.props & idaapi.SF_FRAME:
+        elif internal.structure.frame(sptr):
             return logging.debug(u"{:s}.created({:#x}, {:#x}) : Ignoring memberscope.created event for structure {:#x} (is a frame).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, sptr.id))
         return super(memberscope, cls).created(sptr.id, mptr.id)
 
@@ -3472,7 +3473,7 @@ class memberscope(memberscopecommon):
             return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring memberscope.deleting event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sid, mid, sid))
         elif not internal.structure.member.has(mid):
             return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring memberscope.deleting event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sid, mid, mid))
-        elif sptr.props & idaapi.SF_FRAME:
+        elif internal.structure.frame(sptr):
             return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring memberscope.deleting event for structure {:#x} (is a frame).".format('.'.join([__name__, cls.__name__]), sid, mid, sid))
         return super(memberscope, cls).deleting(sid, mid)
 
@@ -3484,7 +3485,7 @@ class memberscope(memberscopecommon):
             return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring memberscope.deleted event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, sid))
         elif internal.structure.member.has(mid):
             return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring memberscope.deleted event for member {:#x} (not actually deleted).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, mid))
-        elif sptr.props & idaapi.SF_FRAME:
+        elif internal.structure.frame(sptr):
             return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring memberscope.deleted event for structure {:#x} (is a frame).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, sid))
         return super(memberscope, cls).deleted(sid, mid, offset)
 
@@ -3525,7 +3526,7 @@ class memberscope_84(memberscopecommon):
             return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring {:s}.deleting event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sid, mid, description, sid))
         elif not internal.structure.member.has(mid):
             return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring {:s}.deleting event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sid, mid, description, mid))
-        elif sptr.props & idaapi.SF_FRAME:
+        elif internal.structure.frame(sptr):
             return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring {:s}.deleting event for structure {:#x} (is a frame).".format('.'.join([__name__, cls.__name__]), sid, mid, description, sid))
 
         # Grab the structure and the member using the identifiers we were given
@@ -3549,7 +3550,7 @@ class memberscope_84(memberscopecommon):
         description, sid, mid = cls.__name__, sptr.id, member_id
         if not internal.structure.has(sid):
             return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring {:s}.deleted event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, description, sid))
-        elif sptr.props & idaapi.SF_FRAME:
+        elif internal.structure.frame(sptr):
             return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring {:s}.deleted event for structure {:#x} (is a frame).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, description, sid))
         description = cls.__name__
         logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Received {:s}.deleted event for member {:#x}.".format('.'.join([__name__, cls.__name__]), sid, mid, offset, description, mid))
@@ -3582,11 +3583,11 @@ class framememberscope(memberscopecommon):
     @classmethod
     def created(cls, sptr, mptr):
         '''struc_member_created(sptr, mptr)'''
-        if not internal.structure.has(sptr.id):
+        if not internal.structure.has(sptr):
             return logging.debug(u"{:s}.created({:#x}, {:#x}) : Ignoring framememberscope.created event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, sptr.id))
-        elif not internal.structure.member.has(mptr.id):
+        elif not internal.structure.member.has(mptr):
             return logging.debug(u"{:s}.created({:#x}, {:#x}) : Ignoring framememberscope.created event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
-        elif not sptr.props & idaapi.SF_FRAME:
+        elif not internal.structure.frame(sptr):
             return logging.debug(u"{:s}.created({:#x}, {:#x}) : Ignoring framememberscope.created event for structure {:#x} (not a frame).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, sptr.id))
         return super(framememberscope, cls).created(sptr.id, mptr.id)
 
@@ -3598,7 +3599,7 @@ class framememberscope(memberscopecommon):
             return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring framememberscope.deleting event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sid, mid, sid))
         elif not internal.structure.member.has(mid):
             return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring framememberscope.deleting event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sid, mid, mid))
-        elif not sptr.props & idaapi.SF_FRAME:
+        elif not internal.structure.frame(sptr):
             return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring framememberscope.deleting event for structure {:#x} (not a frame).".format('.'.join([__name__, cls.__name__]), sid, mid, sid))
         return super(framememberscope, cls).deleting(sid, mid)
 
@@ -3610,7 +3611,7 @@ class framememberscope(memberscopecommon):
             return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring framememberscope.deleted event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, sid))
         elif internal.structure.member.has(mid):
             return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring framememberscope.deleted event for member {:#x} (not actually deleted).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, mid))
-        elif not sptr.props & idaapi.SF_FRAME:
+        elif not internal.structure.frame(sptr):
             return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring framememberscope.deleted event for structure {:#x} (not a frame).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, sid))
         return super(framememberscope, cls).deleted(sid, mid, offset)
 
@@ -3751,26 +3752,26 @@ class membernaming(membernamingcommon):
     @classmethod
     def renaming(cls, sptr, mptr, newname):
         '''renaming_struc_member(sptr, mptr, newname)'''
-        if not internal.structure.member.has(mptr.id):
+        if not internal.structure.member.has(mptr):
             return logging.debug(u"{:s}.renaming({:#x}, {:#x}, {!r}) : Ignoring membernaming.renaming event for member {:#x} (unknown frame member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, newname, mptr.id))
 
         # Now try and grab the member using its identifier. This should always
         # succeed since we just checked the member id up above.
         mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
-        if mowner.props & idaapi.SF_FRAME:
+        if internal.structure.frame(mowner):
             return logging.debug(u"{:s}.renaming({:#x}, {:#x}, {!r}) : Ignoring membernaming.renaming event for member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, newname, mptr.id))
         return super(membernaming, cls).renaming(mowner.id, mptr.id, newname)
 
     @classmethod
     def renamed(cls, sptr, mptr):
         '''struc_member_renamed(sptr, mptr)'''
-        if not internal.structure.member.has(mptr.id):
+        if not internal.structure.member.has(mptr):
             return logging.debug(u"{:s}.renamed({:#x}, {:#x}) : Ignoring membernaming.renamed event for member {:#x} (unknown frame member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
 
         # Now try and grab the member that was renamed using its identifier.
         # This always succeeds since we just checked the member id up above.
         mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
-        if mowner.props & idaapi.SF_FRAME:
+        if internal.structure.frame(mowner):
             return logging.debug(u"{:s}.renamed({:#x}, {:#x}) : Ignoring membernaming.renamed event for member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
         return super(membernaming, cls).renamed(mowner.id, mptr.id)
 
@@ -3792,26 +3793,26 @@ class framemembernaming(membernamingcommon):
     @classmethod
     def renaming(cls, sptr, mptr, newname):
         '''renaming_struc_member(sptr, mptr, newname)'''
-        if not internal.structure.member.has(mptr.id):
+        if not internal.structure.member.has(mptr):
             return logging.debug(u"{:s}.renaming({:#x}, {:#x}, {!r}) : Ignoring framemembernaming.renaming event for member {:#x} (unknown frame member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, newname, mptr.id))
 
         # Now try and grab the member using its identifier. This should always
         # succeed since we just checked the member id up above.
         mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
-        if not mowner.props & idaapi.SF_FRAME:
+        if not internal.structure.frame(mowner):
             return logging.debug(u"{:s}.renaming({:#x}, {:#x}, {!r}) : Ignoring framemembernaming.renaming event for member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, newname, mptr.id))
         return super(framemembernaming, cls).renaming(mowner.id, mptr.id, newname)
 
     @classmethod
     def renamed(cls, sptr, mptr):
         '''struc_member_renamed(sptr, mptr)'''
-        if not internal.structure.member.has(mptr.id):
+        if not internal.structure.member.has(mptr):
             return logging.debug(u"{:s}.renamed({:#x}, {:#x}) : Ignoring framemembernaming.renamed event for member {:#x} (unknown frame member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
 
         # Now try and grab the member that was renamed using its identifier.
         # This always succeeds since we just checked the member id up above.
         mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
-        if not mowner.props & idaapi.SF_FRAME:
+        if not internal.structure.frame(mowner):
             return logging.debug(u"{:s}.renamed({:#x}, {:#x}) : Ignoring framemembernaming.renamed event for member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
         return super(framemembernaming, cls).renamed(mowner.id, mptr.id)
 
@@ -3950,7 +3951,7 @@ class membertypeinfo(membertypeinfocommon):
         # Now try and grab the member using its identifier. This should always
         # succeed since we just checked the member id up above.
         mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
-        if mowner.props & idaapi.SF_FRAME:
+        if internal.structure.frame(mowner):
             return logging.debug(u"{:s}.changing({:#x}, {!r}, {!r}) : Ignoring membertypeinfo.changing event for member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), mid, new_type, new_fnames, mptr.id))
         return super(membertypeinfo, cls).changing(mptr.id, new_type, new_fnames)
 
@@ -3963,7 +3964,7 @@ class membertypeinfo(membertypeinfocommon):
         # We just need to grab our own versions of the structure and member, and
         # then check if it belongs to a frame. Afterwards just call our parent.
         mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
-        if mowner.props & idaapi.SF_FRAME:
+        if internal.structure.frame(mowner):
             return logging.debug(u"{:s}.changed({:#x}, {!r}, {!r}) : Ignoring membertypeinfo.changed event for member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), mid, type, fnames, mptr.id))
         return super(membertypeinfo, cls).changed(mptr.id, type, fnames)
 
@@ -3989,7 +3990,7 @@ class framemembertypeinfo(membertypeinfocommon):
         # Now try and grab the member using its identifier. This should always
         # succeed since we just checked the member id up above.
         mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
-        if not mowner.props & idaapi.SF_FRAME:
+        if not internal.structure.frame(mowner):
             return logging.debug(u"{:s}.changing({:#x}, {!r}, {!r}) : Ignoring membertypeinfo.changing event for member {:#x} (does not belong to a frame).".format('.'.join([__name__, cls.__name__]), mid, new_type, new_fnames, mptr.id))
         return super(framemembertypeinfo, cls).changing(mptr.id, new_type, new_fnames)
 
@@ -4002,7 +4003,7 @@ class framemembertypeinfo(membertypeinfocommon):
         # We just need to grab our own versions of the structure and member, and
         # then check if it belongs to a frame. Afterwards just call our parent.
         mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
-        if not mowner.props & idaapi.SF_FRAME:
+        if not internal.structure.frame(mowner):
             return logging.debug(u"{:s}.changed({:#x}, {!r}, {!r}) : Ignoring membertypeinfo.changed event for member {:#x} (does not belong to a frame).".format('.'.join([__name__, cls.__name__]), mid, type, fnames, mptr.id))
         return super(framemembertypeinfo, cls).changed(mptr.id, type, fnames)
 
@@ -4117,26 +4118,26 @@ class memberchange(memberchangecommon):
     @classmethod
     def changing(cls, sptr, mptr, flag, newinfo, nbytes):
         '''changing_struc_member(sptr, mptr, flag, newinfo, nbytes)'''
-        if not internal.structure.member.has(mptr.id):
+        if not internal.structure.member.has(mptr):
             return logging.debug(u"{:s}.changing({:#x}, {:#x}, {:#0{:d}x}, {!s}, {:+#x}) : Ignoring memberchange.changing event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, flag, 2 + 8, newinfo, nbytes, mptr.id))
 
         # Now try and grab the member using its identifier. This should always
         # succeed since we just checked the member id up above.
         mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
-        if mowner.props & idaapi.SF_FRAME:
+        if internal.structure.frame(mowner):
             return logging.debug(u"{:s}.changing({:#x}, {:#x}, {:#0{:d}x}, {!s}, {:+#x}) : Ignoring memberchange.changing event for member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, flag, 2 + 8, newinfo, nbytes, mptr.id))
         return super(memberchange, cls).changing(mowner.id, mptr.id, flag, newinfo, nbytes)
 
     @classmethod
     def changed(cls, sptr, mptr):
         '''struc_member_changed(sptr, mptr)'''
-        if not internal.structure.member.has(mptr.id):
+        if not internal.structure.member.has(mptr):
             return logging.debug(u"{:s}.changed({:#x}, {:#x}) : Ignoring memberchange.changed event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
 
         # We just need to grab our own versions of the structure and member, and
         # then check if it belongs to a frame. Afterwards just call our parent.
         mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
-        if mowner.props & idaapi.SF_FRAME:
+        if internal.structure.frame(mowner):
             return logging.debug(u"{:s}.changed({:#x}, {:#x}) : Ignoring memberchange.changed event for member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
         return super(memberchange, cls).changed(mowner.id, mptr.id)
 
@@ -4162,26 +4163,26 @@ class framememberchange(memberchangecommon):
     @classmethod
     def changing(cls, sptr, mptr, flag, newinfo, nbytes):
         '''changing_struc_member(sptr, mptr, flag, newinfo, nbytes)'''
-        if not internal.structure.member.has(mptr.id):
+        if not internal.structure.member.has(mptr):
             return logging.debug(u"{:s}.changing({:#x}, {:#x}, {:#0{:d}x}, {!s}, {:+#x}) : Ignoring framememberchange.changing event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, flag, 2 + 8, newinfo, nbytes, mptr.id))
 
         # Now try and grab the member using its identifier. This should always
         # succeed since we just checked the member id up above.
         mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
-        if not mowner.props & idaapi.SF_FRAME:
+        if not internal.structure.frame(mowner):
             return logging.debug(u"{:s}.changing({:#x}, {:#x}, {:#0{:d}x}, {!s}, {:+#x}) : Ignoring framememberchange.changing event for member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, flag, 2 + 8, newinfo, nbytes, mptr.id))
         return super(framememberchange, cls).changing(mowner.id, mptr.id, flag, newinfo, nbytes)
 
     @classmethod
     def changed(cls, sptr, mptr):
         '''struc_member_changed(sptr, mptr)'''
-        if not internal.structure.member.has(mptr.id):
+        if not internal.structure.member.has(mptr):
             return logging.debug(u"{:s}.changed({:#x}, {:#x}) : Ignoring framememberchange.changed event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
 
         # We just need to grab our own versions of the structure and member, and
         # then check if it belongs to a frame. Afterwards just call our parent.
         mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
-        if not mowner.props & idaapi.SF_FRAME:
+        if not internal.structure.frame(mowner):
             return logging.debug(u"{:s}.changed({:#x}, {:#x}) : Ignoring framememberchange.changed event for member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
         return super(framememberchange, cls).changed(mowner.id, mptr.id)
 
