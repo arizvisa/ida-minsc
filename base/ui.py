@@ -493,8 +493,14 @@ hexdump = dump
 class enumerations(appwindow):
     """
     This namespace is for interacting with the Enumerations window.
+
+    On more recent versions of the disassembler, where the enumerations
+    window has been removed, this will interact with the local types.
     """
-    __open__ = staticmethod(idaapi.open_enums_window)
+    if hasattr(idaapi, 'open_enums_window'):
+        __open__ = staticmethod(idaapi.open_enums_window)
+    else:
+        __open__ = staticmethod(idaapi.open_loctypes_window)
     __open_defaults__ = (idaapi.BADADDR, 0)
 
 class exports(appwindow):
@@ -798,8 +804,14 @@ class strings(appwindow):
 class structures(appwindow):
     """
     This namespace is for interacting with the Structures window.
+
+    On more recent versions of the disassembler, where the structures
+    window has been removed, this will interact with the local types.
     """
-    __open__ = staticmethod(idaapi.open_structs_window)
+    if hasattr(idaapi, 'open_structs_window'):
+        __open__ = staticmethod(idaapi.open_structs_window)
+    else:
+        __open__ = staticmethod(idaapi.open_loctypes_window)
     __open_defaults__ = (idaapi.BADADDR, 0)
 
 class threads(appwindow):
