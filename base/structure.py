@@ -256,15 +256,11 @@ def search(**type):
 def by_name(name, *suffix, **offset):
     '''Return an instance of a structure by its name.'''
     string = name if isinstance(name, types.tuple) else (name,)
-    res = utils.string.to(interface.tuplename(*(string + suffix)))
-
-    # try and find the structure id according to its name
-    id = idaapi.get_struc_id(res)
-    if id == idaapi.BADADDR:
-        raise E.StructureNotFoundError(u"{:s}.by_name(\"{:s}\"{:s}) : Unable to locate a structure with the specified name.".format(__name__, utils.string.escape(res, '"'), u", {:s}".format(utils.string.kwargs(offset)) if offset else ''))
-
-    # grab an instance of the structure by its id that we found
-    return internal.structure.new(id, offset.get('offset', 0))
+    res = interface.tuplename(*(string + suffix))
+    sptr = internal.structure.by_name(res)
+    if not sptr:
+        raise E.StructureNotFoundError(u"{:s}.by_name({!r}{:s}) : Unable to locate a structure with the specified name \"{:s}\".".format(__name__, res, u", {:s}".format(utils.string.kwargs(offset)) if offset else '', utils.string.escape(res, '"')))
+    return internal.structure.new(sptr, offset.get('offset', 0))
 byname = utils.alias(by_name)
 
 def by_index(index, **offset):
