@@ -85,6 +85,24 @@ def by_identifier(identifier):
     '''Return the structure at the specified `identifier` from the database.'''
     return by_index_or_identifier(identifier)
 
+def by_name(name):
+    '''Return the structure with the specified `name` from the database.'''
+    string = utils.string.to(name)
+
+    # try and find the structure id according to its name. if we couldn't find
+    # it then we just return None so the caller can complain about it.
+    if idaapi.__version__ < 8.5:
+        sid = idaapi.get_struc_id(string)
+        return None if sid == idaapi.BADADDR else idaapi.get_struc(sid)
+
+    # otherwise we try to determine the ordinal, and then return a type that
+    # references it. if it's not a structure than abort entirely.
+    ordinal = interface.tinfo.by_name(name)
+    tinfo = interface.tinfo.for_ordinal(ordinal)
+    if tinfo and not tinfo.is_udt():
+        raise E.StructureNotFoundError(u"{:s}.by_name(\"{:s}\") : The type for the specified ordinal ({:d}) is not a structure or union.".format(__name__, utils.string.escape(name, '"'), ordinal))
+    return tinfo
+
 def union(type):
     '''Return whether the structure in `type` is defined as a union.'''
     ti, SF_UNION = idaapi.tinfo_t(), getattr(idaapi, 'SF_UNION', 0x2)
