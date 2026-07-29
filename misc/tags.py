@@ -1036,7 +1036,7 @@ class select_v1(object):
         '''Query the members of the structure `sid` and yield a tuple containing each member identifier and all of the `required` tags with any `included` ones.'''
         selection = True if any([args, kwargs]) else False
         for mid, used in query_v1.structure(sid, *args, **kwargs):
-            tags = member.get(mid)
+            tags = member.get(mid) if idaapi.__version__ < 8.5 else typeinfo_member.get(mid)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
             if selection:
