@@ -6304,9 +6304,12 @@ class decompilermonitor(object):
             # FIXME: This is a little weird for the "func_printed" event, since
             #        the event explicitly resets all of the variable types so
             #        that we actually lose our ability to track what the user
-            #        did. This should be fixed by redefining the meaning of the
-            #        "__typeinfo__" tag so that the tag means something else.
-            if '__typeinfo__' in oldtagged or (oldvariable is not None and not interface.tinfo.same(type, oldvariable.type)):
+            #        did. What we're attempting to do is to find out if a
+            #        variable type has been changed from its previous value, or
+            #        to potentially identify is it was applied or propagated.
+            is_user_type_initial = oldvariable is None and internal.hexrays.variable.has_user_type(cfunc, locator,  type)
+            is_user_type_changed = oldvariable is not None and not interface.tinfo.same(type, oldvariable.type)
+            if '__typeinfo__' in oldtagged or any([is_user_type_initial, is_user_type_changed]):
                 internal.tags.reference.hexvariable.increment(locator, '__typeinfo__', target=cfunc)
             continue
         return
