@@ -231,15 +231,10 @@ def new(string, *suffix, **offset):
     """
     res = string if isinstance(string, types.tuple) else (string,)
     name = interface.tuplename(*(res + suffix))
-
-    # add a structure with the specified name
-    realname = utils.string.to(name)
-    id = idaapi.add_struc(idaapi.BADADDR, realname, offset.get('union', False))
-    if id == idaapi.BADADDR:
-        raise E.DisassemblerError(u"{:s}.new({:s}{:s}) : Unable to add a new {:s} to the database with the specified name ({!r}).".format(__name__, ', '.join(map("{!r}".format, res + suffix)), u", {:s}".format(utils.string.kwargs(offset)) if offset else '', 'union' if offset.get('union', False) else 'structure', name))
-
-    # return a new instance using the specified identifier
-    return internal.structure.new(id, offset.get('offset', 0))
+    sptr = internal.structure.create(name, offset.get('union', False))
+    if not sptr:
+        raise E.DisassemblerError(u"{:s}.new({:s}{:s}) : Unable to add a new {:s} to the database with the name \"{:s}\".".format(__name__, ', '.join(map("{!r}".format, res + suffix)), u", {:s}".format(utils.string.kwargs(offset)) if offset else '', 'union' if offset.get('union', False) else 'structure', utils.string.escape(name, '"')))
+    return internal.structure.new(sptr, offset.get('offset', 0))
 
 @utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
