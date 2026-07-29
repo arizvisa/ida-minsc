@@ -2586,7 +2586,7 @@ class member(object):
             return tags.pop(key, None)
 
         elif key == '__typeinfo__':
-            tags, original = cls.get(mptr), internal.structure.member.remote_typeinfo(mptr)
+            tags, original = cls.get(mptr), internal.structure.member.remove_typeinfo(mptr)
             return tags.pop(key, None)
 
         # Read both the comment types to figure out where the tag we want to remove is located at.
