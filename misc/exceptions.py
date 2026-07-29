@@ -116,7 +116,7 @@ class MissingNameError(UnicodeException, E.NameError):
     A name that was required was found missing and was unable to be recovered.
     """
 
-class UnsupportedVersion(UnicodeException, E.NotImplementedError):
+class UnsupportedVersion(UnicodeException, E.NotImplementedError, E.EnvironmentError):
     """
     This functionality is not supported on the current version of IDA.
     """
