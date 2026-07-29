@@ -2800,7 +2800,7 @@ class hexvariable(object):
         # figure out if we were given a locator or a function with a locator.
         # then we can determine unpack the locator depending on the type.
         if args and isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
-            locator = internal.hexrays.variables.by(func, *args)
+            locator = internal.hexrays.variables.by(func, arg)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
             func = defea
 
@@ -2811,7 +2811,7 @@ class hexvariable(object):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({!r}, {!r}).tag() : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), func, arg))
 
         elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
-            locator = internal.hexrays.variables.by(*args)
+            locator = internal.hexrays.variables.by(arg)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
             func = defea
 
@@ -2871,7 +2871,7 @@ class hexvariable(object):
         # a function with a locator, and then use the arg type to unpack it.
         [arg, key, value] = args if len(args) == 3 else itertools.chain([func], args)
         if len(args) > 2 and isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
-            locator = internal.hexrays.variables.by(func, *args)
+            locator = internal.hexrays.variables.by(func, arg)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
             func = defea
 
@@ -2882,7 +2882,7 @@ class hexvariable(object):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({!r}, {!r}).tag({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), func, arg, key, value))
 
         elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
-            locator = internal.hexrays.variables.by(*args)
+            locator = internal.hexrays.variables.by(arg)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
             func = defea
 
@@ -2936,7 +2936,7 @@ class hexvariable(object):
         # a function with a locator, and then use the arg type to unpack it.
         [arg, key, none] = args if len(args) == 3 else itertools.chain([func], args)
         if len(args) > 2 and isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
-            locator = internal.hexrays.variables.by(func, *args)
+            locator = internal.hexrays.variables.by(func, arg)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
             func = defea
 
@@ -2947,7 +2947,7 @@ class hexvariable(object):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({!r}, {!r}).tag({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), func, arg, key, none))
 
         elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
-            locator = internal.hexrays.variables.by(*args)
+            locator = internal.hexrays.variables.by(arg)
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
             func = defea
 
@@ -2973,7 +2973,7 @@ class hexvariable(object):
         # then we can grab the function from the unpacked information, and
         # determine if we need to handle removing an implicit tag.
         cfunc = internal.hexrays.function(func)
-        if _key == '__name__':
+        if key == '__name__':
             return internal.hexrays.variable.remove_name(cfunc, locator)
 
         elif key == '__typeinfo__':
