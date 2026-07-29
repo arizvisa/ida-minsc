@@ -60,22 +60,22 @@ def has_member(id):
 def by_index_or_identifier(index_or_identifier):
     '''Return the structure at the specified `index_or_identifier` from the database.'''
     tinfo = idaapi.tinfo_t()
-    if hasattr(idaapi, 'get_struc') and interface.node.identifier(index_or_identifier):
-        return idaapi.get_struc(index_or_identifier)
-    elif interface.node.identifier(index_or_identifier):
-        if tinfo.get_type_by_tid(index_or_identifier):
+    if interface.node.identifier(index_or_identifier):
+        if idaapi.__version__ < 8.5:
+            return idaapi.get_struc(index_or_identifier)
+        elif tinfo.get_type_by_tid(index_or_identifier):
             return interface.tinfo.copy(tinfo)
         raise E.StructureNotFoundError(u"{:s}.by_index_or_identifier({:#x}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, index_or_identifier, index_or_identifier))
 
     # otherwise, the index is definitely an index and we'll use it to grab the sptr.
-    if hasattr(idaapi, 'get_struc_by_idx'):
+    elif idaapi.__version__ < 8.5:
         sid = idaapi.get_struc_by_idx(index_or_identifier)
         return None if sid == idaapi.BADADDR else idaapi.get_struc(sid)
 
-    ti = interface.tinfo.for_ordinal(index_or_identifier)
-    if ti and (ti.is_struct() or ti.is_union()):
-        return ti
-    raise E.StructureNotFoundError(u"{:s}.by_index_or_identifier({:d}) : Unable to locate a structure at the specified index ({:d}).".format(__name__, index_or_identifier, index_or_identifier))
+    tinfo = interface.tinfo.for_ordinal(index_or_identifier)
+    if tinfo and not tinfo.is_udt():
+        raise E.StructureNotFoundError(u"{:s}.by_index_or_identifier({:d}) : Unable to locate a structure at the specified index ({:d}).".format(__name__, index_or_identifier, index_or_identifier))
+    return tinfo
 
 def by_index(index):
     '''Return the structure at the specified `index` from the database.'''
