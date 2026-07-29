@@ -1599,7 +1599,9 @@ class function(object):
     def clear(cls, func):
         '''Clear the decompiler cache for the function described by `func`.'''
         ea = cls.address(func)
-        return ida_hexrays.mark_cfunc_dirty(ea)
+        if hasattr(ida_hexrays, 'mark_cfunc_dirty'):
+            return ida_hexrays.mark_cfunc_dirty(ea)
+        raise exceptions.UnsupportedVersion(u"{:s}.clear({:#x}) : Unable to clear the cache for the specified function ({:#x}) due to the current decompiler ({!s}) not supporting this functionality.".format('.'.join([__name__, cls.__name__]), ea, ea, idaapi.__version__))
 
     @classmethod
     def user_comments(cls, comments):
