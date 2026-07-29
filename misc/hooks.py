@@ -2707,10 +2707,11 @@ class structures(changingchanged):
         # fail due to the test we did at the beginning.
         # then log a warning and abort so that we don't interrupt the user.
         sptr = internal.structure.by_identifier(struc_id)
+        sid = interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
 
         # Create a new event using sid and repeatable as a unique key. We also
         # grab the old comment prior to renaming so that we can compare it.
-        event, oldcmt = cls.new((sptr.id, repeatable)), internal.structure.comment.get(sptr, repeatable)
+        event, oldcmt = cls.new((sid, repeatable)), internal.structure.comment.get(sptr, repeatable)
 
         # Disable the hooks to prevent re-entrancy issues that might occur.
         hooks = [name for name in ['changing_struc_cmt', 'struc_cmt_changed'] if name in ui.hook.idb.available]
@@ -2718,11 +2719,11 @@ class structures(changingchanged):
 
         # Now we can send the data received to the coroutine that we allocated.
         try:
-            event.send((sptr.id, True if repeatable else False, newcmt))
+            event.send((sid, True if repeatable else False, newcmt))
 
         # If the coroutine raised a StopIteration, then we let the user know.
         except StopIteration:
-            logging.fatal(u"{:s}.changing({:#x}, {!s}, {!r}) : Abandoning structures.changing event for a {:s} comment on structure {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), struc_id, repeatable, newcmt, 'repeatable' if repeatable else 'non-repeatable', sptr.id))
+            logging.fatal(u"{:s}.changing({:#x}, {!s}, {!r}) : Abandoning structures.changing event for a {:s} comment on structure {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), struc_id, repeatable, newcmt, 'repeatable' if repeatable else 'non-repeatable', sid))
 
         # Then, we restore the hooks that we disabled and wait for the next event.
         finally:
@@ -2739,10 +2740,11 @@ class structures(changingchanged):
         # Go ahead and grab the structure that had its comment changed. This
         # shouldn't fail if the test at the beginning passed.
         sptr = internal.structure.by_identifier(struc_id)
+        sid = interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
 
         # Now we'll use the parameters to try and resume the coroutine. We also
         # extract the comment since by now the new comment has been applied.
-        event, newcmt = cls.resume((sptr.id, repeatable)), internal.structure.comment.get(sptr, repeatable)
+        event, newcmt = cls.resume((sid, repeatable)), internal.structure.comment.get(sptr, repeatable)
 
         # Before submitting the changes to our coroutine, disable all the hooks
         # since the coroutine might write to the same comment which could cause
@@ -2753,12 +2755,12 @@ class structures(changingchanged):
         # Send the parameters and our new comment to the coroutine so that it
         # could finish what it started.
         try:
-            event.send((sptr.id, True if repeatable else False, newcmt))
+            event.send((sid, True if repeatable else False, newcmt))
 
         # If we received a StopIteration, then the coroutine has aborted for
         # some reason and we can't do anything else but whine about it.
         except StopIteration:
-            logging.fatal(u"{:s}.changed({:#x}, {!s}) : Abandoning structures.changed event for a {:s} comment on structure {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), sptr.id, repeatable, 'repeatable' if repeatable else 'non-repeatable', sptr.id))
+            logging.fatal(u"{:s}.changed({:#x}, {!s}) : Abandoning structures.changed event for a {:s} comment on structure {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), sid, repeatable, 'repeatable' if repeatable else 'non-repeatable', sid))
 
         # Restore the hooks that we disabled, and close the coroutine since this
         # event signals that the comment has been completely applied.
@@ -2987,12 +2989,13 @@ class structurenaming(changingchanged):
         if not internal.structure.has(sid):
             return logging.warning(u"{:s}.renaming({:#x}, {!s}, {!r}) : Received structurenaming.renaming event for an unknown structure ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, "{!r}".format(oldname), "{!r}".format(newname), sid))
         sptr = internal.structure.by_identifier(sid)
+        sid = interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
 
         # Now we need to create a new state for the structure, and then send it
         # our parameters so that we can track what the name has been changed to.
-        event = cls.new(sptr.id)
+        event = cls.new(sid)
         try:
-            event.send((sptr.id, oldname, newname))
+            event.send((sid, oldname, newname))
         except StopIteration:
             logging.fatal(u"{:s}.renaming({:#x}, {!s}, {!r}) : Abandoning rename for structure {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), sid, "{!r}".format(oldname), "{!r}".format(newname), sid))
         return
@@ -3000,23 +3003,24 @@ class structurenaming(changingchanged):
     @classmethod
     def renamed(cls, sptr):
         '''struc_renamed(sptr, success)'''
-        logging.debug(u"{:s}.renamed({:#x}) : Received structurenaming.renamed event for structure {:#x}.".format('.'.join([__name__, cls.__name__]), sptr.id, sptr.id))
+        sid = interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
+        logging.debug(u"{:s}.renamed({:#x}) : Received structurenaming.renamed event for structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, sid))
 
         # Unpack the structure id, and then use it to regrab the structure from
         # the database. If it doesn't exist, then abort and don't do anything.
-        sid, sptr = sptr.id, internal.structure.by_identifier(sptr.id) if internal.structure.has(sptr) else None
+        sptr = internal.structure.by_identifier(sid) if internal.structure.has(sptr) else None
         if not sptr:
             logging.warning(u"{:s}.renamed({:#x}) : Received structurenaming.renamed event for an unknown structure ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, "{!r}".format(oldname), "{!r}".format(newname), sid))
             return
 
         # Now we can use the id to resume our event state, get the current
         # name, and then send them both to the event before closing it.
-        event, name = cls.resume(sptr.id), internal.structure.naming.get(sptr)
+        event, name = cls.resume(sid), internal.structure.naming.get(sptr)
         try:
-            event.send((sptr.id, name))
+            event.send((sid, name))
 
         except StopIteration:
-            logging.fatal(u"{:s}.renamed({:#x}) : Abandoning rename for structure {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), sptr.id, sptr.id))
+            logging.fatal(u"{:s}.renamed({:#x}) : Abandoning rename for structure {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), sid, sid))
         event.close()
 
 class membertagscommon(changingchanged):
