@@ -1040,6 +1040,38 @@ class variables(object):
         width = interface.tinfo.size(type)
         return cls(cfunc).find_lvar(locator.location, width)
 
+    # XXX: the following function might not actually be necessary at all...
+    @classmethod
+    def same(cls, func, variables):
+        '''Return whether the specified `variables` belonging to the function `func` are the exact same.'''
+        cfunc = function(func)
+
+        # Gather all of the data for each variable and store it in a dictionary.
+        res = {}
+        for locator in variables:
+            id = variable.identity(locator)
+            items = res.setdefault(id, [])
+            lvar = locator if isinstance(locator, ida_hexrays_types.lvar) else variable.get(cfunc, locator)
+            name, type = variable.get_name(lvar), variable.get_type(lvar)
+            items.append((name, type))
+
+        # If the identity of all the variables does not coalesce to the same id,
+        # then the set of variables are not equai. Then we can grab the result.
+        if len(res) != 1:
+            return False
+
+        # Now we go through each of the variables at the same location, so
+        # that we can check if their names and types are at all different.
+        items = next(value for _, value in res.items())
+        names = {name for name, _ in items}
+        types = [type for _, type in items]
+
+        # All that's left to do is to check the list of types. We don't bother
+        # checking the name in case the variables come from different functions.
+        iterable = iter(types)
+        reduced = functools.reduce(lambda agg, item: agg + [(item, interface.tinfo.equals(agg[-1][0], item))], iterable, [(next(iterable), True)])
+        return all(ok for type, ok in reduced)
+
 class variable(object):
     """
     This namespace contains utilities that are related to an individual variable
