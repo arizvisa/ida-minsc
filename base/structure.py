@@ -268,7 +268,7 @@ def by_index(index, **offset):
     sptr = internal.structure.by_index(index)
     if not sptr:
         raise E.StructureNotFoundError(u"{:s}.by_index({:d}{:s}) : Unable to locate a structure with the specified index ({:#x}).".format(__name__, index, u", {:s}".format(utils.string.kwargs(offset)) if offset else '', index))
-    return internal.structure.new(sptr.id, offset.get('offset', 0))
+    return internal.structure.new(sptr, offset.get('offset', 0))
 byindex = utils.alias(by_index)
 
 def by_identifier(identifier, **offset):
@@ -276,8 +276,7 @@ def by_identifier(identifier, **offset):
     sptr = internal.structure.by_index(identifier)
     if not sptr:
         raise E.StructureNotFoundError(u"{:s}.by_identifier({:#x}{:s}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, identifier, u", {:s}".format(utils.string.kwargs(offset)) if offset else '', identifier))
-    return internal.structure.new(sptr.id, offset.get('offset', 0))
-
+    return internal.structure.new(sptr, offset.get('offset', 0))
 by_id = byidentifier = byId = utils.alias(by_identifier)
 
 ### Functions that are related to finding and using a structure_t.
