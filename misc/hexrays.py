@@ -1497,6 +1497,49 @@ class variable(object):
             raise exceptions.DecompilerError(u"{:s}.set_size({:#x}, {:s}, {:d}) : Unable to call `{:s}({:d}, {:#x})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), size, utils.pycompat.fullname(lvar.set_width), size, svw_flags, utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
         return result
 
+    @classmethod
+    def has_user_type(cls, func, variable, *type):
+        '''Return whether the type of the variable identified by the given `args` is potentially user-specified.'''
+        # XXX: the purpose of this function is to attempt to determine whether
+        #      the variable type or the specified type was set by something
+        #      other than the decompiler. we need this only because the
+        #      `lvar_t.has_user_type` property is only ever set when the user
+        #      changes the type manually, and not when a type gets its initial
+        #      value from a propagated type.
+
+        # if it's a variable identity, then convert it back into a var locator.
+        if isinstance(variable, internal.types.tuple):
+            defea, atype, alocinfo = variable
+            locator = internal.hexrays.variable.new_locator(defea, internal.hexrays.variable.copy_vdloc(atype, alocinfo))
+        else:
+            locator = variable
+
+        # FIXME: we could probably do better here by doing things like checking
+        #        the type of the matching frame member and comparing it to the
+        #        variable's type. that is pretty much why this function takes a
+        #        full function and variable pair to work with.
+
+        # if the `lvar_t.has_user_type` property is set, then we're good to go.
+        lvar = variables.get(func, locator)
+        if lvar.has_user_type:
+            return True
+
+        # first try and resolve the type from a pointer to its final target, or
+        # from an array to its final element type.
+        [resolved] = map(interface.tinfo.copy, type if type else [lvar.tif])
+        while resolved.is_ptr() or resolved.is_array():
+            resolved, _ = interface.tinfo.array(resolved) if resolved.is_array() else (resolved, 0)
+            resolved = resolved.get_pointed_object() if resolved.is_ptr() else resolved
+
+        # if it's a primitive type, the decompiler does not ever use these. so
+        # it must be user-specified. if it's _not_ a compiler type, then it is
+        # also not likely to be user-specified since they tend to be chosen.
+        if interface.tinfo.primitive(resolved):
+            return True
+        elif not interface.tinfo.compiler(resolved):
+            return True
+        return False
+
 class function(object):
     """
     This namespace contains tools for a function that is produced by the
