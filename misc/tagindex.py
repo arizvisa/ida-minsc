@@ -2181,8 +2181,8 @@ class members(counted):
 
         maxname = max(len(name) for _, _, _, _, _, name, _ in members) if members else 0
         maxtags = max(len("{!s}".format(names)) for _, _, _, _, _, _, names in members) if members else 0
-        iterable = [','.join(map("{:d}".format, tags.explode(integer))) for _, _, _, _, integer, fullname, _ in members if Fmatch(fullname)]
-        maxpositions = max(map(len, iterable)) if members else 0
+        listable = [','.join(map("{:d}".format, tags.explode(integer))) for _, _, _, _, integer, fullname, _ in members if Fmatch(fullname)]
+        maxpositions = max(map(len, listable)) if listable else 0
 
         lines = []
         lines.append(u"Schema version: {:d}".format(cls.version()))
@@ -2386,8 +2386,8 @@ class structure(schema):
 
         maxname = max(len(name) for _, _, _, _, name, _ in res) if res else 0
         maxtags = max(len("{!s}".format(names)) for _, _, _, _, _, names in res) if res else 0
-        iterable = [','.join(map("{:d}".format, tags.explode(integer))) for _, _, _, integer, fullname, _ in res if Fmatch(fullname)]
-        maxpositions = max(map(len, iterable)) if res else 0
+        listable = [','.join(map("{:d}".format, tags.explode(integer))) for _, _, _, integer, fullname, _ in res if Fmatch(fullname)]
+        maxpositions = max(map(len, listable)) if listable else 0
 
         lines = []
         lines.append(u"Schema version: {:d}".format(cls.version()))
