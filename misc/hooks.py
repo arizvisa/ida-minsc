@@ -4275,7 +4275,7 @@ class localtypesmonitor_state(object):
         #      but failing whenever we try to get them. So, we treat these types
         #      that are not "correct" (`is_correct`) as having no members.
         if tinfo.is_correct():
-            has_members = tinfo.is_struct() or tinfo.is_union()
+            has_members = tinfo.is_udt()
 
         else:
             has_members = False
@@ -4419,7 +4419,7 @@ class localtypesmonitor_state(object):
                 logging.debug(u"{:s}.load({:s}) : Skipping deleted or empty type \"{:s}\" at ordinal {:d} of the local types library.".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(*library) if library else '', utils.string.escape(name, '"'), ordinal))
                 continue
 
-            elif not(tinfo.is_struct() or tinfo.is_union()):
+            elif not tinfo.is_udt():
                 logging.debug(u"{:s}.load({:s}) : Ignoring type \"{:s}\" at ordinal {:d} that is not a structure or a union.".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(*library) if library else '', utils.string.escape(name, '"'), ordinal))
                 continue
 
@@ -4427,7 +4427,7 @@ class localtypesmonitor_state(object):
             # previous name will be. We also create a dictionary for the
             # structure so that we can store information about its members.
             structurecache[ordinal] = name
-            structureid[ordinal] = interface.tinfo.identifier(tinfo)
+            structureid[ordinal] = interface.tinfo.identifier(ordinal)
             structurecomment[ordinal] = utils.string.of(tinfo.get_type_cmt())
             memberoffsets = memberoffsetcache.setdefault(ordinal, {})
             memberindices = memberindexcache.setdefault(ordinal, {})
@@ -5356,7 +5356,7 @@ class localtypesmonitor_84(object):
 
         # First check its type, we only support structures and unions atm.
         tinfo, aliased = state.get_type(ordinal), interface.tinfo.at_ordinal(ordinal)
-        if not (tinfo.is_struct() or tinfo.is_union()):
+        if not tinfo.is_udt():
             return sid, newname, newcomment, newmembers
 
         elif aliased and aliased.is_typeref():
