@@ -25,6 +25,20 @@ def new(identifier, offset):
     # or crawling down a structure path looking for something.
     return structure_t(identifier, offset)
 
+def create(string, union):
+    '''Create a new structure or `union` type using the name specified by `string` and return it.'''
+    make_union = union
+
+    # add a structure with the specified name on older versions.
+    if idaapi.__version__ < 8.5:
+        sid = idaapi.add_struc(idaapi.BADADDR, utils.string.to(string), make_union)
+        return None if sid == idaapi.BADADDR else idaapi.get_struc(sid)
+
+    # create a new union or structure using `idaapi.tinfo_t.create_udt`.
+    tinfo, utd = idaapi.tinfo_t(), idaapi.udt_type_data_t()
+    utd.is_union = make_union
+    return tinfo if tinfo.create_udt(utd) else None
+
 def has(id):
     '''Return whether a structure with the specified `id` or name exists within the database.'''
     tinfo = idaapi.tinfo_t()
