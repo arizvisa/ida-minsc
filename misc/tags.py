@@ -2850,8 +2850,9 @@ class hexvariable(object):
             decoded.setdefault('__name__', name)
 
         # when determining whether the type has a tag, we need to distinguish
-        # between a native compiler type and a user-specified one.
-        if not interface.tinfo.compiler(typeinfo):
+        # between a native compiler type and a user-specified one. the following
+        # function attempts to do this, but it's likely completely incorrect.
+        if internal.hexrays.variable.has_user_type(cfunc, locator, typeinfo):
             validname = interface.name.member(name) # FIXME: types have different character requirements
             typeinfo_string = idaapi.print_tinfo('', 0, 0, 0, typeinfo, validname, '')
             decoded.setdefault('__typeinfo__', typeinfo_string)
