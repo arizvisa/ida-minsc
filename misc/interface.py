@@ -14186,7 +14186,7 @@ class decode(object):
             elif info and dsize == FF_STRLIT:
                 width, length, _, encoding = string.unpack(info.strtype)
                 codec = string.codec(width, encoding)
-                Fdecode = functools.partial(codec.decode, errors='replace') if codec else internal.utils.fthrough(bytes, len)
+                Fdecode = (lambda input: codec.decode(input, 'replace')) if codec else internal.utils.fthrough(bytes, len)
                 ldata, strdata = mdata[:length], mdata[length:]
                 prefix = cls.unsigned(Fordered(length, ldata))
                 decoded, used = Fdecode(strdata)
@@ -14253,7 +14253,7 @@ class decode(object):
         elif info and dsize == FF_STRLIT:
             width, length, _, _ = string.unpack(info.strtype)
             #codec = string.codec(width, encoding)
-            #Fdecode = internal.utils.fidentity if codec is None else functools.partial(codec.decode, errors='replace')
+            #Fdecode = internal.utils.fidentity if codec is None else (lambda input: codec.decode(input, 'replace'))
             ldata, strdata = bytes[:length], bytes[length:]
             prefix, array = cls.unsigned(Fordered(length, ldata)), cls.string(width, strdata, order=order)
             if length and prefix != len(array):
@@ -14387,7 +14387,7 @@ class decode(object):
             elif hasattr(udm, 'repr') and udm.repr.is_strlit():
                 width, length, _, _ = string.unpack(udm.repr.strtype)
                 #codec = string.codec(width, encoding)
-                #Fdecode = internal.utils.fidentity if codec is None else functools.partial(codec.decode, errors='replace')
+                #Fdecode = internal.utils.fidentity if codec is None else (lambda input: codec.decode(input, 'replace'))
                 ldata, strdata = bytes[:length], bytes[length:]
                 prefix, decoded = cls.unsigned(Fordered(length, ldata)), cls.string(width, strdata, order=order)
                 if length and prefix != len(decoded):
