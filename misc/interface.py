@@ -4757,13 +4757,43 @@ class address(object):
     @classmethod
     def apply_typeinfo(cls, ea, info, *flags):
         '''Apply the given type information in `info` to the address `ea` with the given `flags`.'''
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        del_tinfo = idaapi.del_tinfo2 if idaapi.__version__ < 7.0 else idaapi.del_tinfo
         ea = int(ea)
 
-        # If `info` is None, then we're only being asked to remove the type information.
+        # If `info` is `None`, then we're only being asked to remove the type
+        # information. Since removing the information should also result in
+        # deleting the data, we grab the address item size, the original type,
+        # and the original aflags before anything so we can restore on failure.
         if info is None and any(hasattr(idaapi, attribute) for attribute in ['del_tinfo', 'del_tinfo2']):
-            del_tinfo = idaapi.del_tinfo2 if idaapi.__version__ < 7.0 else idaapi.del_tinfo
-            void = del_tinfo(ea)
-            return True
+            oldinfo, nbytes = idaapi.tinfo_t(), cls.size(ea)
+            guessed = node.aflags(ea, idaapi.AFL_TYPE_GUESSED if hasattr(idaapi, 'AFL_TYPE_GUESSED') else idaapi.AFL_USERTI)
+
+            # If there's no type here at this address, then we just go ahead and
+            # delete the address item anyways... However, it seems that this api
+            # is bonkers also. If size is 1 byte and the address is already
+            # deleted, `del_items` can still fail. So if the item size is one
+            # byte, then we check its flags to see if we can delete it or not.
+            if not get_tinfo(oldinfo, ea):
+                nbytes = 0 if nbytes <= 1 and cls.flags(ea, idaapi.MS_CLS) == idaapi.FF_UNK else nbytes
+                return idaapi.del_items(ea, 0, nbytes) if nbytes else True
+
+            # Now we can remove the type, and then check if there is still a
+            # type applied to determine whether we succeeded or not.
+            ok = False if del_tinfo(ea) or get_tinfo(idaapi.tinfo_t(), ea) else True
+
+            # If we successfully removed the type, then we should be okay to
+            # delete the items. If that fails, then we can easily restore the
+            # old type back to the same address before returning failure.
+            if ok and idaapi.del_items(ea, 0, nbytes):
+                return True
+
+            # Now we go ahead and restore the type back to the address. If we
+            # failed, log a warning because we're failing out anyways.
+            definitive = guessed == idaapi.AFL_USERTI or guessed & getattr(idaapi, 'AFL_HR_DETERMINED', 0xC0000000)
+            if not idaapi.apply_tinfo(ea, oldinfo, idaapi.TINFO_DEFINITE if definitive else idaapi.TINFO_GUESSED):
+                logging.error(u"{:s}.apply_typeinfo({:#x}, {!s}{:s}) : Error trying to restore the original type {!s} to the specified address ({:#x}) during type removal failure.".format('.'.join([__name__, cls.__name__]), ea, None, ", {:#x}".format(*flags) if flags else '', tinfo.quoted(oldinfo), ea))
+            return False
 
         # If `info` is None, but we don't have an API then we don't have a real way to remove
         # type information. Still, we can remove the NSUP_TYPEINFO(3000) and clear its aflags.
@@ -4775,6 +4805,12 @@ class address(object):
             discard = node.aflags(ea, functools.reduce(operator.or_, aflags), 0)
             [ internal.netnode.sup.remove(ea, val) for val in supvals ]
             return True
+
+        # Before doing anything, we preserve the original type and aflags in
+        # case we error. This way we can restore them before we return failure.
+        else:
+            oldinfo, oldflags = idaapi.tinfo_t(), node.aflags(ea)
+            oldinfo = oldinfo if get_tinfo(oldinfo, ea) else None
 
         # Now we need to figure out what flags to use when applying the type. If
         # the caller didn't provide any flags, we try to preserve them with the
@@ -4788,8 +4824,85 @@ class address(object):
         if flags and tflags == idaapi.TINFO_GUESSED and definitive:
             node.aflags(ea, idaapi.AFL_USERTI, 0)
 
-        # Now everything is set to use idaapi and apply our tinfo_t to the address.
+        # We want to only change the type if we can actually apply it. Since
+        # calls to `apply_tinfo` will almost always succeed if given a valid
+        # address, we try it once so that we can check if the type was written.
+
+        # Our test write... If we fail, then restore aflags and leave.
+        if not idaapi.apply_tinfo(ea, info, tflags):
+            if flags and tflags == idaapi.TINFO_GUESSED and definitive:
+                node.aflags(ea, idaapi.AFL_USERTI, oldflags)
+            return False
+
+        # Now we can get the type and see if it matches what we've written and
+        # make sure that it was changed from what we had previously.
+        written = idaapi.tinfo_t()
+        written = written if get_tinfo(written, ea) else None
+
+        # If the type being written is different and our oldtype and what was
+        # written is the same, then we actually errored out.
+        if not written or not tinfo.same(info, written):
+            if flags and tflags == idaapi.TINFO_GUESSED and definitive:
+                node.aflags(ea, idaapi.AFL_USERTI, oldflags)
+
+            # If there is no old type, or the old type and the desired type are
+            # the same, then we don't have to do anything.
+            if not oldinfo or tinfo.same(oldinfo, info):
+                ok = True
+
+            # Otherwise we try to restore the old type back to the address.
+            else:
+                ok = idaapi.apply_tinfo(ea, oldinfo, idaapi.TINFO_DEFINITE if definitive else idaapi.TINFO_GUESSED)
+
+            # If restoring the type failed, then we log an error before
+            # returning failure since we damaged the type in the database.
+            if not ok:
+                logging.error(u"{:s}.apply_typeinfo({:#x}, {!r}{:s}) : Error trying to restore the original type {!s} to the specified address ({:#x}) during type application failure.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), ", {:#x}".format(*flags) if flags else '', tinfo.quoted(oldinfo), ea))
+            return False
+
+        # If the address is a function, then there's no reason to delete any
+        # items since you can't delete code in functions like that anyways.
+        elif function.has(ea):
+            if flags and tflags & idaapi.TINFO_GUESSED:
+                node.aflags(ea, idaapi.AFL_USERTI, 0)
+            return True
+
+        # We've written the type successfully, so we can now delete the data for
+        # the given address, and then attempt to reapply without rechecking
+        # afterwards. Unfortunately, it's rare but this api can actually fail...
+        nbytes = tinfo.size(written)
+        if not idaapi.del_items(ea, 0, nbytes):
+            if flags and tflags == idaapi.TINFO_GUESSED and definitive:
+                node.aflags(ea, idaapi.AFL_USERTI, oldflags)
+
+            # If there was an old type, and the old type is the same as what was
+            # written, then we don't have to do anything here.
+            if oldinfo and tinfo.same(oldinfo, written):
+                ok = True
+
+            # If there was no old type, then we need to delete whatever it is
+            # that we applied previously.
+            elif not oldinfo:
+                ok = del_tinfo(ea)
+
+            # Otherwise, we try to restore the old type to the desired address.
+            else:
+                ok = idaapi.apply_tinfo(ea, oldinfo, idaapi.TINFO_DEFINITE if definitive else idaapi.TINFO_GUESSED)
+
+            # If anything failed, then we need to log it and return failure.
+            if not ok:
+                description = "restore the original type {!s} to".format(interface.tinfo.quoted(oldinfo)) if oldinfo else 'remove the current type from'
+                logging.error(u"{:s}.apply_typeinfo({:#x}, {!r}{:s}) : Error trying to {:s} the specified address ({:#x}) during failure while deleting {:d} byte{:s}.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), ", {:#x}".format(*flags) if flags else '', description, ea, nbytes, '' if nbytes == 1 else 's'))
+            return False
+
+        # We've successfully deleted things, so we should now be completely good
+        # to go. So, we reapply the type we already wrote to the deleted bytes
+        # which should result in the data being changed. This can error too, but
+        # it's not too important since the type was already applied anyways.
         ok = idaapi.apply_tinfo(ea, info, tflags)
+        if not ok:
+            node.aflags(ea, idaapi.AFL_USERTI, oldflags)
+            logging.warning(u"{:s}.apply_typeinfo({:#x}, {!r}{:s}) : Ignoring an error while applying an already applied type {!s} to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), ", {:#x}".format(*flags) if flags else '', tinfo.quoted(oldinfo), ea))
 
         # If the caller gave us explicit flags to apply as TINFO_GUESSED, then
         # we need to clear the aflags to force the applied type as being guessed.
