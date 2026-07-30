@@ -2570,6 +2570,32 @@ class type(object):
         return interface.instruction.is_calli(ea)
     is_calli = calli = linki = is_linki = utils.alias(enteri, 'type')
 
+    @utils.multicase()
+    @classmethod
+    def purged(cls):
+        '''Return the purged bytes from the indirect branch instruction at the current address.'''
+        return cls.purged(ui.current.address())
+    @utils.multicase(ea=types.integer)
+    @classmethod
+    def purged(cls, ea):
+        '''Return the purged bytes from the indirect branch instruction at the address `ea`.'''
+        ea = interface.address.inside(ea)
+        return idaapi.get_ind_purged(ea)
+    @utils.multicase(ea=types.integer, size=types.integer)
+    @classmethod
+    def purged(cls, ea, size):
+        '''Return the purged bytes for the indirect branch instruction at the address `ea` to `size` bytes..'''
+        ea = interface.address.inside(ea)
+        res, ok = idaapi.get_ind_purged(ea), idaapi.set_purged(ea, size, True)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.purged({:#x}, {:d}) : Unable to apply the specified size ({:d}) to the purged bytes for the instruction at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, size, size, ea))
+        return res
+    @utils.multicase(ea=types.integer, none=types.none)
+    @classmethod
+    def purged(cls, ea, none):
+        '''Removed the purged bytes from the indirect branch instruction at the address `ea`.'''
+        res, void = idaapi.get_ind_purged(ea), idaapi.del_ind_purged(ea)
+        return res
 t = type    # XXX: ns alias
 
 feature = utils.alias(type.feature, 'type')
