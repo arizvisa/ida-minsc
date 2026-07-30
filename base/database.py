@@ -9331,7 +9331,7 @@ class get(object):
         # Next thing to do is to figure out which decoder to use, turn our
         # array into a string, and then decode it with the callable we got.
         codec = interface.string.codec(width, encoding)
-        Fdecode = utils.fmap(utils.fidentity, len) if codec is None else functools.partial(codec.decode, errors='replace')
+        Fdecode = utils.fmap(utils.fidentity, len) if codec is None else (lambda input: codec.decode(input, 'replace'))
         data = res.tostring() if sys.version_info.major < 3 else res.tobytes()
         string, count = Fdecode(data)
         return string
