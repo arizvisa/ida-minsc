@@ -9265,7 +9265,7 @@ class get(object):
     def string(cls, ea, width, terminal, encoding):
         '''Return the data at the address `ea` as a string with the given character `width` and string `encoding` that is terminated by the bytes in `terminal`.'''
         default = interface.string.default()
-        _, _, default, _ = interface.string.unpack(default)
+        _, _, defterminals, _ = interface.string.unpack(default)
 
         # Some tests that are used to terminate reading if our current address
         # ends up being out of bounds or is not pointing to an initialized value.
@@ -9275,8 +9275,8 @@ class get(object):
 
         # Use the terminal characters we were given or the default terminals from
         # the database in order to create a test that stops when they're encountered.
-        sentinel = bytearray(itertools.islice(itertools.chain(terminal or b'', default * width), width))
-        Fis_terminator = utils.fcompose(functools.partial(read, size=width), functools.partial(operator.eq, builtins.bytes(sentinel)))
+        sentinel = bytearray(itertools.islice(itertools.chain(terminal or b'', defterminals * width), width))
+        Fis_terminator = utils.fcompose(functools.partial(read, size=width), functools.partial(operator.contains, builtins.bytes(sentinel)))
 
         # Now we have everything we need to read bytes from the database until we
         # encounter our terminator characters. Start at the address we were given
