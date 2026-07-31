@@ -2604,7 +2604,7 @@ class structures(changingchanged):
             logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for tag {!s} in structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(key), sid))
             internal.tags.reference.structure.decrement(sid, key)
 
-        if contentkeys ^ available:
+        if contentkeys - available:
             logging.warning(u"{:s}.delete_refs({:#x}) : Due to a discrepancy for some of the tags ({!s}), not all keys may have been removed ({!s}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(contentkeys - available), utils.string.repr(available - contentkeys)))
         return
 
@@ -3097,7 +3097,7 @@ class membertagscommon(changingchanged):
             logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for tag {!s} in member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(key), mid))
             internal.tags.reference.members.decrement(mid, key)
 
-        if contentkeys ^ available:
+        if contentkeys - available:
             logging.warning(u"{:s}.delete_refs({:#x}) : Due to a discrepancy for some of the tags ({!s}), not all keys may have been removed ({!s}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(contentkeys - available), utils.string.repr(available - contentkeys)))
         return
 
@@ -6349,7 +6349,7 @@ class decompilermonitor(object):
             logging.debug(u"{:s}.__delete_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Decreasing reference count for tag {!s} at address {:#x}/{:d} of function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, utils.string.repr(key), ea, itp, fn))
             internal.tags.reference.hexfunction.decrement((ea, itp), key, target=cfunc)
 
-        if oldkeys ^ newkeys:
+        if oldkeys - newkeys:
             logging.debug(u"{:s}.__delete_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : Due to a discrepancy for some of the tags ({!s}) at address {:#x}/{:d} of function {:#x}, not all keys may have been removed ({!s}).".format('.'.join([__name__, cls.__name__]), fn, ea, itp, old, new, utils.string.repr(oldkeys - newkeys), ea, itp, fn, utils.string.repr(newkeys - oldkeys)))
         return
 
@@ -6436,7 +6436,7 @@ class decompilermonitor(object):
             logging.debug(u"{:s}.__lvar_delete_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Decreasing reference count for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(key), locator, fn))
             internal.tags.reference.hexvariable.decrement(locator, key, target=cfunc)
 
-        if oldkeys ^ newkeys:
+        if oldkeys - newkeys:
             logging.debug(u"{:s}.__lvar_delete_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Due to a discrepancy for some of the tags ({!s}) for variable {!s} from function {:#x}, not all keys may have been removed ({!s}).".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(oldkeys - newkeys), locator, fn, utils.string.repr(newkeys - oldkeys)))
         return
 
