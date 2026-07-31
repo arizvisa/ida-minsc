@@ -1858,7 +1858,7 @@ class contents(counted):
         address = fn if isinstance(fn, types.integer) else interface.range.start(fn)
 
         key = idaapi.ea2node(address)
-        if netnode.sup.has(node, key, usagetag) and not(netnode.sup.remove(node, key, cls.usagetag)):
+        if netnode.sup.has(node, key, cls.usagetag) and not(netnode.sup.remove(node, key, cls.usagetag)):
             logging.error(u"{:s}.erase({!s}) : Unable to remove the usage mask for the function at {:#x} from netnode {:#x}.".format('.'.join([__name__, cls.__name__]), parameter, address, node))
 
         for position in netnode.alt.fiter(key, cls.counttag):
