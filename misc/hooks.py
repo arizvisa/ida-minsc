@@ -6816,10 +6816,15 @@ class entrymethods(object):
         def segm_deleted(self, start_ea, end_ea, flags):
             '''introduced by commit 3ce5b7f06dfdba36eb84d679c08248734a12036a to patch_codegen/idp.py:78.'''
 
+        # idaapi.__version__ >= 7.6
+        def bookmark_changed(self, index, pos, desc, operation):
+            '''introduced by commit c22e07185389adaef1698314071f2c6cd31dd08b to patch_codegen/idp.py:69.'''
+
         idaapi.__version__ >= 7.6 and mapping.setdefault('compiler_changed', compiler_changed)
         idaapi.__version__ < 8.4 and mapping.setdefault('local_types_changed', busted_local_types_changed)
         idaapi.__version__ >= 8.4 and mapping.setdefault('local_types_changed', local_types_changed)
         idaapi.__version__ >= 7.7 and mapping.setdefault('segm_deleted', segm_deleted)
+        idaapi.__version__ >= 7.6 and mapping.setdefault('bookmark_changed', bookmark_changed)
 
     class IDP_Hooks(object):
         """
