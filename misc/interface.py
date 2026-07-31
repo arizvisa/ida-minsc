@@ -1741,6 +1741,7 @@ class prioritybase(object):
                 while True:
                     parameters = (yield result)
                     args, kwargs = parameters
+                    parameters_description = format_parameters(*args, **kwargs)
                     logging.info(u"{:s}.coroutine_when_enabled({!r}) : Coroutine for the target {:s} has received parameters ({:s}) and is still waiting for termination.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target), format_parameters(*args, **kwargs)))
 
                     # verify that our parameters haven't changed so that we can warn the user about it.
