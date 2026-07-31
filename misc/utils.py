@@ -204,7 +204,7 @@ class pycompat(object):
 
         # Get the module and combine it with the short name into a full name.
         module, qualified_name = cls.module(object), cls.shortname(object)
-        return '.'.join([module, qualified_name] if module else [Fqualified_name])
+        return '.'.join([module, qualified_name] if module else [qualified_name])
 
     @classmethod
     def shortname(cls, object):
