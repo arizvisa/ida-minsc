@@ -3477,6 +3477,8 @@ class address(object):
     @classmethod
     def prevbyte(cls, byte, **count):
         '''Return the previous address that uses the specified `byte` value.'''
+        if 'predicate' in count:
+            return cls.prevbyte(byte, count.pop('ea', ui.current.address()), count.pop('predicate'), **count)
         return cls.prevbyte(byte, ui.current.address(), count.pop('count', 1))
     @utils.multicase(byte=internal.types.integer, ea=internal.types.integer)
     @classmethod
@@ -3512,6 +3514,8 @@ class address(object):
     @classmethod
     def nextbyte(cls, byte, **count):
         '''Return the next address that uses the specified `byte` value.'''
+        if 'predicate' in count:
+            return cls.nextbyte(byte, count.pop('ea', ui.current.address()), count.pop('predicate'), **count)
         return cls.nextbyte(byte, ui.current.address(), count.pop('count', 1))
     @utils.multicase(byte=internal.types.integer, ea=internal.types.integer)
     @classmethod
