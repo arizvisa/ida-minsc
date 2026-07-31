@@ -6815,12 +6815,17 @@ class entrymethods(object):
         def struc_renamed(self, sptr, success):
             '''introduced by commit 023c5ba53ca91c730d39539c2c50778ac8e5cd87 to patch_codegen/idp.py:87.'''
 
+        # idaapi.__version__ >= 7.6
+        def renamed(self, ea, new_name, local_name, old_name):
+            '''introduced by commit c22e07185389adaef1698314071f2c6cd31dd08b to patch_codegen/idp.py:51.'''
+
         idaapi.__version__ >= 7.6 and mapping.setdefault('compiler_changed', compiler_changed)
-        idaapi.__version__ < 8.4 and mapping.setdefault('local_types_changed', busted_local_types_changed)
+        idaapi.__version__ <  8.4 and mapping.setdefault('local_types_changed', busted_local_types_changed)
         idaapi.__version__ >= 8.4 and mapping.setdefault('local_types_changed', local_types_changed)
         idaapi.__version__ >= 7.7 and mapping.setdefault('segm_deleted', segm_deleted)
         idaapi.__version__ >= 7.6 and mapping.setdefault('bookmark_changed', bookmark_changed)
         idaapi.__version__ >= 8.0 and mapping.setdefault('struc_renamed', struc_renamed)
+        idaapi.__version__ >= 7.6 and mapping.setdefault('renamed', renamed)
 
     class IDP_Hooks(object):
         """
