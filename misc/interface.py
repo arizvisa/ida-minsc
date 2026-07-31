@@ -8025,7 +8025,7 @@ class tinfo(object):
         if idaapi.__version__ < 6.8:
             til = cls.library(type)
             return idaapi.is_castable2(til, type, other)
-        [tcflags] = flags if flags else [idaapi.TCMP_AUTOCAST]
+        [tcflags] = flags if flags else [idaapi.TCMP_CALL if type.is_func() else idaapi.TCMP_AUTOCAST]
         return type.compare_with(other, tcflags)
 
     @classmethod
@@ -8034,7 +8034,7 @@ class tinfo(object):
         if idaapi.__version__ < 6.8:
             til = cls.library(type)
             return idaapi.equal_types(til, type, other)
-        return type.equals_to(other)
+        return type.compare_with(other, idaapi.TCMP_EQUAL)
 
     @classmethod
     def same(cls, type, other):
@@ -8042,10 +8042,15 @@ class tinfo(object):
         if idaapi.__version__ < 6.8:
             til = cls.library(type)
             return idaapi.equal_types(til, type, other)
-
         elif type.empty() or other.empty():
             return type.empty() == other.empty()
-
+        elif hasattr(idaapi, 'replace_ordinal_typerefs'):
+            til_type, til_other = map(cls.library, [type, other])
+            stripped_type, stripped_other = map(tinfo.copy, [type, other])
+            idaapi.replace_ordinal_typerefs(til_type, stripped_type), idaapi.replace_ordinal_typerefs(til_other, stripped_other)
+            return stripped_type.compare_with(stripped_other, idaapi.TCMP_DECL)
+        elif hasattr(type, 'compare_with'):
+            return type.compare_with(other, idaapi.TCMP_DECL)
         return type.serialize() == other.serialize()
 
     @classmethod
