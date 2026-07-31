@@ -6802,19 +6802,24 @@ class entrymethods(object):
 
         # idaapi.__version__ >= 7.6
         def compiler_changed(self, adjust_inf_fields):
-            '''introduced by commit c22e07185389adaef1698314071f2c6cd31dd08b to patch_codegen/idp.py.'''
+            '''introduced by commit c22e07185389adaef1698314071f2c6cd31dd08b to patch_codegen/idp.py:60.'''
 
         # idaapi.__version__ < 8.4
         def busted_local_types_changed(self):
-            '''this variation is defined in v7.7 of the disassembler as having no parameters (making it useless).'''
+            '''this variation is defined in v6.8 of the disassembler as having no parameters (making it useless).'''
 
         # idaapi.__version__ >= 8.4
         def local_types_changed(self, ltc, ordinal, name):
-            '''introduced by commit ae62cd4df534f18c8c3dc47bd159d50c9822d82d to patch_codegen/idp.py.'''
+            '''introduced by commit ae62cd4df534f18c8c3dc47bd159d50c9822d82d to patch_codegen/idp.py:96.'''
+
+        # idaapi.__version__ >= 7.7
+        def segm_deleted(self, start_ea, end_ea, flags):
+            '''introduced by commit 3ce5b7f06dfdba36eb84d679c08248734a12036a to patch_codegen/idp.py:78.'''
 
         idaapi.__version__ >= 7.6 and mapping.setdefault('compiler_changed', compiler_changed)
         idaapi.__version__ < 8.4 and mapping.setdefault('local_types_changed', busted_local_types_changed)
         idaapi.__version__ >= 8.4 and mapping.setdefault('local_types_changed', local_types_changed)
+        idaapi.__version__ >= 7.7 and mapping.setdefault('segm_deleted', segm_deleted)
 
     class IDP_Hooks(object):
         """
