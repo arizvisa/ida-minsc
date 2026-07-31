@@ -1378,7 +1378,7 @@ class naming(changingchanged):
         return
 
     @classmethod
-    def changed(cls, ea, new_name, local_name):
+    def changed(cls, ea, new_name, local_name, old_name):
         if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changed({:#x}, {!r}, {!s}) : Ignoring naming.changed event (not an address) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, local_name, ea))
 
@@ -6716,14 +6716,6 @@ class supermethods(object):
             return supermethod(adjust_inf_fields)
 
         # idaapi.__version__ >= 7.6
-        def renamed(self, ea, new_name, local_name):
-            '''This patch is needed due to the supermethod wanting a different number of parameters.'''
-            cls = self.__class__
-            supercls = super(cls, self)
-            supermethod = getattr(supercls, 'renamed')
-            return supermethod(ea, new_name, local_name or None, '')
-
-        # idaapi.__version__ >= 7.6
         def bookmark_changed(self, index, pos, desc, operation):
             '''This patch is needed due to the supermethod not wanting *this as its first parameter.'''
             cls = self.__class__
@@ -6743,7 +6735,6 @@ class supermethods(object):
         # to be patched for the IDB_Hooks class by checking the version
         # in order to determine whether it should be assigned or not.
         idaapi.__version__ >= 7.6 and mapping.setdefault('compiler_changed', compiler_changed)
-        idaapi.__version__ >= 7.6 and mapping.setdefault('renamed', renamed)
         idaapi.__version__ >= 7.6 and mapping.setdefault('bookmark_changed', bookmark_changed)
         idaapi.__version__ >= 7.7 and mapping.setdefault('segm_deleted', segm_deleted)
 
