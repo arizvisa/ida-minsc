@@ -4638,17 +4638,7 @@ class type(object):
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}{:s}) : Unable to parse the provided string (\"{:s}\") into a type declaration.".format('.'.join([__name__, cls.__name__]), ea, string, ", {:s}".format(utils.string.kwargs(guessed)) if guessed else '', utils.string.escape(string, '"')))
         return cls(ea, ti, **guessed)
 
-    @utils.multicase()
-    @classmethod
-    def size(cls):
-        '''Return the size of the item at the current address.'''
-        return size(ui.current.address())
-    @utils.multicase(ea=internal.types.integer)
-    @classmethod
-    def size(cls, ea):
-        '''Return the size of the item at the address `ea`.'''
-        ea = interface.address.within(ea)
-        return interface.address.size(ea)
+    size = utils.alias(address.size, 'address')
 
     @utils.multicase()
     @classmethod
