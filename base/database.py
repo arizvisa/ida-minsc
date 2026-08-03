@@ -4619,7 +4619,7 @@ class address(object):
                 raise E.AddressOutOfBoundsError(u"{:s}.nextfunction({:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, bottom(), ea))
             ea = next = interface.range.start(fn)
         return ea
-    @utils.multicase(location=internal.types.integer, count=internal.types.integer)
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def nextfunction(cls, location, count):
         '''Translate the `location` to the following `count` addresses within a function.'''
@@ -4654,14 +4654,21 @@ class address(object):
                 counter -= 1
             ea = next
         return ea
-    @utils.multicase(ea=internal.types.integer)
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def prevrelocation(cls, location, predicate, **count):
+        '''Translate the `location` to the previous relocation address satisfying the given `predicate`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevrelocation(int(location), predicate, **count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevrelocation(start, predicate, **count)
+        return interface.bounds_t(res, stop)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t))
     @classmethod
     def prevrelocation(cls, ea):
         '''Return the address of the relocation prior to the address `ea`.'''
-        res = idaapi.get_prev_fixup_ea(ea)
-        if res == idaapi.BADADDR:
-            raise E.AddressOutOfBoundsError(u"{:s}.prevrelocation({:#x}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, top(), ea))
-        return res
+        return cls.prevrelocation(ea, 1)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevrelocation(cls, ea, count):
@@ -4672,6 +4679,16 @@ class address(object):
                 raise E.AddressOutOfBoundsError(u"{:s}.prevrelocation({:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, top(), ea))
             ea = next
         return ea
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), count=internal.types.integer)
+    @classmethod
+    def prevrelocation(cls, location, count):
+        '''Translate the `location` to the previous `count` relocation addresses.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevrelocation(int(location), count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevrelocation(start, count)
+        return interface.bounds_t(res, stop)
     @utils.multicase()
     @classmethod
     def nextrelocation(cls, **count):
@@ -4695,14 +4712,21 @@ class address(object):
                 counter -= 1
             ea = next
         return ea
-    @utils.multicase(ea=internal.types.integer)
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def nextrelocation(cls, location, predicate, **count):
+        '''Translate the `location` to the following relocation address satisfying the provided `predicate`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextrelocation(int(location), predicate, **count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextrelocation(stop, predicate, **count)
+        return interface.bounds_t(start, res)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t))
     @classmethod
     def nextrelocation(cls, ea):
         '''Return the address of the relocation after the address `ea`.'''
-        res = idaapi.get_next_fixup_ea(ea)
-        if res == idaapi.BADADDR:
-            raise E.AddressOutOfBoundsError(u"{:s}.nextrelocation({:#x}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, bottom(), idaapi.get_item_end(ea)))
-        return res
+        return cls.nextrelocation(ea, 1)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextrelocation(cls, ea, count):
@@ -4713,6 +4737,16 @@ class address(object):
                 raise E.AddressOutOfBoundsError(u"{:s}.nextrelocation({:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, bottom(), idaapi.get_item_end(ea)))
             ea = next
         return ea
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), count=internal.types.integer)
+    @classmethod
+    def nextrelocation(cls, location, count):
+        '''Translate the `location` to the following `count` relocation addresses.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextrelocation(int(location), count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextrelocation(stop, count)
+        return interface.bounds_t(start, res)
     prevfixup, nextfixup = utils.alias(prevrelocation, 'address'), utils.alias(nextrelocation, 'address')
 
     # address translations
