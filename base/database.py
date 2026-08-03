@@ -3003,22 +3003,22 @@ class address(object):
     def prev(cls, predicate, **count):
         '''Return the previous address from the current address that satisfies the provided `predicate`.'''
         return cls.prev(ui.current.address(), predicate, **count)
-    @utils.multicase(ea=internal.types.integer)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t))
     @classmethod
     def prev(cls, ea):
         '''Return the previous address from the address specified by `ea`.'''
-        return cls.prev(ea, 1)
-    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
+        return cls.prevF(ea, utils.fidentity, 1)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), predicate=internal.types.callable)
     @classmethod
     def prev(cls, ea, predicate):
         '''Return the previous address from the address `ea` that satisfies the provided `predicate`.'''
         return cls.prevF(ea, predicate, 1)
-    @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def prev(cls, ea, count):
         '''Return the previous `count` addresses from the address specified by `ea`.'''
         return cls.prevF(ea, utils.fidentity, count)
-    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable, count=internal.types.integer)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), predicate=internal.types.callable, count=internal.types.integer)
     @classmethod
     def prev(cls, ea, predicate, count):
         '''Return the previous `count` addresses from the address `ea` that satisfies the provided `predicate`.'''
@@ -3034,22 +3034,22 @@ class address(object):
     def next(cls, predicate, **count):
         '''Return the next address from the current address that satisfies the provided `predicate`.'''
         return cls.next(ui.current.address(), predicate, **count)
-    @utils.multicase(ea=internal.types.integer)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t))
     @classmethod
     def next(cls, ea):
         '''Return the next address from the address `ea`.'''
         return cls.next(ea, 1)
-    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), predicate=internal.types.callable)
     @classmethod
     def next(cls, ea, predicate):
         '''Return the next address from the address `ea` that satisfies the provided `predicate`.'''
         return cls.nextF(ea, predicate, 1)
-    @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def next(cls, ea, count):
         '''Return the next `count` addresses from the address specified by `ea`.'''
         return cls.nextF(ea, utils.fidentity, count)
-    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable, count=internal.types.integer)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), predicate=internal.types.callable, count=internal.types.integer)
     @classmethod
     def next(cls, ea, predicate, count):
         '''Return the next `count` addresses from the address `ea` that satisfies the provided `predicate`.'''
