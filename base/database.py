@@ -3060,7 +3060,7 @@ class address(object):
     def prevF(cls, predicate, **count):
         '''Return the previous address from the current one that satisfies the provided `predicate`.'''
         return cls.prevF(ui.current.address(), predicate, count.pop('count', 1))
-    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), predicate=internal.types.callable)
     @classmethod
     def prevF(cls, ea, predicate, **count):
         '''Return the previous address from the address `ea` that satisfies the provided `predicate`.'''
@@ -3084,13 +3084,27 @@ class address(object):
         if count and len(items) < count:
             raise E.AddressOutOfBoundsError(u"{:s}.prevF({:#x}, {!r}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, count, top, items[-1] if items else ea))
         return items[-1] if items else ea
+    @utils.multicase(location=interface.location_t, predicate=internal.types.callable, count=internal.types.integer)
+    @classmethod
+    def prevF(cls, location, predicate, count):
+        '''Translate the `location` to the previous `count` addresses satisfying the provided `predicate`.'''
+        res = cls.prevF(int(location), predicate, count)
+        old, size = location
+        return interface.location_t(res, size)
+    @utils.multicase(bounds=interface.bounds_t, predicate=internal.types.callable, count=internal.types.integer)
+    @classmethod
+    def prevF(cls, bounds, predicate, count):
+        '''Enlarge the `bounds` to include the previous `count` addresses satisfying the provided `predicate`.'''
+        start, stop = bounds
+        res = cls.prevF(start, predicate, count)
+        return interface.bounds_t(res, stop)
 
     @utils.multicase(predicate=internal.types.callable)
     @classmethod
     def nextF(cls, predicate, **count):
         '''Return the next address from the current one that satisfies the provided `predicate`.'''
         return cls.nextF(ui.current.address(), predicate, count.pop('count', 1))
-    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), predicate=internal.types.callable)
     @classmethod
     def nextF(cls, ea, predicate, **count):
         '''Return the next address from the address `ea` that satisfies the provided `predicate`.'''
@@ -3114,6 +3128,20 @@ class address(object):
         if count and len(items) < count:
             raise E.AddressOutOfBoundsError(u"{:s}.nextF({:#x}, {!r}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, count, bottom, items[-1] if items else ea))
         return items[-1] if items else ea
+    @utils.multicase(location=interface.location_t, predicate=internal.types.callable, count=internal.types.integer)
+    @classmethod
+    def nextF(cls, location, predicate, count):
+        '''Translate the `location` to the following `count` addresses satisfying the provided `predicate`.'''
+        res = cls.nextF(int(location), predicate, count)
+        old, size = location
+        return interface.location_t(res, size)
+    @utils.multicase(bounds=interface.bounds_t, predicate=internal.types.callable, count=internal.types.integer)
+    @classmethod
+    def nextF(cls, bounds, predicate, count):
+        '''Enlarge the `bounds` to include the following `count` addresses satisfying the provided `predicate`.'''
+        start, stop = bounds
+        res = cls.nextF(stop, predicate, count)
+        return interface.bounds_t(start, res)
 
     @utils.multicase(mask=(internal.types.integer, internal.types.tuple))
     @classmethod
