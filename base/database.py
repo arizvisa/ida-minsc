@@ -2785,6 +2785,18 @@ class address(object):
 
     @utils.multicase()
     @classmethod
+    def size(cls):
+        '''Return the size of the item at the current address.'''
+        return size(ui.current.address())
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def size(cls, ea):
+        '''Return the size of the item at the address `ea`.'''
+        ea = interface.address.within(ea)
+        return interface.address.size(ea)
+
+    @utils.multicase()
+    @classmethod
     def bounds(cls):
         '''Return the bounds of the current address or selection in a tuple formatted as `(left, right)`.'''
         address, selection = ui.current.address(), ui.current.selection()
