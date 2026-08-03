@@ -3560,7 +3560,7 @@ class address(object):
         if 'predicate' in count:
             return cls.prevbyte(byte, count.pop('ea', ui.current.address()), count.pop('predicate'), **count)
         return cls.prevbyte(byte, ui.current.address(), count.pop('count', 1))
-    @utils.multicase(byte=internal.types.integer, ea=internal.types.integer)
+    @utils.multicase(byte=internal.types.integer, ea=(internal.types.integer, interface.location_t, interface.bounds_t))
     @classmethod
     def prevbyte(cls, byte, ea):
         '''Return the previous address from the address `ea` that uses the specified `byte` value.'''
@@ -3578,6 +3578,16 @@ class address(object):
                 counter -= 1
             ea = next
         return ea
+    @utils.multicase(byte=internal.types.integer, location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def prevbyte(cls, byte, location, predicate, **count):
+        '''Translate the `location` to the previous address satisfying the given `predicate` and using the specified `byte` value.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevbyte(byte, int(location), predicate, **count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevbyte(byte, start, predicate, **count)
+        return interface.bounds_t(res, stop)
     @utils.multicase(byte=internal.types.integer, ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevbyte(cls, byte, ea, count):
@@ -3589,6 +3599,16 @@ class address(object):
                 raise E.AddressOutOfBoundsError(u"{:s}.prevbyte({:#0{:d}x}, {:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), byte, 2 + 2, ea, count, top(), ea))
             ea = next
         return ea
+    @utils.multicase(byte=internal.types.integer, location=(interface.location_t, interface.bounds_t), count=internal.types.integer)
+    @classmethod
+    def prevbyte(cls, byte, location, count):
+        '''Translate the `location` to the previous `count` addresses using the specified `byte` value.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevbyte(byte, int(location), count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevbyte(byte, start, count)
+        return interface.bounds_t(res, stop)
 
     @utils.multicase(byte=internal.types.integer)
     @classmethod
@@ -3597,7 +3617,7 @@ class address(object):
         if 'predicate' in count:
             return cls.nextbyte(byte, count.pop('ea', ui.current.address()), count.pop('predicate'), **count)
         return cls.nextbyte(byte, ui.current.address(), count.pop('count', 1))
-    @utils.multicase(byte=internal.types.integer, ea=internal.types.integer)
+    @utils.multicase(byte=internal.types.integer, ea=(internal.types.integer, interface.location_t, interface.bounds_t))
     @classmethod
     def nextbyte(cls, byte, ea):
         '''Return the next address from the address `ea` that uses the specified `byte` value.'''
@@ -3617,6 +3637,16 @@ class address(object):
                 counter -= 1
             ea = next
         return ea
+    @utils.multicase(byte=internal.types.integer, location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def nextbyte(cls, byte, location, predicate, **count):
+        '''Translate the `location` to the following address satisfying the given `predicate` and using the specified `byte` value.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextbyte(byte, int(location), predicate, **count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextbyte(byte, stop, predicate, **count)
+        return interface.bounds_t(start, res)
     @utils.multicase(byte=internal.types.integer, ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextbyte(cls, byte, ea, count):
@@ -3631,6 +3661,16 @@ class address(object):
                 raise E.AddressOutOfBoundsError(u"{:s}.nextbyte({:#0{:d}x}, {:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), byte, 2 + 2, ea, count, bottom(), ea))
             ea = next
         return ea
+    @utils.multicase(byte=internal.types.integer, location=(interface.location_t, interface.bounds_t), count=internal.types.integer)
+    @classmethod
+    def nextbyte(cls, byte, location, count):
+        '''Translate the `location` to the following `count` addresses using the specified `byte` value.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextbyte(byte, int(location), count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextbyte(byte, stop, count)
+        return interface.bounds_t(start, res)
 
     @utils.multicase()
     @classmethod
