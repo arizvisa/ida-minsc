@@ -4522,7 +4522,7 @@ class address(object):
     def prevfunction(cls, **count):
         '''Return the previous address from the current address that is within a function.'''
         return cls.prevfunction(ui.current.address(), count.pop('count', 1))
-    @utils.multicase(ea=internal.types.integer)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t))
     @classmethod
     def prevfunction(cls, ea):
         '''Return the previous address from the address `ea` that is within a function.'''
@@ -4542,6 +4542,16 @@ class address(object):
                 count -= 1
             ea = next
         return ea
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def prevfunction(cls, location, predicate, **count):
+        '''Translate the `location` to the previous address within a function satisfying the provided `predicate`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevfunction(int(location), predicate, **count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevfunction(start, predicate, **count)
+        return interface.bounds_t(res, stop)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevfunction(cls, ea, count):
@@ -4552,13 +4562,23 @@ class address(object):
                 raise E.AddressOutOfBoundsError(u"{:s}.prevfunction({:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, top(), ea))
             ea = interface.range.stop(fn) - 1
         return ea
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), count=internal.types.integer)
+    @classmethod
+    def prevfunction(cls, location, count):
+        '''Translate the `location` to the previous `count` addresses within a function.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevfunction(int(location), count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevfunction(start, count)
+        return interface.bounds_t(res, stop)
 
     @utils.multicase()
     @classmethod
     def nextfunction(cls, **count):
         '''Return the next address from the current address that is within a function.'''
         return cls.nextfunction(ui.current.address(), count.pop('count', 1))
-    @utils.multicase(ea=internal.types.integer)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t))
     @classmethod
     def nextfunction(cls, ea):
         '''Return the next address from the address `ea` that is within a function.'''
@@ -4578,6 +4598,16 @@ class address(object):
                 counter -= 1
             ea = next
         return ea
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def nextfunction(cls, location, predicate, **count):
+        '''Translate the `location` to the following address within a function satisfying the provided `predicate`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextfunction(int(location), predicate, **count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextfunction(stop, predicate, **count)
+        return interface.bounds_t(start, res)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextfunction(cls, ea, count):
@@ -4589,6 +4619,16 @@ class address(object):
                 raise E.AddressOutOfBoundsError(u"{:s}.nextfunction({:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, bottom(), ea))
             ea = next = interface.range.start(fn)
         return ea
+    @utils.multicase(location=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def nextfunction(cls, location, count):
+        '''Translate the `location` to the following `count` addresses within a function.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextfunction(int(location), count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextfunction(stop, count)
+        return interface.bounds_t(start, res)
     prevfunc, nextfunc = utils.alias(prevfunction, 'address'), utils.alias(nextfunction, 'address')
 
     @utils.multicase()
