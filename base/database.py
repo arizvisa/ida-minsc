@@ -3442,14 +3442,21 @@ class address(object):
                 counter -= 1
             ea = next
         return ea
-    @utils.multicase(ea=internal.types.integer)
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def prevcode(cls, location, predicate, **count):
+        '''Translate the `location` to the previous address defined as code and satisfying the provided `predicate`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevcode(int(location), predicate, **count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevcode(start, predicate, **count)
+        return interface.bounds_t(res, stop)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t))
     @classmethod
     def prevcode(cls, ea):
         '''Return the previous address from the address `ea` that is defined as code.'''
-        res = idaapi.find_code(ea, idaapi.SEARCH_UP)
-        if res == idaapi.BADADDR:
-            raise E.AddressOutOfBoundsError(u"{:s}.prevcode({:#x}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, top(), ea))
-        return res
+        return cls.prevcode(ea, 1)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevcode(cls, ea, count):
@@ -3460,6 +3467,16 @@ class address(object):
                 raise E.AddressOutOfBoundsError(u"{:s}.prevcode({:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, top(), ea))
             ea = next
         return ea
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), count=internal.types.integer)
+    @classmethod
+    def prevcode(cls, location, count):
+        '''Translate the specified `location` to the previous `count` addresses defined as code.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevcode(int(location), count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevcode(start, count)
+        return interface.bounds_t(res, stop)
 
     @utils.multicase()
     @classmethod
@@ -3484,14 +3501,21 @@ class address(object):
                 counter -= 1
             ea = next
         return ea
-    @utils.multicase(ea=internal.types.integer)
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def nextcode(cls, location, predicate, **count):
+        '''Translate the `location` to the following address defined as code and satisfying the provided `predicate`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextcode(int(location), predicate, **count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextcode(stop, predicate, **count)
+        return interface.bounds_t(start, res)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t))
     @classmethod
     def nextcode(cls, ea):
         '''Return the next address from the address `ea` that is defined as code.'''
-        res = idaapi.find_code(ea, idaapi.SEARCH_DOWN)
-        if res == idaapi.BADADDR:
-            raise E.AddressOutOfBoundsError(u"{:s}.nextcode({:#x}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, bottom(), idaapi.get_item_end(ea)))
-        return res
+        return cls.nextcode(ea, 1)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextcode(cls, ea, count):
@@ -3502,6 +3526,16 @@ class address(object):
                 raise E.AddressOutOfBoundsError(u"{:s}.nextcode({:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, bottom(), idaapi.get_item_end(ea)))
             ea = next
         return ea
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), count=internal.types.integer)
+    @classmethod
+    def nextcode(cls, location, count):
+        '''Translate the `location` to the following `count` addresses defined as code.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextcode(int(location), count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextcode(stop, count)
+        return interface.bounds_t(start, res)
 
     @utils.multicase()
     @classmethod
