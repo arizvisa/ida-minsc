@@ -7124,14 +7124,34 @@ class contiguous(object):
             for item, original in items:
                 res = size[item.__class__](item)
                 offset += direction * res
-                yield math.trunc(offset), original if isinstance(item, internal.types.integer) and isinstance(original, symbol_t) else original if isinstance(original, (internal.types.list, internal.types.tuple)) or (getattr(original, '__hash__', None) and original in typemap.typemap) else item
+
+                if isinstance(item, internal.types.integer) and isinstance(original, symbol_t):
+                    newitem = original
+                elif isinstance(original, (internal.types.list, internal.types.tuple)):
+                    newitem = original
+                elif getattr(original, '__hash__', None) and original in typemap.typemap:
+                    newitem = original
+                else:
+                    newitem = item
+
+                yield math.trunc(offset), newitem
             return
 
         # Otherwise, we start at the current offset, and
         # adjust the offset for each item as it comes in.
         for item, original in items:
             res = size[item.__class__](item)
-            yield math.trunc(offset), original if isinstance(item, internal.types.integer) and isinstance(original, symbol_t) else original if isinstance(original, (internal.types.list, internal.types.tuple)) or (getattr(original, '__hash__', None) and original in typemap.typemap) else item
+
+            if isinstance(item, internal.types.integer) and isinstance(original, symbol_t):
+                newitem = original
+            elif isinstance(original, (internal.types.list, internal.types.tuple)):
+                newitem = original
+            elif getattr(original, '__hash__', None) and original in typemap.typemap:
+                newitem = original
+            else:
+                newitem = item
+
+            yield math.trunc(offset), newitem
             offset += direction * res
         return
 
