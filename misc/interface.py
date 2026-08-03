@@ -7121,35 +7121,35 @@ class contiguous(object):
         # If we're laying the list of items in reverse, then
         # we calculate the offset before yielding the item.
         if direction < 0:
-            for item, original in items:
-                res = size[item.__class__](item)
+            for itemsize, item in items:
+                res = size[itemsize.__class__](itemsize)
                 offset += direction * res
 
-                if isinstance(item, internal.types.integer) and isinstance(original, symbol_t):
-                    newitem = original
-                elif isinstance(original, (internal.types.list, internal.types.tuple)):
-                    newitem = original
-                elif getattr(original, '__hash__', None) and original in typemap.typemap:
-                    newitem = original
-                else:
+                if isinstance(itemsize, internal.types.integer) and isinstance(item, symbol_t):
                     newitem = item
+                elif isinstance(item, (internal.types.list, internal.types.tuple)):
+                    newitem = itemsize if item[0] is None else item
+                elif getattr(item, '__hash__', None) and item in typemap.typemap:
+                    newitem = itemsize if item is None else item
+                else:
+                    newitem = itemsize
 
                 yield math.trunc(offset), newitem
             return
 
         # Otherwise, we start at the current offset, and
         # adjust the offset for each item as it comes in.
-        for item, original in items:
-            res = size[item.__class__](item)
+        for itemsize, item in items:
+            res = size[itemsize.__class__](itemsize)
 
-            if isinstance(item, internal.types.integer) and isinstance(original, symbol_t):
-                newitem = original
-            elif isinstance(original, (internal.types.list, internal.types.tuple)):
-                newitem = original
-            elif getattr(original, '__hash__', None) and original in typemap.typemap:
-                newitem = original
-            else:
+            if isinstance(itemsize, internal.types.integer) and isinstance(item, symbol_t):
                 newitem = item
+            elif isinstance(item, (internal.types.list, internal.types.tuple)):
+                newitem = itemsize if item[0] is None else item
+            elif getattr(item, '__hash__', None) and item in typemap.typemap:
+                newitem = itemsize if item is None else item
+            else:
+                newitem = itemsize
 
             yield math.trunc(offset), newitem
             offset += direction * res
