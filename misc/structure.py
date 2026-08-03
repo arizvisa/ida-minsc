@@ -8933,6 +8933,18 @@ class members_t(object):
                 return True
             continue
         return False
+    @utils.multicase(member=membertypes)
+    def has(self, member):
+        '''Return whether the specified `members` is owned by the current structure.'''
+        ti, mowner = idaapi.tinfo_t(), self.owner
+        sid, mid = mowner.id, member.id
+        if isinstance(mowner, idaapi.tinfo_t):
+            sptr, mindex, mptr = v9members.by_identifier(mowner.ptr, mid)
+            expected, expected_member = interface.tinfo.identifier(sptr), sptr.get_udm_tid(mindex)
+        else:
+            sptr, mindex, mptr = members.by_identifier(mowner.ptr, mid)
+            expected, expected_member = sptr.id, mptr.id
+        return all([sid == expected, mid == expected_member])
 
     @utils.string.decorate_arguments('name', 'suffix')
     def by_name(self, name, *suffix):
