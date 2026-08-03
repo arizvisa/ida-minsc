@@ -2980,6 +2980,15 @@ class address(object):
         '''Return the address of the byte at the beginning of the address `ea`.'''
         ea = interface.address.within(ea)
         return idaapi.get_item_head(ea)
+    @utils.multicase(location=(interface.location_t, interface.bounds_t))
+    @classmethod
+    def head(cls, location):
+        '''Return the specified `location` translated to the byte at the beginning of its address.'''
+        ea = interface.address.within(ea)
+        if isinstance(location, interface.location_t):
+            return interface.location_t(idaapi.get_item_head(ea), location.size)
+        start, stop = location
+        return interface.bounds_t(idaapi.get_item_head(start), stop)
 
     @utils.multicase()
     @classmethod
@@ -2992,6 +3001,15 @@ class address(object):
         '''Return the address of the last byte at the end of the address at `ea`.'''
         ea = interface.address.within(ea)
         return idaapi.get_item_end(ea) - 1
+    @utils.multicase(location=(interface.location_t, interface.bounds_t))
+    @classmethod
+    def tail(cls, location):
+        '''Return the specified `location` translated to the last byte at the end of its address.'''
+        ea = interface.address.within(ea)
+        if isinstance(location, interface.location_t):
+            return interface.location_t(idaapi.get_item_end(ea) - 1, location.size)
+        start, stop = location
+        return interface.bounds_t(start, idaapi.get_item_end(stop) - 1)
 
     @utils.multicase()
     @classmethod
