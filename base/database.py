@@ -3148,19 +3148,19 @@ class address(object):
     def prevflag(cls, mask, **count):
         '''Return the previous address where its flags match the given `mask`.'''
         return cls.prevflag(mask, ui.current.address(), count.pop('count', 1))
-    @utils.multicase(mask=(internal.types.integer, internal.types.tuple, internal.types.callable), ea=internal.types.integer)
+    @utils.multicase(mask=(internal.types.integer, internal.types.tuple, internal.types.callable), ea=(internal.types.integer, interface.location_t, interface.bounds_t))
     @classmethod
     def prevflag(cls, mask, ea):
         '''Return the previous address from the address `ea` where its flags match the given `mask`.'''
         return cls.prevflag(mask, ea, 1)
-    @utils.multicase(mask_value=internal.types.tuple, ea=internal.types.integer, predicate=internal.types.callable)
+    @utils.multicase(mask_value=internal.types.tuple, ea=(internal.types.integer, interface.location_t, interface.bounds_t), predicate=internal.types.callable)
     @classmethod
     def prevflag(cls, mask_value, ea, predicate, **count):
         '''Return the previous address from the address `ea` where its flags match the given `mask_value` and satisfies the given `predicate`.'''
         mask, value = mask_value
         Ftest = utils.fcompose(functools.partial(operator.and_, mask), functools.partial(operator.eq, value))
         return cls.prevflag(Ftest, ea, predicate, **count)
-    @utils.multicase(mask=internal.types.integer, ea=internal.types.integer, predicate=internal.types.callable)
+    @utils.multicase(mask=internal.types.integer, ea=(internal.types.integer, interface.location_t, interface.bounds_t), predicate=internal.types.callable)
     @classmethod
     def prevflag(cls, mask, ea, predicate, **count):
         '''Return the previous address from the address `ea` where its flags match the given `mask`.'''
@@ -3178,14 +3178,24 @@ class address(object):
                 counter -= 1
             ea = next
         return ea
-    @utils.multicase(mask_value=internal.types.tuple, ea=internal.types.integer, count=internal.types.integer)
+    @utils.multicase(test=internal.types.callable, location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def prevflag(cls, test, location, predicate, **count):
+        '''Translate the `location` to the previous address satisfying the `predicate` and with a flag satisfying the given `test`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevflag(test, int(location), predicate, **count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevflag(test, start, predicate, **count)
+        return interface.bounds_t(res, stop)
+    @utils.multicase(mask_value=internal.types.tuple, ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def prevflag(cls, mask_value, ea, count):
         '''Return the previous `count` addresses from the address `ea` where its flags match the given `mask_value`.'''
         mask, value = mask_value
         Ftest = utils.fcompose(functools.partial(operator.and_, mask), functools.partial(operator.eq, value))
         return cls.prevflag(Ftest, ea, count)
-    @utils.multicase(mask=internal.types.integer, ea=internal.types.integer, count=internal.types.integer)
+    @utils.multicase(mask=internal.types.integer, ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def prevflag(cls, mask, ea, count):
         '''Return the previous `count` addresses from the address `ea` where its flags match the given `mask`.'''
@@ -3201,25 +3211,35 @@ class address(object):
                 raise E.AddressOutOfBoundsError(u"{:s}.prevflag({!s}, {:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), test, ea, count, top(), ea))
             ea = next
         return ea
+    @utils.multicase(test=internal.types.callable, location=(interface.location_t, interface.bounds_t), count=internal.types.integer)
+    @classmethod
+    def prevflag(cls, test, location, count):
+        '''Translate the `location` to the previous `count` addresses having a flag satisfying the given `test`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevflag(test, int(location), count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevflag(test, start, count)
+        return interface.bounds_t(res, stop)
 
     @utils.multicase(mask=(internal.types.integer, internal.types.tuple))
     @classmethod
     def nextflag(cls, mask, **count):
         '''Return the next address where its flags match the given `mask`.'''
         return cls.nextflag(mask, ui.current.address(), count.pop('count', 1))
-    @utils.multicase(mask=(internal.types.integer, internal.types.tuple, internal.types.callable), ea=internal.types.integer)
+    @utils.multicase(mask=(internal.types.integer, internal.types.tuple, internal.types.callable), ea=(internal.types.integer, interface.location_t, interface.bounds_t))
     @classmethod
     def nextflag(cls, mask, ea):
         '''Return the next address from the address `ea` where its flags match the given `mask`.'''
         return cls.nextflag(mask, ea, 1)
-    @utils.multicase(mask_value=internal.types.tuple, ea=internal.types.integer, predicate=internal.types.callable)
+    @utils.multicase(mask_value=internal.types.tuple, ea=(internal.types.integer, interface.location_t, interface.bounds_t), predicate=internal.types.callable)
     @classmethod
     def nextflag(cls, mask_value, ea, predicate, **count):
         '''Return the next address from the address `ea` where its flags match the given `mask_value` and satisfies the given `predicate`.'''
         mask, value = mask_value
         Ftest = utils.fcompose(functools.partial(operator.and_, mask), functools.partial(operator.eq, value))
         return cls.nextflag(Ftest, ea, predicate, **count)
-    @utils.multicase(mask=internal.types.integer, ea=internal.types.integer, predicate=internal.types.callable)
+    @utils.multicase(mask=internal.types.integer, ea=(internal.types.integer, interface.location_t, interface.bounds_t), predicate=internal.types.callable)
     @classmethod
     def nextflag(cls, mask, ea, predicate, **count):
         '''Return the next address from the address `ea` where its flags match the given `mask`.'''
@@ -3237,14 +3257,24 @@ class address(object):
                 counter -= 1
             ea = next
         return ea
-    @utils.multicase(mask_value=internal.types.tuple, ea=internal.types.integer, count=internal.types.integer)
+    @utils.multicase(test=internal.types.callable, location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def nextflag(cls, test, location, predicate, **count):
+        '''Translate the `location` to the following address satisfying the `predicate` and with a flag satisfying the given `test`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextflag(test, int(location), predicate, **count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextflag(test, stop, predicate, **count)
+        return interface.bounds_t(start, res)
+    @utils.multicase(mask_value=internal.types.tuple, ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def nextflag(cls, mask_value, ea, count):
         '''Return the next `count` addresses from the address `ea` where its flags match the given `mask_value`.'''
         mask, value = mask_value
         Ftest = utils.fcompose(functools.partial(operator.and_, mask), functools.partial(operator.eq, value))
         return cls.nextflag(Ftest, ea, count)
-    @utils.multicase(mask=internal.types.integer, ea=internal.types.integer, count=internal.types.integer)
+    @utils.multicase(mask=internal.types.integer, ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def nextflag(cls, mask, ea, count):
         '''Return the next `count` addresses from the address `ea` where its flags match the given `mask`.'''
@@ -3260,6 +3290,16 @@ class address(object):
                 raise E.AddressOutOfBoundsError(u"{:s}.nextflag({!s}, {:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), test, ea, count, bottom(), ea))
             ea = next
         return ea
+    @utils.multicase(test=internal.types.callable, location=(interface.location_t, interface.bounds_t), count=internal.types.integer)
+    @classmethod
+    def nextflag(cls, test, location, count):
+        '''Translate the `location` to the following `count` addresses having a flag satisfying the given `test`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextflag(test, int(location), count)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextflag(test, stop, count)
+        return interface.bounds_t(start, res)
 
     @utils.multicase()
     @classmethod
