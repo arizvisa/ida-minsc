@@ -4017,6 +4017,48 @@ class address(object):
         top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
         return interface.address.scan_register(ea, bottom, registers, predicate, *count, **modifiers)
 
+    # register navigation, but for `location_t` and `bounds_t`.
+    @utils.multicase(location=(interface.location_t, interface.bounds_t))
+    @classmethod
+    def prevreg(cls, location, **modifiers):
+        '''Translate the `location` to the previous instruction matching the specified `modifiers`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevreg(int(location), **modifiers)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevreg(start, **modifiers)
+        return interface.bounds_t(res, stop)
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), registers=(internal.types.string, interface.register_t))
+    @classmethod
+    def prevreg(cls, location, *registers, **modifiers):
+        '''Translate the `location` to the previous instruction using the specified `registers`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevreg(int(location), *registers, **modifiers)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevreg(start, *registers, **modifiers)
+        return interface.bounds_t(res, stop)
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def prevreg(cls, location, predicate, **modifiers):
+        '''Translate the `location` to the previous instruction matching the specified `modifiers` and satisfying the given `predicate`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevreg(int(location), predicate, **modifiers)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevreg(start, predicate, **modifiers)
+        return interface.bounds_t(res, stop)
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable, registers=(internal.types.string, interface.register_t))
+    @classmethod
+    def prevreg(cls, location, predicate, *registers, **modifiers):
+        '''Translate the `location` to the previous instruction using the given `registers` and satisfying the given `predicate`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.prevreg(int(location), predicate, *registers, **modifiers)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.prevreg(start, predicate, *registers, **modifiers)
+        return interface.bounds_t(res, stop)
+
     @utils.multicase()
     @classmethod
     def nextreg(cls, **modifiers):
@@ -4073,6 +4115,48 @@ class address(object):
         # from this result, we can grab the bottom address to stop scanning at.
         top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
         return interface.address.scan_register(ea, top, registers, predicate, *count, **modifiers)
+
+    # register navigation, but for `location_t` and `bounds_t`.
+    @utils.multicase(location=(interface.location_t, interface.bounds_t))
+    @classmethod
+    def nextreg(cls, location, **modifiers):
+        '''Translate the `location` to the following instruction matching the specified `modifiers`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextreg(int(location), **modifiers)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextreg(stop, **modifiers)
+        return interface.bounds_t(start, res)
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), registers=(internal.types.string, interface.register_t))
+    @classmethod
+    def nextreg(cls, location, *registers, **modifiers):
+        '''Translate the `location` to the following instruction using the specified `registers`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextreg(int(location), *registers, **modifiers)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextreg(stop, *registers, **modifiers)
+        return interface.bounds_t(start, res)
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def nextreg(cls, location, predicate, **modifiers):
+        '''Translate the `location` to the following instruction matching the specified `modifiers` and satisfying the given `predicate`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextreg(int(location), predicate, **modifiers)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextreg(stop, predicate, **modifiers)
+        return interface.bounds_t(start, res)
+    @utils.multicase(location=(interface.location_t, interface.bounds_t), predicate=internal.types.callable, registers=(internal.types.string, interface.register_t))
+    @classmethod
+    def nextreg(cls, location, predicate, *registers, **modifiers):
+        '''Translate the `location` to the following instruction using the given `registers` and satisfying the given `predicate`.'''
+        if isinstance(location, interface.location_t):
+            res = cls.nextreg(int(location), predicate, *registers, **modifiers)
+            return interface.location_t(res, location.size)
+        start, stop = location
+        res = cls.nextreg(stop, predicate, *registers, **modifiers)
+        return interface.bounds_t(start, res)
 
     # FIXME: these two functions, prevstack and nextstack, should be deprecated as they're really not
     #        useful for anything and their performance sucks. the only reason why they're not deprecated
