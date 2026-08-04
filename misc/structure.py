@@ -6584,6 +6584,18 @@ class members(object):
                 sid = opinfo.tid = idaapi.get_struc_id(tinfo.get_type_name() or '')
                 flag = idaapi.get_flags_by_size(tinfo.get_size()) if sid == idaapi.BADADDR else FF_STRUCT
 
+            # If our mptr is an `idaapi.udm_t`, then the user is mixing up the
+            # member types. So we extract the type information and use that.
+            elif hasattr(idaapi, 'udm_t') and isinstance(mptr, idaapi.udm_t):
+                mowner, mindex = item.parent.ptr, item.index
+                tinfo = v9member.get_typeinfo(mowner, mindex)
+
+                # Figure out the operand info and flags using the type we received.
+                opinfo, nbytes = idaapi.opinfo_t(), tinfo.get_size()
+                sid = opinfo.tid = idaapi.get_struc_id(tinfo.get_type_name() or '')
+                flag = idaapi.get_flags_by_size(tinfo.get_size()) if sid == idaapi.BADADDR else FF_STRUCT
+                comments = [v9member.get_comment(mowner, mindex, repeatable) for repeatable in [False, True]]
+
             # If our mptr is not a size, then this is a pythonic type that we need to resolve.
             elif not isinstance(mptr, types.integer):
                 flag, typeid, nbytes = interface.typemap.resolve(mptr)
@@ -6617,6 +6629,8 @@ class members(object):
                 mname = member.default_name(sptr, None, offset)
             elif isinstance(mptr, types.string) and interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC):
                 mname, _ = interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC)
+            elif hasattr(idaapi, 'udm_t') and isinstance(mptr, idaapi.udm_t):
+                mname = utils.string.of(mptr.name)
             elif not isinstance(mptr, types.integer):
                 mname = member.default_name(sptr, None, offset)
             else:
@@ -6640,6 +6654,14 @@ class members(object):
             # name when there's a field with some type information to use.
             elif isinstance(mptr, idaapi.member_t):
                 mname = '' if idaapi.is_special_member(mptr.id) else newnames[offset]
+                originalname = mname or member.default_name(sptr, None, offset)
+                original[offset] = newnames[offset] = originalname
+                candidates.setdefault(mname, []).append(offset)
+
+            # If we're mixing and matching types, then we only need to determine
+            # the default name to assign.
+            elif hasattr(idaapi, 'udm_t') and isinstance(mptr, idaapi.udm_t):
+                mname = utils.string.of(mptr.name)
                 originalname = mname or member.default_name(sptr, None, offset)
                 original[offset] = newnames[offset] = originalname
                 candidates.setdefault(mname, []).append(offset)
@@ -6711,6 +6733,12 @@ class members(object):
                 logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Using alternative name \"{:s}\" for new member at {:s} of {:s} ({:#x}) as the member ({:#x}) at {:s} is currently using the requested name \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, utils.string.escape(newname, '"'), new_descr, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id, mptr.id, old_descr, utils.string.escape(oldname, '"')))
 
             elif isinstance(mptr, (idaapi.tinfo_t, types.string)):
+                conflict = idaapi.get_member_by_name(sptr, utils.string.to(oldname))
+                new_descr = "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset)
+                old_descr = "member ({:#x}) at {:s} is currently using the requested name \"{:s}\"".format(conflict.id, "index {:d}".format(conflict.soff) if union(sptr) else "offset {:+#x}".format(base + conflict.soff), utils.string.escape(oldname, '"')) if conflict else "original name \"{:s}\" is currenty being used".format(utils.string.escape(oldname, '"'))
+                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Using alternative name \"{:s}\" for new member at {:s} of {:s} ({:#x}) as the {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, utils.string.escape(newname, '"'), new_descr, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id, old_descr))
+
+            elif hasattr(idaapi, 'udm_t') and isinstance(mptr, idaapi.udm_t):
                 conflict = idaapi.get_member_by_name(sptr, utils.string.to(oldname))
                 new_descr = "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset)
                 old_descr = "member ({:#x}) at {:s} is currently using the requested name \"{:s}\"".format(conflict.id, "index {:d}".format(conflict.soff) if union(sptr) else "offset {:+#x}".format(base + conflict.soff), utils.string.escape(oldname, '"')) if conflict else "original name \"{:s}\" is currenty being used".format(utils.string.escape(oldname, '"'))
