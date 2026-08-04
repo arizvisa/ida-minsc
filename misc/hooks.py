@@ -3012,7 +3012,7 @@ class structurenaming(changingchanged):
         # the database. If it doesn't exist, then abort and don't do anything.
         sptr = internal.structure.by_identifier(sid) if internal.structure.has(sptr) else None
         if not sptr:
-            logging.warning(u"{:s}.renamed({:#x}) : Received structurenaming.renamed event for an unknown structure ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, "{!r}".format(oldname), "{!r}".format(newname), sid))
+            logging.warning(u"{:s}.renamed({:#x}, {!s}) : Received structurenaming.renamed event for an unknown structure ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, success, sid))
             return
 
         # Now we can use the id to resume our event state, get the current
@@ -3022,7 +3022,7 @@ class structurenaming(changingchanged):
             event.send((sid, name))
 
         except StopIteration:
-            logging.fatal(u"{:s}.renamed({:#x}) : Abandoning rename for structure {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), sid, sid))
+            logging.fatal(u"{:s}.renamed({:#x}, {!s}) : Abandoning rename for structure {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), sid, success, sid))
         event.close()
 
 class membertagscommon(changingchanged):
