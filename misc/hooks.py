@@ -4385,7 +4385,7 @@ class localtypesmonitor_state(object):
         disabled = [hook.idb.disable(event) for event in required]
         try:
             if not all(disabled):
-                raise exceptions.DisassemblerError(u"{:s}.ignore_changes({!s}) : Unable to disable {:d} of {:d} requested event{:s}.".format('.'.join([__name__, cls.__name__]), sum(1 for ok in disabled if not ok), len(required), '' if len(required) == 1 else 's'))
+                raise exceptions.DisassemblerError(u"{:s}.ignore_changes({!s}) : Unable to disable {:d} of {:d} requested event{:s}.".format('.'.join([__name__, cls.__name__]), "{!r}".format(events), sum(1 for ok in disabled if not ok), len(required), '' if len(required) == 1 else 's'))
             yield
 
         # Now that we're done, we can go ahead and re-enable all of the
@@ -4394,7 +4394,7 @@ class localtypesmonitor_state(object):
             enabled = [hook.idb.enable(event) for event in required]
 
         if not all(enabled):
-            raise exceptions.DisassemblerError(u"{:s}.ignore_changes({!s}) : Unable to enable {:d} of {:d} disabled event{:s}.".format('.'.join([__name__, cls.__name__]), sum(1 for ok in enabled if not ok), len(required), '' if len(required) == 1 else 's'))
+            raise exceptions.DisassemblerError(u"{:s}.ignore_changes({!s}) : Unable to enable {:d} of {:d} disabled event{:s}.".format('.'.join([__name__, cls.__name__]), "{!r}".format(events), sum(1 for ok in enabled if not ok), len(required), '' if len(required) == 1 else 's'))
         return
 
     def unload(self, *library):
