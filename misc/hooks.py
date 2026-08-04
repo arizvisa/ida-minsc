@@ -2255,10 +2255,12 @@ class functions(changingchanged):
         except exceptions.OutOfBoundsError:
             contents = cls.contents(pfn, [(left, right)])
 
+            count = 0
             for ea, names in contents:
                 internal.tags.reference.contents.erase_address(pfn, ea)
-                logging.debug(u"{:s}.deleting_func_tail({:#x}, {!s}) : Removed {:d} tag{:s} associated with the unmapped tail {:#x}..{:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(pfn), bounds, len(items), utils.string.repr(tag)))
-                continue
+                count += len(names)
+
+            logging.debug(u"{:s}.deleting_func_tail({:#x}, {!s}) : Removed {:d} tag{:s} associated with {:d} address{:s} in the unmapped tail {:#x}..{:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(pfn), bounds, count, '' if len(count) == 1 else 's', len(contents), '' if len(contents) == 1 else 's', left, right))
             return
 
         # If the number of referrers is larger than 1, then the tail was just removed
