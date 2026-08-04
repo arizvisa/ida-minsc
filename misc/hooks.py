@@ -733,7 +733,7 @@ class typeinfo(changingchanged):
         # If we encounter a StopIteration while submitting the comment, then the
         # coroutine has gone out of control and we need to let the user know.
         except StopIteration:
-            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Abandoning type information at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), ea), exc_info=True)
+            logging.fatal(u"{:s}.changing({:#x}, {!s}, {!s}) : Abandoning type information at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), ea), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled and then leave.
         finally:
@@ -743,20 +743,20 @@ class typeinfo(changingchanged):
     @classmethod
     def changed(cls, ea, type, fnames):
         if interface.node.identifier(ea):
-            return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (not an address) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), utils.string.repr(type), fnames, ea))
+            return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (not an address) with type ({!s}) and name ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), utils.string.repr(type), fnames, ea))
 
         # Verify that the address is within our database boundaries because IDA
         # can actually create "extra" comments outside of the database.
         try:
             ea = interface.address.within(ea)
         except exceptions.OutOfBoundsError:
-            return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (not a valid address) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), utils.string.repr(type), fnames, ea))
+            return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (not a valid address) with type ({!s}) and name ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), utils.string.repr(type), fnames, ea))
 
         # Resume the state for the current address, and then take the data from
         # our parameters (which IDA is telling us was just written) and pack
         # them into a tuple. This way we can send them to the state after we
         # disable the necessary hooks to prevent re-entrancy.
-        logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Received typeinfo.changed event with type ({!s}) and name ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), utils.string.repr(type), fnames))
+        logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Received typeinfo.changed event with type ({!s}) and name ({!r}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), utils.string.repr(type), fnames))
         event, new = cls.resume(ea), (type or b'', fnames or b'')
 
         # First disable our hooks so that we can prevent re-entrancy issues.
