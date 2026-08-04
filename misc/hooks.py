@@ -6431,7 +6431,7 @@ class decompilermonitor(object):
 
         oldkeys, newkeys = ({item for item in (content or {})} for content in [old, new])
         if not (old is not None and isinstance(new, internal.types.dictionary)) or (False if new is None else True):
-            raise internal.exceptions.InvalidParameterError(u"{:s}.__lvar_delete_cmt_refs({:#x}, {:#x}, {:d}, {!r}, {!r}) : An invalid parameter was used when trying to delete the references for the variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, locator, fn))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.__lvar_delete_cmt_refs({:#x}, {!s}, {!r}, {!r}) : An invalid parameter was used when trying to delete the references for the variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, locator, fn))
 
         logging.debug(u"{:s}.__lvar_delete_cmt_refs({:#x}, {!s}, {!r}, {!r}) : Deleting tags ({!s}) for variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, utils.string.repr(oldkeys), locator, fn))
         for key in (oldkeys & newkeys):
@@ -6450,7 +6450,7 @@ class decompilermonitor(object):
 
         oldkeys, newkeys = ({item for item in (content or {})} for content in [old, new])
         if not all(content is not None and isinstance(content, internal.types.dictionary) for content in [old, new]):
-            raise internal.exceptions.InvalidParameterError(u"{:s}.__lvar_update_cmt_refs({:#x}, {!s}, {!r}, {!r}) : An invalid parameter was used when trying to update the references for the variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, fn))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.__lvar_update_cmt_refs({:#x}, {!s}, {!r}, {!r}) : An invalid parameter was used when trying to update the references for the variable {!s} from function {:#x}.".format('.'.join([__name__, cls.__name__]), fn, locator, old, new, locator, fn))
 
         # figure out how the key was updated so that we can figure out how to
         # update the tagindex with whatever happened.
