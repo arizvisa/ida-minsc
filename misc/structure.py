@@ -4555,15 +4555,21 @@ class v9members(object):
 
             # If it's one of the member or structure types, then we can extract.
             elif hasattr(idaapi, 'member_t') and isinstance(item, membertypes):
-                mptr = item if isinstance(item, idaapi.member_t) else item.ptr
-                mtype = member.get_typeinfo(mptr)
-                regcmt, rptcmt = member.get_comment(mptr, repeatable=False), member.get_comment(mptr, repeatable=True)
+                mid = item.id
+                owner = item.parent if isinstance(item, member_t) else item
+                if isinstance(getattr(owner, 'ptr', owner), idaapi.tinfo_t):
+                    namespace, mptr = v9member, mid
+                else:
+                    namespace, mptr = member, getattr(item, 'ptr', item)
+                mtype = namespace.get_typeinfo(mptr)
+                regcmt, rptcmt = namespace.get_comment(mptr, False), namespace.get_comment(mptr, True)
                 mcomments = (True, rptcmt) if rptcmt else (False, regcmt)
 
             elif hasattr(idaapi, 'struc_t') and isinstance(item, (structuretypes, members_t)):
-                owner = item.owner if isinstance(item, idaapi.member_t) else item
+                owner = item.owner if isinstance(item, members_t) else item
                 sptr = owner if isinstance(owner, idaapi.struc_t) else owner.ptr
-                mtype = address.type(sptr.id)
+                sid = interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
+                mtype = address.type(sid)
                 regcmt, rptcmt = comment.get(sptr, repeatable=False), comment.get(sptr, repeatable=True)
                 mcomments = (True, rptcmt) if rptcmt else (False, regcmt)
 
@@ -4668,9 +4674,9 @@ class v9members(object):
 
             elif isinstance(item, member_t):
                 mowner, _, mindex, udm = cls.by(item.id)
-                mname = '' if udm.is_special_member() else newnames[offset]
+                mname = '' if hasattr(udm, 'is_special_member') and udm.is_special_member() else newnames[offset]
                 originalname = mname or member.default_name(sid, None, offset)
-                orginal[offset] = newnames[offset] = originalname
+                original[offset] = newnames[offset] = originalname
                 candidates.setdefault(mname, []).append(offset)
 
             # Check if the item is non-anonymous type by checking against an
