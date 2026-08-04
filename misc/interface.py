@@ -7048,20 +7048,20 @@ class contiguous(object):
     def size(cls, items):
         '''Return the total size of the given list of `items` containing structures, members, boundaries, locations, registers, and integers in `items`.'''
         size = {integer_t : internal.utils.fidentity for integer_t in internal.types.integer}
-        v9 = not hasattr(idaapi, 'struc_t')
 
         # Start by building the lookup table that will map an individual item to its size.
-        if v9:
+        if idaapi.__version__ < 8.5:
+            size[idaapi.member_t] = idaapi.get_member_size
+            size[idaapi.struc_t] = idaapi.get_struc_size
+
+            size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('ptr'), internal.utils.fcondition(internal.utils.finstance(idaapi.tinfo_t))(tinfo.size, idaapi.get_struc_size))
+            size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('ptr'), internal.utils.fcondition(internal.utils.finstance(idaapi.tinfo_t))(tinfo.size, idaapi.get_struc_size))
+            size[internal.structure.member_t] = internal.utils.fcondition(internal.utils.fcompose(operator.attrgetter('parent'), operator.attrgetter('ptr'), internal.utils.finstance(idaapi.tinfo_t)))(internal.utils.fcompose(operator.attrgetter('typeinfo'), tinfo.size), internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size))
+
+        else:
             size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('typeinfo'), tinfo.size)
             size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('typeinfo'), tinfo.size)
             size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('typeinfo'), tinfo.size)
-
-        else:
-            size[idaapi.member_t] = idaapi.get_member_size
-            size[idaapi.struc_t] = idaapi.get_struc_size
-            size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_struc_size)
-            size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('ptr'), idaapi.get_struc_size)
-            size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size)
 
         size[idaapi.func_t] = size[idaapi.segment_t] = size[idaapi.range_t] = range.size
         size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
@@ -7087,20 +7087,20 @@ class contiguous(object):
     def layout(cls, offset, items, direction):
         '''Yield the offset and item for each of the given `items` when laid out contiguously in the specified `direction` from `offset`.'''
         size = {integer_t : internal.utils.fidentity for integer_t in internal.types.integer}
-        v9 = not hasattr(idaapi, 'struc_t')
 
         # Start by building the lookup table that will map an individual item to its size.
-        if v9:
+        if idaapi.__version__ < 8.5:
+            size[idaapi.member_t] = idaapi.get_member_size
+            size[idaapi.struc_t] = idaapi.get_struc_size
+
+            size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('ptr'), internal.utils.fcondition(internal.utils.finstance(idaapi.tinfo_t))(tinfo.size, idaapi.get_struc_size))
+            size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('ptr'), internal.utils.fcondition(internal.utils.finstance(idaapi.tinfo_t))(tinfo.size, idaapi.get_struc_size))
+            size[internal.structure.member_t] = internal.utils.fcondition(internal.utils.fcompose(operator.attrgetter('parent'), operator.attrgetter('ptr'), internal.utils.finstance(idaapi.tinfo_t)))(internal.utils.fcompose(operator.attrgetter('typeinfo'), tinfo.size), internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size))
+
+        else:
             size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('typeinfo'), tinfo.size)
             size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('typeinfo'), tinfo.size)
             size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('typeinfo'), tinfo.size)
-
-        else:
-            size[idaapi.member_t] = idaapi.get_member_size
-            size[idaapi.struc_t] = idaapi.get_struc_size
-            size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_struc_size)
-            size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('ptr'), idaapi.get_struc_size)
-            size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size)
 
         size[idaapi.func_t] = size[idaapi.segment_t] = size[idaapi.range_t] = range.size
         size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
