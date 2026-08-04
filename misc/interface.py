@@ -620,7 +620,7 @@ class typemap(object):
             # If it wasn't in the table and the length of the tuple is not 2 elements,
             # then this is an invalid type and there's nothing we can do but bail.
             elif len(pythonType) != 2:
-                raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({!s}) : Unable the resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+                raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({!s}) : Unable to resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
 
             # Now we unpack the tuple into its basic type so we can use it to verify that
             # the type actually exists but with a negative size that we needed to absolute.
@@ -633,7 +633,7 @@ class typemap(object):
             # table. This only occurs if the type is "unsized" which means we rely
             # on the size we were given which only occurs for alignment.
             elif t not in table:
-                raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({!s}) : Unable the resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+                raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({!s}) : Unable to resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
 
             # Now we know that this is a valid type, we can use it to fetch the flags and
             # typeid. If the user gave us a size for this basic type, this'll get combined
@@ -712,7 +712,7 @@ class typemap(object):
                 else:
                     processor_name = idaapi.inf_get_procname()
                 why = '' if info and Fprocessor_name(info) else ' due to the processor size not being detected or a database not currently open.'
-                raise internal.exceptions.ItemNotFoundError(u"{:s}.resolve({!s}) : Unable the resolve the given type ({!s}) to a corresponding native type{:s}.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType, why))
+                raise internal.exceptions.ItemNotFoundError(u"{:s}.resolve({!s}) : Unable to resolve the given type ({!s}) to a corresponding native type{:s}.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType, why))
             flag, typeid = table[None]
 
             # Construct an opinfo_t with the type-id that was returned, and then
@@ -723,7 +723,7 @@ class typemap(object):
 
         # This is our catch-all so that we can compain about it to the user.
         else:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({!s}) : Unable the resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({!s}) : Unable to resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
 
         # If we fell-through, we should have the flags, type identifier, and the
         # total size that IDAPython needs when describing a type. If we received
@@ -813,13 +813,13 @@ class typemap(object):
 
             ti = idaapi.tinfo_t()
             if not ti.create_array(atd):
-                raise internal.exceptions.DisassemblerError(u"{:s}.resolvetype({!s}) : Unable the create an array of type {!s} with the specified length ({:d}).".format('.'.join([__name__, cls.__name__]), pythonType, tinfo.quoted(element), count))
+                raise internal.exceptions.DisassemblerError(u"{:s}.resolvetype({!s}) : Unable to create an array of type {!s} with the specified length ({:d}).".format('.'.join([__name__, cls.__name__]), pythonType, tinfo.quoted(element), count))
             return ti
 
         # If our pythonType is a tuple, with the first element being a type or
         # structure of some kind, then this is a variable-length structure.
         elif isinstance(pythonType, internal.types.tuple) and isinstance(next(iter(pythonType)), internal.structure.structuretypes):
-            raise NotImplementedError(u"{:s}.resolvetype({!s}) : Unable the return a type for the variable-length structure {!s}.".format('.'.join([__name__, cls.__name__]), pythonType, tinfo.quoted(element), count))
+            raise NotImplementedError(u"{:s}.resolvetype({!s}) : Unable to return a type for the variable-length structure {!s}.".format('.'.join([__name__, cls.__name__]), pythonType, tinfo.quoted(element), count))
 
         # If a tuple and the first element is not a type or structure, then this
         # is an atomic type that we'll return.
@@ -832,7 +832,7 @@ class typemap(object):
                 return idaapi.tinfo_t(decl)
 
             elif len(pythonType) != 2:
-                raise internal.exceptions.InvalidParameterError(u"{:s}.resolvetype({!s}) : Unable the resolve the type {!s} to a corresponding local type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+                raise internal.exceptions.InvalidParameterError(u"{:s}.resolvetype({!s}) : Unable to resolve the type {!s} to a corresponding local type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
 
             # Now we go ahead and unpack the tuple into its basic type. If it
             # isn't in our table, then raise an exception so that we can abort.
@@ -842,7 +842,7 @@ class typemap(object):
                 return idaapi.tinfo_t(decl)
 
             # Otherwise raise an exception because we don't know this type.
-            raise internal.exceptions.InvalidParameterError(u"{:s}.resolvetype({!s}) : Unable the resolve the type {!s} to a corresponding local type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.resolvetype({!s}) : Unable to resolve the type {!s} to a corresponding local type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
 
         # If it's already a local type, then return it.
         elif isinstance(pythonType, idaapi.tinfo_t):
@@ -880,7 +880,7 @@ class typemap(object):
 
             ti = idaapi.tinfo_t()
             if not ti.create_ptr(ptd):
-                raise internal.exceptions.DisassemblerError(u"{:s}.resolvetype({!s}) : Unable the create a pointer for the given type ({!s}).".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+                raise internal.exceptions.DisassemblerError(u"{:s}.resolvetype({!s}) : Unable to create a pointer for the given type ({!s}).".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
             return ti
 
         raise internal.exceptions.InvalidParameterError(u"{:s}.resolvetype({!s}) : Unable to resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
