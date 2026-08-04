@@ -230,11 +230,11 @@ class address(changingchanged):
         logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(oldkeys), utils.string.repr(newkeys), ' for runtime-linked function' if rt else ''))
         for key in oldkeys ^ newkeys:
             if key not in new:
-                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
+                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
                 if f and not rt: internal.tags.reference.contents.decrement(ea, key)
                 else: internal.tags.reference.globals.decrement(ea, key)
             if key not in old:
-                logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for {!s} at {:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
+                logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
                 if f and not rt: internal.tags.reference.contents.increment(ea, key)
                 else: internal.tags.reference.globals.increment(ea, key)
             continue
@@ -288,7 +288,7 @@ class address(changingchanged):
         # Now to match the comments and fix the comment that was applied.
         if (newea, nrpt) == (ea, rpt):
             if (new or '') != (expected or ''):
-                logging.warning(u"{:s}.updater() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
+                logging.warning(u"{:s}.updater() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(expected), utils.string.repr(new)))
 
             # If the comment is of the correct format, then we can simply
             # write the comment to the given address.
@@ -307,7 +307,7 @@ class address(changingchanged):
         # If the changed event didn't happen in the right order, and we got an
         # address that didn't match what was expected, then we erase anything
         # that was at that address, and reapply its references.
-        logging.fatal(u"{:s}.updater() : Comment events are out of sync at address {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
+        logging.fatal(u"{:s}.updater() : Comment events are out of sync at address {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(expected), utils.string.repr(new)))
 
         cls._delete_refs(ea, o)
         idaapi.set_cmt(ea, '', rpt)
