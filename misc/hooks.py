@@ -1332,7 +1332,7 @@ class naming(changingchanged):
 
             # Otherwise we log that we didn't have to do anything.
             elif name_t == idaapi.FF_ANYNAME:
-                logging.debug(u"{:s}.updater() : Ignoring existing symbol rename ({:s}) received as a {:s} reference for at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ', '.join(itertools.chain(['FF_LABL'] if name_t & idaapi.FF_LABL else [], ['FF_NAME'] if name_t & idaapi.FF_NAME else [])), 'content' if kwds else 'global', ea, original, expected))
+                logging.debug(u"{:s}.updater() : Ignoring existing symbol rename ({:s}) received as a {:s} reference at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ', '.join(itertools.chain(['FF_LABL'] if name_t & idaapi.FF_LABL else [], ['FF_NAME'] if name_t & idaapi.FF_NAME else [])), 'content' if kwds else 'global', ea, original, expected))
 
             else:
                 logging.debug(u"{:s}.updater() : Skipping rename at {:#x} from {!r} to {!r} due to it already being tracked.".format('.'.join([__name__, cls.__name__]), ea, original, expected))
@@ -1358,7 +1358,7 @@ class naming(changingchanged):
 
         # Here we didn't do anything, but we still log the nothing that we did.
         elif name_t == idaapi.FF_ANYNAME:
-            logging.debug(u"{:s}.updater() : Ignoring existing symbol rename ({:s}) received as a {:s} reference for at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ', '.join(itertools.chain(['FF_LABL'] if name_t & idaapi.FF_LABL else [], ['FF_NAME'] if name_t & idaapi.FF_NAME else [])), 'content' if kwds else 'global', ea, original, expected))
+            logging.debug(u"{:s}.updater() : Ignoring existing symbol rename ({:s}) received as a {:s} reference at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ', '.join(itertools.chain(['FF_LABL'] if name_t & idaapi.FF_LABL else [], ['FF_NAME'] if name_t & idaapi.FF_NAME else [])), 'content' if kwds else 'global', ea, original, expected))
 
         else:
             logging.debug(u"{:s}.updater() : Skipping rename at {:#x} from {!r} to {!r} due to it already being tracked.".format('.'.join([__name__, cls.__name__]), ea, original, expected))
