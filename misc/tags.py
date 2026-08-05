@@ -3232,6 +3232,9 @@ class reference_v0(object):
         def name(cls, func, **target):
             return {tag for tag in []}
         @classmethod
+        def usage(cls):
+            return {tag for tag in []}
+        @classmethod
         def address(cls, func, **target):
             return [preciser for preciser in []]
         @classmethod
@@ -3272,6 +3275,9 @@ class reference_v0(object):
             return (locator for locator in [])
         @classmethod
         def name(cls, func, **target):
+            return {tag for tag in []}
+        @classmethod
+        def usage(cls):
             return {tag for tag in []}
         @classmethod
         def address(cls, func, **target):
@@ -3531,8 +3537,13 @@ class reference_v1(object):
             iterable = internal.tagindex.hexfunction.select()
             return ((ea, internal.tagindex.tags.names(used)) for ea, used in iterable)
         @classmethod
-        def name(cls, func, **target):
-            used = internal.tagindex.hexfunction.usage(func)
+        def name(cls, *func, **target):
+            used = internal.tagindex.hexfunction.usage(target.get('target', *func))
+            return internal.tagindex.tags.names(used)
+        @classmethod
+        def usage(cls):
+            iterable = map(operator.itemgetter(1), internal.tagindex.hexfunction.select())
+            used = functools.reduce(operator.or_, iterable, 0)
             return internal.tagindex.tags.names(used)
         @classmethod
         def address(cls, func, **target):
@@ -3589,10 +3600,13 @@ class reference_v1(object):
             iterable = internal.tagindex.hexvariable.select()
             return ((ea, internal.tagindex.tags.names(used)) for ea, used in iterable)
         @classmethod
-        def name(cls, **target):
-            if 'target' not in target:
-                raise internal.exceptions.InvalidParameterError(u"{:s}.name({!s}) : Unable to interact with variables due to the missing parameter \"{:s}\" which should contain the decompiled function.".format('.'.join([__name__, cls.__name__]), utils.string.kwargs(target) if target else '', 'target'))
-            used = internal.tagindex.hexvariable.usage(target['target'])
+        def name(cls, *func, **target):
+            used = internal.tagindex.hexvariable.usage(target.get('target', *func))
+            return internal.tagindex.tags.names(used)
+        @classmethod
+        def usage(cls):
+            iterable = map(operator.itemgetter(1), internal.tagindex.hexvariable.select())
+            used = functools.reduce(operator.or_, iterable, 0)
             return internal.tagindex.tags.names(used)
         @classmethod
         def address(cls, **target):
