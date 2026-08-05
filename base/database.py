@@ -1187,7 +1187,7 @@ class names(object):
             f1, f2 = idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, utils.string.of)
             messages = ((u"[{:d}] {:#x} {:s}".format(idx, ea, name if interface.name.mangled(ea, name) == idaapi.FF_UNK else "({:s}) {:s}".format(name, utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM) or name))) for idx, ea, name in map(utils.fthrough(utils.fidentity, f1, f2), listable)))
             [ logging.info(msg) for msg in messages ]
-            logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f1(listable[0]), utils.string.escape(f2(listable[0]), '"')))
+            logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first item at {:#x} with the name \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f1(listable[0]), utils.string.escape(f2(listable[0]), '"')))
 
         iterable = (item for item in listable)
         res = builtins.next(iterable, None)
@@ -1624,7 +1624,7 @@ def name(none, **flags):
     return name(ui.current.address(), none or '', **flags)
 @utils.multicase(ea=internal.types.integer, fullname=internal.types.tuple)
 def name(ea, fullname, **flags):
-    '''Renames the address specifed by `ea` to the given packed `fullname`.'''
+    '''Renames the address specified by `ea` to the given packed `fullname`.'''
     return name(ea, *fullname, **flags)
 @utils.multicase(ea=internal.types.integer, string=internal.types.string)
 @utils.string.decorate_arguments('string', 'suffix')
@@ -2190,7 +2190,7 @@ class exports(object):
             messages = ((u"[{:d}] ({:s}) {:#x} : {:s} {:s}".format(idx, '' if ordinal == ea else "#{:d}".format(ordinal), ea, '[FUNC]' if interface.function.has(ea) else '[ADDR]', name or unmangled(ea))) for idx, ea, name, ordinal in listable)
             [ logging.info(msg) for msg in messages ]
             _, ea, _, _ = listable[0]
-            logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join([__name__, cls.__name__]), query_s, len(listable), ea))
+            logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first entry point at {:#x}.".format('.'.join([__name__, cls.__name__]), query_s, len(listable), ea))
 
         iterable = (address for index, address, name, ordinal in listable)
         res = builtins.next(iterable, None)
@@ -6534,7 +6534,7 @@ class types(object):
         '''Return the ordinal number for the type with the given `name` from a specified type `library`.'''
         ordinal = interface.tinfo.by_name(name, library)
         if not ordinal:
-            raise E.ItemNotFoundError(u"{:s}.ordinal({!r}, {:s}) : Unable to find a type with the name \"{:s}\" in the specifed type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), utils.string.escape(name, '"')))
+            raise E.ItemNotFoundError(u"{:s}.ordinal({!r}, {:s}) : Unable to find a type with the name \"{:s}\" in the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), utils.string.escape(name, '"')))
         return ordinal
     @utils.multicase(structure=(internal.types.integer, internal.structure.structuretypes, internal.structure.membertypes))
     @classmethod
@@ -7095,7 +7095,7 @@ class types(object):
         ti = idaapi.tinfo_t()
         if not ti.create_ptr(pi):
             attributes_description = " using the given attributes ({:#x})".format(taptr_bits) if taptr_bits else ''
-            raise E.DisassemblerError(u"{:s}.pointer(\"{:s}\", {:d}, {:#x}{:s}) : Unable to create a pointer{:s} for the specifed type \"{:s}\".".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, taptr_bits, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', attributes_description, utils.string.escape("{!s}".format(info), '"')))
+            raise E.DisassemblerError(u"{:s}.pointer(\"{:s}\", {:d}, {:#x}{:s}) : Unable to create a pointer{:s} for the specified type \"{:s}\".".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, taptr_bits, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', attributes_description, utils.string.escape("{!s}".format(info), '"')))
 
         # If any type-specific attributes were specified, then apply those too
         # before concretizing the result and returning it to the caller.
