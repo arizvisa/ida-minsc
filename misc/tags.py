@@ -3098,6 +3098,13 @@ class reference_v0(object):
         def name(cls, address, **target):
             return internal.tagcache.contents.name(address, target=target.get('target'))
         @classmethod
+        def usage(cls):
+            res = {name for name in []}
+            for ea in interface.function.iterate():
+                used = internal.tagcache.contents.name(address, target=ea)
+                res = res.union(used)
+            return res
+        @classmethod
         def address(cls, address, **target):
             return internal.tagcache.contents.address(address, target=target.get('target'))
         @classmethod
@@ -3390,6 +3397,11 @@ class reference_v1(object):
         @classmethod
         def name(cls, address, **target):
             used = internal.tagindex.contents.usage(address)
+            return internal.tagindex.tags.names(used)
+        @classmethod
+        def usage(cls):
+            iterable = map(operator.itemgetter(1), internal.tagindex.contents.select())
+            used = functools.reduce(operator.or_, iterable, 0)
             return internal.tagindex.tags.names(used)
         @classmethod
         def address(cls, address, **target):
