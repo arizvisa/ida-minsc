@@ -221,6 +221,38 @@ def select(**boolean):
         yield internal.structure.new(sid, 0), res
     return
 
+@utils.multicase(tag=types.string)
+@utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+def selectmembers(tag, *required, **boolean):
+    '''Query the structures in the database using the given `tag` in its members and any others that may be `required`.'''
+    res = {tag} | {item for item in required}
+    boolean['required'] = {item for item in boolean.get('required', [])} | res
+    return selectmembers(**boolean)
+@utils.multicase()
+@utils.string.decorate_arguments('And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+def selectmembers(**boolean):
+    """Query the structures in the database using the tags specified by `boolean` in its members and yield a tuple for each matching structure with selected tags.
+
+    If `require` is given as an iterable of tag names then require that each returned structure uses them in its members.
+    If `include` is given as an iterable of tag names then include the tags for each returned structure if available.
+    """
+    boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
+
+    # if we were given some parameters to use when querying, unpack them into
+    # separate variables, and use them with `internal.tags.structure`. If there
+    # wasn't any parameters given, then just avoid using them to get everything.
+    if boolean:
+        included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
+        iterable = internal.tags.select.owners(required, included)
+    else:
+        iterable = internal.tags.select.owners()
+
+    # FIXME: we need to check if the structure is a frame or has a base offset
+    #        stashed somewhere. not sure if it's _actually_ useful though.
+    for sid, res in iterable:
+        yield internal.structure.new(sid, 0), res
+    return
+
 @utils.multicase(string=(types.string, types.tuple))
 @utils.string.decorate_arguments('string', 'suffix')
 def new(string, *suffix, **offset):
