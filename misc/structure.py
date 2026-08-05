@@ -4239,7 +4239,7 @@ class v9members(object):
 
             # Then we can do the data references that point to other members.
             if drefs:
-                logging.warning(u"{:s}.clear_bounds({:#x}, {:#x} {:#x}{:s}) : Removal of member \"{:s}\" ({:#x}) at {:s} has resulted in the removal of {:d} referenced identifier{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, utils.string.escape(mname, '"'), mid, location_description, len(drefs), '' if len(drefs) == 1 else 's', ', '.join(map("{:#x}".format, drefs))))
+                logging.warning(u"{:s}.clear_bounds({:#x}, {:#x}, {:#x}{:s}) : Removal of member \"{:s}\" ({:#x}) at {:s} has resulted in the removal of {:d} referenced identifier{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sid, start, stop, offset_description, utils.string.escape(mname, '"'), mid, location_description, len(drefs), '' if len(drefs) == 1 else 's', ', '.join(map("{:#x}".format, drefs))))
                 [logging.info(u"{:s}.clear_bounds({:#x}, {:#x}, {:#x}{:s}) : Removed member \"{:s}\" ({:#x}) at {:s} used to reference \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:#x}".format(base) if offset else '', utils.string.escape(mname, '"'), identifier, location_description, internal.netnode.name.get(idaapi.ea2node(id)), id)) for id in drefs]
             continue
 
@@ -6341,7 +6341,7 @@ class members(object):
 
             # ...then we can do the identifiers which includes structures/unions, members, or whatever.
             if drefs:
-                logging.warning(u"{:s}.clear_bounds({:#x}, {:#x} {:#x}{:s}) : Removal of member \"{:s}\" ({:#x}) at {:s} has resulted in the removal of {:d} referenced identifier{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:#x}".format(base) if offset else '', utils.string.escape(mname, '"'), identifier, location_description, len(drefs), '' if len(drefs) == 1 else 's', ', '.join(map("{:#x}".format, drefs))))
+                logging.warning(u"{:s}.clear_bounds({:#x}, {:#x}, {:#x}{:s}) : Removal of member \"{:s}\" ({:#x}) at {:s} has resulted in the removal of {:d} referenced identifier{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:#x}".format(base) if offset else '', utils.string.escape(mname, '"'), identifier, location_description, len(drefs), '' if len(drefs) == 1 else 's', ', '.join(map("{:#x}".format, drefs))))
                 [logging.info(u"{:s}.clear_bounds({:#x}, {:#x}, {:#x}{:s}) : Removed member \"{:s}\" ({:#x}) at {:s} used to reference \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:#x}".format(base) if offset else '', utils.string.escape(mname, '"'), identifier, location_description, internal.netnode.name.get(idaapi.ea2node(id)), id)) for id in drefs]
             continue
 
