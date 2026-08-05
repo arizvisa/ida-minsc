@@ -1000,6 +1000,10 @@ def references(member):
     return internal.structure.member.references(mptr)
 refs = utils.alias(references)
 
+def tags():
+    '''Return the tag names used by all of the structures within the database.'''
+    return internal.tags.reference.structure.usage()
+
 class members(object):
     """
     This namespace is essentially a shortcut for accessing the members of
@@ -1138,3 +1142,8 @@ class members(object):
                 size -= 0 if unionQ else m_size
             continue
         return
+
+    @classmethod
+    def tags(cls):
+        '''Return the tag names used by all of the members from structures within the database.'''
+        return internal.tags.reference.members.usage()
