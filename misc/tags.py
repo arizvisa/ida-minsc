@@ -3156,11 +3156,11 @@ class reference_v0(object):
         """
         @classmethod
         def has(cls, mid):
-            res = member.get(mid)
+            res = member.get(mid) if idaapi.__version__ < 8.5 else typeinfo_member.get(mid)
             return True if res else False
         @classmethod
         def get(cls, mid):
-            res = member.get(mid)
+            res = member.get(mid) if idaapi.__version__ < 8.5 else typeinfo_member.get(mid)
             return {tag for tag in res}
         @classmethod
         def increment(cls, mid, name):
@@ -3180,6 +3180,20 @@ class reference_v0(object):
         @classmethod
         def erase(cls, sid):
             return []
+        @classmethod
+        def name(cls, *sid):
+            Fmembers = lambda sptr: internal.structure.v9members.iterate(sptr) if isinstance(sptr, idaapi.tinfo_t) else internal.structure.members.iterate(sptr)
+            iterable = ((id, idaapi.tinfo_t()) for id in sid)
+            available = (((idaapi.get_struc(id) if idaapi.__version__ < 8.5 else tinfo if tinfo.get_type_by_tid(id) else None) if isinstance(id, internal.types.integer) else id) for id, tinfo in iterable)
+            res = {name for name in []}
+            for mowner, mindex, mptr in itertools.chain(*map(Fmembers, filter(None, available))):
+                content = typeinfo_member.get(mowner, mindex) if isinstance(mowner, idaapi.tinfo_t) else member.get(mptr)
+                res = res.union(content)
+            return res
+        @classmethod
+        def usage(cls):
+            available = (sptr for _, sptr in internal.structure.iterate())
+            return cls.name(*available)
 
     class hexfunction(object):
         """
@@ -3466,6 +3480,17 @@ class reference_v1(object):
             iterable = internal.tagindex.members.structure([sid])
             selected = [mid for mid, used in iterable]
             return internal.tagindex.members.erase(sid, selected)
+        @classmethod
+        def name(cls, *sid):
+            sids = ((interface.tinfo.identifier(id) if isinstance(id, idaapi.tinfo_t) else id if isinstance(id, internal.types.integer) else id.id) for id in sid)
+            iterable = map(operator.itemgetter(1), internal.tagindex.members.select(*sids))
+            used = functools.reduce(operator.or_, iterable, 0)
+            return internal.tagindex.tags.names(used)
+        @classmethod
+        def usage(cls):
+            iterable = map(operator.itemgetter(1), internal.tagindex.members.select())
+            used = functools.reduce(operator.or_, iterable, 0)
+            return internal.tagindex.tags.names(used)
 
     class hexfunction(object):
         """
