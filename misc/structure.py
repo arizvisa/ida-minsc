@@ -9600,6 +9600,11 @@ class members_t(object):
     __members_matcher.predicate('predicate'), __members_matcher.predicate('pred')
     __members_matcher.combinator('size', utils.fcondition(utils.finstance(types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fcompose(types.set, utils.fpartial(utils.fpartial, operator.contains))), member.size)
 
+    def tags(self):
+        '''Return the names of all the tags used by the structure's members.'''
+        sid = self.owner.id
+        return internal.tags.reference.members.name(sid)
+
     @utils.multicase(tag=types.string)
     @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
     def select(self, tag, *required, **boolean):
