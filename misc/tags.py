@@ -3148,6 +3148,13 @@ class reference_v0(object):
         @classmethod
         def erase(cls, sid):
             return []
+        @classmethod
+        def usage(cls):
+            res = {name for name in []}
+            for index, sptr in internal.structure.iterate():
+                content = typeinfo.get(sptr) if isinstance(sptr, idaapi.tinfo_t) else structure.get(sptr)
+                res = res.union(content)
+            return res
 
     class members(object):
         """
@@ -3426,6 +3433,10 @@ class reference_v1(object):
         @classmethod
         def erase(cls, sid):
             return internal.tagindex.structure.erase([sid])
+        @classmethod
+        def usage(cls):
+            used = internal.tagindex.structure.usage()
+            return internal.tagindex.tags.names(used)
 
     class members(object):
         """
