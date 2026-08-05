@@ -3480,7 +3480,7 @@ class type(object):
         # Now we should just be able to apply it to the function... or not.
         result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, newti, *flags)
         if not ok:
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Unable to apply the parsed type \"{!s}\" to the specifed {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(rendered, '"'), 'address' if rt else 'function', ea))
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Unable to apply the parsed type \"{!s}\" to the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(rendered, '"'), 'address' if rt else 'function', ea))
         return result
     @utils.multicase(func=(idaapi.func_t, types.integer), none=types.none)
     def __new__(cls, func, none):
