@@ -2258,7 +2258,7 @@ class function(mangled):
         return string[:left] + replacements[string[left : right]] + string[right:]
 
     def __clean_segment(self, segment, replacement, string):
-        '''Return a transformed `string` with the specifed `segment` replaced with `replacement`.'''
+        '''Return a transformed `string` with the specified `segment` replaced with `replacement`.'''
         left, right = segment
         return string[:left] + replacement + string[right:]
 
@@ -2315,7 +2315,7 @@ class function(mangled):
         return string[:start] + "operator{{{:s}}}".format(target) + string[point:]
 
     def __clean_replacement(self, keyword, replacement, string):
-        '''Return a transformed `string` with the specifed `keyword` substituted by `replacement`.'''
+        '''Return a transformed `string` with the specified `keyword` substituted by `replacement`.'''
         point = string.rindex(keyword)
         return string[:point] + replacement + string[point + len(keyword):]
 
