@@ -2176,3 +2176,52 @@ class ctree(object):
         for index in range(cfunc.treeitems.size()):
             yield index, cfunc.treeitems[index]
         return
+
+    @classmethod
+    def address(cls, item):
+        '''Return the address of the expression specified by the given CTREE `item`.'''
+        if item.op <= ida_hexrays.cot_last or item.is_expr():
+            return -1 if item.ea == idaapi.BADADDR else item.ea
+        cinsn = item.cinsn
+        if item.op == ida_hexrays.cit_empty:
+            return -1 if item.ea == idaapi.BADADDR else item.ea
+        elif item.op == ida_hexrays.cit_block:
+            return item.ea
+        elif item.op == ida_hexrays.cit_expr:
+            if cinsn.cexpr:
+                return cinsn.cexpr.ea
+            return -1 if item.ea == idaapi.BADADDR else item.ea
+        elif item.op == ida_hexrays.cit_if:
+            if cinsn.cif and cinsn.cif.expr:
+                return cinsn.cif.expr.ea
+            return -1 if item.ea == idaapi.BADADDR else item.ea
+        elif item.op == ida_hexrays.cit_for:
+            if cinsn.cfor and cinsn.cfor.expr:
+                return cinsn.cfor.expr.ea
+            elif cinsn.cfor and cinsn.cfor.init:
+                return cinsn.cfor.init.ea
+            return -1 if item.ea == idaapi.BADADDR else item.ea
+        elif item.op == ida_hexrays.cit_while:
+            if cinsn.cwhile and cinsn.cwhile.expr:
+                return cinsn.cwhile.expr.ea
+            return -1 if item.ea == idaapi.BADADDR else item.ea
+        elif item.op == ida_hexrays.cit_do:
+            if cinsn.cdo and cinsn.cdo.expr:
+                return cinsn.cdo.expr.ea
+            return -1 if item.ea == idaapi.BADADDR else item.ea
+        elif item.op == ida_hexrays.cit_switch:
+            if cinsn.cswitch and cinsn.cswitch.expr:
+                return cinsn.cswitch.expr.ea
+            return -1 if item.ea == idaapi.BADADDR else item.ea
+        elif item.op == ida_hexrays.cit_break:
+            return -1 if item.ea == idaapi.BADADDR else item.ea
+        elif item.op == ida_hexrays.cit_continue:
+            return -1 if item.ea == idaapi.BADADDR else item.ea
+        elif item.op == ida_hexrays.cit_return:
+            if cinsn.creturn and cinsn.creturn.expr:
+                return cinsn.creturn.expr.ea
+            return -1 if item.ea == idaapi.BADADDR else item.ea
+        elif item.op == ida_hexrays.cit_asm:
+            return item.ea
+        return -1 if item.ea == idaapi.BADADDR else item.ea
+
