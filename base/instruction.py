@@ -1391,7 +1391,7 @@ def op_structurepath(ea, opnum):
     return results if len(results) > 1 else results[0]
 
 ## current address and opnum with variable-length path
-@utils.multicase(opnum=types.integer, structure=(internal.structure.structuretypes, types.string, idaapi.tinfo_t))
+@utils.multicase(opnum=types.integer, structure=(internal.structure.structure_t, types.string, idaapi.tinfo_t))
 def op_structurepath(opnum, structure, *path, **delta):
     '''Apply the specified `structure` along with any members in `path` directly to the operand `opnum` of the instruction at the current address.'''
     deltapath = [delta.pop('delta', 0)] if delta else []
@@ -1403,7 +1403,7 @@ def op_structurepath(opnum, member, *path, **delta):
     return op_structurepath(ui.current.address(), opnum, [item for item in itertools.chain([member], path, deltapath)])
 
 ## address and opnum with variable-length path
-@utils.multicase(ea=types.integer, opnum=types.integer, structure=(internal.structure.structuretypes, types.string, idaapi.tinfo_t))
+@utils.multicase(ea=types.integer, opnum=types.integer, structure=(internal.structure.structure_t, types.string, idaapi.tinfo_t))
 def op_structurepath(ea, opnum, structure, *path, **delta):
     '''Apply the specified `structure` along with the members in `path` directly to the operand `opnum` of the instruction at address `ea`.'''
     deltapath = [delta.pop('delta', 0)] if delta else []
@@ -1415,7 +1415,7 @@ def op_structurepath(ea, opnum, member, *path, **delta):
     return op_structurepath(ea, opnum, [item for item in itertools.chain([member], path, deltapath)])
 
 ## operand reference with variable-length path
-@utils.multicase(reference=interface.opref_t, structure=(internal.structure.structuretypes, types.string, idaapi.tinfo_t))
+@utils.multicase(reference=interface.opref_t, structure=(internal.structure.structure_t, types.string, idaapi.tinfo_t))
 def op_structurepath(reference, structure, *path, **delta):
     '''Apply the specified `structure` along with the members in `path` directly to the operand pointed to by `reference`.'''
     deltapath = [delta.pop('delta', 0)] if delta else []
@@ -1438,23 +1438,24 @@ def op_structurepath(ea, opnum, path):
     items = [item for item in path]
     member = items.pop(0) if len(items) else ''
     if isinstance(member, (types.string, idaapi.tinfo_t)):
-        sptr, fullpath = structure.by(member).ptr, items
+        tinfo = member if isinstance(member, idaapi.tinfo_t) else interface.tinfo.parse(None, member)
+        sid = interface.tinfo.identifier(tinfo)
+        sptr, fullpath = structure.by(sid).ptr, items
     elif hasattr(idaapi, 'struc_t') and isinstance(member, idaapi.struc_t):
         sptr, fullpath = structure.by(member.id), items
-    elif isinstance(member, structure.structure_t):
+    elif isinstance(member, internal.structure.structure_t):
         sptr, fullpath = member.ptr, items
     elif hasattr(idaapi, 'member_t') and isinstance(member, idaapi.member_t):
         _,_, sptr = idaapi.get_member_by_id(member.id)
         if not interface.node.identifier(sptr.id):
             sptr = idaapi.get_member_struc(idaapi.get_member_fullname(member.id))
         fullpath = itertools.chain([member], items)
-    elif isinstance(member, structure.member_t):
+    elif isinstance(member, internal.structure.member_t):
         sptr, fullpath = member.parent.ptr, itertools.chain([member], items)
     else:
         raise E.InvalidParameterError(u"{:s}.op_structurepath({:#x}, {:d}, {!r}) : Unable to determine the structure from the provided path due to the first item being of an unsupported type ({!s}).".format(__name__, ea, opnum, path, member.__class__))
     return op_structurepath(ea, opnum, sptr, [item for item in fullpath])
-
-@utils.multicase(ea=types.integer, opnum=types.integer, structure=structure.structure_t, path=types.ordered)
+@utils.multicase(ea=types.integer, opnum=types.integer, structure=internal.structure.structure_t, path=types.ordered)
 def op_structurepath(ea, opnum, structure, path):
     '''Apply the specified `structure` along with the members in `path` directly to the operand `opnum` of the instruction at address `ea`.'''
     return op_structurepath(ea, opnum, structure.ptr, path)
