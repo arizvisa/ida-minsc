@@ -576,6 +576,11 @@ class functions(object):
         '''Return the address of each of the functions within the database as a list.'''
         return [item for item in cls.iterate(*string, **type)]
 
+    @classmethod
+    def tags(cls):
+        '''Return the tag names used in the contents of the all the functions from the database.'''
+        return internal.tags.reference.contents.usage()
+
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
