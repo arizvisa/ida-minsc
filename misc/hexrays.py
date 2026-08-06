@@ -244,6 +244,8 @@ class ida_hexrays_template(object):
     cot_helper = 68         # arbitrary name
     cot_type = 69           # arbitrary type
 
+    cot_last = 69           # last expression item
+
     cit_empty = 70          # instruction types start here
     cit_block = 71          # block-statement: { ... }
     cit_expr = 72           # expression-statement: expr;
