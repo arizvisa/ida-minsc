@@ -1791,6 +1791,24 @@ class function(object):
             yield ea, id, text
         return
 
+    @classmethod
+    def get_comment(cls, func, ea, itp, *always):
+        '''Return the comment at precisely `itp` of address `ea` in the decompiled function `func`.'''
+        location, cfunc = ida_hexrays.treeloc_t(), cls(func)
+        location.ea, location.itp = ea, itp
+        res = cfunc.get_user_cmt(location, *always if always else [idaapi.RETRIEVE_ALWAYS])
+        return utils.string.of(res)
+
+    @classmethod
+    def set_comment(cls, func, ea, itp, comment):
+        '''Apply the specified `comment` to precisely `itp` of address `ea` in the decompiled function `func`.'''
+        location, cfunc = ida_hexrays.treeloc_t(), cls(func)
+        location.ea, location.itp = ea, itp
+        res = cfunc.get_user_cmt(location, idaapi.RETRIEVE_ALWAYS)
+        cfunc.set_user_cmt(location, utils.string.to(comment))
+        cfunc.save_user_cmts()
+        return utils.string.of(res)
+
 class code(object):
     """
     This namespace is for interacting with the microcode produced by the
@@ -2048,7 +2066,7 @@ class ctree(object):
 
     @classmethod
     def repr(cls, *args):
-        '''Return the canonical string representation for the specifed CTREE item.'''
+        '''Return the canonical string representation for the specified CTREE item.'''
         func, item = itertools.chain([None] if len(args) < 2 else [], args)
 
         # If we weren't given a function for the item, then we need the address
@@ -2135,24 +2153,6 @@ class ctree(object):
         # recurse into ourselves to do the actual rendering.
         treeitem = cfunc.treeitems[item]
         return cls.repr(cfunc, treeitem)
-
-    @classmethod
-    def get_comment(cls, func, ea, itp, *always):
-        '''Return the comment at precisely `itp` of address `ea` in the decompiled function `func`.'''
-        location, cfunc = ida_hexrays.treeloc_t(), hexrays.function(func)
-        location.ea, location.itp = ea, itp
-        res = cfunc.get_user_cmt(location, *always if always else [idaapi.RETRIEVE_ALWAYS])
-        return utils.string.of(res)
-
-    @classmethod
-    def set_comment(cls, func, ea, itp, comment):
-        '''Apply the specified `comment` to precisely `itp` of address `ea` in the decompiled function `func`.'''
-        location, cfunc = ida_hexrays.treeloc_t(), hexrays.function(func)
-        location.ea, location.itp = ea, itp
-        res = cfunc.get_user_cmt(location, idaapi.RETRIEVE_ALWAYS)
-        cfunc.set_user_cmt(location, utils.string.to(comment))
-        cfunc.save_user_cmts(i)
-        return utils.string.of(res)
 
     @classmethod
     def iterate(cls, func):
