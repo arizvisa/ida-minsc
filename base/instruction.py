@@ -813,26 +813,26 @@ def op_float(ea, opnum):
 op_flt = utils.alias(op_float)
 
 @utils.multicase(opnum=types.integer)
-def op_stackvar(opnum):
+def op_stack(opnum):
     '''Set the type for the operand `opnum` at the current instruction to a stack variable and return it.'''
-    return op_stackvar(ui.current.address(), opnum)
+    return op_stack(ui.current.address(), opnum)
 @utils.multicase(reference=interface.opref_t)
-def op_stackvar(reference):
+def op_stack(reference):
     '''Set the type for the operand given by `reference` to a stack variable and return it.'''
     address, opnum, _ = reference
-    return op_stackvar(address, opnum)
+    return op_stack(address, opnum)
 @utils.multicase(ea=types.integer, opnum=types.integer)
-def op_stackvar(ea, opnum):
+def op_stack(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a stack variable and return it.'''
     if not function.has(ea):
-        raise E.FunctionNotFoundError(u"{:s}.op_stackvar({:#x}, {:d}) : The specified address ({:#x}) is not within a function.".format(__name__, ea, opnum, ea))
+        raise E.FunctionNotFoundError(u"{:s}.op_stack({:#x}, {:d}) : The specified address ({:#x}) is not within a function.".format(__name__, ea, opnum, ea))
 
     if not idaapi.op_stkvar(ea, opnum):
-        raise E.DisassemblerError(u"{:s}.op_stackvar({:#x}, {:d}) : Unable to set operand {:d} to a stack variable.".format(__name__, ea, opnum, opnum))
+        raise E.DisassemblerError(u"{:s}.op_stack({:#x}, {:d}) : Unable to set operand {:d} to a stack variable.".format(__name__, ea, opnum, opnum))
 
     # Now that it's set, call into op_structure to return it.
     return op_structure(ea, opnum)
-op_stack = op_stkvar = utils.alias(op_stackvar)
+op_stackvar = op_stkvar = utils.alias(op_stack)
 
 @utils.multicase(opnum=types.integer)
 def op_structure(opnum):
