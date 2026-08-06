@@ -2259,3 +2259,52 @@ class ctree(object):
             return item.ea
         return -1 if item.ea == idaapi.BADADDR else item.ea
 
+    @classmethod
+    def uses_variable(cls, locator, item):
+        '''Return whether the specified CTREE `item` uses the variable `locator` as one of its operands.'''
+        var = variable.get_locator(locator)
+
+        # If it's actually a variable, then we just need to compare.
+        if item.op == idaapi.cot_var:
+            ref = variable.get_locator(item.cexpr.v)
+            if var.location == ref.location and var.defea == ref.defea:
+                return True
+            return False
+
+        # If it's not an expression, then it's not a direct user.
+        elif not item.is_expr():
+            return False
+
+        # Now we can convert it to an actual expression object.
+        else:
+            cexpr = item.cexpr
+
+        # First check the "x" operand to see if it's a variable to compare.
+        if getattr(cexpr, 'x', None):
+            if cexpr.x.op == idaapi.cot_var:
+                ref = variable.get_locator(cexpr.x.v)
+                if var.location == ref.location and var.defea == ref.defea:
+                    return True
+                pass
+            pass
+
+        # Then check the "y" operand to see if it's a variable to compare.
+        if getattr(cexpr, 'y', None):
+            if cexpr.y.op == idaapi.cot_var:
+                ref = variable.get_locator(cexpr.y.v)
+                if var.location == ref.location and var.defea == ref.defea:
+                    return True
+                pass
+            pass
+
+        # And finally we can check the "y" operand to see if it's a variable.
+        if hasattr(cexpr, 'z') and cexpr.z:
+            if cexpr.z.op == idaapi.cot_var:
+                ref = variable.get_locator(cexpr.z.v)
+                if var.location == ref.location and var.defea == ref.defea:
+                    return True
+                pass
+            pass
+
+        # Otherwise, we didn't find a parent with our variable as a child.
+        return False
