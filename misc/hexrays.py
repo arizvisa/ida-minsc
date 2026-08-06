@@ -2308,3 +2308,47 @@ class ctree(object):
 
         # Otherwise, we didn't find a parent with our variable as a child.
         return False
+
+    @classmethod
+    def recurses_variable(cls, locator, item):
+        '''Return whether the specified CTREE `item` uses the variable `locator` as any of its operands recursively.'''
+        var = variable.get_locator(locator)
+
+        # If recursing got us to a variable, then we just compare the locators.
+        if item.op == idaapi.cot_var:
+            ref = variable.get_locator(item.cexpr.v)
+            if var.location == ref.location and var.defea == ref.defea:
+                return True
+            return False
+
+        # If we didn't find an expression, then we can't really descend at all.
+        elif not item.is_expr():
+            return False
+
+        # Chew up a `ida_hexrays.citem_t` and spit out an `ida_hexrays.cexpr_t`.
+        else:
+            cexpr = item.cexpr
+
+        # Recursively check for the "x" operand if it exists.
+        try:
+            if getattr(cexpr, 'x', None) and cls.recurses_variable(var, cexpr.x):
+                return True
+            pass
+        except (AttributeError, TypeError): pass
+
+        # Recursively check for the "y" operand if it exists.
+        try:
+            if getattr(cexpr, 'y', None) and cls.recurses_variable(var, cexpr.y):
+                return True
+            pass
+        except (AttributeError, TypeError): pass
+
+        # Recursively check for the "z" operand if it exists.
+        try:
+            if hasattr(cexpr, 'z') and cls.recurses_variable(var, cexpr.z):
+                return True
+            pass
+        except (AttributeError, TypeError): pass
+
+        # We hit a leaf expression of some sort without any operands.
+        return False
