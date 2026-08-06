@@ -1823,6 +1823,40 @@ class function(object):
             yield index, [interface.bounds_t(start, stop) for start, stop in iterable]
         return
 
+    @classmethod
+    def precise_location(cls, func, ea, itp, item):
+        '''Return if the specified CTREE `item` matches a comment located at address `ea` with the preciser `itp`.'''
+        cfunc = cls(func) if isinstance(item, types.integer) else None
+        index = item if isinstance(item, types.integer) else item.index
+        citem = cfunc.treeitems[index] if cfunc and 0 <= index < cfunc.treeitems.size() else item
+        if not isinstance(citem, ida_hexrays.citem_t):
+            fn = "{:#x}".format(cls.address(cfunc)) if func else "{!r}".format(item) if isinstance(item, types.string) else "{!s}".format(item)
+            description = "{:d}".format(item) if isinstance(item, types.integer) else "{!r}".format(item)
+            message = "invalid index ({:d})".format(item) if isinstance(item, types.integer) else "unsupported type ({!s})".format(item.__class__)
+            raise exceptions.InvalidParameterError(u"{:s}.precise_location({!s}, {:#x}, {:d}, {!s}) : Unable find the precise location for an item of an {!s}.".format('.'.join([__name__, cls.__name__]), fn, ea, itp, description, message))
+        elif itp == ida_hexrays.ITP_SEMI:
+            if item.op > ida_hexrays.cot_last:
+                expression = ctree.address(item)
+                return expression == ea
+            return False
+        elif itp in (ida_hexrays.ITP_CURLY1, ida_hexrays.ITP_CURLY2):
+            if item.op == ida_hexrays.cit_block:
+                return item.ea == ea
+            elif item.op in {ida_hexrays.cit_if, ida_hexrays.cit_for, ida_hexrays.cit_while, ida_hexrays.cit_do, ida_hexrays.cit_switch}:
+                return item.ea == ea
+            return False
+        elif itp in (ida_hexrays.ITP_BRACE1, ida_hexrays.ITP_BRACE2):
+            if item.op <= ida_hexrays.cot_last:
+                return item.ea == ea
+            return False
+        elif itp == ida_hexrays.ITP_COLON:
+            if item.op == ida_hexrays.cit_switch:
+                return item.ea == ea
+            elif item.op < ida_hexrays.cot_last:
+                return item.ea == ea
+            return False
+        return False
+
 class code(object):
     """
     This namespace is for interacting with the microcode produced by the
