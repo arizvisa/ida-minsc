@@ -286,6 +286,68 @@ class query_v0(object):
         return
 
     @classmethod
+    def frames(cls, required=[], included=[]):
+        '''Query the frames in the database and yield a tuple containing the owning function and all of the `required` tags with any `included` ones.'''
+        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+        required = {key for key in iterable}
+        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        included = {key for key in iterable}
+
+        # If we weren't given anything to query with, then we need to yield
+        # the members tags for every single structure that we can find.
+        if not(required or included):
+            for ea in filter(interface.function.has_frame, interface.function.iterate()):
+                ti, fn = idaapi.tinfo_t(), interface.function.by(ea)
+                if not hasattr(ti, 'get_func_frame'):
+                    sptr = idaapi.get_frame(fn)
+                elif ti.get_func_frame(fn):
+                    sptr = ti
+                else:
+                    continue
+
+                if isinstance(sptr, idaapi.tinfo_t):
+                    iterable = (typeinfo_member.get(mowner, mindex) for mowner, mindex, mptr in internal.structure.v9members.iterate(sptr))
+                else:
+                    iterable = (member.get(mptr) for mowner, mindex, mptr in internal.structure.members.iterate(sptr))
+                names = {tag for tag in itertools.chain(*iterable)}
+                if names:
+                    yield ea, names
+                continue
+            return
+
+        # If we were given something to query the members of each structure
+        # with, then we first grab the tags for every single structure member.
+        for ea in filter(interface.function.has_frame, interface.function.iterate()):
+            ti, fn = idaapi.tinfo_t(), interface.function.by(ea)
+            if not hasattr(ti, 'get_func_frame'):
+                sptr = idaapi.get_frame(fn)
+            elif ti.get_func_frame(fn):
+                sptr = ti
+            else:
+                continue
+
+            if isinstance(sptr, idaapi.tinfo_t):
+                iterable = (typeinfo_member.get(mowner, mindex) for mowner, mindex, mptr in internal.structure.v9members.iterate(sptr))
+            else:
+                iterable = (member.get(mptr) for mowner, mindex, mptr in internal.structure.members.iterate(sptr))
+            names = {tag for tag in itertools.chain(*iterable)}
+
+            # Then we select any of the tag names that we were asked to include.
+            # If any tag names are required, make sure they exist and skip to
+            # the next structure if they don't.
+            collected = included & names
+            if required:
+                if required & names == required:
+                    collected.update(required)
+                else: continue
+
+            # If we have anything left, then it is worth yielding to the caller.
+            if collected:
+                yield ea, collected
+            continue
+        return
+
+    @classmethod
     def members(cls, required=[], included=[]):
         '''Query the members in the database and yield a tuple containing the member and all of the `required` tags with any `included` ones.'''
         iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
@@ -524,6 +586,23 @@ class select_v0(object):
             explicit = {tag for tag in res if tag and not tag.startswith('__')}
             if explicit:
                 yield sid, explicit
+            continue
+        return
+
+    @classmethod
+    def frames(cls, *args, **kwargs):
+        '''Query the frame members in the database and yield a tuple containing the owning function and a set of the matching `required` tags with any `included` ones.'''
+        if args or kwargs:
+            for ea, res in query_v0.frames(*args, **kwargs):
+                yield ea, res
+            return
+
+        # We weren't given any tags, meaning we are being asked to yield all of
+        # them. So we filter out the empty tag and any implicit tags by default.
+        for ea, res in query_v0.frames(*args, **kwargs):
+            explicit = {tag for tag in res if tag and not tag.startswith('__')}
+            if explicit:
+                yield ea, explicit
             continue
         return
 
