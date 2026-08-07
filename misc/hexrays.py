@@ -2120,6 +2120,26 @@ class ctree(object):
         return results
 
     @classmethod
+    def climb(cls, func, item):
+        '''Yield the indices of each ``ida_hexrays.citem_t`` from the specified `item` of the function `func`.'''
+        cfunc = function(func)
+        body, count = cfunc.treeitems[0], cfunc.treeitems.size()
+
+        # start with the specified item using the starting index.
+        index = item.index if isinstance(item, ida_hexrays_types.citem_t) else item
+        if not(0 <= index < count):
+            raise exceptions.IndexOutOfBoundsError(u"{:s}.climb({:#x}, {:d}) : Unable to locate the specified item due to the index ({:d}) being out of bounds ({:s}).".format('.'.join([__name__, cls.__name__]), function.address(cfunc), index, index, "{:d}..{:d}".format(0, count) if count else "{:d}".format(0)))
+        citem = cfunc.treeitems[index]
+
+        # now we can start traversing upward from the item we're starting with.
+        parent = body.find_parent_of(citem)
+        while parent:
+            citem = parent
+            yield citem.index
+            parent = body.find_parent_of(citem)
+        return
+
+    @classmethod
     def repr(cls, *args):
         '''Return the canonical string representation for the specified CTREE item.'''
         func, item = itertools.chain([None] if len(args) < 2 else [], args)
