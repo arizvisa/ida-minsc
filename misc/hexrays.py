@@ -2269,12 +2269,14 @@ class ctree(object):
     @classmethod
     def uses_variable(cls, locator, item):
         '''Return whether the specified CTREE `item` uses the variable `locator` as one of its operands.'''
-        var = variable.get_locator(locator)
+        iterable = map(variable.get_locator, locator if isinstance(locator, types.unordered) else [locator])
+        vars = {(locator if isinstance(locator, types.tuple) else variable.identity(locator)) for locator in iterable}
 
         # If it's actually a variable, then we just need to compare.
         if item.op == idaapi.cot_var:
             ref = variable.get_locator(item.cexpr.v)
-            if var.location == ref.location and var.defea == ref.defea:
+            var = variable.identity(ref)
+            if var in vars:
                 return True
             return False
 
@@ -2290,7 +2292,8 @@ class ctree(object):
         if getattr(cexpr, 'x', None):
             if cexpr.x.op == idaapi.cot_var:
                 ref = variable.get_locator(cexpr.x.v)
-                if var.location == ref.location and var.defea == ref.defea:
+                var = variable.identity(ref)
+                if var in vars:
                     return True
                 pass
             pass
@@ -2299,7 +2302,8 @@ class ctree(object):
         if getattr(cexpr, 'y', None):
             if cexpr.y.op == idaapi.cot_var:
                 ref = variable.get_locator(cexpr.y.v)
-                if var.location == ref.location and var.defea == ref.defea:
+                var = variable.identity(ref)
+                if var in vars:
                     return True
                 pass
             pass
@@ -2308,7 +2312,8 @@ class ctree(object):
         if hasattr(cexpr, 'z') and cexpr.z:
             if cexpr.z.op == idaapi.cot_var:
                 ref = variable.get_locator(cexpr.z.v)
-                if var.location == ref.location and var.defea == ref.defea:
+                var = variable.identity(ref)
+                if var in vars:
                     return True
                 pass
             pass
