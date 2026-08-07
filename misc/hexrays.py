@@ -1160,6 +1160,13 @@ class variable(object):
             expr = reference if isinstance(reference, ida_hexrays_types.cexpr_t) else reference.cexpr
             reference = expr.v
 
+        # if we were given a serialized identity, then we can convert it back.
+        elif isinstance(reference, internal.types.tuple):
+            if len(reference) != 3:
+                raise exceptions.InvalidTypeOrValueError(u"{:s}.get_locator({!r}) : Unable to fetch the variable locator from the requested reference ({!r}) due to it being an unsupported type {:s} as a result of its length ({:d}).".format('.'.join([__name__, cls.__name__]), reference, reference, utils.pycompat.fullname(reference.__class__), len(reference)))
+            ea, atype, alocinfo = reference
+            return cls.new_locator(ea, (atype, alocinfo))
+
         # otherwise it needs to be one of the supported types to continue.
         elif not isinstance(reference, types):
             raise exceptions.InvalidTypeOrValueError(u"{:s}.get_locator({!r}) : Unable to fetch the variable locator from the requested reference ({!r}) due to it being an unsupported type {:s}.".format('.'.join([__name__, cls.__name__]), reference, reference, utils.pycompat.fullname(reference.__class__)))
