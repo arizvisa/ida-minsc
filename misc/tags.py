@@ -815,6 +815,29 @@ class query_v1(object):
         return
 
     @classmethod
+    def frames(cls, require=frozenset(), include=frozenset()):
+        '''Yield the owning function address and tags for each frame with members that use all the tags in `require` and include any from `include`.'''
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+        for sid, used in internal.tagindex.members.select():
+            if not internal.structure.frame(sid):
+                continue
+            else:
+                fn = interface.function.by_frame(sid)
+            ea = interface.range.start(fn)
+
+            if not(used):
+                continue
+            elif not(selection) and used:
+                yield ea, internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield ea, internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield ea, internal.tagindex.tags.names(used & requested)
+            continue
+        return
+
+    @classmethod
     def members(cls, require=frozenset(), include=frozenset()):
         '''Yield the member id and tags for each member in the database using all the tags in `require` and including any from `include`.'''
         rmask, imask = (cls.mask(names) for names in [require, include])
@@ -1091,6 +1114,19 @@ class select_v1(object):
                 yield sid, used
             elif explicit:
                 yield sid, explicit
+            continue
+        return
+
+    @classmethod
+    def frames(cls, *args, **kwargs):
+        '''Query the frame members in the database and yield a tuple containing the owning function address for the frame and a set of the matching `required` tags with any `included` ones.'''
+        selection = True if any([args, kwargs]) else False
+        for ea, used in query_v1.frames(*args, **kwargs):
+            explicit = {key for key in used if key and not key.startswith('__')}
+            if selection:
+                yield ea, used
+            elif explicit:
+                yield ea, explicit
             continue
         return
 
