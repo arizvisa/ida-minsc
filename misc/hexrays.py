@@ -2083,7 +2083,7 @@ class ctree(object):
     @classmethod
     def up(cls, func, item):
         '''Return the indices of each ``ida_hexrays.citem_t`` from the function `func` that uses the specified `item` as one of its children.'''
-        cfunc = hexrays.function(func)
+        cfunc = function(func)
         count = cfunc.treeitems.size()
 
         # set the current item using the starting index.
