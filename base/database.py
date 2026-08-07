@@ -2346,6 +2346,33 @@ def selectcontents(**boolean):
     return internal.tags.select.contents()
 selectcontent = utils.alias(selectcontents)
 
+@utils.multicase(tag=internal.types.string)
+@utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+def selectframes(tag, *included, **boolean):
+    '''Query the frames of each function for the given `tag` or any others that may be `included`.'''
+    res = {tag} | {item for item in included}
+    boolean['included'] = {item for item in boolean.get('included', [])} | res
+    return selectframes(**boolean)
+@utils.multicase()
+@utils.string.decorate_arguments('And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+def selectframes(**boolean):
+    """Query the frames of each function for any of the tags specified by `boolean` and yield a tuple for each matching function address with selected tags.
+
+    If `require` is given as an iterable of tag names then require that each returned function uses them.
+    If `include` is given as an iterable of tag names then include the specified tags for each returned function if available.
+    """
+    boolean = {key : {item for item in value} if isinstance(value, internal.types.unordered) else {value} for key, value in boolean.items()}
+
+    # If we were given some tags to filter with, unpack them from our parameter
+    # and use them with the `internal.tags.contents` function to yield the
+    # results to the caller. If we weren't given any tags to filter with, then
+    # we just avoid giving any parameters to get it to yield all the results.
+    if boolean:
+        included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
+        return internal.tags.select.frames(required, included)
+    return internal.tags.select.frames()
+selectframe = utils.alias(selectframes)
+
 ## imports
 class imports(object):
     """
