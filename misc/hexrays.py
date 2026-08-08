@@ -2120,9 +2120,9 @@ class ctree(object):
         return results
 
     @classmethod
-    def climb(cls, func, item):
+    def climb(cls, func, item, *predicate):
         '''Yield the indices of each ``ida_hexrays.citem_t`` from the specified `item` of the function `func`.'''
-        cfunc = function(func)
+        cfunc, [Fpredicate] = function(func), predicate if predicate else [utils.fidentity]
         body, count = cfunc.treeitems[0], cfunc.treeitems.size()
 
         # start with the specified item using the starting index.
@@ -2135,7 +2135,8 @@ class ctree(object):
         parent = body.find_parent_of(citem)
         while parent:
             citem = parent
-            yield citem.index
+            if Fpredicate(citem):
+                yield citem.index
             parent = body.find_parent_of(citem)
         return
 
