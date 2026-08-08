@@ -2632,6 +2632,20 @@ class frame(object):
             raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : The specified function does not have a frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
         return interface.function.frame(fn)
 
+    @utils.multicase()
+    @classmethod
+    def tags(cls):
+        '''Return the tags used by the frames from all the functions within the database.'''
+        return internal.tags.reference.frames.usage()
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def tags(cls, func):
+        '''Return the tags used by the frame from the function `func`.'''
+        fn = interface.function.by(func)
+        sid = fn.frame if interface.function.has_frame(fn) else idaapi.BADADDR
+        iterable = {} if sid == idaapi.BADADDR else internal.tags.reference.members.name(sid)
+        return {name for name in iterable}
+
     class members(object):
         """
         This namespace is for interacting with the members from the frame for
