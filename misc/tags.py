@@ -3317,6 +3317,23 @@ class reference_v0(object):
             available = (sptr for _, sptr in internal.structure.iterate())
             return cls.name(*available)
 
+    class frames(members):
+        """
+        Function frames are composed of structure members, so there isn't really
+        anything for us to implement other than iterating through functions
+        instead of structures.
+        """
+        @classmethod
+        def usage(cls):
+            iterable = filter(interface.function.has_frame, interface.function.iterate())
+            iterable = ((interface.function.by(ea), idaapi.tinfo_t()) for ea in iterable)
+            if hasattr(idaapi.tinfo_t, 'get_func_frame'):
+                iterable = ((tinfo.get_func_frame(fn), tinfo) for fn, tinfo in iterable)
+                frames = (tinfo for ok, tinfo in iterable if ok)
+            else:
+                frames = (idaapi.get_frame(fn) for fn, _ in iterable)
+            return cls.name(*frames)
+
     class hexfunction(object):
         """
         This namespace is just a frontend for the addresses that belong to a
@@ -3621,7 +3638,19 @@ class reference_v1(object):
             return internal.tagindex.tags.names(used)
         @classmethod
         def usage(cls):
-            iterable = map(operator.itemgetter(1), internal.tagindex.members.select())
+            iterable = (used for mid, used in internal.tagindex.members.select() if not internal.structure.frame(mid))
+            used = functools.reduce(operator.or_, iterable, 0)
+            return internal.tagindex.tags.names(used)
+
+    class frames(members):
+        """
+        This namespace contains all the tools required for tracking the tags
+        that have been applied to frame members belonging to a function. It
+        is is basically a copy of the `members` namespace up above.
+        """
+        @classmethod
+        def usage(cls):
+            iterable = (used for mid, used in internal.tagindex.members.select() if internal.structure.frame(mid))
             used = functools.reduce(operator.or_, iterable, 0)
             return internal.tagindex.tags.names(used)
 
