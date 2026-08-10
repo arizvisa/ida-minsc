@@ -2400,6 +2400,15 @@ class ctree(object):
         return False
 
     @classmethod
+    def at(cls, func, ea):
+        '''Return the indices for the instructions at the address `ea` from the decompiled function `func`.'''
+        cfunc = function(func)
+        if ea in cfunc.eamap:
+            instructions = cfunc.eamap[ea]
+            return [instructions[idx].index for idx in range(instructions.size())]
+        return []
+
+    @classmethod
     def precise(cls, func, item, position='after'):
         '''Return the address and ``ida_hexrays.item_preciser_t`` for the the specified CTREE `item` from the decompiled function `func`.'''
         cfunc = function(func)
