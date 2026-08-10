@@ -859,7 +859,7 @@ class variables(object):
             raise exceptions.InvalidTypeOrValueError(u"{:s}.by({!r}) : Unable to locate a variable with a locator type ({!s}) that is unsupported.".format('.'.join([__name__, cls.__name__]), locator, locator.__class__))
 
         elif not variable.has_location(locator):
-            raise exceptions.DecompilerError(u"{:s}.by({!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), varable.repr_locator(locator), idaapi.as_signed(locator.defea, interface.database.bits())))
+            raise exceptions.DecompilerError(u"{:s}.by({!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), variable.repr_locator(locator), idaapi.as_signed(locator.defea, interface.database.bits())))
 
         cfunc = function(locator.defea)
         lvars = cls(locator.defea)
