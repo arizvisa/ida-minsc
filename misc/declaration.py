@@ -1895,6 +1895,92 @@ class preciser(object):
             return index, itp
         return index, itp
 
+    @classmethod
+    def at(cls, cfunc, ea, itp):
+        '''Return the index for the ``ida_hexrays.citem_t`` at the address `ea` with the precisier specified by `itp`.'''
+        is_case = True if itp & idaapi.ITP_CASE else False
+        is_arg = (not is_case) and (idaapi.ITP_ARG1 <= itp & 0xFFFFFFFF <= idaapi.ITP_ARG64)
+
+        # Define a closure for ranking an item if we couldn't find its address.
+        def rank(index):
+            '''Return the ranking of the ``ida_hexrays.citem_t`` at the specified `index`.'''
+            citem = cfunc.treeitems[index]
+            if is_case:
+                return 2 if citem.op == idaapi.cit_switch else 0
+            elif is_arg and citem.op == idaapi.cot_call:
+                return 2
+            elif is_arg:
+                return 1 if citem.is_expr() else 0
+            return 0 if citem.is_expr() else 2
+
+        # If it's not an argument, then go ahead and try getting the treeitem
+        # index for the address we were given directly.
+        candidates = [] if is_arg else internal.hexrays.ctree.at(cfunc, ea)
+        if candidates:
+            return max(candidates, key=lambda index: (rank(index), index))
+
+        # Iterate through the citems to find the best rankings for the items
+        # that can match the address that was requested by the caller.
+        best = below = above = None
+        for index in builtins.range(cfunc.treeitems.size()):
+            address = cfunc.treeitems[index].ea
+            if address == idaapi.BADADDR:
+                continue
+            if address == ea:
+                key = rank(index), index
+                if best is None:
+                    best = (key, index)
+                    continue
+                ranking, _ = best
+                if key > ranking:
+                    best = (key, index)
+                continue
+            elif address < ea:
+                if below is None:
+                    below = ea - address, index
+                    continue
+                ranking, _ = below
+                if ea - address < ranking:
+                    below = ea - address, index
+                continue
+            else:
+                if above is None:
+                    above = address - ea, index
+                    continue
+                ranking, _ = above
+                if address - ea < ranking:
+                    above = address - ea, index
+                continue
+            continue
+
+        # Now we can return the index of the item that was the closest.
+        res = None
+        if best is not None:
+            _, index = best
+            if not (is_arg or is_case) and cfunc.treeitems[index].is_expr():
+                F = lambda it: not it.is_expr() and it.ea != idaapi.BADADDR
+                return next(internal.hexrays.ctree.climb(cfunc, index, F), index)
+            res = index
+        elif below is not None:
+            _, res = below
+        elif above is not None:
+            _, res = above
+        return res
+
+    @classmethod
+    def exactly(cls, cfunc, ea, itp):
+        '''Return the index and location for the ``ida_hexrays.citem_t`` at the address `ea` with the precisier specified by `itp`.'''
+        index = cls.at(cfunc, ea, itp)
+        if itp in cls.inversed:
+            return index, cls.inversed[itp]
+        elif cfunc.treeitems[index].op == idaapi.cit_switch:
+            flag_sign, flag_case = (itp & flag for flag in [idaapi.ITP_SIGN, idaapi.ITP_CASE])
+            case = itp & ~(idaapi.ITP_SIGN | idaapi.ITP_CASE)
+            # FIXME: need to translate the case value back to a case index,
+            #        value, or location.
+            return index, itp
+        return index, itp
+
 class mangled(object):
     """
     This class processes a mangled symbol in a number of
