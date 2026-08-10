@@ -2828,7 +2828,7 @@ class hexfunction(object):
         #        confirm if the location points to a labelled treeitem, and
         #        then we can apply the label. unfortunately, i don't know of
         #        a way to enumerate all of the labelled address in a function.
-        elif name == '__label__':
+        elif key == '__label__':
             pass
 
         # decode the comment and update the tags with the new value. once that
