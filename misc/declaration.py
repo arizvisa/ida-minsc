@@ -7,7 +7,7 @@ function and type declarations.
 TODO: Implement parsers for some of the C++ symbol manglers in order to
       query them for specific attributes or type information.
 """
-import functools, operator, itertools, logging, builtins, string as _string
+import functools, operator, itertools, logging, builtins, bisect, string as _string
 logging = logging.getLogger(__name__)
 
 import internal, idaapi
@@ -1681,6 +1681,10 @@ class preciser(object):
         idaapi.ITP_COLON:  'after',
     }
 
+    for name, itp in arguments.items():
+        inversed[itp] = name
+    del(name, itp)
+
     @classmethod
     def preferred(cls, cfunc, index):
         '''Return the preferred ``ida_hexrays.item_preciser_t`` for the ``ida_hexrays.citem_t`` at the specified `index` from the decompiled function `cfunc`.'''
@@ -1829,10 +1833,67 @@ class preciser(object):
         return citem.ea, cls.fixed[where]
 
     @classmethod
+    def contained(cls, intervals, ea):
+        '''Return the index of the item from `intervals` that contains the address specified by `ea`.'''
+        Fstart = lambda key: (lambda bounds, index: bounds.left)(*key)
+        index = bisect.bisect_right(intervals, ea, key=Fstart)  # FIXME: Py3-only.
+        covering = [((start, -stop), res) for (start, stop), res in itertools.islice(intervals, 0, index) if start <= ea < stop]
+        if not covering:
+            return None
+        _, res = max(covering)
+        return res
+
+    @classmethod
+    def nearest(cls, intervals, ea):
+        '''Return the index of the item from `intervals` nearest to the address specified by `ea`.'''
+        Fstart = lambda key: (lambda bounds, index: bounds.left)(*key)
+
+        # Collect our intervals into dictionaries for extracting each field.
+        boundsmapping, treemapping = {}, {}
+        for key in intervals:
+            boundsmapping[key], treemapping[key] = key
+
+        # Find the lowest bound from our intervals.
+        index = bisect.bisect_right(intervals, ea, key=Fstart) - 1  # FIXME: Py3-only.
+        if index < 0:
+            below = []
+        else:
+            below = [(ea - boundsmapping[intervals[index]].right + 1, treemapping[intervals[index]])]
+
+        # Find the highest bound from our intervals.
+        index = bisect.bisect_right(intervals, ea, key=Fstart) - 1  # FIXME: Py3-only.
+        if index + 1 < len(intervals):
+            above = [(boundsmapping[intervals[1 + index]].left - ea, treemapping[intervals[1+index]])]
+        else:
+            above = []
+
+        # Combine both of them into a list.
+        candidate = below + above
+        if not candidate:
+            return None
+
+        # Then we can find the minimum, unpack our index, and then return it.
+        _, res = min(candidate) if candidate else ((), None)
+        return res
+
+    @classmethod
     def where(cls, cfunc, ea, itp):
         '''Return the index and location for the ``ida_hexrays.citem_t`` at the address `ea` with the precisier specified by `itp`.'''
-        # FIXME: we want a citem_t, not an address.
-        return ea, cls.inversed[itp]
+        intervals = internal.hexrays.function.intervals(cfunc)
+        if not intervals:
+            raise internal.exceptions.DecompilerError(u"{:s}.where({:#x}, {:#x}, {:d}) : Could not return the instruction boundaries from the decompiled function {:#x}.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, ea, itp, cfunc.entry_ea))
+        index = cls.contained(intervals, ea)
+        if index is None:
+            index = cls.nearest(intervals, ea)
+        if itp in cls.inversed:
+            return index, cls.inversed[itp]
+        elif cfunc.treeitems[index].op == idaapi.cit_switch:
+            flag_sign, flag_case = (itp & flag for flag in [idaapi.ITP_SIGN, idaapi.ITP_CASE])
+            case = itp & ~(idaapi.ITP_SIGN | idaapi.ITP_CASE)
+            # FIXME: need to translate the case value back to a case index,
+            #        value, or location.
+            return index, itp
+        return index, itp
 
 class mangled(object):
     """
