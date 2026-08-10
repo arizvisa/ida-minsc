@@ -2398,3 +2398,29 @@ class ctree(object):
 
         # We hit a leaf expression of some sort without any operands.
         return False
+
+    @classmethod
+    def precise(cls, func, item, position='after'):
+        '''Return the address and ``ida_hexrays.item_preciser_t`` for the the specified CTREE `item` from the decompiled function `func`.'''
+        cfunc = function(func)
+        return internal.declaration.preciser.resolve(cfunc, item, position)
+
+    @classmethod
+    def where(cls, func, ea, itp):
+        '''Return the CTREE item at the address `ea` and location `itp` of the decompiled function `func`.'''
+        cfunc = function(func)
+        return internal.declaration.preciser.where(cfunc, ea, itp)
+
+    @classmethod
+    def get_comment(cls, func, item, position, *always):
+        '''Return the comment from the decompiled function `func` at the given `position` for the specified CTREE `item`.'''
+        cfunc = function(func)
+        ea, itp = internal.declaration.preciser.resolve(cfunc, item, position)
+        return function.get_comment(cfunc, ea, itp, *always)
+
+    @classmethod
+    def set_comment(cls, func, item, position, comment):
+        '''Apply the `comment` to the decompiled function `func` at the specified `position` of the given CTREE `item`.'''
+        cfunc = function(func)
+        ea, itp = internal.declaration.preciser.resolve(cfunc, item, position)
+        return function.set_comment(cfunc, ea, itp, comment)
