@@ -3509,6 +3509,4 @@ class parseable(object):
             else:
                 res.append("[{:d}] {!r} -> {!r}".format(index, string, transformed))
             continue
-        res.append('')
-
-        return '\n'.join(itertools.chain([cls], res))
+        return '\n'.join(itertools.chain([cls], res, ['']))
