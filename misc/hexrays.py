@@ -1831,6 +1831,17 @@ class function(object):
         return
 
     @classmethod
+    def intervals(cls, func):
+        '''Return a sorted list of intervals for the specified decompiled function `func`.'''
+        cfunc, result = cls(func), []
+        for index, bounds in cls.boundaries(cfunc):
+            if index >= 0:
+                iterable = ((item, index) for item in bounds)
+                result.extend(iterable)
+            continue
+        return sorted(result)
+
+    @classmethod
     def precise_location(cls, func, ea, itp, item):
         '''Return if the specified CTREE `item` matches a comment located at address `ea` with the preciser `itp`.'''
         cfunc = cls(func) if isinstance(item, types.integer) else None
