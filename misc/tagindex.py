@@ -2491,7 +2491,7 @@ class hexfunction(counted):
         '''Decode the specified `preciser` into an instance of the ``ida_hexrays.treeloc_t`` type.'''
         ea, itp = cls.decode_preciser(preciser) if isinstance(preciser, internal.types.integer) else preciser
         res = internal.hexrays.ida_hexrays_types.treeloc_t()
-        res.ea, res.itp = ea, itp
+        res.ea, res.itp = ea, idaapi.as_signed(itp, 32)
         return res
 
     # methods that the parent namespace requires us to implement.
