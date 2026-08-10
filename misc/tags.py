@@ -1197,15 +1197,16 @@ class select_v1(object):
     def hexfunction(cls, func, *args, **kwargs):
         '''Yield the function address and tags from the contents of each function containing all the tags in `require` and including any from `include`.'''
         cfunc, selection = internal.hexrays.function(func), True if any([args, kwargs]) else False
-        for preciser, used in query_v1.hexfunction(cfunc, *args, **kwargs):
-            ea, _ = cls.navigation.analyze(preciser.ea), preciser.itp
-            tags = hexfunction.get(preciser)
+        for instance, used in query_v1.hexfunction(cfunc, *args, **kwargs):
+            cindex, where = internal.declaration.preciser.exactly(cfunc, instance.ea, instance.itp & 0xFFFFFFFF)
+            key = cfunc.treeitems[cindex], where
+            tags = hexfunction.get(cfunc, (instance.ea, instance.itp))
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
             if selection:
-                yield preciser, selected
+                yield key, selected
             elif explicit:
-                yield preciser, explicit
+                yield key, explicit
             continue
         return
 
