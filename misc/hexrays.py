@@ -1804,7 +1804,7 @@ class function(object):
     def get_comment(cls, func, ea, itp, *always):
         '''Return the comment at precisely `itp` of address `ea` in the decompiled function `func`.'''
         location, cfunc = ida_hexrays.treeloc_t(), cls(func)
-        location.ea, location.itp = ea, itp
+        location.ea, location.itp = ea, idaapi.as_signed(itp, 32)
         res = cfunc.get_user_cmt(location, *always if always else [idaapi.RETRIEVE_ALWAYS])
         return utils.string.of(res)
 
@@ -1812,7 +1812,7 @@ class function(object):
     def set_comment(cls, func, ea, itp, comment):
         '''Apply the specified `comment` to precisely `itp` of address `ea` in the decompiled function `func`.'''
         location, cfunc = ida_hexrays.treeloc_t(), cls(func)
-        location.ea, location.itp = ea, itp
+        location.ea, location.itp = ea, idaapi.as_signed(itp, 32)
         res = cfunc.get_user_cmt(location, idaapi.RETRIEVE_ALWAYS)
         cfunc.set_user_cmt(location, utils.string.to(comment))
         cfunc.save_user_cmts()
