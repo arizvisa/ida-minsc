@@ -1634,6 +1634,206 @@ class convention(object):
         '''Return whether the given `code` is a special calling convention.'''
         return code in cls.choice['__userspecial']
 
+class preciser(object):
+    """
+    This class exists for simplifying the complexity of the `item_preciser_t` so
+    that we can avoid having to remember constants and where they are applied.
+    It was basically written with the assistance of an LLM which bruteforced all
+    of the available `ida_hexrays.citem_t` (other than `ida_hexrays.cot_comma`
+    which turned out to be pesky) against all of the available `item_preciser_t`
+    enumerator values. I didn't really need to use one, but I thought it was
+    going to be more complicated than I had anticipated. Basically, it tries to
+    introduce some shorthand that is simpler to predict location-wise.
+    """
+
+    locations = {'above', 'after', 'block-open', 'block-close', 'do-while'}
+    arguments = {"arg{:d}".format(1 + index) : idaapi.ITP_ARG1 + index for index in builtins.range(0, 64)}
+    locations = locations | {argument for argument in arguments}
+
+    instructions = {
+        idaapi.cit_expr: idaapi.ITP_SEMI,
+        idaapi.cit_return: idaapi.ITP_SEMI,
+        idaapi.cit_break: idaapi.ITP_SEMI,
+        idaapi.cit_continue: idaapi.ITP_SEMI,
+        idaapi.cit_goto: idaapi.ITP_SEMI,
+        idaapi.cit_do: idaapi.ITP_SEMI,        # this would be trailing `} while(...)`.
+        idaapi.cit_if: idaapi.ITP_BRACE2,
+        idaapi.cit_for: idaapi.ITP_BRACE2,
+        idaapi.cit_while: idaapi.ITP_BRACE2,
+        idaapi.cit_switch: idaapi.ITP_BRACE2,
+        idaapi.cit_block: idaapi.ITP_CURLY1,
+    }
+
+    fixed = {
+        'block-open': idaapi.ITP_CURLY1,
+        'block-close': idaapi.ITP_CURLY2,
+        'do-while': idaapi.ITP_DO,
+    }
+
+    inversed = {
+        idaapi.ITP_BLOCK1: 'above',
+        idaapi.ITP_CURLY1: 'block-open',
+        idaapi.ITP_CURLY2: 'block-close',
+        idaapi.ITP_DO: 'do-while',
+        idaapi.ITP_SEMI: 'after',
+        idaapi.ITP_BRACE2: 'after',
+        idaapi.ITP_BLOCK2: 'after',
+        idaapi.ITP_COLON:  'after',
+    }
+
+    @classmethod
+    def preferred(cls, cfunc, index):
+        '''Return the preferred ``ida_hexrays.item_preciser_t`` for the ``ida_hexrays.citem_t`` at the specified `index` from the decompiled function `cfunc`.'''
+        if isinstance(index, idaapi.citem_t):
+            citem = index
+        elif 0 <= index < cfunc.treeitems.size():
+            citem = cfunc.treeitems[index]
+        else:
+            return None
+        if not citem.is_expr():
+            return None if citem.ea == idaapi.BADADDR else cls.instructions[citem.op]
+        res = cls.ancestor(cfunc, citem)
+        if res is not None:
+            op = cfunc.treeitems[res].op
+            return cls.instructions.get(op)
+        return None
+
+    @classmethod
+    def ancestor(cls, cfunc, item):
+        '''Return the first ancestor containing an address for the ``ida_hexrays.citem_t`` specified by `item` in the decompiled function `cfunc`.'''
+        F = lambda item: not item.is_expr() and item.ea != idaapi.BADADDR
+        if isinstance(item, idaapi.citem_t):
+            cindex = item.index
+        elif 0 <= item < cfunc.treeitems.size():
+            cindex = item
+        else:
+            return None
+        iterable = itertools.chain([cindex] if F(cfunc.treeitems[cindex]) else [], internal.hexrays.ctree.climb(cfunc, cindex, F))
+        return next(iterable, None)
+
+    @classmethod
+    def resolve(cls, cfunc, item, location='above'):
+        '''Return the first ancestor containing an address for the ``ida_hexrays.citem_t`` specified by `item` from the decompiled function `cfunc`.'''
+        where, length = location.lower() if isinstance(location, types.string) else location, cfunc.treeitems.size()
+        if isinstance(item, idaapi.citem_t):
+            citem = item
+        elif isinstance(item, types.integer) and 0 <= item < length:
+            citem = cfunc.treeitems[item]
+        elif isinstance(item, types.integer):
+            description = location if isinstance(location, internal.types.integer) else "{!r}".format(location)
+            raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({:#x}, {:d}, {!s}) : Cannot determine the specified `{!s}` due to its index ({:d}) being out of bounds ({!s}).".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, item, description, utils.pycompat.fullname(idaapi.citem_t), item, '..'.join(map("{:d}".format, [0, length]))))
+        else:
+            description = location if isinstance(location, internal.types.integer) else "{!r}".format(location)
+            raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({:#x}, {!s}, {!s}) : Cannot determine the specified `{!s}` due to its type ({!s}) being unsupported.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, "{!r}".format(item), description, utils.pycompat.fullname(idaapi.citem_t), item))
+
+        # start checking if we are acting on a switch and given the right type.
+        if citem.op == idaapi.cit_switch and not isinstance(where, (types.integer, types.string)):
+            description = location if isinstance(location, internal.types.integer) else "{!r}".format(location)
+            raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({:#x}, {:d}, {!s}) : Cannot resolve the specified location ({!s}) due to its type ({!s}) being unsupported.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, citem.index, description, description, where.__class__))
+
+        # special case for the switch statements since we have case numbers.
+        elif citem.op == idaapi.cit_switch and isinstance(where, types.integer):
+            cswitch = citem.cinsn.cswitch
+
+            # FIXME: figure out how to extract the type from the following
+            #        expression. that should allow us to clamp the values.
+            cexpr = cswitch.expr
+
+            # enumerate all of the cases and values within this `cswitch_t`. we
+            # will need to use the expression for the switch to figure out the
+            # result type so that we can clamp the values to the correct size.
+            cases = [cswitch.cases[index] for index in builtins.range(cswitch.cases.size())]
+            iterable = ([case.value(index) for index in builtins.range(case.size())] for index, case in enumerate(cases))
+            values = {value for value in itertools.chain(*iterable)}
+            inversed = sorted(values)
+
+            # now we'll check to see if the user specified a valid value, a
+            # numeric index into the cases, or we throw up an exception.
+            if where in values:
+                res = where
+            elif 0 <= where < len(inversed):
+                res = inversed[where]
+            else:
+                description = location if isinstance(location, internal.types.integer) else "{!r}".format(location)
+                raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({:#x}, {:d}, {!s}) : The location {!s} is invalid for the `{:s}` of type `{:s}` at index {:d}.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, citem.index, description, "{:d} ({:#x})".format(where, where) if isinstance(where, types.integer) else "{!r)".format(where), utils.pycompat.fullname(idaapi.cinsn_t), '.'.join(['ida_hexrays', 'cit_switch']), citem.index))
+            return citem.ea, res
+
+        # if we were given an integer, then just use it as-is.
+        elif isinstance(where, types.integer):
+            if citem.ea == idaapi.BADADDR:
+                return citem.ea, where
+            return citem.ea, where
+
+        # if it's not a valid location, throw an error up into the sky.
+        elif where not in cls.locations:
+            locations = [location for location in sorted(cls.locations)]
+            choices = (itertools.chain([locations[:-1]], map("or {:s}".format, locations[-1:])))
+            description = location if isinstance(location, internal.types.integer) else "{!r}".format(location)
+            raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({:#x}, {:d}, {!s}) : The specified location {!s} is invalid and must be {:s}.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, citem.index, description, description, ', '.join(choices)))
+
+        # if targeting an argument index, then clamp it to the argument list
+        # size. if we can't, then we can fallthrough to using "after".
+        elif where.startswith('arg'):
+            res = cls.arguments[where]
+            if citem.op != idaapi.cot_call:
+                description = location if isinstance(location, internal.types.integer) else "{!r}".format(location)
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.resolve({:#x}, {:d}, {!s}) : Cannot specify a location for an argument of a `{:s}` that is not an `{:s}` expression ({:d}).".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, citem.index, description, utils.pycompat.fullname(idaapi.citem_t), '.'.join(['idaapi', 'cot_call']),idaapi.cot_call))
+            carglist = citem.cexpr.a
+            if res < carglist.size():
+                return citem.ea, res
+            where = 'after'
+
+        # figure out the preferred location to appear on the same line as the
+        # specified item. if we can't, then fallthrough to using "above".
+        if where in {'after'}:
+            res = cls.preferred(cfunc, citem)
+            if res:
+                anchor = cls.ancestor(cfunc, citem)
+                ea = citem.ea if anchor is None else cfunc.treeitems[anchor].ea
+                return ea, res
+            where = 'above'
+
+        # if our comment goes above the item, then find the ancestor to use.
+        if where in {'above'}:
+            res = cls.ancestor(cfunc, citem)
+            if res is None:
+                description = location if isinstance(location, internal.types.integer) else "{!r}".format(location)
+                raise internal.exceptions.ItemNotFoundError(u"{:s}.resolve({:#x}, {:d}, {!s}) : Cannot find the ancestor for the `{!s}` at index {:d} of the decompiled function ({:#x})".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, citem.index, description, utils.pycompat.fullname(idaapi.citem_t), citem.index, cfunc.entry_ea))
+            return cfunc.treeitems[res].ea, idaapi.ITP_BLOCK1
+
+        # for a switch, we need to get the address of the right expression.
+        elif where in {'block-open', 'block-close'} and citem.op != idaapi.cit_block:
+            body = None
+            if citem.op == idaapi.cit_if:
+                body = citem.cinsn.cif.ithen
+            elif citem.op == idaapi.cit_for:
+                body = citem.cinsn.cfor.body
+            elif citem.op == idaapi.cit_while:
+                body = citem.cinsn.cwhile.body
+            elif citem.op == idaapi.cit_do:
+                body = citem.cinsn.cdo.body
+
+            # next we need to check whether the block has braces or not. this
+            # way we can normalize "open" and "close" to "above" and "after".
+            if body and body.op == idaapi.cit_block and body.cblock.size() > 1:
+                return body.ea, cls.fixed[where]
+            elif not body:
+                return citem.ea, cls.fixed[where]
+            elif where in {'open'}:
+                return cls.resolve(cfunc, citem, 'above')
+            elif body.op == idaapi.cit_block:
+                res = body.cblock.front() if body.cblock.size() else None
+            else:
+                res = body
+            return cls.resolve(cfunc, *[res, 'after'] if res else [citem, 'above'])
+        return citem.ea, cls.fixed[where]
+
+    @classmethod
+    def where(cls, cfunc, ea, itp):
+        '''Return the index and location for the ``ida_hexrays.citem_t`` at the address `ea` with the precisier specified by `itp`.'''
+        # FIXME: we want a citem_t, not an address.
+        return ea, cls.inversed[itp]
+
 class mangled(object):
     """
     This class processes a mangled symbol in a number of
