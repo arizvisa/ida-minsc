@@ -1687,7 +1687,7 @@ class preciser(object):
 
     @classmethod
     def preferred(cls, cfunc, index):
-        '''Return the preferred ``ida_hexrays.item_preciser_t`` for the ``ida_hexrays.citem_t`` at the specified `index` from the decompiled function `cfunc`.'''
+        '''Return the preferred ``ida_hexrays.item_preciser_t`` for the item at the specified `index` of the decompiled function `cfunc`.'''
         if isinstance(index, idaapi.citem_t):
             citem = index
         elif 0 <= index < cfunc.treeitems.size():
@@ -1704,7 +1704,7 @@ class preciser(object):
 
     @classmethod
     def ancestor(cls, cfunc, item):
-        '''Return the first ancestor containing an address for the ``ida_hexrays.citem_t`` specified by `item` in the decompiled function `cfunc`.'''
+        '''Return the first ancestor containing an address for the specified `item` from the decompiled function `cfunc`.'''
         F = lambda item: not item.is_expr() and item.ea != idaapi.BADADDR
         if isinstance(item, idaapi.citem_t):
             cindex = item.index
@@ -1717,7 +1717,7 @@ class preciser(object):
 
     @classmethod
     def resolve(cls, cfunc, item, location='above'):
-        '''Return the first ancestor containing an address for the ``ida_hexrays.citem_t`` specified by `item` from the decompiled function `cfunc`.'''
+        '''Return the first ancestor containing an address for the specified `item` from the decompiled function `cfunc`.'''
         where, length = location.lower() if isinstance(location, types.string) else location, cfunc.treeitems.size()
         if isinstance(item, idaapi.citem_t):
             citem = item
@@ -1878,7 +1878,7 @@ class preciser(object):
 
     @classmethod
     def where(cls, cfunc, ea, itp):
-        '''Return the index and location for the ``ida_hexrays.citem_t`` at the address `ea` with the precisier specified by `itp`.'''
+        '''Return the index and location for the address `ea` of the decompiled function `cfunc` with the preciser specified by `itp`.'''
         intervals = internal.hexrays.function.intervals(cfunc)
         if not intervals:
             raise internal.exceptions.DecompilerError(u"{:s}.where({:#x}, {:#x}, {:d}) : Could not return the instruction boundaries from the decompiled function {:#x}.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, ea, itp, cfunc.entry_ea))
@@ -1897,7 +1897,7 @@ class preciser(object):
 
     @classmethod
     def at(cls, cfunc, ea, itp):
-        '''Return the index for the ``ida_hexrays.citem_t`` at the address `ea` with the precisier specified by `itp`.'''
+        '''Return the index for the at the address `ea` of the decompiled function `cfunc` with the preciser specified by `itp`.'''
         is_case = True if itp & idaapi.ITP_CASE else False
         is_arg = (not is_case) and (idaapi.ITP_ARG1 <= itp & 0xFFFFFFFF <= idaapi.ITP_ARG64)
 
@@ -1969,7 +1969,7 @@ class preciser(object):
 
     @classmethod
     def exactly(cls, cfunc, ea, itp):
-        '''Return the index and location for the ``ida_hexrays.citem_t`` at the address `ea` with the precisier specified by `itp`.'''
+        '''Return the index and location for the item at address `ea` of the decompiled function `cfunc` with the preciser specified by `itp`.'''
         index = cls.at(cfunc, ea, itp)
         if itp in cls.inversed:
             return index, cls.inversed[itp]
