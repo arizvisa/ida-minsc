@@ -2764,7 +2764,7 @@ class hexfunction(object):
             cfunc = internal.hexrays.function(ea)
 
         # now we can create the locator for the function's ctree.
-        treeloc.ea, treeloc.itp = preciser
+        treeloc.ea, treeloc.itp = (lambda ea, itp: (ea, idaapi.as_signed(itp, 32)))(*preciser)
 
         # get the comment at the specified preciser and decode it into a dict.
         usercmt = cfunc.get_user_cmt(treeloc, idaapi.RETRIEVE_ALWAYS)
@@ -2817,7 +2817,7 @@ class hexfunction(object):
 
         # now we can use the preciser to create the tree locator, and then we
         # can use the tree locator to get the comment from the function.
-        treeloc.ea, treeloc.itp = preciser
+        treeloc.ea, treeloc.itp = (lambda ea, itp: (ea, idaapi.as_signed(itp, 32)))(*preciser)
         usercmt = cfunc.get_user_cmt(treeloc, idaapi.RETRIEVE_ALWAYS)
 
         # then we can start checking for the implicit tags.
@@ -2867,7 +2867,7 @@ class hexfunction(object):
 
         # now we can create the locator for the function's ctree and use it to
         # get the comment from the specified preciser.
-        treeloc.ea, treeloc.itp = preciser
+        treeloc.ea, treeloc.itp = (lambda ea, itp: (ea, idaapi.as_signed(itp, 32)))(*preciser)
         usercmt = cfunc.get_user_cmt(treeloc, idaapi.RETRIEVE_ALWAYS)
 
         # if the implicit tag is a name, then go ahead and remove it.
