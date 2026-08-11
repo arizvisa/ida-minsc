@@ -2484,7 +2484,7 @@ class hexfunction(counted):
         '''Decode the specified `integer` into a tuple containing the address and preciser.'''
         shift = pow(2, cls.__preciser_size)
         ea, itp = divmod(integer, shift)
-        return idaapi.node2ea(ea), itp
+        return idaapi.node2ea(ea), idaapi.as_signed(itp, 32)
 
     @classmethod
     def decode_object(cls, preciser):
