@@ -906,7 +906,10 @@ class variables(object):
         if isinstance(locator, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
             ea = function.address(func)
             chunks = map(interface.range.unpack, interface.function.chunks(ea))
-            return any(left <= locator.defea < right for left, right in chunks)
+            if not any(left <= locator.defea < right for left, right in chunks):
+                return False
+            lvars = cls(func)
+            return lvars.find(locator) is not None
 
         # XXX: it might be a better idea to check `func` directly for the mba.
         elif isinstance(locator, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t)):
