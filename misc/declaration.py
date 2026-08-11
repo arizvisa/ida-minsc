@@ -1644,11 +1644,31 @@ class preciser(object):
     enumerator values. I didn't really need to use one, but I thought it was
     going to be more complicated than I had anticipated. Basically, it tries to
     introduce some shorthand that is simpler to predict location-wise.
+
+    The supported locations are as follows:
+
+        `above` - above the item, an anterior comment.
+        `after` - trailing the item, coming after a semicolon.
+        `open` - at the opening brace "{".
+        `close` - at the closing brace "}".
+        `do` - for a "do-while" loop; at the "do".
+
+    The ``ida_hexrays.item_preciser_t`` integer constants from the SDK as
+    specified using the ``ida_hexrays.ITP_*`` enumerations are also supported.
     """
 
-    locations = {'above', 'after', 'block-open', 'block-close', 'do-while'}
+    locations = {'above', 'after', 'open', 'close', 'do'}
     arguments = {"arg{:d}".format(1 + index) : idaapi.ITP_ARG1 + index for index in builtins.range(0, 64)}
     locations = locations | {argument for argument in arguments}
+
+    # some basic aliases for the where a comment should be applied.
+    aliases = {
+        'block-open': 'open',
+        'block-close': 'close',
+        'semi': 'after', 'semicolon': 'after',
+        'anterior': 'above',
+        'do-while': 'do',
+    }
 
     instructions = {
         idaapi.cit_expr: idaapi.ITP_SEMI,
@@ -1665,16 +1685,16 @@ class preciser(object):
     }
 
     fixed = {
-        'block-open': idaapi.ITP_CURLY1,
-        'block-close': idaapi.ITP_CURLY2,
-        'do-while': idaapi.ITP_DO,
+        'open': idaapi.ITP_CURLY1,
+        'close': idaapi.ITP_CURLY2,
+        'do': idaapi.ITP_DO,
     }
 
     inversed = {
         idaapi.ITP_BLOCK1: 'above',
-        idaapi.ITP_CURLY1: 'block-open',
-        idaapi.ITP_CURLY2: 'block-close',
-        idaapi.ITP_DO: 'do-while',
+        idaapi.ITP_CURLY1: 'open',
+        idaapi.ITP_CURLY2: 'close',
+        idaapi.ITP_DO: 'do',
         idaapi.ITP_SEMI: 'after',
         idaapi.ITP_BRACE2: 'after',
         idaapi.ITP_BLOCK2: 'after',
@@ -1718,7 +1738,7 @@ class preciser(object):
     @classmethod
     def resolve(cls, cfunc, item, location='above'):
         '''Return the first ancestor containing an address for the specified `item` from the decompiled function `cfunc`.'''
-        where, length = location.lower() if isinstance(location, types.string) else location, cfunc.treeitems.size()
+        where, length = cls.aliases.get(location.lower(), location.lower()) if isinstance(location, types.string) else location, cfunc.treeitems.size()
         if isinstance(item, idaapi.citem_t):
             citem = item
         elif isinstance(item, types.integer) and 0 <= item < length:
@@ -1806,7 +1826,7 @@ class preciser(object):
             return cfunc.treeitems[res].ea, idaapi.ITP_BLOCK1
 
         # for a switch, we need to get the address of the right expression.
-        elif where in {'block-open', 'block-close'} and citem.op != idaapi.cit_block:
+        elif where in {'open', 'close'} and citem.op != idaapi.cit_block:
             body = None
             if citem.op == idaapi.cit_if:
                 body = citem.cinsn.cif.ithen
