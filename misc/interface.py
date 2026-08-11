@@ -14795,9 +14795,9 @@ class name(object):
 
     @classmethod
     @contextlib.contextmanager
-    def prototype(cls, type, *library, **names):
-        '''Return a context manager that renames the parameters of the function `type` with some temporary `names` and yields the type and names.'''
-        Funique_name = internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}".format, 'prototype_parameter'))
+    def fields(cls, type, *library, **names):
+        '''Return a context manager that renames the fields of the specified `type` with some temporary `names` and yields the new type with its field names.'''
+        Funique_name = internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}".format, 'field_name'))
         til, suggested = library if library else tinfo.library(), [name for name in names.get('names', [])]
 
         # if we got an integer, then we need to determine if it's an ordinal or
@@ -14808,10 +14808,8 @@ class name(object):
         elif isinstance(type, internal.types.integer) and 0 < type < tinfo.quantity():
             serialized = cls.get_numbered_type(til, type)
             ti = tinfo.get(til, *serialized)
-        elif isinstance(type, idaapi.tinfo_t) and (type.is_func() or type.is_funcptr() or tinfo.resolve(type).is_func()):
-            ti = tinfo.copy(type)
         elif isinstance(type, idaapi.tinfo_t):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.prototype({!r}{:s}) : Unable to get the parameters for the specified type due to it not being a prototype.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else ''))
+            ti = tinfo.copy(type)
         elif isinstance(type, internal.types.integer):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.prototype({!s}{:s}) : Unable to locate the type using the specified {:s} ({!s}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', 'identifier' if node.identifier(type) else 'ordinal', "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type)))
         else:
