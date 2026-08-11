@@ -2791,6 +2791,23 @@ class hexfunction(object):
             ea, label = ea_label
             decoded.setdefault('__label__', label) if ea == treeloc.ea else decoded
 
+        # Check if the tagindex matches the tags that we decoded from the
+        # comment for the location. If they do, then we have a result to return.
+        expected = reference.hexfunction.get((treeloc.ea, treeloc.itp & 0xFFFFFFFF))
+        available = {key for key in decoded} if reference == reference_v1 else {key for key in []}
+        if expected == available:
+            return decoded
+
+        # FIXME: this is probably not the greatest place to do this, and as
+        #        such we should probably track down in hexrays to confirm
+        #        why we get stale tag information. we might need to do some
+        #        kind of synchronous update when we apply or clear comments.
+
+        # Otherwise, we need to fix the reference counts for the location. We
+        # start by removing the ones that definitely do not exist. Afterwards,
+        # we increment the tag names that don't exist yet.
+        [reference.hexfunction.decrement((treeloc.ea, treeloc.itp), name) for name in expected - available]
+        [reference.hexfunction.increment((treeloc.ea, treeloc.itp), name) for name in available - expected]
         return decoded
 
     @classmethod
