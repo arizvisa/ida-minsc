@@ -432,6 +432,11 @@ class information(object):
         _, uval = asize_t.assign(RIDX_SHA256), asize_t.value()
         return internal.netnode.sup.get(root, uval, type=memoryview).tobytes()
 
+    @classmethod
+    def tags(cls):
+        '''Return all of the tags from all of the available domains in the database.'''
+        return internal.tags.reference.tags.name()
+
 config = info = information # XXX: ns alias
 
 range = utils.alias(information.bounds, 'information')
