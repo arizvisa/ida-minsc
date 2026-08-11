@@ -2951,7 +2951,7 @@ class hexvariable(object):
         # now we can get the function from the parameters, and then use the
         # locator to grab the comment for the variable and decode it.
         cfunc = internal.hexrays.function(func)
-        cmt = internal.hexrays.variable.get_comment(cfunc, locator)
+        cmt = internal.hexrays.variable.get_comment(cfunc, locator) if internal.hexrays.variables.has(cfunc, locator) else ''
         decoded = comment.decode(cmt)
 
         # now all we need to do is to add the implicit tags here. all of this
@@ -2973,8 +2973,22 @@ class hexvariable(object):
             typeinfo_string = idaapi.print_tinfo('', 0, 0, 0, typeinfo, validname, '')
             decoded.setdefault('__typeinfo__', typeinfo_string)
 
-        # that should be everything, so all we need to do now is to return the
-        # modified dictionary.
+        # use the function and locator to get the expected variable tags and
+        # verify that they match before returning the resulting dictionary.
+        expected = reference.hexvariable.get(locator, target=cfunc)
+        available = {key for key in decoded} if reference == reference_v1 else {key for key in []}
+        if expected == available:
+            return decoded
+
+        # FIXME: this is probably not the greatest place to do this, and as
+        #        such we should probably figure out a way to identify when a
+        #        variable locator has gone stale due to a decompilation.
+
+        # if they were different, then we have some reference counts to fix. we
+        # remove the ones that don't exist, and increment the ones that were
+        # just added to the variable.
+        [reference.hexvariable.decrement(locator, name, target=cfunc) for name in expected - available]
+        [reference.hexvariable.increment(locator, name, target=cfunc) for name in available - expected]
         return decoded
 
     @classmethod
