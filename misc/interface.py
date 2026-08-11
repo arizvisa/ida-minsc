@@ -14796,9 +14796,9 @@ class name(object):
     @classmethod
     @contextlib.contextmanager
     def prototype(cls, type, *library, **names):
-        '''Return a context manager that renames the parameters of the function `type` using `names``, the function with a temporary `name` and yields it.'''
+        '''Return a context manager that renames the parameters of the function `type` with some temporary `names` and yields the type and names.'''
         Funique_name = internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}".format, 'prototype_parameter'))
-        til, suggested, utils = library if library else tinfo.library(), names.get('names'), internal.utils
+        til, suggested = library if library else tinfo.library(), [name for name in names.get('names', [])]
 
         # if we got an integer, then we need to determine if it's an ordinal or
         # an identifier so that we can assign it to our type.
@@ -14817,119 +14817,142 @@ class name(object):
         else:
             raise internal.exceptions.InvalidParameterError(u"{:s}.prototype({!r}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', type.__class__))
 
-        # now that we got a valid prototype, we need to recursively count the
-        # number of parameters for the names that we will be replacing. we also
-        # store the indices for structures so that we can correct the name
-        # ordering later.
-        push = utils.fcompose(utils.fgetattr('append'), utils.fpartial(utils.fpartial, getattr(operator, 'call', lambda F, *a, **k: F(*a, **k))))
-        count, queue, sizes = 0, [(0, ti)], {}
+        # define a handful of closures that we will use later in the function.
+        def reduce(ti):
+            '''Dereference or demote any pointers or arrays to their base type.'''
+            while ti.is_ptr() or ti.is_array():
+                if ti.is_array():
+                    ti, _ = tinfo.array(ti)
+                    continue
+                elif not ti.is_ptr():
+                    break
+                res = ti.get_pointed_object()
+                if res is None:
+                    break
+                ti = res
+            return ti
 
-        # consume the name index and parameter type from the queue so that we
-        # can recursively count the potential parameter names it may contain.
-        while queue:
-            index, next_t = queue.pop()
+        # define a closure for registering slots into the "slotnames" dict.
+        slotnames = {}
+        def slot(name, ti, path):
+            '''Record the `path` for the specified `name` and typed with `ti`.'''
+            slotnames[path] = name
+            iterable = itertools.chain([path], children(ti, path))
+            return [item for item in iterable]
 
-            # if the popped element from the queue is a function pointer, then
-            # we need to process the multiple names belonging to the element.
-            if next_t.is_func() or next_t.is_funcptr() or tinfo.resolve(next_t).is_func():
-                counter = 0
+        # define a closure for recursively walking through the subtypes that 
+        # compose a type sequentially, and registering the name in "slotnames".
+        def children(ti, path):
+            '''Walk through the subtypes that compose the type specified by `ti` in sequential order.'''
+            result, reduced = [], reduce(ti)
+            if reduced.has_details() and any([reduced.is_func() or reduced.is_funcptr()]):
+                iterable = (name for name in tinfo.function(reduced))
+                returned, parameters = next(iterable), iterable
+                for index, (aname, atype, astorage) in enumerate(parameters):
+                    iterable = itertools.chain(path, ['arg', index])
+                    result.extend(slot(aname, atype, tuple(iterable)))
+                _, atype, _ = returned
+                return result + children(atype, path + ('ret',))
+            elif reduced.get_type_name():
+                pass
+            elif reduced.is_udt() and reduced.has_details():
+                for index, member in enumerate(tinfo.members(reduced)):
+                    mname, moffset, msize, mtype, malign = member
+                    iterable = itertools.chain(path, ['mem', index])
+                    result.extend(slot(mname, mtype, tuple(iterable)))
+                pass
+            elif reduced.is_enum():
+                for index, member in enumerate(tinfo.members(reduced)):
+                    mname, moffset, msize, mtype, malign = member
+                    iterable = itertools.chain(path, ['enum', index])
+                    identity = tuple(iterable)
+                    slotnames[identity] = mname
+                    result.append(identity)
+                pass
+            return result
 
-                # iterate through all of the function parameters while looking
-                # for certain types. if the parameter is a typedef, then its
-                # type doesn't matter and it only has one name.
-                for aname, atype, astorage in tinfo.function(next_t)[1:]:
-                    if atype.is_typeref():
-                        pass
+        # define a closure for returning both sides of the specified path.
+        def spiral(ti, path):
+            '''Spiral out...keep going...spiral out...keep.. going.'''
+            if ti.is_ptr():
+                pointed = ti.get_pointed_object()
+                return spiral(pointed, path) if pointed else ([], [])
 
-                    # if the parameter is a function prototype of some sort,
-                    # then queue it up, and adjust our index using the number of
-                    # parameters that the prototype uses.
-                    elif atype.is_func() or atype.is_funcptr() or tinfo.resolve(atype).is_func():
-                        push(queue)((index, atype))
-                        _, ftd = tinfo.prototype_details(atype)
-                        index += ftd.size()
+            # if we got an array, gather its element type and try again.
+            elif ti.is_array():
+                element, _ = tinfo.array(ti)
+                return spiral(element, path)
 
-                    # if the parameter is a structure, then we queue it up and
-                    # adjust our index for the number of fields. we also store
-                    # the current index and size to fix the name ordering later.
-                    elif atype.is_udt() or tinfo.resolve(atype).is_udt():
-                        push(queue)((index, atype))
-                        utd = idaapi.udt_type_data_t()
-                        if not atype.get_udt_details(utd):
-                            raise internal.exceptions.InvalidParameterError(u"{:s}.prototype({!r}{:s}) : Unable to get the udt type data from the parameter type ({!r}) in {!s}.".format('.'.join([__name__, cls.__name__]), "{!r}".format("{!s}".format(type)) if isinstance(type, idaapi.tinfo_t) else "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', "{!s}".format(atype), tinfo.quoted(next_t)))
-                        sizes[index], index = utd.size(), index + utd.size()
+            # if it was a function pointer, then grab its result type first.
+            # after that has been accomplished, we shuffle the names and types
+            # into the parameters, and then return both sides of the type.
+            elif ti.has_details() and any([ti.is_func(), ti.is_funcptr()]):
+                res, iterable = [], (parameter for parameter in tinfo.function(ti))
+                (_, type, _) = next(iterable)
+                for index, (aname, atype, astorage) in enumerate(iterable):
+                    iterable = itertools.chain(path, ['arg', index])
+                    identity = tuple(iterable)
+                    slotnames[identity] = aname
+                    left, remaining = spiral(atype, identity)
+                    iterable = itertools.chain(left, [identity], remaining)
+                    res.extend(iterable)
+                left, right = spiral(type, path + ('ret',))
+                return left, res + right
 
-                    # adjust the index by adding one for the prototype parameter
-                    # name. we also update our counter for each function
-                    # parameter we've tallied up.
-                    counter, index = counter + 1, index + 1
+            # if this has a type name, then the whole type is replaced with it.
+            elif ti.get_type_name():
+                pass
 
-                # update the total count using the internally scoped counter.
-                count += counter
+            # otherwise, this is an anonymous structure and we need to copy all
+            # of the members sequentially into our result.
+            elif ti.has_details() and ti.is_udt():
+                res = []
+                for index, member in enumerate(tinfo.members(ti)):
+                    mname, moffset, msize, mtype, malign = member
+                    iterable = itertools.chain(path, ['mem', index])
+                    identity = tuple(iterable)
+                    slotnames[identity] = mname
+                    left, right = spiral(mtype, identity)
+                    iterable = itertools.chain(left, [identity], right)
+                    res.extend(iterable)
+                return res, []
 
-            # if the element we popped from the queue is a structure, then we
-            # will need to process all of its fields and their types.
-            elif next_t.is_udt() or tinfo.resolve(next_t).is_udt():
-                counter = 0
+            # if it is an anonymous enumeration, then there's no need to descend
+            # into it. basically, we do the same thing that we do for members.
+            elif ti.is_enum():
+                res = []
+                for index, member in enumerate(tinfo.members(ti)):
+                    mname, moffset, msize, mtype, malign = member
+                    iterable = itertools.chain(path, ['enum', index])
+                    identity = tuple(iterable)
+                    slotnames[identity] = mname
+                    res.append(identity)
+                return res, []
+            return [], []
 
-                # iterate through all of the structure fields while looking for
-                # specific types. if the field is a typedef, then its type does
-                # not matter at all since it has only one field name anyways.
-                for mname, moffset, msize, mtype, malign in tinfo.members(next_t):
-                    if mtype.is_typeref():
-                        pass
+        # use our closures to gather the children names in serial order, and
+        # then we use another closure to gather the names in read order. 
+        ids = children(ti, ('root',))
+        left, right = spiral(ti, ('root',))
+        peelids, count = left + right, len(ids)
 
-                    # if the field is a function prototype, then queue it up
-                    # while adjusting our index for the number of parameters.
-                    elif mtype.is_func() or mtype.is_funcptr() or tinfo.resolve(mtype).is_func():
-                        push(queue)((index, mtype))
-                        _, ftd = tinfo.prototype_details(mtype)
-                        index += ftd.size()
+        # grab the peeled names from our slots, and use them to generate unique
+        # names. then we can slice the names up to the number of names.
+        # FIXME: i think the order of the unique names does not adjust the index
+        #        to generate a hash in order ot produce a unique name.
+        peeled = [slotnames[identity] for identity in peelids]
+        iterable = itertools.chain([name for name in suggested][:count], [Funique_name(indexed_name) for indexed_name in enumerate(peeled)])
+        newnames = [name for name in itertools.islice(iterable, count)]
 
-                    # if the field is a structure, then queue it up and adjust
-                    # the index by the number of fields. since the names order
-                    # is shuffled, we store the index and its field count.
-                    elif mtype.is_udt() or tinfo.resolve(mtype).is_udt():
-                        push(queue)((index, mtype))
-                        utd = idaapi.udt_type_data_t()
-                        if not atype.get_udt_details(utd):
-                            raise internal.exceptions.InvalidParameterError(u"{:s}.prototype({!s}{:s}) : Unable to get the udt type data for the field type ({!r}) in {!s}.".format('.'.join([__name__, cls.__name__]), "{!r}".format("{!s}".format(type)) if isinstance(type, idaapi.tinfo_t) else "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', "{!s}".format(mtype), tinfo.quoted(next_t)))
-                        sizes[index], index = utd.size(), index + utd.size()
-
-                    # finally we can adjust the index by adding one for the
-                    # field name. since we're tallying up all the names, we
-                    # update our counter for each field that we process.
-                    counter, index = counter + 1, index + 1
-
-                # adjust the total count for the number of names we processed.
-                count += counter
-
-            # if we queued up an unsupported type, then we throw up an error.
-            else:
-                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.prototype({!s}{:s}) : Unable to count the names for an unsupported type {!s}.".format('.'.join([__name__, cls.__name__]), "{!r}".format("{!s}".format(type)) if isinstance(type, idaapi.tinfo_t) else "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', tinfo.quoted(next_t)))
-            continue
-
-        # next we can update the names of the parameters to whatever the caller
-        # gave us, or something that we can guarantee as being unique.
-        iterable = itertools.chain(tinfo.names(ti), [''] * count)
-        oldnames = [name for name in itertools.islice(iterable, count)]
-        newnames = [Funique_name(indexed_name) for indexed_name in enumerate(oldnames)] if suggested is None else [name for name in suggested][:count]
-
-        # make a copy of the new names so that we can reorder the names that are
-        # related to a structure type. this is because the name for a structure
-        # type comes at the end, rather than being at the first index.
-        reordered = newnames[:]
-        for index, length in sizes.items():
-            fields = newnames[index : 1 + index + length]
-            reordered[index : 1 + index + length] = fields[-1:] + fields[:-1]
-
-        # apply the names that we reordered due to the shuffling of field names
-        # and the parameter for a structure, and apply them to the type. we also
-        # return the applied names in order from left to right.
+        # now we build a map for getting an index for a member identity, and
+        # then we can use it as an index for the new names we were given.
+        rank = {identity: index for index, identity in enumerate(peelids)}
+        reordered = [newnames[rank[identity]] for identity in ids]
         try:
             yield tinfo.names(ti, reordered), newnames
         finally:
-            logging.debug(u"{:s}.prototype({!s}{:s}) : Finished renaming the parameters for the given type from the original names ({!r}) to the {:s} names ({!r}).".format('.'.join([__name__, cls.__name__]), "{!r}".format("{!s}".format(type)) if isinstance(type, idaapi.tinfo_t) else "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', oldnames, 'specified' if suggested else 'unique', newnames))
+            original = [name for name in itertools.islice(itertools.chain(tinfo.names(ti), [''] * count), count)]
+            logging.debug(u"{:s}.prototype({!s}{:s}) : Finished renaming the parameters for the given type from the original names ({!r}) to the {:s} names ({!r}).".format('.'.join([__name__, cls.__name__]), "{!r}".format("{!s}".format(type)) if isinstance(type, idaapi.tinfo_t) else "{:#x}".format(type) if node.identifier(type) else "{:d}".format(type), ", {!s}".format(internal.utils.string.kwargs(names)) if names else '', original, 'specified' if suggested else 'unique', newnames))
         return
 
     @classmethod
