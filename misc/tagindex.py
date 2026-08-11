@@ -3090,7 +3090,10 @@ class hexvariable(counted):
         # if our argument represents a valid variable type, then use it to get a
         # variable and then unpack its locator information to get the address.
         elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
-            locator = internal.hexrays.variables.by(arg)
+            if internal.hexrays.variables.has(arg):
+                locator = internal.hexrays.variables.by(arg)
+            elif isinstance(arg, internal.hexrays.ida_hexrays_types.lvar_locator_t):
+                locator = arg
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
             func = defea
 
