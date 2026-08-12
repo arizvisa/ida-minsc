@@ -7318,6 +7318,31 @@ class structure_t(object):
     def members(self):
         '''Return the members belonging to the structure.'''
         return self.__members__
+    @members.setter
+    def members(self, items):
+        '''Assign the specified list of `items` as a slice to the structure.'''
+        cls, owner, sid = self.__class__, self.ptr, self.id
+        if not isinstance(items, (internal.types.list, members_t)):
+            raise E.InvalidParameterError(u"{:s}({:#x}).members({!s}) : Unable to assign the specified parameter to the members due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), sid, "{:#x}".format(items.owner.id) if isinstance(items, members_t) else "{!r}".format(items), items.__class__))
+        else:
+            items = items[:]
+
+        # Start out by figuring out how many elements we currently contain so
+        # that we can make a slice object containing all of the members.
+        count = v9members.count(owner) if isinstance(owner, idaapi.tinfo_t) else members.count(owner)
+        index, offset = slice(0, count), self.offset
+
+        # If the structure is a type, then we need to use the v9 namespace.
+        if isinstance(owner, idaapi.tinfo_t):
+            removed = v9members.layout_setslice(owner, index, items, 8 * offset)
+            iterable = ((mname, mtype, mbitlocation, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo, mcomments in removed)
+            iterable = ((mname, isinstance(mtype, structure_t), mtype, (mbitlocation - base) / 8 + base, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo in iterable)
+            iterable = ((mname, mtype - mtype.offset + int(mlocation) if is_structure else mtype, mlocation, mtypeinfo) for mname, is_structure, mtype, mlocation, mtypeinfo in iterable)
+            return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo in iterable]
+
+        # Otherwise we can use the old namespace to slice-assign the members.
+        removed = members.layout_setslice(owner, index, items, offset)
+        return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo, mcomments in removed]
 
     @property
     def name(self):
