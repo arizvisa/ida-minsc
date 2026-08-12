@@ -1625,8 +1625,9 @@ class variable(object):
         return False
 
     @classmethod
-    def has_user_type(cls, func, variable, *type):
-        '''Return whether the type of the variable identified by the given `args` is potentially user-specified.'''
+    def has_user_type(cls, function, variable, *type):
+        '''Return whether the `type` for the specified `variable` from the decompiled `function` is potentially user-specified.'''
+
         # XXX: the purpose of this function is to attempt to determine whether
         #      the variable type or the specified type was set by something
         #      other than the decompiler. we need this only because the
@@ -1646,8 +1647,11 @@ class variable(object):
         #        variable's type. that is pretty much why this function takes a
         #        full function and variable pair to work with.
 
+        # use the function and locator to get the variable and its indexed tags.
+        lvar = variables.get(function, locator)
+        available = internal.tags.reference.hexvariable.get(locator, target=function)
+
         # if the `lvar_t.has_user_type` property is set, then we're good to go.
-        lvar = variables.get(func, locator)
         if lvar.has_user_type:
             return True
 
