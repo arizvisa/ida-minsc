@@ -1597,6 +1597,34 @@ class variable(object):
         return result
 
     @classmethod
+    def has_user_name(cls, function, variable, *name):
+        '''Return whether the `name` of the specified `variable` from the decompiled `function` is potentially user-specified.'''
+
+        # FIXME: the detection of a user-specified variable name can be
+        #        vastly-improved. this is because the `lvar_t.has_user_name`
+        #        attribute is always set if the user touched it. unfortunately
+        #        this means there is no way to revert the name back to normal.
+
+        # if it's a variable identity, then convert it back into a var locator.
+        if isinstance(variable, internal.types.tuple):
+            defea, atype, alocinfo = variable
+            locator = internal.hexrays.variable.new_locator(defea, internal.hexrays.variable.copy_vdloc(atype, alocinfo))
+        else:
+            locator = variable
+
+        # use the function and locator to get the variable and any indexed tags.
+        lvar = variables.get(function, locator)
+        available = internal.tags.reference.hexvariable.get(locator, target=function)
+
+        # if the `lvar_t.has_user_name` property is set, then we're good to go.
+        if lvar.has_user_name:
+            return True
+
+        # FIXME: we need a way to check if the name returned is default or not.
+        [realname] = name if name else utils.string.of(lvar.name)
+        return False
+
+    @classmethod
     def has_user_type(cls, func, variable, *type):
         '''Return whether the type of the variable identified by the given `args` is potentially user-specified.'''
         # XXX: the purpose of this function is to attempt to determine whether
