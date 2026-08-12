@@ -454,6 +454,15 @@ class architecture_t(object):
             raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to demote the specified register ({!s}) to a size smaller than {!r}.".format('.'.join([cls.__module__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), register, register))
         raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to demote {!r}.".format('.'.join([cls.__module__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), bits, register))
 
+    def select(self, register, *bits):
+        '''Return the specified `register` selected at the size specified by `bits`.'''
+        [res] = bits if bits else [register.bits]
+        if res < register.bits:
+            return self.demote(register, res)
+        elif res > register.bits:
+            return self.promote(register, res)
+        return self.by(register, register.size)
+
 ## Hex-Rays (decompiler) architecture
 try:
     import ida_hexrays
