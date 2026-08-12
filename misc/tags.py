@@ -2899,15 +2899,27 @@ class hexfunction(object):
 
         # decode the comment and check the key to remove actually exists.
         decoded = comment.decode(usercmt)
-        if key not in decoded:
-            raise internal.exceptions.MissingTagError(u"{:s}({:#x}, {:d}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the decompiler address {:#x}/{:d}.".format('.'.join([__name__, cls.__name__]), treeloc.ea, treeloc.itp, key, none, utils.string.escape(key, '"'), treeloc.ea, treeloc.itp))
 
-        # now we can just remove the key from the dictionary and update the old
-        # comment at the specified location with the new encoded dictionary.
+        # now we need to check if the key has gone stale or anything. if the key
+        # doesn't exist in the index or the dictionary, then we can abort it.
+        expected = reference.hexfunction.get((treeloc.ea, treeloc.itp & 0xFFFFFFFF))
+        available = {key for key in decoded} if reference == reference_v1 else {key for key in []}
+        if key not in (expected | available):
+            raise internal.exceptions.MissingTagError(u"{:s}({:#x}, {:d}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the decompiler address {:#x}/{:d}.".format('.'.join([__name__, cls.__name__]), treeloc.ea, treeloc.itp, key, none, utils.string.escape(key, '"'), treeloc.ea, treeloc.itp))
         res = decoded.pop(key)
-        encoded = comment.encode(decoded)
-        cfunc.set_user_cmt(treeloc, encoded)
-        cfunc.save_user_cmts()
+
+        # if the key is in both, then we just update the comment, and let the
+        # event take care of updating the index when we set the new comment.
+        if key in (expected & available):
+            encoded = comment.encode(decoded)
+            cfunc.set_user_cmt(treeloc, encoded)
+            cfunc.save_user_cmts()
+
+        # if the key is only in the index, then we need to fix the reference
+        # counts for it so that select won't return the location again.
+        elif key in expected:
+            [reference.hexfunction.decrement((treeloc.ea, treeloc.itp), name) for name in expected - available]
+            [reference.hexfunction.increment((treeloc.ea, treeloc.itp), name) for name in available - expected]
         return res
 
 class hexvariable(object):
