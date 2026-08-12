@@ -31,17 +31,17 @@ class Intel(internal.architecture.architecture_t):
         i2s = "{:d}".format
         Fidaname = lambda idaname, available={name for name in idaapi.ph_get_regnames()}: {'idaname': idaname} if idaname in available else {}
 
-        [ setitem('r'+_, self.new('r'+_, 64, _)) for _ in ('ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip') ]
-        [ setitem('r'+_, self.new('r'+_, 64)) for _ in map(i2s, range(8, 16)) ]
+        [ setitem('r'+_, self.new('r'+_, 64, idaname=_)) for _ in ('ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip') ]
+        [ setitem('r'+_, self.new('r'+_, 64, idaname='r'+_)) for _ in map(i2s, range(8, 16)) ]
         [ setitem('e'+_, self.child(self.by_name('r'+_), 'e'+_, 0, 32, _)) for _ in ('ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip') ]
         [ setitem('r'+_+'d', self.child(self.by_name('r'+_), 'r'+_+'d', 0, 32, idaname='r'+_)) for _ in map(i2s, range(8, 16)) ]
         [ setitem('r'+_+'w', self.child(self.by_name('r'+_+'d'), 'r'+_+'w', 0, 16, idaname='r'+_)) for _ in map(i2s, range(8, 16)) ]
         [ setitem('r'+_+'b', self.child(self.by_name('r'+_+'w'), 'r'+_+'b', 0, 8, idaname='r'+_)) for _ in map(i2s, range(8, 16)) ]
-        [ setitem(    _, self.child(self.by_name('e'+_), _, 0, 16)) for _ in ('ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip') ]
+        [ setitem(    _, self.child(self.by_name('e'+_), _, 0, 16, idaname=_)) for _ in ('ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip') ]
         [ setitem(_+'h', self.child(self.by_name(_+'x'), _+'h', 8, 8, idaname=_+'h')) for _ in ('a', 'c', 'd', 'b') ]
         [ setitem(_+'l', self.child(self.by_name(_+'x'), _+'l', 0, 8, idaname=_+'l')) for _ in ('a', 'c', 'd', 'b') ]
         [ setitem(_+'l', self.child(self.by_name(_), _+'l', 0, 8, idaname=_+'l')) for _ in ('sp', 'bp', 'si', 'di') ]
-        [ setitem(    _, self.new(_, 16)) for _ in ('es', 'cs', 'ss', 'ds', 'fs', 'gs') ]
+        [ setitem(    _, self.new(_, 16, idaname=_)) for _ in ('es', 'cs', 'ss', 'ds', 'fs', 'gs') ]
 
         # FIXME: rex-prefixed 32-bit registers are implicitly extended to the 64-bit regs which implies that 64-bit are children of 32-bit
         for _ in ['ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip']:
@@ -56,29 +56,29 @@ class Intel(internal.architecture.architecture_t):
 
         setitem('fpstack', self.new('fpstack', 80*8, dtype=None))
         # umm..80-bit precision? i've seen op_t's in ida for fsubp with the implied st(0) using idaapi.dt_tbyte
-        [ setitem("st{:d}".format(_), self.child(self.by_name('fpstack'), "st{:d}".format(_), _*80, 80, dtype=idaapi.dt_packreal, ptype=types.float)) for _ in range(8) ]
+        [ setitem("st{:d}".format(_), self.child(self.by_name('fpstack'), "st{:d}".format(_), _*80, 80, idaname="st{:d}".format(_), dtype=idaapi.dt_packreal, ptype=types.float)) for _ in range(8) ]
         # double precision
-        [ setitem("st{:d}d".format(_), self.child(self.by_name("st{:d}".format(_)), "st{:d}d".format(_), 0, 64, dtype=idaapi.dt_double, ptype=types.float)) for _ in range(8) ]
+        [ setitem("st{:d}d".format(_), self.child(self.by_name("st{:d}".format(_)), "st{:d}d".format(_), 0, 64, idaname="st{:d}".format(_), dtype=idaapi.dt_double, ptype=types.float)) for _ in range(8) ]
         # single precision
-        [ setitem("st{:d}f".format(_), self.child(self.by_name("st{:d}d".format(_)), "st{:d}f".format(_), 0, 32, dtype=idaapi.dt_float, ptype=types.float)) for _ in range(8) ]
+        [ setitem("st{:d}f".format(_), self.child(self.by_name("st{:d}d".format(_)), "st{:d}f".format(_), 0, 32, idaname="st{:d}".format(_), dtype=idaapi.dt_float, ptype=types.float)) for _ in range(8) ]
         # half precision
-        [ setitem("st{:d}h".format(_), self.child(self.by_name("st{:d}f".format(_)), "st{:d}h".format(_), 0, 16, dtype=getattr(idaapi, 'dt_half', idaapi.dt_word), ptype=types.float)) for _ in range(8) ]
+        [ setitem("st{:d}h".format(_), self.child(self.by_name("st{:d}f".format(_)), "st{:d}h".format(_), 0, 16, idaname="st{:d}".format(_), dtype=getattr(idaapi, 'dt_half', idaapi.dt_word), ptype=types.float)) for _ in range(8) ]
 
         # not sure if the mmx registers trash the other 16 bits of an fp register
         [ setitem("mm{:d}u".format(_), self.child(self.by_name('fpstack'), "mm{:d}u".format(_), _*80, 80, dtype=idaapi.dt_tbyte)) for _ in range(8) ]
         [ setitem("mm{:d}".format(_), self.child(self.by_name("mm{:d}u".format(_)), "mm{:d}".format(_), 0, 64, "mm{:d}".format(_), dtype=idaapi.dt_qword)) for _ in range(8) ]
 
         # sse1/sse2 simd registers
-        [ setitem("zmm{:d}".format(_), self.new("zmm{:d}".format(_), 512, dtype=idaapi.dt_byte64, ptype=types.float)) for _ in range(32) ]
-        [ setitem("ymm{:d}".format(_), self.child(self.by_name("zmm{:d}".format(_)), "ymm{:d}".format(_), 0, 256, dtype=idaapi.dt_byte32, ptype=types.float)) for _ in range(32) ]
-        [ setitem("xmm{:d}".format(_), self.child(self.by_name("ymm{:d}".format(_)), "xmm{:d}".format(_), 0, 128, dtype=idaapi.dt_byte16, ptype=types.float)) for _ in range(32) ]
+        [ setitem("zmm{:d}".format(_), self.new("zmm{:d}".format(_), 512, idaname="zmm{:d}".format(_), dtype=idaapi.dt_byte64, ptype=types.float)) for _ in range(32) ]
+        [ setitem("ymm{:d}".format(_), self.child(self.by_name("zmm{:d}".format(_)), "ymm{:d}".format(_), 0, 256, idaname="ymm{:d}".format(_), dtype=idaapi.dt_byte32, ptype=types.float)) for _ in range(32) ]
+        [ setitem("xmm{:d}".format(_), self.child(self.by_name("ymm{:d}".format(_)), "xmm{:d}".format(_), 0, 128, idaname="xmm{:d}".format(_), dtype=idaapi.dt_byte16, ptype=types.float)) for _ in range(32) ]
 
         # control registers (32-bit and 64-bit)
         [ setitem("cr{:d}".format(_), self.new("cr{:d}".format(_), database.config.bits())) for _ in range(0, 8) ]
         [ setitem("cr{:d}".format(_), self.new("cr{:d}".format(_), database.config.bits())) for _ in range(8, 16) ]
 
         # kr registers
-        [ setitem("k{:d}".format(_), self.new("k{:d}".format(_), database.config.bits())) for _ in range(8) ]
+        [ setitem("k{:d}".format(_), self.new("k{:d}".format(_), database.config.bits(), idaname="k{:d}".format(_))) for _ in range(8) ]
 
         # 64-bit flags
         setitem('rflags', self.new('rflags', 64))
@@ -167,7 +167,7 @@ class Intel(internal.architecture.architecture_t):
         setitem('mxcsr_rc',  self.child(self.by_name('fpcr'), 'mxcsr.rc', 13,  2))  # rounding control
         setitem('mxcsr_fz',  self.child(self.by_name('fpcr'), 'mxcsr.fz', 15,  1))  # flush-zero
 
-        [ setitem("bnd{:d}".format(_), self.new("bnd{:d}".format(_), 128)) for _ in range(4) ]
+        [ setitem("bnd{:d}".format(_), self.new("bnd{:d}".format(_), 128, idaname="bnd{:d}".format(_))) for _ in range(4) ]
 
     def by_float(self, index):
         '''Return the desired floating-point stack register by the specified `index`.'''
