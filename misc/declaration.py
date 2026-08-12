@@ -1853,14 +1853,14 @@ class preciser(object):
         return citem.ea, cls.fixed[where]
 
     @classmethod
-    def contained(cls, intervals, ea):
+    def contained(cls, cfunc, intervals, ea):
         '''Return the index of the item from `intervals` that contains the address specified by `ea`.'''
         Fstart = lambda key: (lambda bounds, index: bounds.left)(*key)
         index = bisect.bisect_right(intervals, ea, key=Fstart)  # FIXME: Py3-only.
-        covering = [((start, -stop), res) for (start, stop), res in itertools.islice(intervals, 0, index) if start <= ea < stop]
+        covering = [((start, -stop), (1 if cfunc.treeitems[res].ea == ea else 0), res) for (start, stop), res in itertools.islice(intervals, 0, index) if start <= ea < stop]
         if not covering:
             return None
-        _, res = max(covering)
+        _, _, res = max(covering)
         return res
 
     @classmethod
@@ -1902,7 +1902,7 @@ class preciser(object):
         intervals = internal.hexrays.function.intervals(cfunc)
         if not intervals:
             raise internal.exceptions.DecompilerError(u"{:s}.where({:#x}, {:#x}, {:d}) : Could not return the instruction boundaries from the decompiled function {:#x}.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, ea, itp, cfunc.entry_ea))
-        index = cls.contained(intervals, ea)
+        index = cls.contained(cfunc, intervals, ea)
         if index is None:
             index = cls.nearest(intervals, ea)
         if itp in cls.inversed:
@@ -1925,13 +1925,16 @@ class preciser(object):
         def rank(index):
             '''Return the ranking of the ``ida_hexrays.citem_t`` at the specified `index`.'''
             citem = cfunc.treeitems[index]
+            exact = 1 if citem.ea == ea else 0
             if is_case:
-                return 2 if citem.op == idaapi.cit_switch else 0
+                base = 2 if citem.op == idaapi.cit_switch else 0
             elif is_arg and citem.op == idaapi.cot_call:
-                return 2
+                base = 2
             elif is_arg:
-                return 1 if citem.is_expr() else 0
-            return 0 if citem.is_expr() else 2
+                base = 1 if citem.is_expr() else 0
+            else:
+                base = 0 if citem.is_expr() else 2
+            return exact, base
 
         # If it's not an argument, then go ahead and try getting the treeitem
         # index for the address we were given directly.
