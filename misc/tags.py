@@ -2990,8 +2990,7 @@ class hexvariable(object):
 
         # when processing the name, we need to distinguish whether there's a
         # custom name applied or a regular name chosen by the decompiler.
-        lvar = internal.hexrays.variables.get(cfunc, locator)
-        if lvar.has_user_name:
+        if internal.hexrays.variable.has_user_name(cfunc, locator, name):
             decoded.setdefault('__name__', name)
 
         # when determining whether the type has a tag, we need to distinguish
