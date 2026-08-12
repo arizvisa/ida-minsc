@@ -1371,6 +1371,89 @@ class variable(object):
         return utils.string.of(lvar.name)
 
     @classmethod
+    def member_name(cls, *args):
+        '''Return the matching or default name (disassembler) for the variable identified by the given `args`.'''
+        fn = function(*args[:1]) if len(args) > 1 else None
+        locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
+
+        # validate the locator, then determine the function, then the variable.
+        if cls.has_location(locator):
+            cfunc = function(locator.defea) if fn is None else fn
+            lvar = variables.get(cfunc, locator)
+
+        # if it didn't validate, the locator was corrupted in some way.
+        else:
+            description = cls.repr_locator(locator)
+            raise exceptions.DecompilerError(u"{:s}.member_name({!s}{!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), description if fn is None else "{:#x}".format(fn.entry_ea), '' if fn is None else ", {:s}".format(description), idaapi.as_signed(locator.defea, interface.database.bits())))
+
+        # grab all information about the function containing the variable.
+        ea, locator = cfunc.entry_ea, cls.get_locator(lvar)
+        fn, frame = (F(ea) for F in [interface.function.by, interface.function.frame])
+
+        # get the frame type and use it to get the correct namespaces.
+        sptr = getattr(frame, 'ptr', frame)
+        nsmember = internal.structure.v9member if isinstance(sptr, idaapi.tinfo_t) else internal.structure.member
+        nsmembers = internal.structure.v9members if isinstance(sptr, idaapi.tinfo_t) else internal.structure.members
+        Fscale = functools.partial(operator.mul, 8 if isinstance(sptr, idaapi.tinfo_t) else 1)
+        specials = saved, returned = [' s', ' r'] if idaapi.__version__ < 8.5 else ['__saved_registers', '__return_address']
+
+        # grab the storage location for the variable. if it's a register, figure
+        # out whether its an arg or var and suffix its name with the register.
+        store = cls.get_storage(locator, lvar.width)
+        if not isinstance(store, interface.location_t):
+            res = 'arg' if lvar.is_arg_var else 'var', store.name
+            return interface.tuplename(*res)
+
+        # if it wasn't a register, then it's in the stack frame. so, we need to
+        # translate its offset to the frame member offset.
+        offset, size = store + fn.frsize + fn.frregs
+
+        # now we can use the offset to check for a frame member that overlaps
+        # the offset with size. if not, then use the offset to generate a name.
+        if not nsmembers.has_bounds(frame, *map(Fscale, [offset, offset + size])):
+            delta = fn.frregs
+            default = nsmember.default_name(frame, None, offset)
+            return default.replace(' ', '$') if default in specials else default
+
+        # otherwise, a member exists at the given offset of the frame and we can
+        # use our store location to gather valid member candidates for it.
+        iterable = nsmembers.at_bounds(frame, *map(Fscale, [offset, offset + size]))
+        candidates = [packed for packed in iterable]
+
+        # if there were no member candidates, then we have to do it ourselves.
+        if not candidates:
+            frameoffset = interface.function.frame_member_offset(fn, offset)
+            if offset < fn.frsize:
+                res = 'var', frameoffset
+            elif offset < fn.frsize + interface.function.frame_registers(fn):
+                res = [saved if offset < fn.frsize + fn.frregs else returned]
+            else:
+                res = 'arg', frameoffset
+            return interface.tuplename(*res)
+
+        # otherwise, a member exists at the given offset of the frame and we can
+        # use our location to snag its name, check the size, and apply it.
+        [(mowner, mindex, mptr)] = candidates[:1]
+
+        if isinstance(mowner, idaapi.tinfo_t):
+            fullname = internal.structure.v9member.fullname(mowner, mindex)
+            bits = internal.structure.v9member.size(mowner, mindex)
+            res, extra = divmod(bits, 8)
+        else:
+            fullname = internal.structure.member.fullname(mptr)
+            res, extra = internal.structure.member.size(mptr), 0
+
+        # if the size does not match the member then just log a warning.
+        size = res + 1 if extra else res
+        if size != store.size:
+            log.warning(u"{:s}.member_name({:#x}, {:s}) : The storage location {!s} for the variable named \"{:s}\" is not the same size ({:d}) as the frame member \"{:s}\" in the given function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), store, utils.string.escape(utils.string.of(lvar.name), '"'), size, utils.string.escape(fullname, '"'), ea))
+
+        # now we can go ahead and return the frame member name for the variable.
+        if isinstance(mowner, idaapi.tinfo_t):
+            return internal.structure.v9member.get_name(mowner, mindex)
+        return internal.structure.member.get_name(mptr)
+
+    @classmethod
     def remove_name(cls, *args):
         '''Remove the name from the variable identified by the given `args`.'''
         fn = function(*args[:1]) if len(args) > 1 else None
