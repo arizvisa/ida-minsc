@@ -3139,19 +3139,29 @@ class hexvariable(object):
         elif key == '__typeinfo__':
             return internal.hexrays.variable.remove_type(cfunc, locator)
 
-        # now we use the locator to get the command and decode it. before doing
-        # anything, though, we check that the tag exists in the decoded comment.
+        # now we use the locator to get the command and decode it.
         cmt = internal.hexrays.variable.get_comment(cfunc, locator)
         decoded = comment.decode(cmt)
-        if key not in decoded:
-            raise internal.exceptions.MissingTagError(u"{:s}({:#x}, {:d}, {!s}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the variable defined at {:#x} of the decompiled function {:#x}.".format('.'.join([__name__, cls.__name__]), defea, atype, alocinfo, key, none, utils.string.escape(key, '"'), defea, internal.hexrays.function(cfunc)))
 
-        # all that is left to do is to remove the key from the dictionary and
-        # update the old variable comment with the new encoded comment before
-        # returning the value of the key that was specified.
-        res = decoded.pop(key)
-        encoded = comment.encode(decoded)
-        old = internal.hexrays.variable.set_comment(cfunc, locator, encoded)
+        # next we check that the tag exists in the decoded comment and hasn't
+        # gone stale. if it's not in either, we can abort due to an unknown tag.
+        expected = reference.hexvariable.get(locator, target=cfunc)
+        available = {key for key in decoded} if reference == reference_v1 else {key for key in []}
+        if key not in (expected | available):
+            raise internal.exceptions.MissingTagError(u"{:s}({:#x}, {:d}, {!s}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the variable defined at {:#x} of the decompiled function {:#x}.".format('.'.join([__name__, cls.__name__]), defea, atype, alocinfo, key, none, utils.string.escape(key, '"'), defea, internal.hexrays.function(cfunc)))
+        res = decoded.pop(key, None)
+
+        # if the key is expected and available, then we can adjust the tags and
+        # update the comment. the event should take care of the index.
+        if key in (expected & available):
+            encoded = comment.encode(decoded)
+            old = internal.hexrays.variable.set_comment(cfunc, locator, encoded)
+
+        # if the key was still found in the index, then we need to fix the index
+        # so that this variable won't be returned for this tag name again.
+        elif key in expected:
+            [reference.hexvariable.decrement(locator, name, target=cfunc) for name in expected - available]
+            [reference.hexvariable.increment(locator, name, target=cfunc) for name in available - expected]
         return res
 
 class reference_v0(object):
