@@ -58,10 +58,10 @@ that is prefixed with a backslash.
 """
 
 import functools, operator, itertools, types
-import collections, heapq, string
+import collections, heapq, string, bz2
 import sys, six, logging
 
-import internal, idaapi
+import internal, idaapi, ida
 import codecs
 
 ### cheap data structure for doing pattern matching with
@@ -772,7 +772,6 @@ class tagging(object):
         return node
 
 class contents(tagging):
-    '''Tagging for an address within a function (contents)'''
     """
     This namespace is used to update the tag state for any content tags
     associated with a function in the database. The address for the top
@@ -787,6 +786,14 @@ class contents(tagging):
     written or removed, the reference count for both the name and the
     address is adjusted.
 
+    Earlier versions of this implementation would store the marshall'd
+    dictionary directly in the netnode for the function. As reported in
+    issue #198, this can conflict with some processor modules. In order
+    to remedy this condition, the implementation creates a completely
+    separate netnode using the function address to avoid any conflict.
+    If the netnode does not exist and the old location has a blob stored
+    within it, then the blob is migrated into the new netnode.
+
     Due to a size limit of a blob, the supval for the tagging node is
     used to store the tag names that are used within a function as a
     marshall'd ``set``. This ``set`` is used to verify that the tag
@@ -800,6 +807,14 @@ class contents(tagging):
     # netnode.sup[fn.start_ea] = marshal.dumps({tagnames})
 
     #btag = idaapi.stag         # XXX: apparently 'S' is used for comments
+    #btag = idaapi.atag         # XXX: apparently 'A' is used for altvals
+
+    # XXX: this tag conflicts with the altvals used by some disassembler
+    #      architectures as a result of how blobs are stored within a netnode.
+    #      so, to avoid interfering with the chosen disassembler we create our
+    #      own netnode by prefixing the `tagging.__node__` string with the
+    #      function address similar to the disassembler's format for a function
+    #      netnode ("$ F10083200").
     btag = idaapi.atag
 
     @classmethod
@@ -859,7 +874,7 @@ class contents(tagging):
 
         If `target` is ``None``, then use the address of the function containing `ea`.
         """
-        node, key = tagging.node(), cls._key(ea) if target is None else target
+        node, key = cls.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._read_header({!r}, {:#x}) : Unable to locate a function for target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, key, ea))
 
@@ -896,7 +911,7 @@ class contents(tagging):
         If `target` is ``None`` then use `ea` to locate the function.
         If `value` is ``None``, then remove the supval at the specified `target`.
         """
-        node, key = tagging.node(), cls._key(ea) if target is None else target
+        node, key = cls.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to determine the key for target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), target, ea))
 
@@ -933,12 +948,265 @@ class contents(tagging):
         return bool(ok)
 
     @classmethod
+    def _format_netnode_name(cls, target, ea):
+        """Return the netnode name for storing a blob in the new format that is associated with the specified `target`.
+
+        If `target` is undefined or ``None`` then use `ea` to locate the function.
+        """
+        key = cls._key(ea) if target is None else target
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._format_netnode_name({!r}, {:#x}) : Unable to determine the key for the target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, target, ea))
+
+        # If we received a list as the key, then we need to warn the
+        # user that we have to guess which supval to read from.
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._format_netnode_name({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # Now we use the function address (key) to generate a unique netnode
+        # name by taking the function address and adding the `INF_NETADELTA` to
+        # it. Then we go and format the resulting integer by formatting it as
+        # hexadecimal and prefixing it with "F". Afterwards, we prefix the whole
+        # thing with the netnode name to make the name unique to the plugin.
+        Foriginal = functools.partial(operator.add, ida.getinf(idaapi.INF_NETDELTA))
+        formatter = "{:s}.{:s}".format(cls.__node__, 'F{:X}')
+        return formatter.format(key + ida.getinf(idaapi.INF_NETDELTA))
+
+    @classmethod
+    def _move_netnode_tagcache(cls, old, new):
+        '''Rename the netnode for the `old` address to the specified `new` address.'''
+        oldname = cls._format_netnode_name(old, old)
+        newname = cls._format_netnode_name(new, new)
+
+        # First check if the netnode exists with the old name. If it doesn't,
+        # then we don't need to move anything at all.
+        if not internal.netnode.has(oldname):
+            return True
+
+        # Now we can grab the original netnode that we are going to rename.
+        # Once we grab it, we then check to see if the new netnode name already
+        # exists. If it doesn't, then we can just go ahead and rename. If it
+        # does, though, then we extract the tagcache stored for the old name.
+        oldnode = internal.netnode.get(oldname)
+        if not internal.netnode.has(newname):
+            return internal.netnode.name.set(oldnode, newname)
+        oldencoded = internal.netnode.blob.get(oldnode, tag=cls.btag)
+
+        # If the new name already exists, then we're going to overwrite its
+        # Otherwise, the new name already exists which means we'll be
+        # overwriting the contents with the tagcache from the old netnode. We
+        # grab the new netnode and also preserve its contents so that we can log
+        # exactly what it is we're overwriting.
+        newnode = internal.netnode.get(newname)
+        newencoded = internal.netnode.blob.get(newnode, tag=cls.btag)
+
+        # Log a warning explaining that we are overwriting the new netnode with
+        # the old contents and ensure that the data being overwritten is
+        # displayed. Afterwards, we can go ahead and assign the encoded data.
+        logging.warning(u"{:s}._move_netnode_tagcache({:#x}, {:#x}) : Overwriting the target netnode \"{!s}\" ({:#x}) using the contents from the source netnode \"{!s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), old, new, internal.utils.string.escape(newname, '"'), newnode, internal.utils.string.escape(oldname, '"'), oldnode))
+        logging.debug(u"{:s}._move_netnode_tagcache({:#x}, {:#x}) : Overwriting the new netnode data in {:#x} ({!s}) using the contents from the old netnode at {:#x} ({!s}).".format('.'.join([__name__, cls.__name__]), old, new, newnode, ''.join(map("{:02x}".format, bytearray(newencoded))), oldnode, ''.join(map("{:02x}".format, bytearray(oldencoded)))))
+
+        if not internal.netnode.blob.set(newnode, cls.btag, oldencoded):
+            logging.critical(u"{:s}._move_netnode_tagcache({:#x}, {:#x}) : Failure trying to copy {:d} byte{:s} of old tagcache \"{!s}\" ({:#x}) for function {:#x} over {:d} byte{:s} of new tagcache \"{!s}\" ({:#x}) for function {:#x}.".format('.'.join([__name__, cls.__name__]), old, new, len(oldencoded), '' if len(oldencoded) == 1 else 's', internal.utils.string.escape(oldname, '"'), oldnode, old, len(newencoded), '' if len(newencoded) == 1 else 's', internal.utils.string.escape(newname, '"'), newnode, new))
+
+        # Finally, we can remove the netnode containing the old tagcache since
+        # it was already copied into the new target netnode.
+        ok = internal.netnode.remove(oldnode)
+        if not ok:
+            logging.warning(u"{:s}._move_netnode_tagcache({:#x}, {:#x}) : Failure trying to remove the netnode \"{!s}\" ({:#x}) containing the tag cache for the old function address ({:#x}).".format('.'.join([__name__, cls.__name__]), old, new, internal.utils.string.escape(oldname, '"'), oldnode, old))
+        return ok
+
+    @classmethod
+    def _has_old_tagcache(cls, ea):
+        '''Return if there is a tagcache in the old format for the function specified by the address `ea`.'''
+        key = ea
+
+        # if there is no netnode for the function key, then return false.
+        if not internal.netnode.has(key):
+            return False
+
+        # if there isn't a blob stored for the functon, then we can just go
+        # ahead and return false before doing anything else. otherwise, we
+        # extract the data from the blob so that we can check it for bzip2.
+        elif not internal.netnode.blob.has(key, tag=cls.btag):
+            return False
+
+        # grab the encoded contents of the blob so that we can verify whether it
+        # is is bzip2-compressed or not. we need to check for the magic first
+        # before verifying that we can actually decompress some of it.
+        encoded = internal.netnode.blob.get(key, tag=cls.btag)
+
+        # magic
+        bytes = bytearray(encoded)
+        if bytes[:3] != b'BZh':
+            return False
+
+        # blocksize
+        if not (b'1' <= bytes[3 : 4] <= b'9'):
+            return False
+
+        # decompress a chunk from the stream
+        ok = True
+        try:
+            dec = bz2.BZ2Decompressor()
+            dec.decompress(bytes, max_length=1)
+        except (OSError, ValueError):
+            ok = False
+        return ok
+
+    @classmethod
+    def _has_new_tagcache(cls, ea):
+        '''Return if there is a tagcache in the new format for the function specified by the address `ea`.'''
+        key = ea
+
+        # for performance reasons, we can just format the function address into
+        # a name, and then we just need to check if the netnode already exists.
+        name = cls._format_netnode_name(key, ea)
+        return internal.netnode.has(name)
+
+    @classmethod
+    def _get_tagcache_blob(cls, target, ea):
+        '''Return the blob for the function at the address specified by `target`.'''
+        key = cls._key(ea) if target is None else target
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._get_tagcache_blob({!r}, {:#x}) : Unable to determine the key for the target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, target, ea))
+
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._get_tagcache_blob({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # check if we're using a specific netnode for the function. otherwise, we
+        # need to check if we're using the function's netnode which can be
+        # identified by looking for a bzip2-encoded blob. basically, this
+        # logic is the gateway to fixing issue #198.
+        if cls._has_new_tagcache(key):
+            name = cls._format_netnode_name(key, ea)
+            return internal.netnode.blob.get(name, cls.btag)
+
+        elif not(cls._has_old_tagcache(key)):
+            return None
+
+        # otherwise, we get the blob for the specified function and return it to
+        # the caller so that they can decompress and unmarshall it.
+        return internal.netnode.blob.get(key, cls.btag)
+
+    @classmethod
+    def _new_tagcache_blob(cls, target, ea):
+        """Create a tag cache netnode for the function at the address specified by `target`.
+
+        If `target` is undefined or ``None`` then use `ea` to locate the function.
+        """
+        key = cls._key(ea) if target is None else target
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._new_tagcache_blob({!r}, {:#x}) : Unable to determine the key for the function containing address {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, ea))
+
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._new_tagcache_blob({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # figure out the name of the netnode using the key for the function, and
+        # check to see if it already exists so that we can avoid creating it.
+        name = cls._format_netnode_name(key, ea)
+        if internal.netnode.has(name):
+            return True
+
+        # now we can use the name to create a new netnode with nothing stashed
+        # inside of it. last thing is to return whether we created it or not.
+        node = internal.netnode.new(name)
+        return internal.netnode.has(node)
+
+    @classmethod
+    def _set_tagcache_blob(cls, target, ea, encoded):
+        """Update the blob for the function at the address specified by `target` with the given `encoded` data.
+
+        If `target` is undefined or ``None`` then use `ea` to locate the function.
+        """
+        key = cls._key(ea) if target is None else target
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._set_tagcache_blob({!r}, {:#x}, {!r}) : Unable to determine the key for the target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, encoded, target, ea))
+
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._set_tagcache_blob({!r}, {:#x}, {!r}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, encoded, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # if we're using the migrated tagcache already, then go ahead and write
+        # to it. this should be what happens by default.
+        if cls._has_new_tagcache(key):
+            name = cls._format_netnode_name(key, ea)
+            node = internal.netnode.get(name)
+            return internal.netnode.blob.set(node, cls.btag, encoded)
+
+        # otherwise, we just write it to the old location of the tag cache. the
+        # tagcache should actually be migrated by someone else. so, that makes
+        # this logic a fallback in case that other person didn't migrate it yet.
+        return internal.netnode.blob.set(key, cls.btag, encoded)
+
+    @classmethod
+    def _del_tagcache_blob(cls, target, ea):
+        """Remove the blob for the function at the address specified by `target`.
+
+        If `target` is undefined or ``None`` then use `ea` to locate the function.
+        """
+        key = cls._key(ea) if target is None else target
+        if key is None:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._del_tagcache_blob({!r}, {:#x}) : Unable to determine the key for the target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, target, ea))
+
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._del_tagcache_blob({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
+
+        # if we're using the migrated tagcache already, then go and erase the
+        # bitch. this is intended to switch between the old and new locations.
+        if cls._has_new_tagcache(key):
+            name = cls._format_netnode_name(key, ea)
+            node = internal.netnode.get(name)
+            return internal.netnode.blob.remove(node, cls.btag)
+
+        # otherwise, we just remove it from the old location. this should only
+        # occur if it hasn't been migrated yet as this location conflicts with
+        # some of the disassemblers like AArch and AArch64.
+        return internal.netnode.blob.remove(key, cls.btag)
+
+    @classmethod
+    def _migrate_tagcache(cls, ea):
+        '''Move the tag cache for the function specified by `ea` to its own isolated netnode if it doesn't already exist.'''
+        key = ea
+
+        # if we're already using an isolated netnode for the function, then
+        # there isn't anything for us to do and we can just return success.
+        if cls._has_new_tagcache(key):
+            return True
+
+        # if the tag cache is not stashed in the function's netnode, then we
+        # don't need to migrate anything. the `contents.has_old_tagcache` method
+        # will only return true if the netnode exists and its blob is bzip2'd.
+        elif not(cls._has_old_tagcache(key)):
+            return True
+
+        # now we go ahead and grab the blob from the old location in the
+        # function's netnode, and then we write it to the new location. if the
+        # blob is empty, then we create the new netnode but we leave it alone.
+        encoded = internal.netnode.blob.get(key, cls.btag)
+        if encoded is None:
+            return True
+
+        name = cls._format_netnode_name(key, ea)
+        node = internal.netnode.new(name)
+
+        ok = internal.netnode.blob.set(node, cls.btag, encoded)
+        if not ok:
+            logging.info(u"{:s}._migrate_tagcache({:#x}) : Error while writing the following data to the blob cache in \"{:s}\" ({:#x}): {!r}.".format('.'.join([__name__, cls.__name__]), ea, internal.utils.string.repr(value), internal.utils.string.escape(name, '"'), node, encoded))
+            raise internal.exceptions.DisassemblerError(u"{:s}._migrate_tagcache({:#x}) : Unable to migrate the contents for address {:#x} from the blob cache ({!s}) in the function associated with the key {:#x} to the new netnode \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea, cls.btag, key, internal.utils.string.escape(name, '"'), node))
+
+        # finally, we go ahead and remove the blob that was previously stashed
+        # to the netnode for the specified function.
+        ok = internal.netnode.blob.remove(key, cls.btag)
+        if not ok:
+            logging.warning(u"{:s}._migrate_tagcache({:#x}) : Error while trying to remove the blob data from the tag cache stashed in the function netnode at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, key))
+        return ok
+
+    @classmethod
     def _read(cls, target, ea):
         """Reads the value from the contents supval for the specific `target`.
 
         If `target` is undefined or ``None`` then use `ea` to locate the function.
         """
-        node, key = tagging.node(), cls._key(ea) if target is None else target
+        node, key = cls.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._read({!r}, {:#x}) : Unable to determine the key for the target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, target, ea))
 
@@ -947,10 +1215,14 @@ class contents(tagging):
         elif isinstance(key, list):
             key, _ = key[0], logging.critical(u"{:s}._read({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
 
-        encdata = internal.netnode.blob.get(key, cls.btag)
+        # fetch the encoded data from the blob for the function specified by
+        # `key` so that we can decode and unmarshal it back into a dictionary.
+        encdata = cls._get_tagcache_blob(key, ea)
         if encdata is None:
             return None
 
+        # first we'll decompress the encoded data unless it raises an ecception.
+        # if it does, then log what happened and raise the correct exception.
         try:
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
@@ -961,6 +1233,8 @@ class contents(tagging):
             logging.info(u"{:s}._read({!r}, {:#x}) : Error while decoding the following data from the blob cache: {!r}.".format('.'.join([__name__, cls.__name__]), target, ea, encdata))
             raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to decode the contents for address {:#x} from the blob cache ({!s}) associated with key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, ea, cls.btag, key))
 
+        # next we'll unmarshall the decompressed data back into a dictionary. if
+        # this raises an exception for any reason, then reraise the correct one.
         try:
             result = cls.marshaller.loads(data)
 
@@ -976,7 +1250,7 @@ class contents(tagging):
         If `target` is undefined or ``None`` then use `ea` to locate the function.
         If `value` is ``None``, then erase the value from the supval.
         """
-        node, key = tagging.node(), cls._key(ea) if target is None else target
+        node, key = cls.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to determine the key for target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), target, ea))
 
@@ -985,18 +1259,63 @@ class contents(tagging):
         elif isinstance(key, list):
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to determine the owner of the address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
 
-        # erase cache and blob if no data is specified
+        # check if the blob for our function is stored within its own netnode,
+        # so that we can use it. this path should be more efficient.
+        if cls._has_new_tagcache(key):
+            ok = True
+
+        # if there is no old tagcache, then the blob is empty and we can go
+        # ahead and create the blob for the new tagcache.
+        elif not cls._has_old_tagcache(key):
+            logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Creating a netnode for storing the tag cache belonging to function ({:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), key))
+            ok = cls._new_tagcache_blob(key, ea)
+
+        # otherwise, we need to migrate the tag cache blob from the old location
+        # to the new tagcache location. at this point, though, we've already
+        # damaged the altvals for the function and there's nothing we can really
+        # do to recover the original altvals. :-/
+        else:
+            logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Migrating the tag cache for the specified function ({:#x}) to its own netnode.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), key))
+            ok = cls._migrate_tagcache(key)
+
+        # if we couldn't create the netnode for the function to store the tag
+        # cache, or we couldn't migrate it from the old location to the new one,
+        # then we need to complain about it and abort.
+        if not ok:
+            name = cls._format_netnode_name(key, ea)
+            node = internal.netnode.get(name)
+            migrating = cls._has_old_tagcache(key)
+            data = " with data ({!s})".format(internal.utils.string.repr(internal.netnode.blob.get(key, cls.btag)))
+            logging.info(u"{:s}._write({!r}, {:#x}, {!s}) : Failure while {:s} netnode \"{:s}\" ({:#x}) {!s} for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), 'migrating to' if migrating else 'creating', internal.utils.string.escape(name, '"'), node, data if migrating else '', key))
+            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Error while trying to {:s} the tag cache for function {:#x} to an isolated netnode \"{!s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), 'migrate' if migrating else 'create', key, internal.utils.string.escape(name, '"'), node))
+
+        # erase cache and blob if no data is specified. we will also be removing
+        # the netnode, so we'll start by getting its identifier.
         if not value:
+            name = cls._format_netnode_name(key, ea)
+            node = internal.netnode.get(name)
+
+            # first we clear the supvalues in the header.
             try:
-                ok = cls._write_header(target, ea, None)
+                ok = cls._write_header(key, ea, None)
                 if not ok:
                     logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to remove the address {:#x} from the cache header associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, key))
 
+            # after removing the supvalue in the header for the given function,
+            # now we can delete the blob that is stored within the netnode for
+            # the function and we should be able to remove the entire netnode.
             finally:
-                count = internal.netnode.blob.remove(key, cls.btag)
-                logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Removed {:d} blob{:s} ({!s}) associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), count, '' if count == 1 else 's', cls.btag, key))
+                ok = cls._del_tagcache_blob(key, ea)
+                logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Removed the blob ({!s}) associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), cls.btag, key))
 
-            return True
+                # next we'll try to remove the entire netnode since it's empty.
+                if ok:
+                    logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Attempting to remove the netnode \"{!s}\" ({:#x}) containing the tag cache for function {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), internal.utils.string.escape(name, '"'), node, key))
+                    ok = internal.netnode.remove(node)
+                    logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Removal of netnode \"{!s}\" ({:#x}) from emptying function {:#x} has {!s}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), internal.utils.string.escape(name, '"'), node, key, 'succeeded' if ok else 'failed'))
+
+                ok = ok
+            return ok
 
         # update blob for given address
         res = value
@@ -1017,8 +1336,12 @@ class contents(tagging):
         if sz != len(data):
             raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}, {!s}) : The number of bytes that was encoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), sz, len(data)))
 
-        # write blob
-        ok = internal.netnode.blob.set(key, cls.btag, encdata)
+        # now that we have an encoded version of the data, we can now write the
+        # encoded data into the blob for the specified function. we use the
+        # classmethod since in order to fix issue #198, so that we store to the
+        # correct place if the function tagcache netnode exists. otherwise we
+        # fall back to the old (busted) location stored in the function netnode.
+        ok = cls._set_tagcache_blob(key, ea, encdata)
         if not ok:
             logging.info(u"{:s}._write({!r}, {:#x}, {!s}) : Error while writing the following data to the blob cache: {!r}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), encdata))
             raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to write the contents for address {:#x} to the blob cache ({!s}) associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, cls.btag, key))
@@ -1033,7 +1356,7 @@ class contents(tagging):
     @classmethod
     def iterate(cls):
         '''Yield each address and names for all of the contents tags in the database according to what is written into the tagging supval.'''
-        node = tagging.node()
+        node = cls.node()
         for ea in internal.netnode.sup.fiter(node):
             view = internal.netnode.sup.get(node, ea, type=memoryview)
             encdata = view.tobytes()
@@ -1235,7 +1558,7 @@ class globals(tagging):
     @classmethod
     def inc(cls, address, name):
         '''Increase the global tag count for the given `address` and `name`.'''
-        node, eName = tagging.node(), internal.utils.string.to(name)
+        node, eName = cls.node(), internal.utils.string.to(name)
 
         cName = (internal.netnode.hash.get(node, eName, type=int) or 0) + 1
         cAddress = (internal.netnode.alt.get(node, address) or 0) + 1
@@ -1248,7 +1571,7 @@ class globals(tagging):
     @classmethod
     def dec(cls, address, name):
         '''Decrease the global tag count for the given `address` and `name`.'''
-        node, eName = tagging.node(), internal.utils.string.to(name)
+        node, eName = cls.node(), internal.utils.string.to(name)
 
         cName = (internal.netnode.hash.get(node, eName, type=int) or 1) - 1
         cAddress = (internal.netnode.alt.get(node, address) or 1) - 1
@@ -1268,18 +1591,18 @@ class globals(tagging):
     @classmethod
     def name(cls):
         '''Return all the tag names (``set``) in the specified database (globals and func-tags)'''
-        node = tagging.node()
+        node = cls.node()
         return { internal.utils.string.of(name) for name in internal.netnode.hash.fiter(node) }
 
     @classmethod
     def address(cls):
         '''Return all the tag addresses (``sorted``) in the specified database (globals and func-tags)'''
-        return sorted(ea for ea in internal.netnode.alt.fiter(tagging.node()))
+        return sorted(ea for ea in internal.netnode.alt.fiter(cls.node()))
 
     @classmethod
     def set_name(cls, name, count):
         '''Set the global tag count for `name` in the database to `count`.'''
-        node, eName = tagging.node(), internal.utils.string.to(name)
+        node, eName = cls.node(), internal.utils.string.to(name)
         res = internal.netnode.hash.get(node, eName, type=int)
         internal.netnode.hash.set(node, eName, count)
         return res
@@ -1287,7 +1610,7 @@ class globals(tagging):
     @classmethod
     def set_address(cls, address, count):
         '''Set the global tag count for `address` in the database to `count`.'''
-        node = tagging.node()
+        node = cls.node()
         res = internal.netnode.alt.get(node, address)
         internal.netnode.alt.set(node, address, count)
         return res
@@ -1295,7 +1618,7 @@ class globals(tagging):
     @classmethod
     def iterate(cls):
         '''Yield the address and count for each of the globals in the database according to what is written in the altvals.'''
-        node = tagging.node()
+        node = cls.node()
         for ea, count in internal.netnode.alt.fitems(node):
             yield ea, count
         return
@@ -1303,7 +1626,7 @@ class globals(tagging):
     @classmethod
     def counts(cls):
         '''Yield the tag name and its count for each of the globals in the database according to what is written in the hashvals.'''
-        node = tagging.node()
+        node = cls.node()
 
         for item, count in internal.netnode.hash.fitems(node, int):
             string = internal.utils.string.of(item)

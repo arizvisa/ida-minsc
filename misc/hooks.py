@@ -1848,6 +1848,14 @@ def set_func_start(pfn, new_start):
     """
     start, stop = interface.range.unpack(pfn)
 
+    # first thing we'll need to do is to move the tag cache from the old address
+    # to the new one. this requires is to either rename the netnode, or to copy
+    # the tag cache from the old one into the one for the new address. we also
+    # do a sanity check to ensure that the function is actually being relocated.
+    ok = True if start == new_start else internal.comment.contents._move_netnode_tagcache(start, new_start)
+    if not ok:
+        logging.warning(u"{:s}.set_func_start({:#x}..{:#x}, {:#x}) : An error occurred while trying to relocate the tag cache for the function at address {:#x} to its new address {:#x}.".format(__name__, start, stop, new_start, start, new_start))
+
     # if new_start has removed addresses from function, then we need to transform
     # all contents tags into globals tags
     if start > new_start:
