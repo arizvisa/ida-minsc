@@ -542,6 +542,17 @@ class ida_hexrays_template(object):
     ITP_SIGN = 536870912
     ITP_CASE = 1073741824
 
+    CFS_BOUNDS = 1
+    CFS_TEXT = 2
+    CFS_LVARS_HIDDEN = 4
+
+    CV_FAST = 0x0000
+    CV_PRUNE = 0x0001
+    CV_PARENTS = 0x0002
+    CV_POST = 0x0004
+    CV_RESTART= 0x0008
+    CV_INSNS = 0x0010
+
     citem_t = missing_class
     cnumber_t = missing_class
     cinsn_t = missing_class
