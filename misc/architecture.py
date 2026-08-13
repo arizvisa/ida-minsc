@@ -283,7 +283,6 @@ class architecture_t(object):
 
         If `idaname` is a string, then use it to identify the disassembler register instead of `name`.
         """
-        dt_bitfield, dtype_by_size = idaapi.dt_bitfild, internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
         ptype = builtins.next((kwargs.pop(item) for item in ['ptype'] if item in kwargs), int)
         dtype = builtins.next((kwargs.pop(item) for item in ['dtyp', 'dtype', 'type'] if item in kwargs), self.__get_dtype_by_size__(ptype, bits))
 
@@ -385,8 +384,8 @@ class architecture_t(object):
     @utils.multicase(register=interface.register_t, size=types.integer)
     def by(self, register, size):
         '''Return the specified `register` from the given architecture by its `size`.'''
-        dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
-        dtype = dtype_by_size(size)
+        type, _ = register.type
+        dtype = self.__get_dtype_by_size__(type, 8 * size)
 
         # If it's a regular register, then we can trust its id and type.
         if isinstance(register.realname, types.string):
