@@ -1198,8 +1198,7 @@ class select_v1(object):
         '''Yield the function address and tags from the contents of each function containing all the tags in `require` and including any from `include`.'''
         cfunc, selection = internal.hexrays.function(func), True if any([args, kwargs]) else False
         for instance, used in query_v1.hexfunction(cfunc, *args, **kwargs):
-            cindex, where = internal.declaration.preciser.exactly(cfunc, instance.ea, instance.itp & 0xFFFFFFFF)
-            key = cfunc.treeitems[cindex], where
+            key = internal.declaration.preciser.exactly(cfunc, instance.ea, instance.itp & 0xFFFFFFFF)
             tags = hexfunction.get(cfunc, (instance.ea, instance.itp))
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
