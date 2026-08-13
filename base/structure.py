@@ -641,7 +641,7 @@ def comment(tinfo, cmt, **repeatable):
 @utils.multicase(id=types.integer)
 def index(id):
     '''Return the position of the structure identified by `id`.'''
-    sptr = internal.structure.by_index(id)
+    sptr = internal.structure.by_index_or_identifier(id)
     if not sptr:
         number, description = ("{:#x}".format(id), 'identifier') if interface.node.identifier(id) else ("{:d}".format(id), 'index')
         raise E.StructureNotFoundError(u"{:s}.index({:s}) : Unable to locate a structure with the specified {:s} ({:s}).".format(__name__, number, description, number))
@@ -657,15 +657,18 @@ def index(structure):
 @utils.multicase(id=types.integer, position=types.integer)
 def index(id, position):
     '''Move the structure identified by `id` to the specified `position` of the structure list.'''
-    sptr = internal.structure.by_index(id)
+    sptr = internal.structure.by_index_or_identifier(id)
     if not sptr:
         number, description = ("{:#x}".format(id), 'identifier') if interface.node.identifier(id) else ("{:d}".format(id), 'index')
         raise E.StructureNotFoundError(u"{:s}.index({:s}, {:d}) : Unable to locate a structure with the specified {:s} ({:s}).".format(__name__, number, position, description, number))
 
     # If the structure we got is an `idaapi.tinfo_t`, then abort completely.
-    elif isinstance(sptr, idaapi.tinfo_t):
+    elif idaapi.__version__ > 8.4:
         number = "{:#x}".format(id) if interface.node.identifier(id) else "{:d}".format(id)
         raise E.UnsupportedCapability(u"{:s}.index({:s}, {:d}) : Unable to change the ordinal of a structure that is backed by an `{:s}`.".format(__name__, number, position, internal.utils.pycompat.fullname(idaapi.tinfo_t)))
+
+    elif isinstance(sptr, idaapi.tinfo_t):
+        sptr = idaapi.get_struc(sptr)
 
     # Otherwise, we can just go ahead and fuck with the index.
     res, ok = idaapi.get_struc_idx(sptr.id), idaapi.set_struc_idx(sptr, position)
@@ -675,7 +678,10 @@ def index(id, position):
 @utils.multicase(structure=internal.structure.structuretypes, position=types.integer)
 def index(structure, position):
     '''Move the specified `structure` to the specified `position` of the structure list.'''
-    return index(structure.id, position)
+    sptr, sid = getattr(structure, 'ptr', structure), structure.id
+    if idaapi.__version__ > 8.4 and isinstance(sptr, idaapi.tinfo_t):
+        raise E.UnsupportedCapability(u"{:s}.index({:#x}, {:d}) : Unable to change the ordinal of a structure that is backed by an `{:s}`.".format(__name__, sid, position, internal.utils.pycompat.fullname(idaapi.tinfo_t)))
+    return index(sid, position)
 @utils.multicase(tinfo=idaapi.tinfo_t)
 def index(tinfo):
     '''Return the index of the structure specified by `tinfo`.'''
