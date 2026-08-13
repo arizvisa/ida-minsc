@@ -279,6 +279,7 @@ class typemap(object):
         idaapi.BTMT_BOOL8 | idaapi.BT_BOOL: None,  # only avail if 64-bit
         idaapi.BTMT_BOOL4 | idaapi.BT_BOOL: (bool, 4),
     }
+    typeinfo_booleans[idaapi.BT_BOOL] = (bool, 1)
 
     typeinfo_floats = {
         idaapi.BTMT_FLOAT | idaapi.BT_FLOAT: (float, 4),
@@ -299,13 +300,20 @@ class typemap(object):
         idaapi.BTMT_CHAR | idaapi.BT_INT8: (int, 1),
 
         # These are for signed and unsigned integers. We use a negative size to
-        # signify the sign. We don't support explicit unsigned unfortunately.
+        # signify the sign.
         idaapi.BTMT_SIGNED | idaapi.BT_INT: None,
         idaapi.BTMT_SIGNED | idaapi.BT_INT8: (int, -1),
         idaapi.BTMT_SIGNED | idaapi.BT_INT16: (int, -2),
         idaapi.BTMT_SIGNED | idaapi.BT_INT32: (int, -4),
         idaapi.BTMT_SIGNED | idaapi.BT_INT64: (int, -8),
         idaapi.BTMT_SIGNED | idaapi.BT_INT128: (int, -16),
+
+        idaapi.BTMT_UNSIGNED | idaapi.BT_INT: None,
+        idaapi.BTMT_UNSIGNED | idaapi.BT_INT8: (int, 1),
+        idaapi.BTMT_UNSIGNED | idaapi.BT_INT16: (int, 2),
+        idaapi.BTMT_UNSIGNED | idaapi.BT_INT32: (int, 4),
+        idaapi.BTMT_UNSIGNED | idaapi.BT_INT64: (int, 8),
+        idaapi.BTMT_UNSIGNED | idaapi.BT_INT128: (int, 16),
 
         # These are things like _BYTE, _WORD, _DWORD, _QWORD, _OWORD
         idaapi.BTMT_SIZE12 | idaapi.BT_VOID : (int, 1),
@@ -362,11 +370,12 @@ class typemap(object):
             typeinfo_inverted[t] = fl
         continue
 
+    selected = idaapi.BTMT_SIGNED | idaapi.BT_VOID | idaapi.BT_UNK
     for fl, t in typeinfo_integers.items():
-        if t is not None and t[0] is not bool:
+        if fl & selected and t is not None and t[0] is not bool:
             typeinfo_inverted[t] = fl
         continue
-    del fl, t
+    del selected, fl, t
 
     # Assign the default values for the processor that was selected for the database.
     @classmethod
@@ -387,6 +396,7 @@ class typemap(object):
 
         # Update the local types map with the default integer sizes.
         typemap.typeinfo_integers[idaapi.BT_INT] = int, tinfo.size(idaapi.tinfo_t(idaapi.BT_INT))
+        typemap.typeinfo_integers[idaapi.BTMT_UNSIGNED | idaapi.BT_INT] = int, tinfo.size(idaapi.tinfo_t(idaapi.BTMT_UNSIGNED | idaapi.BT_INT))
         typemap.typeinfo_integers[idaapi.BTMT_SIGNED | idaapi.BT_INT] = int, -tinfo.size(idaapi.tinfo_t(idaapi.BTMT_SIGNED | idaapi.BT_INT))
 
         if bits < 64:
