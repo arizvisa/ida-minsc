@@ -1454,6 +1454,53 @@ class variable(object):
         return internal.structure.member.get_name(mptr)
 
     @classmethod
+    def default_name(cls, *args):
+        '''Return the default name (decompiler) for the variable identified by the given `args`.'''
+        fn = function(*args[:1]) if len(args) > 1 else None
+        locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
+
+        # check the locator is valid, and then get the function and variable.
+        if cls.has_location(locator):
+            cfunc = function(locator.defea) if fn is None else fn
+            lvar = variables.get(cfunc, locator)
+
+        # otherwise, the locator was completely invalid and we should abort.
+        else:
+            description = cls.repr_locator(locator)
+            raise exceptions.DecompilerError(u"{:s}.default_name({!s}{!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), description if fn is None else "{:#x}".format(fn.entry_ea), '' if fn is None else ", {:s}".format(description), idaapi.as_signed(locator.defea, interface.database.bits())))
+
+        # fetch all of the details from the function owning our variable.
+        ea, locator = cfunc.entry_ea, cls.get_locator(lvar)
+        fn = interface.function.by(ea)
+        specials = saved, returned = [' s', ' r'] if idaapi.__version__ < 8.5 else ['__saved_registers', '__return_address']
+
+        # grab the variables for the function so that we can figure out the
+        # variable index and to distinguish the correct prefix for us to use.
+        lvars = variables(cfunc)
+
+        # if it's not an argument, then we just need the index of the variable
+        # FIXME: we are determining the index here in O(n) time... terrible.
+        if not lvar.is_arg_var:
+            iterable = (index for index in range(lvars.size()) if (lvars[index].defea, lvars[index].location) == (lvar.defea, lvar.location))
+            prefix, suffix = 'v', next(iterable, -1)
+
+        # if it's an argument, then we need to figure it out from the prototype.
+        # then build an index for the storage of all of the argument variables.
+        else:
+            iterable = enumerate(interface.tinfo.function(cfunc.type))
+            iterable = ((index, isinstance(storage, interface.register_t), storage) for index, (_, _, storage) in iterable)
+            arguments = {microarchitecture.select(storage, 8 * lvar.width) if register else idaapi.get_frame_retsize(fn) + storage : index for index, register, storage in iterable}
+
+            # now we can look up the index using our variable storage.
+            store = cls.get_storage(locator, lvar.width)
+            key = microarchitecture.select(store, 8 * lvar.width) if isinstance(store, interface.register_t) else store
+            prefix, suffix = 'a', arguments.get(key, -1)
+
+        # check the index in the suffix. if it is invalid, then return an empty
+        # string as an error. otherwise we render them together for the name.
+        return '' if suffix < 0 else "{:s}{:d}".format(prefix, suffix)
+
+    @classmethod
     def remove_name(cls, *args):
         '''Remove the name from the variable identified by the given `args`.'''
         fn = function(*args[:1]) if len(args) > 1 else None
