@@ -830,22 +830,48 @@ is_union, is_frame, is_listed = utils.alias(type.union, 'type'), utils.alias(typ
 @utils.multicase(structure=internal.structure.structuretypes)
 def remove(structure):
     '''Remove the specified `structure` from the database.'''
-    sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
-    identifier, index, name, size = (F(sptr.id) for F in [utils.fidentity, idaapi.get_struc_idx, idaapi.get_struc_name, idaapi.get_struc_size])
-    if not idaapi.del_struc(sptr):
-        raise E.DisassemblerError(u"{:s}.remove({!r}) : Unable to remove the requested structure ({:#x}).".format(__name__, structure, structure.id))
-    return identifier, name, size
-@utils.multicase(name=types.string)
+    sptr, sid = getattr(structure, 'ptr', structure), structure.id
+    if idaapi.__version__ < 8.5 and not isinstance(sptr, idaapi.tinfo_t):
+        identifier, index, name, size = (F(sptr.id) for F in [utils.fidentity, idaapi.get_struc_idx, idaapi.get_struc_name, idaapi.get_struc_size])
+        if not idaapi.del_struc(sptr):
+            raise E.DisassemblerError(u"{:s}.remove({:#x}) : Unable to remove the requested structure ({:#x}).".format(__name__, sid, sid))
+        return identifier, name, size
+    return remove(sptr)
+@utils.multicase(name=(types.string, types.tuple))
 @utils.string.decorate_arguments('name', 'suffix')
 def remove(name, *suffix):
     '''Remove the structure with the specified `name`.'''
-    res = by_name(name, *suffix)
-    return remove(res)
+    realname = interface.tuplename(*itertools.chain(name if isinstance(name, types.tuple) else [name], suffix))
+    sptr = internal.structure.by_name(realname)
+    if not sptr:
+        raise E.StructureNotFoundError(u"{:s}.remove({!r}) : Unable to locate a structure with the name \"{:s}\".".format(__name__, realname, utils.string.escape(name, '"')))
+    return remove(sptr)
 @utils.multicase(tinfo=idaapi.tinfo_t)
 def remove(tinfo):
     '''Remove the structure represented by the given `tinfo`.'''
-    structure = by(tinfo)
-    return remove(structure.ptr)
+    sid = interface.tinfo.identifier(tinfo)
+    if not tinfo.is_udt() or not internal.structure.has(sid):
+        raise E.InvalidTypeOrValueError(u"{:s}.remove({!r}) : Unable to determine the ordinal for a type that is not a structure or a union.".format(__name__, "{!s}".format(tinfo)))
+    elif idaapi.__version__ < 8.5:
+        sptr = idaapi.get_struc(sid)
+        return remove(sptr)
+    elif interface.tinfo.ordinal(tinfo):
+        ordinal = interface.tinfo.ordinal(tinfo)
+    else:
+        description = 'union' if interface.structure.union(tinfo) else 'structure'
+        raise E.StructureNotFoundError(u"{:s}.remove({!r}) : Unable to determine the ordinal for a {:s} with the type {!s}.".format(__name__, "{!s}".format(tinfo), description, interface.tinfo.quoted(tinfo)))
+
+    # now we can go ahead and remove the type from the type library.
+    res = interface.tinfo.at_ordinal(ordinal)
+    library = interface.tinfo.library(res)
+    if res and not idaapi.del_numbered_type(library, ordinal):
+        description = 'union' if interface.structure.union(res) else 'structure'
+        raise E.DisassemblerError(u"{:s}.remove({!r}) : Unable to remove the {:s} at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(tinfo), description, ordinal))
+    elif not res:
+        description = 'union' if interface.structure.union(res) else 'structure'
+        raise E.LocalTypeNotFoundError(u"{:s}.remove({!r}) : Unable to get the {:s} at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(tinfo), description, ordinal))
+    Fs = interface.tinfo.identifier, operator.methodcaller('get_type_name'), interface.tinfo.size
+    return tuple(F(res) for F in Fs)
 @utils.multicase(id=types.integer)
 def remove(id):
     '''Remove the structure at the specified index or `id` from the database.'''
