@@ -9790,8 +9790,10 @@ class get(object):
     @classmethod
     def structure(cls, ea, structure, **byteorder):
         '''Return the decoded fields of the given `structure` from the address `ea` as a dictionary.'''
-        st = _structure.by(structure)
-        return cls.structure(ea, st.ptr, **byteorder)
+        sptr, size = _structure.by(structure).ptr, interface.address.size(ea)
+        expected = interface.tinfo.size(sptr) if isinstance(sptr, idaapi.tinfo_t) else idaapi.get_struc_size(sptr)
+        variableQ = sptr.is_varstruct() if isinstance(sptr, idaapi.tinfo_t) else sptr.props & idaapi.SF_VAR
+        return cls.structure(ea, sptr, size if variableQ else expected, **byteorder)
     @utils.multicase(ea=internal.types.integer, structure=internal.structure.structuretypes)
     @classmethod
     def structure(cls, ea, structure, **byteorder):
