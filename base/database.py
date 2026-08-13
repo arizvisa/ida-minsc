@@ -6837,16 +6837,20 @@ class types(object):
         '''Remove the type at the given `ordinal` of the current type library.'''
         res = interface.tinfo.at_ordinal(ordinal)
         library = interface.tinfo.library(res)
-        if not idaapi.del_numbered_type(library, ordinal):
-            raise E.ItemNotFoundError(u"{:s}.remove({:d}) : Unable to remove the type at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
+        if res and not idaapi.del_numbered_type(library, ordinal):
+            raise E.DisassemblerError(u"{:s}.remove({:d}) : Unable to remove the type at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
+        elif not res:
+            raise E.LocalTypeNotFoundError(u"{:s}.remove({:d}) : Unable to get the type from ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
         return res
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def remove(cls, ordinal, library):
         '''Remove the type at the given `ordinal` of the specified type `library`.'''
         res = interface.tinfo.at_ordinal(ordinal, library)
-        if not idaapi.del_numbered_type(library, ordinal):
-            raise E.ItemNotFoundError(u"{:s}.remove({:d}, {:s}) : Unable to remove the type at ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), ordinal, interface.tinfo.format_library(library), ordinal))
+        if res and not idaapi.del_numbered_type(library, ordinal):
+            raise E.DisassemblerError(u"{:s}.remove({:d}, {:s}) : Unable to remove the type at ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), ordinal, interface.tinfo.format_library(library), ordinal))
+        elif not res:
+            raise E.LocalTypeNotFoundError(u"{:s}.remove({:d}, {:s}) : Unable to get the type from ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), ordinal, interface.tinfo.format_library(library), ordinal))
         return res
     @utils.multicase(name=internal.types.string)
     @classmethod
@@ -6858,8 +6862,10 @@ class types(object):
 
         # then we can delete it from the type library.
         library = interface.tinfo.library(res)
-        if not idaapi.del_named_type(library, utils.string.to(name), idaapi.NTF_TYPE | flags):
-            raise E.ItemNotFoundError(u"{:s}.remove({!r}, {:s}{:s}) : Unable to remove the type named \"{:s}\" from the current type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(name, '"')))
+        if res and not idaapi.del_named_type(library, utils.string.to(name), idaapi.NTF_TYPE | flags):
+            raise E.DisassemblerError(u"{:s}.remove({!r}, {:s}{:s}) : Unable to remove the type named \"{:s}\" from the current type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(name, '"')))
+        elif not res:
+            raise E.LocalTypeNotFoundError(u"{:s}.remove({!r}, {:s}{:s}) : Unable to get the type named \"{:s}\" from the current type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(name, '"')))
         return res
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
@@ -6873,8 +6879,10 @@ class types(object):
         flags |= idaapi.NTF_SYMM if mangled.get('mangled', False) else idaapi.NTF_SYMU
 
         # now we can actually try using del_named_type with our given name and flags.
-        if not idaapi.del_named_type(library, utils.string.to(name), idaapi.NTF_TYPE | flags):
-            raise E.ItemNotFoundError(u"{:s}.remove({!r}, {:s}{:s}) : Unable to remove the type named \"{:s}\" from the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(name, '"')))
+        if res and not idaapi.del_named_type(library, utils.string.to(name), idaapi.NTF_TYPE | flags):
+            raise E.DisassemblerError(u"{:s}.remove({!r}, {:s}{:s}) : Unable to remove the type named \"{:s}\" from the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(name, '"')))
+        elif not res:
+            raise E.LocalTypeNotFoundError(u"{:s}.remove({!r}, {:s}{:s}) : Unable to get the type named \"{:s}\" from the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(name, '"')))
         return res
 
     @utils.multicase(name=internal.types.string)
