@@ -2923,7 +2923,7 @@ class structurenaming(changingchanged):
         erased, tags = [], internal.tags.reference.structure.get(struc_id)
         logging.debug(u"{:s}.deleted({:#x}) : Found {:d} tag{:s} ({!s}) associated with structure {:#x} that will be removed.".format('.'.join([__name__, cls.__name__]), struc_id, len(tags), '' if len(tags) == 1 else 's', tags, struc_id))
 
-        if internal.structure.by_identifier(struc_id):
+        if internal.structure.has(struc_id):
             erased = internal.tags.reference.members.erase(struc_id)
 
         removed = {sid for sid in internal.tags.reference.structure.erase(struc_id)}
