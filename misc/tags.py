@@ -969,10 +969,9 @@ class query_v1(object):
     @classmethod
     def hexfunction(cls, func, require=frozenset(), include=frozenset()):
         '''Yield the preciser and tags from the decompiled function `func` containing all the tags in `require` and including any from `include`.'''
-        cfunc = internal.hexrays.function(func)
         rmask, imask = (cls.mask(names) for names in [require, include])
         requested, selection = rmask | imask, require or include
-        for preciser, used in internal.tagindex.hexfunction.function(cfunc):
+        for preciser, used in internal.tagindex.hexfunction.function(func):
             instance = internal.tagindex.hexfunction.decode_object(preciser)
             if not(used):
                 continue
