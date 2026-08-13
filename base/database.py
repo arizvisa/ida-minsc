@@ -9804,7 +9804,7 @@ class get(object):
         expected, size = _structure.size(sptr), interface.address.size(ea)
         variableQ = sptr.is_varstruct() if isinstance(sptr, idaapi.tinfo_t) else sptr.props & idaapi.SF_VAR
         return cls.structure(ea, sptr, size if variableQ else expected, **byteorder)
-    @utils.multicase(ea=internal.types.integer, structure=(idaapi.tinfo_t, internal.types.integer, internal.types.string), size=internal.types.integer)
+    @utils.multicase(ea=internal.types.integer, structure=(internal.types.integer, internal.types.string), size=internal.types.integer)
     @classmethod
     def structure(cls, ea, structure, size, **byteorder):
         '''Return a dictionary containing the decoded fields of the given `structure` using `size` bytes from the data at address `ea`.'''
@@ -9821,15 +9821,16 @@ class get(object):
         # The user has been warned if necessary, so we can now hand things off to the real implementation.
         sptr = st.ptr
         return cls.structure(ea, sptr, size, **byteorder)
-    @utils.multicase(ea=internal.types.integer, sptr=internal.structure.structuretypes, size=internal.types.integer)
+    @utils.multicase(ea=internal.types.integer, sptr=(internal.structure.structuretypes, idaapi.tinfo_t), size=internal.types.integer)
     @classmethod
     def structure(cls, ea, sptr, size, **byteorder):
         '''Return a dictionary containing the decoded fields of the structure `sptr` using `size` bytes from the data at address `ea`.'''
-        sid = interface.tinfo.identifier(sptr)
-        if isinstance(sptr, internal.structure.structure_t) and isinstance(sptr.ptr, idaapi.tinfo_t):
-            expected = interface.tinfo.size(sptr.ptr)
+        sptr = getattr(sptr, 'ptr', sptr)
+        sid = interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
+        if isinstance(sptr, idaapi.tinfo_t):
+            expected = interface.tinfo.size(sptr)
         else:
-            expected = idaapi.get_struc_size(sptr.id)
+            expected = idaapi.get_struc_size(sid)
 
         if size < expected:
             logging.warning(u"{:s}.structure({:#x}, {:#x}, {:+#x}) : The requested size ({:+d}) is smaller than the size of the structure ({:+d}) and will result in the result being partially initialized.".format('.'.join([__name__, cls.__name__]), ea, sid, size, size, expected))
