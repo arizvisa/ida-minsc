@@ -542,7 +542,7 @@ def name(structure):
 @utils.string.decorate_arguments('string', 'suffix')
 def name(id, string, *suffix):
     '''Set the name of the structure identified by `id` to `string`.'''
-    sptr = internal.structure.new(id)
+    sptr = internal.structure.by_index_or_identifier(id)
     res = string if isinstance(string, types.ordered) else [string]
     string = interface.tuplename(*itertools.chain(res, suffix))
 
