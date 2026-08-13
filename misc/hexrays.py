@@ -560,6 +560,7 @@ class ida_hexrays_template(object):
     ctree_item_t = missing_class
     treeloc_t = missing_class
     ctext_position_t = missing_class
+    ctree_visitor_t = missing_class
     qstring_printer_t = missing_class
 
     ceinsn_t = missing_class
