@@ -3117,7 +3117,7 @@ class hexvariable(counted):
         # now we can get the function from the parameters, and then grab its
         # address so that we can begin encoding the locator. to encode the
         # locator, we build a list of each value and its size.
-        return internal.hexrays.function(func), locator
+        return internal.hexrays.function.address(func), locator
 
     @classmethod
     def encode_locator(cls, func, *args):
@@ -3716,12 +3716,11 @@ class hexvariable(counted):
     @classmethod
     def function(cls, func):
         '''Yield every variable locator and mask belonging to the decompiled function `func`.'''
-        cfunc = internal.hexrays.function(func)
+        node, fn = cls.node(), internal.hexrays.function.address(func)
 
         # we could use the function entrypoint to grab all the chunks and remove
         # all ranges inside it, but since each locator is prefixed with the
         # function address, we'll have enough to select the entire function.
-        node, fn = cls.node(), internal.hexrays.function.address(cfunc)
         start, stop = cls.encode_address_start(fn), cls.encode_address_stop(fn)
 
         # now we have the boundaries, so we can just select the entire range
@@ -3785,8 +3784,7 @@ class hexvariable(counted):
     @classmethod
     def erase(cls, func):
         '''Remove the locators, masks, and reference counts for the variables from the decompiled function `func`.'''
-        node, cfunc = cls.node(), internal.hexrays.function(func)
-        fn = internal.hexrays.function.address(cfunc)
+        node, fn = cls.node(), internal.hexrays.function.address(func)
         funckey, parameter = idaapi.ea2node(fn), "{:#x}".format(fn)
         usagenode, countnode = node, funckey
 
