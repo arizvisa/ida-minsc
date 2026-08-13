@@ -795,7 +795,7 @@ class type(object):
     @classmethod
     def listed(cls, id):
         '''Return whether the structure identified by `id` is listed.'''
-        sptr = idaapi.get_struc(id)
+        sptr = internal.structure.by_index_or_identifier(id)
         if not sptr:
             raise E.StructureNotFoundError(u"{:s}.listed({:#x}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
         return cls.listed(sptr)
@@ -803,28 +803,51 @@ class type(object):
     @classmethod
     def listed(cls, structure):
         '''Return whether the provided `structure` is listed.'''
-        SF_NOLIST = getattr(idaapi, 'SF_NOLIST', 0x8)
-        sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
-        return False if sptr.props & SF_NOLIST else True
+        sptr, sid = getattr(structure, 'ptr', structure), structure.id
+        if idaapi.__version__ < 8.5 and isinstance(sptr, idaapi.tinfo_t):
+            sptr = internal.structure.by_index_or_identifier(sid)
+        if not isinstance(sptr, idaapi.tinfo_t):
+            SF_NOLIST = getattr(idaapi, 'SF_NOLIST', 0x8)
+            return False if sptr.props & SF_NOLIST else True
+        return True
     @utils.multicase(tinfo=idaapi.tinfo_t)
     @classmethod
     def listed(cls, tinfo):
         '''Return whether the structure represented by `tinfo` is listed.'''
-        structure = by(tinfo)
-        return cls.listed(structure.ptr)
-    @utils.multicase(structure=(structure_t, types.integer, idaapi.tinfo_t))
+        sptr, sid = tinfo, interface.tinfo.identifier(tinfo)
+        if idaapi.__version__ < 8.5:
+            sptr = internal.structure.by_index_or_identifier(sid)
+        return True if isinstance(sptr, idaapi.tinfo_t) else cls.listed(sptr)
+    @utils.multicase(id=types.integer)
+    @classmethod
+    def listed(cls, id, boolean):
+        '''Update the structure specified by `id` so that it is listed if the given `boolean` is true.'''
+        sptr = internal.structure.by_index_or_identifier(id)
+        if not sptr:
+            raise E.StructureNotFoundError(u"{:s}.listed({:#x}, {!s}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, True if boolean else False, id))
+        if idaapi.__version__ < 8.5 and isinstance(sptr, idaapi.tinfo_t):
+            sptr = idaapi.get_struc(id)
+        elif isinstance(sptr, idaapi.tinfo_t):
+            raise E.UnsupportedCapability(u"{:s}.listed({:#x}, {!s}) : This functionality is not supported on your version ({!s}) and is only supported on versions prior to {!s}.".format(__name__, id, True if boolean else False, idaapi.__version__, 8.4))
+        return cls.listed(sptr, boolean)
+    @utils.multicase(tinfo=idaapi.tinfo_t)
+    @classmethod
+    def listed(cls, tinfo, boolean):
+        '''Update the structure represented by `tinfo` so that it is listed if the given `boolean` is true.'''
+        sptr, sid = tinfo, interface.tinfo.identifier(tinfo)
+        if idaapi.__version__ > 8.4 and isinstance(tinfo, idaapi.tinfo_t):
+            raise E.UnsupportedCapability(u"{:s}.listed({:#x}, {!s}) : This functionality is not supported on your version ({!s}) and is only supported on versions prior to {!s}.".format(__name__, sid, True if boolean else False, idaapi.__version__, 8.4))
+        sptr = internal.structure.by_index_or_identifier(sid)
+        return cls.listed(sid if isinstance(sptr, idaapi.tinfo_t) else sptr, boolean)
+    @utils.multicase(structure=internal.structure.structuretypes)
     @classmethod
     def listed(cls, structure, boolean):
         '''Update the specified `structure` so that it is listed if the given `boolean` is true.'''
-        st = by(structure)
-        return cls.listed(st.ptr, boolean)
-    @utils.multicase(sptr=idaapi.struc_t)
-    @classmethod
-    def listed(cls, sptr, boolean):
-        '''Update the structure in `sptr` so that it is listed if the given `boolean` is true.'''
-        result, _ = cls.listed(spr), idaapi.set_struc_listed(sptr, boolean)
+        sptr, sid = getattr(structure, 'ptr', structure), structure.id
+        if isinstance(sptr, idaapi.tinfo_t):
+            return cls.listed(sptr, boolean)
+        result, _ = cls.listed(sptr), idaapi.set_struc_listed(sptr, boolean)
         return result
-    is_listed = utils.alias(listed, 'type')
 is_union, is_frame, is_listed = utils.alias(type.union, 'type'), utils.alias(type.frame, 'type'), utils.alias(type.listed, 'type')
 
 @utils.multicase(structure=internal.structure.structuretypes)
