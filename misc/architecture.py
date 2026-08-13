@@ -745,12 +745,19 @@ else:
                 for height, node in Fgather(root):
                     row = matrix.setdefault(height, {})
 
-                    assert not operator.contains(row, node.id)
-                    row[node.__position__, node.__ptype__] = node
+                    assert not operator.contains(row.get((node.__position__, node.__ptype__), {}), node)
+                    row.setdefault((node.__position__, node.__ptype__), set()).add(node)
 
-                    assert not operator.contains(heights, node.id)
+                    assert not operator.contains(heights, node)
                     heights[node] = height
                 return matrix, heights
+
+            def Frecursechildren(root):
+                for register in root.__children__.values():
+                    for child in Frecursechildren(register):
+                        yield child
+                    continue
+                yield root
 
             # start by counting exactly how many regs we have available which we
             # can do by taking from an infinite range until is_kreg() is true.
@@ -828,8 +835,8 @@ else:
             results, roots = {}, {item for item in map(Froot, mregindex)}
             for root in roots:
                 matrix, heights = Fheights(root)
-                assert (root,) == tuple(matrix[0].values())
-                common = available & {node for node in heights}
+                assert {root} == set(itertools.chain(*matrix[0].values()))
+                common = available.union(Frecursechildren(root)) & {node for node in heights}
                 used = sorted({heights[reg] for reg in common})
                 assert used
 
@@ -838,24 +845,28 @@ else:
                 midx = mregindex[root] if root in mregindex else mregindex.get(registers[root.realname or root.name], -1)
                 head = results[root] = self.new(root.name, root.bits, idaname=root.realname if midx < 0 else midx, ptype=root.__ptype__, dtype=root.__dtype__)
                 for hidx in range(1, used[0]):
-                    for (position, ptype), reg in matrix[hidx].items():
-                        assert(reg not in mregindex)
-                        dreg = registers[reg.name if reg.realname is None else reg.realname]
-                        midx = mregindex.get(dreg, -1)
-                        parent = results[reg.__parent__]
-                        results[reg] = self.child(parent, reg.name, position, reg.bits, idaname=midx, ptype=reg.__ptype__, dtype=reg.__dtype__)
+                    for (position, ptype), regs in matrix[hidx].items():
+                        for reg in regs:
+                            assert(reg not in mregindex)
+                            dreg = registers[reg.name if reg.realname is None else reg.realname]
+                            midx = mregindex.get(dreg, -1)
+                            parent = results[reg.__parent__]
+                            results[reg] = self.child(parent, reg.name, position, reg.bits, idaname=midx, ptype=reg.__ptype__, dtype=reg.__dtype__)
+                        continue
                     continue
                 used.pop(0) if used[0] in {0} else used
 
                 # that should give us all our dependencies, and now we just need to go
                 # through and assign the ones that actually have an mreg associated with them.
                 for hidx in used:
-                    for (position, ptype), reg in matrix[hidx].items():
-                        midx = mregindex[reg] if reg in mregindex else mregindex.get(registers[reg.name if reg.realname is None else reg.realname], -1)
-                        parent = results[reg.__parent__]
-                        if midx < 0:
-                            logging.debug(u"skipping register {!r} ({!s}) due to there being no corresponding uregister ({:d})".format(reg, ptype, midx))
-                        results[reg] = self.child(parent, reg.name, position, reg.bits, idaname=reg.realname if midx < 0 else midx, ptype=reg.__ptype__, dtype=reg.__dtype__)
+                    for (position, ptype), regs in matrix[hidx].items():
+                        for reg in regs:
+                            midx = mregindex[reg] if reg in mregindex else mregindex.get(registers[reg.name if reg.realname is None else reg.realname], -1)
+                            parent = results[reg.__parent__]
+                            if midx < 0:
+                                logging.debug(u"skipping register {!r} ({!s}) due to there being no corresponding uregister ({:d})".format(reg, ptype, midx))
+                            results[reg] = self.child(parent, reg.name, position, reg.bits, idaname=reg.realname if midx < 0 else midx, ptype=reg.__ptype__, dtype=reg.__dtype__)
+                        continue
                     continue
                 continue
 
