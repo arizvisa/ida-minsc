@@ -6836,6 +6836,7 @@ class types(object):
     def remove(cls, ordinal):
         '''Remove the type at the given `ordinal` of the current type library.'''
         res = interface.tinfo.at_ordinal(ordinal)
+        library = interface.tinfo.library(res)
         if not idaapi.del_numbered_type(library, ordinal):
             raise E.ItemNotFoundError(u"{:s}.remove({:d}) : Unable to remove the type at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
         return res
@@ -6856,6 +6857,7 @@ class types(object):
         flags |= idaapi.NTF_SYMM if mangled.get('mangled', False) else idaapi.NTF_SYMU
 
         # then we can delete it from the type library.
+        library = interface.tinfo.library(res)
         if not idaapi.del_named_type(library, utils.string.to(name), idaapi.NTF_TYPE | flags):
             raise E.ItemNotFoundError(u"{:s}.remove({!r}, {:s}{:s}) : Unable to remove the type named \"{:s}\" from the current type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(name, '"')))
         return res
