@@ -7223,7 +7223,7 @@ class contiguous(object):
         for offset, item in cls.layout(ending, layout[::-1], -1):
             if isinstance(item, (bounds_t, location_t)):
                 result.append(location_t(offset, item.size) if isinstance(item, location_t) else bounds_t(offset, offset + item.size))
-            if isinstance(item, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t):
+            elif isinstance(item, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t):
                 result.append(range.bounds(item).range())
 
             elif v9 and isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
