@@ -538,14 +538,13 @@ def name(id):
 def name(structure):
     '''Return the name of the given `structure`.'''
     return internal.structure.naming.get(structure)
-@utils.multicase(id=types.integer, string=types.string)
+@utils.multicase(id=types.integer, string=(types.string, types.tuple))
 @utils.string.decorate_arguments('string', 'suffix')
 def name(id, string, *suffix):
     '''Set the name of the structure identified by `id` to `string`.'''
     sptr = internal.structure.new(id)
-
-    res = (string,) + suffix
-    string = interface.tuplename(*res)
+    res = string if isinstance(string, types.ordered) else [string]
+    string = interface.tuplename(*itertools.chain(res, suffix))
 
     # convert the specified string into a form that IDA can handle
     ida_string = utils.string.to(string)
@@ -558,23 +557,23 @@ def name(id, string, *suffix):
 
     # now we can set the name of the structure
     return internal.structure.naming.set(sptr, ida_string)
-@utils.multicase(structure=internal.structure.structuretypes, string=types.string)
+@utils.multicase(structure=internal.structure.structuretypes, string=(types.string, types.tuple))
 @utils.string.decorate_arguments('string', 'suffix')
 def name(structure, string, *suffix):
     '''Set the name of the specified `structure` to `string`.'''
-    return internal.structure.naming.set(structure.ptr, interface.tuplename((string,) + suffix))
+    return internal.structure.naming.set(structure.ptr, interface.tuplename(string, *suffix))
 @utils.multicase(tinfo=idaapi.tinfo_t)
 def name(tinfo):
     '''Return the name of the structure specified by `tinfo`.'''
     if tinfo.is_udt():
         return internal.structure.naming.get(tinfo)
     raise E.StructureNotFoundError(u"{:s}.name({!r}) : Unable to locate a structure using the specified type {!s}.".format(__name__, "{!s}".format(tinfo), interface.tinfo.quoted(tinfo)))
-@utils.multicase(tinfo=idaapi.tinfo_t, string=types.string)
+@utils.multicase(tinfo=idaapi.tinfo_t, string=(types.string, types.tuple))
 @utils.string.decorate_arguments('string', 'suffix')
 def name(tinfo, string, *suffix):
     '''Set the name of the structure represented by `tinfo` to `string`.'''
     structure = by(tinfo)
-    return internal.structure.naming.set(structure.ptr, interface.tuplename((string,) + suffix))
+    return internal.structure.naming.set(structure.ptr, interface.tuplename(string, *suffix))
 
 @utils.multicase(id=types.integer)
 def comment(id, **repeatable):
