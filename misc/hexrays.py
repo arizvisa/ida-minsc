@@ -2251,16 +2251,36 @@ class ctree(object):
         index = item.index if isinstance(item, ida_hexrays_types.citem_t) else item
         if not(0 <= index < cfunc.treeitems.size()):
             raise exceptions.IndexOutOfBoundsError(u"{:s}.down({:#x}, {:d}) : Unable to locate the specified item due to the index ({:d}) being out of bounds ({:s}).".format('.'.join([__name__, cls.__name__]), function.address(cfunc), index, index, "{:d}..{:d}".format(0, cfunc.treeitems.size()) if cfunc.treeitems.size() else '0'))
-        citem = cfunc.treeitems[index]
+        results, citem = [], cfunc.treeitems[index]
 
         # iterate forward from the index of the current item while looking for
         # items that our current item is the parent of.
-        results = []
-        for index in range(index, cfunc.treeitems.size()):
-            if citem.find_parent_of(cfunc.treeitems[index]):
-                results.append(index)
-            continue
-        return results
+        if not hasattr(ida_hexrays, 'ctree_visitor_t'):
+            for index in range(index, cfunc.treeitems.size()):
+                if citem.find_parent_of(cfunc.treeitems[index]):
+                    results.append(index)
+                continue
+            return results
+
+        # define a visitor class that we will instantiate.
+        class subtree(ida_hexrays.ctree_visitor_t):
+            def __init__(self):
+                ida_hexrays.ctree_visitor_t.__init__(self, ida_hexrays.CV_FAST)
+            def visit_insn(self, insn):
+                results.append(insn.index)
+                return 0
+            def visit_expr(self, expr):
+                results.append(expr.index)
+                return 0
+
+        # gather everything and then return our results.
+        error = subtree().apply_to(citem, None)
+        if error:
+            raise exceptions.DecompilerError(u"{:s}.down({:#x}, {:d}) : Unable to gather the subtree of the specified item at index {:d} of the decompiled function ({:#x}).".format('.'.join([__name__, cls.__name__]), function.address(cfunc), index, index, function.address(cfunc)))
+        elif results[0] == citem.index:
+            return sorted(results[1:])
+        listable = [index for index in results if index != citem.index]
+        return sorted(listable)
 
     @classmethod
     def up(cls, func, item):
