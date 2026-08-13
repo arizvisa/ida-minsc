@@ -2727,8 +2727,7 @@ class hexfunction(counted):
     @classmethod
     def function(cls, func):
         '''Yield every preciser and mask belonging to the decompiled function `func`.'''
-        cfunc = internal.hexrays.function(func)
-        fn = internal.hexrays.function.address(cfunc)
+        fn = internal.hexrays.function.address(func)
         chunks = interface.function.chunks(fn)
         ranges = map(interface.range.unpack, chunks)
 
@@ -2741,8 +2740,8 @@ class hexfunction(counted):
     @classmethod
     def erase(cls, func):
         '''Remove the precisers, masks, and reference counts for the decompiled function `func`.'''
-        node, cfunc = cls.node(), internal.hexrays.function(func)
-        fn = internal.hexrays.function.address(cfunc)
+        node = cls.node()
+        fn = internal.hexrays.function.address(func)
         node = usagenode = cls.node()
         key = countnode = idaapi.ea2node(fn)
         if not netnode.sup.remove(node, key, cls.usagetag):
@@ -2760,7 +2759,7 @@ class hexfunction(counted):
 
         # snag all the precisers and values for the given function, and then go
         # through and decrement each of them till everything is removed.
-        deleting = {preciser : used for preciser, used in cls.function(cfunc)}
+        deleting = {preciser : used for preciser, used in cls.function(fn)}
         for preciser, used in deleting.items():
             for position in tags.explode(used):
 
