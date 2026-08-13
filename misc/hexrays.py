@@ -2406,7 +2406,7 @@ class ctree(object):
         cfunc = function(func)
         iterable = ((index, cfunc.treeitems[index]) for index in range(cfunc.treeitems.size()))
         for index in range(cfunc.treeitems.size()):
-            yield index, cfunc.treeitems[index]
+            yield cfunc, index, cfunc.treeitems[index]
         return
 
     @classmethod
