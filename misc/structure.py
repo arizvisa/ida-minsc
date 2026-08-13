@@ -8706,10 +8706,17 @@ class members_t(object):
             six.print_(u"[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {:<{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, "{!s}".format(m.typeinfo.dstr()).replace(' *', '*'), int(maxtypeinfo), utils.string.repr(m.name), int(maxname), utils.string.repr(m.type), int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), u" // {!s}".format(m.tag() if '\n' in m.comment else m.comment) if m.comment else ''))
         return
 
+    @utils.multicase(name=internal.types.string)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'iregex', 'regex', 'mangled', 'decorated')
+    def search(cls, name, **type):
+        '''Search through the members in the structure matching the glob specified by `name`.'''
+        type['like'] = name
+        return cls.search(**type)
     @utils.multicase()
     @utils.string.decorate_arguments('regex', 'iregex', 'name', 'like', 'fullname', 'comment', 'comments')
-    def by(self, **type):
-        '''Return the member that matches the keyword specified by `type`.'''
+    def search(self, **type):
+        '''Search through the members in the structure matching the keyword specified by `type`.'''
         searchstring = utils.string.kwargs(type)
         cls, owner = self.__class__, self.owner
         sid = interface.tinfo.identifier(owner.ptr) if isinstance(owner.ptr, idaapi.tinfo_t) else owner.ptr.id
@@ -8725,6 +8732,17 @@ class members_t(object):
         if res is None:
             raise E.SearchResultsError(u"{:s}({:#x}).members.by({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), sid, searchstring))
         return res
+
+    @utils.multicase(structure=structuretypes)
+    @utils.string.decorate_arguments('name', 'suffix')
+    def by(self, structure):
+        '''Return the first member referencing the specified `structure`.'''
+        return self.search(structure=structure)
+    @utils.multicase(type=idaapi.tinfo_t)
+    @utils.string.decorate_arguments('name', 'suffix')
+    def by(self, type):
+        '''Return the first member using the specified `type`.'''
+        return self.search(type=type)
     @utils.multicase(name=types.string)
     @utils.string.decorate_arguments('name', 'suffix')
     def by(self, name, *suffix):
