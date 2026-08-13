@@ -1505,54 +1505,17 @@ class variable(object):
         '''Remove the name from the variable identified by the given `args`.'''
         fn = function(*args[:1]) if len(args) > 1 else None
         lvar = variables.get(*itertools.chain(args if fn is None else [fn], args[1:]))
-        lvarname = utils.string.of(lvar.name)
 
         # check that the locator actually belongs to a function.
         if fn is None and not cls.has_location(lvar):
             description = cls.repr_locator(lvar)
-            raise exceptions.DecompilerError(u"{:s}.remove_name({!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), description, idaapi.as_signed(lvar.defea, interface.database.bits())))
+            raise exceptions.DecompilerError(u"{:s}.remove_name({!s}{!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), description if fn is None else "{:#x}".format(fn.entry_ea), '' if fn is None else ", {:s}".format(description), idaapi.as_signed(lvar.defea, interface.database.bits())))
 
-        # grab all information about the function containing the variable.
+        # grab the function and then use everything to get the default name so
+        # that we can apply it and return the old one back to the caller.
         cfunc = function(lvar.defea) if fn is None else fn
-        ea, locator = cfunc.entry_ea, cls.get_locator(lvar)
-        fn, frame = (F(ea) for F in [interface.function.by, interface.function.frame])
-
-        # grab the storage location for the variable. if it's a register, figure
-        # out whether its an arg or var and suffix its name with the register.
-        store = cls.get_storage(locator, lvar.width)
-        if not isinstance(store, interface.location_t):
-            res = 'arg' if lvar.is_arg_var else 'var', store.name
-            return cls.set_name(cfunc, locator, res)
-
-        # if it wasn't a register, then it's in the stack frame. so, we need to
-        # translate its offset to the frame member offset.
-        offset, size = store + fn.frsize + fn.frregs
-
-        # now we can use the offset to check for a frame member that overlaps
-        # the offset with size. if not, then use the offset to generate a name.
-        if not internal.structure.members.has_bounds(frame, offset, offset + size):
-            delta = fn.frregs
-            default = internal.structure.member.default_name(frame, None, offset)
-            res = default.replace(' ', '$') if default in {' r', ' s'} else default
-            return cls.set_name(cfunc, locator, res)
-
-        # otherwise, a member exists at the given offset of the frame and we can
-        # use our store location to snag its name, check the size, and apply it.
-        candidates = [packed for packed in internal.structure.members.at_bounds(frame, offset, offset + size)]
-        if not candidates:
-            raise exceptions.MemberNotFoundError(u"{:s}.remove_name({:#x}, {:s}) : Unable to find a variable at the given offset ({:s}) of the frame for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), interface.bounds_t(offset, offset+size), ea))
-        [(sptr, _, mptr)] = candidates[:1]
-
-        # now we need to check the size. we only warn the user about it and hope
-        # that we're actually doing what they wanted.
-        size = internal.structure.member.size(mptr)
-        if size != store.size:
-            fullname = internal.structure.member.fullname(mptr)
-            log.warning(u"{:s}.remove_name({:#x}, {:s}) : The storage location {!s} for the variable named \"{:s}\" is not the same size ({:d}) as the frame member \"{:s}\" in the given function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), store, utils.string.escape(lvarname, '"'), size, utils.string.escape(fullname, '"'), ea))
-
-        # grab the member name, and then apply it.
-        res = internal.structure.member.get_name(mptr)
-        return cls.set_name(cfunc, locator, res)
+        default = cls.member_name(cfunc, lvar) or cls.default_name(cfunc, lvar)
+        return cls.set_name(cfunc, lvar, default)
 
     @classmethod
     def set_name(cls, func, variable, string):
