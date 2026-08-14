@@ -2658,3 +2658,133 @@ class ctext(object):
         if citem.op == ida_hexrays.cit_block and citem.cinsn.cblock.size():
             return cls.xy(cfunc, citem.cinsn.cblock.front())
         return None
+
+    escape_codes = str().join([idaapi.COLOR_ON, idaapi.COLOR_OFF, idaapi.COLOR_ESC, idaapi.COLOR_INV])
+    COLOR_ON, COLOR_OFF, COLOR_ESCAPE, COLOR_INVERT = escape_codes.encode('latin1')
+    del(escape_codes)
+
+    @classmethod
+    def columns(cls, simpleline):
+        '''Yield the visible columns for each anchor point in the given `simpleline`.'''
+        cstring = simpleline.line if isinstance(simpleline, idaapi.simpleline_t) else simpleline
+        cline = bytearray(cstring.encode('latin1'))
+
+        index, anchor = 0, None
+        while index < len(cline):
+            code = cline[index]
+
+            # this is a code byte for the items that we are looking for.
+            if code == cls.COLOR_ON:
+                tag = cline[1 + index]
+                if tag == idaapi.COLOR_ADDR:
+                    short = cline[2 + index : 2 + index + idaapi.COLOR_ADDR_SIZE]
+                    value = int(short, 16) & 0xFFFFFFFF
+                    anchor = None if value & idaapi.ANCHOR_MASK else value & idaapi.ANCHOR_INDEX
+                    index += idaapi.COLOR_ADDR_SIZE
+                index += 2
+                continue
+
+            # these are code bytes that we need to skip.
+            elif code == cls.COLOR_INVERT:
+                index += 1
+                continue
+            elif code == cls.COLOR_OFF:
+                index += 2
+                continue
+
+            # now we're at a real character...
+            bytes = bytearray([cline[1 + index if code == cls.COLOR_ESCAPE else index]])
+            yield anchor, index, 2 + index if code == cls.COLOR_ESCAPE else 1 + index, bytes.decode('latin1')
+            code, skip = (cline[1 + index], 2) if code == cls.COLOR_ESCAPE else (code, 1)
+            index += skip
+        return
+
+    @classmethod
+    def spantree(cls, ctext, branch, start):
+        '''Return a span for the entire CTREE `branch` from the pseudocode in `ctext` starting at the line number given by `start`.'''
+        citems = {(citem.index if isinstance(citem, ida_hexrays.citem_t) else citem) for citem in branch}
+
+        # check the given parameter type and get the CTEXT out of it.
+        if isinstance(ctext, (ida_hexrays.cfunc_t, ida_hexrays.cfuncptr_t)) and cls.has(ctext):
+            ctext = ctext.get_pseudocode()
+        elif isinstance(ctext, (ida_hexrays.cfunc_t, ida_hexrays.cfuncptr_t)):
+            raise exceptions.InvalidParameterError(u"{:s}.xy({!r}, {:d}) : Unable access the state of the given parameter due to it being of an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), cfunc, index, func.__class__))
+
+        # define a closure that will expand the current span until we encompass
+        # all of the columns for our set of CTREE items.
+        def expand(span, line):
+            columns = [column for column in cls.columns(ctext[line])]
+            points = [index for index, (anchor, _, _, _) in enumerate(columns) if anchor in citems]
+            if not points:
+                return span
+            xy1, xy2 = span
+            leftside, rightside = (min(points), line), (max(points), line)
+            return leftside if xy1 is None else xy1, rightside
+
+        # start with nothing, and then expand our span to include all items.
+        xy = xy1, xy2 = functools.reduce(expand, range(start, ctext.size()), (None, None))
+        if not any(xy):
+            return None
+
+        # now we just need to trim our second point to finish the span.
+        (x1, y1), (x2, y2) = xy1, xy2
+        trailing = [column for column in cls.columns(ctext[y2])]
+        left = x1 if y1 == y2 else 0
+        while x2 >= left and trailing[x2][3] in ' \t':
+            x2 -= 1
+        columns = trailing if y1 == y2 else [column for column in cls.columns(ctext[y1])]
+        left = columns[x1][1]
+        right = trailing[x2][2] if x2 >= 0 else left
+        return (left, y1), (right, y2)
+
+    @classmethod
+    def spanitem(cls, func, item):
+        '''Return the span from the pseudocode of the decompiled function `func` for the specified CTREE `item`.'''
+        cfunc, index = func, item.index if isinstance(item, ida_hexrays.citem_t) else item
+        if isinstance(cfunc, (ida_hexrays.cfunc_t, ida_hexrays.cfuncptr_t)) and cls.has(cfunc):
+            ctext = cfunc.get_pseudocode()
+        elif isinstance(cfunc, (ida_hexrays.cfunc_t, ida_hexrays.cfuncptr_t)):
+            raise exceptions.MissingTypeOrAttribute(u"{:s}.spanitem({:#x}, {:d}) : Unable to use the specified function ({:#x}) as there is no pseudocode available.".format('.'.join([__name__, cls.__name__]), function.address(cfunc), index, function.address(cfunc)))
+        else:
+            raise exceptions.InvalidParameterError(u"{:s}.spanitem({!r}, {:d}) : Unable access the state of the given parameter due to it being of an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), cfunc, index, func.__class__))
+
+        # gather all of the children of the CTREE item in the parameters, and
+        # then get the starting coordinate for the item.
+        items = {item} | {index for index in ctree.down(cfunc, item)}
+        xy = cls.xy(cfunc, index)
+        x, y = (0, 0) if xy is None else xy
+
+        # now we can just return the span for all the children.
+        res = cls.spantree(ctext, items, y)
+        if not res:
+            return None
+        xy1, xy2 = res
+        return xy1, xy2
+
+    @classmethod
+    def span(cls, func, items):
+        '''Return the span from the pseudocode of the decompiled function `func` for all of the specified CTREE `items`.'''
+        iterable = items if isinstance(items, types.unordered) else [items]
+        cfunc, citems = func, {(citem.index if isinstance(citem, ida_hexrays.citem_t) else citem) for citem in iterable}
+        if isinstance(cfunc, (ida_hexrays.cfunc_t, ida_hexrays.cfuncptr_t)) and cls.has(cfunc):
+            ctext = cfunc.get_pseudocode()
+        elif isinstance(cfunc, (ida_hexrays.cfunc_t, ida_hexrays.cfuncptr_t)):
+            description = ', '.join(map("{:d}".format, citems))
+            raise exceptions.MissingTypeOrAttribute(u"{:s}.span({:#x}, {!s}) : Unable to use the specified function ({:#x}) as there is no pseudocode available.".format('.'.join([__name__, cls.__name__]), function.address(cfunc), "[{:s}]".format(description), function.address(cfunc)))
+        else:
+            description = ', '.join(map("{:d}".format, citems))
+            raise exceptions.InvalidParameterError(u"{:s}.span({!r}, {!s}) : Unable access the state of the given parameter due to it being of an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), cfunc, "[{:s}]".format(description), func.__class__))
+
+        # gather all of the spans for the items that were selected.
+        iterable = (cls.spanitem(cfunc, index) for index in citems)
+        results = [span for span in iterable if span is not None]
+
+        # now we need to get.
+        Freverse = operator.itemgetter(slice(None, None, -1))
+        if results:
+            iterable = (xy1 for xy1, xy2 in results)
+            start = min(iterable, key=Freverse)
+            iterable = (xy2 for xy1, xy2 in results)
+            stop = max(iterable, key=Freverse)
+            return start, stop
+        return None
