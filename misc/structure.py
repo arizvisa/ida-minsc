@@ -430,6 +430,65 @@ class naming(object):
         return utils.string.of(res)
 
     @classmethod
+    def has(cls, type, *name, **ordinal):
+        '''Return whether the `name` of the specified `type` has a non-default name using the `ordinal` if provided.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        elif isinstance(type, structure_t):
+            ti, sid = type.ptr, type.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            ti, sid = type, type.id
+        elif hasattr(idaapi, 'get_struc') and isinstance(type, types.integer) and interface.node.identifier(type):
+            ti, sid = idaapi.get_struc(type), type
+        elif isinstance(type, types.integer):
+            raise E.ItemNotFoundError(u"{:s}.has({:#x}) : Unable to locate the type with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type, type))
+        else:
+            raise E.InvalidParameterError(u"{:s}.has({!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
+
+        # first we need to figure out the candidate ordinals...
+        indices = []
+        if 'ordinal' in ordinal:
+            indices+= [ordinal.pop('ordinal')]
+        if frame(ti):
+            indices+= [interface.range.start(interface.function.by_frame(ti))]
+        if isinstance(ti, idaapi.tinfo_t):
+            indices+= [interface.tinfo.ordinal(ti)]
+        if all(hasattr(idaapi, attribute) for attribute in ['get_enum_idx', 'get_struc_idx']):
+            indices+= [idaapi.get_struc_idx(sid)] if idaapi.get_enum_idx(sid) == idaapi.BADADDR else [idaapi.get_enum_idx(sid)]
+
+        # now we need to build the list of candidates herre.
+        formats = ["enum_{:d}", "struc_{:d}", "struct_{:d}", "type_{:d}", "typeref_{:d}"]
+        if not frame(ti):
+            candidates = [string.format for string in formats]
+        else:   # FIXME: is this right, how many zeroes do we pad?
+            candidates = [functools.partial("$ F{:#0{:d}X}".format, interface.database.bits() // 8)]
+        iterable = itertools.chain(*(map(Fformat, indices) for Fformat in candidates))
+        candidates = {formatted for formatted in iterable}
+
+        # now we can get the actual name depending on the type, and ensure that
+        # it doesn't exist in our list of candidates.
+        if name:
+            res = interface.tuplename(*name)
+        elif isinstance(ti, idaapi.tinfo_t):
+            res = utils.string.of(idaapi.get_tid_name(sid) or ti.get_type_name())
+        elif idaapi.get_enum_idx(sid) == idaapi.BADADDR:
+            res = idaapi.get_enum_name(sid)
+        else:
+            res = utils.string.of(idaapi.get_struc_name(sid))
+
+        # Check if the name is anonymous. The disassembler assumes that a type
+        # is anonymous if it begins with a '$', but we also verify the length
+        # since in v8.4 the disassembler uses an MD5 hash for anonymous types.
+        if res.startswith('$') and len(res[1:]) == 0x20:
+            return False
+
+        # Otherwise we can just check if the name is one of our candidates.
+        return not(res in candidates)
+
+    @classmethod
     def netnode(cls, type):
         '''Return the name of the netnode for the specified structure by `type`.'''
         ti = idaapi.tinfo_t()
