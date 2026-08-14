@@ -2788,3 +2788,22 @@ class ctext(object):
             stop = max(iterable, key=Freverse)
             return start, stop
         return None
+
+    @classmethod
+    def get(cls, ctext, x1, y1, x2, y2):
+        '''Return the text spanning `x1` and `y1` to `x2` and `y2` from the specified `ctext`.'''
+        if isinstance(ctext, (ida_hexrays.cfunc_t, ida_hexrays.cfuncptr_t)) and cls.has(ctext):
+            ctext = ctext.get_pseudocode()
+        elif isinstance(ctext, (ida_hexrays.cfunc_t, ida_hexrays.cfuncptr_t)):
+            raise exceptions.MissingTypeOrAttribute(u"{:s}.get({:#x}, x1={:d}, y1={:d}, x2={:d}, y2={:d}) : Unable to use the specified function ({:#x}) as there is no pseudocode available.".format('.'.join([__name__, cls.__name__]), function.address(ctext), x1, y1, x2, y2, function.address(ctext)))
+
+        # same line.
+        if y1 == y2:
+            line = ctext[y1].line
+            return line[x1 : x2]
+
+        # let's get slicing...
+        first = [ctext[y1].line[x1:]]
+        lines = (ctext[line].line for line in range(y1 + 1, y2))
+        last = [ctext[y2].line[:x2]]
+        return '\n'.join(itertools.chain(first, lines, last))
