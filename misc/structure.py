@@ -387,39 +387,31 @@ class naming(object):
             ti, sid = type, type.id
         elif hasattr(idaapi, 'get_struc') and isinstance(type, types.integer) and interface.node.identifier(type):
             ti, sid = idaapi.get_struc(type), type
+        elif isinstance(type, types.integer):
+            raise E.ItemNotFoundError(u"{:s}.remove({:#x}) : Unable to locate the type with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type, type))
         else:
             raise E.InvalidParameterError(u"{:s}.remove({!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type.__class__))
 
-        # Now we can figure out which api to use for removing the name. If it is
-        # not a local type, but rather `struc_t` then we can set the structure
-        # name to empty in order to remove it.
-        if not isinstance(ti, idaapi.tinfo_t):
-            res, ok = idaapi.get_struc_name(sid), idaapi.set_struc_name(sid, utils.string.to(''))
-            if not ok:
-                raise E.DisassemblerError(u"{:s}.remove({:#x}) : Unable to remove the name from the specified structure ({:#x}).".format(__name__, sid, sid))
-            return utils.string.of(res)
-
         # Otherwise, we need to use the type to figure out what its default name
         # could be. To do this, we need both its index (ordinal) and its type.
-        ordinal = interface.tinfo.ordinal(ti)
+        ordinal = interface.tinfo.ordinal(ti) if isinstance(ti, idaapi.tinfo_t) else idaapi.get_struc_idx(sid) if idaapi.get_enum_idx(sid) == idaapi.BADADDR else idaapi.get_enum_idx(sid)
         if union(ti):
             erasedname = "union_{:d}".format(ordinal)
-
-        elif ti.is_struct():
-            erasedname = "struc_{:d}".format(ordinal)
-
-        elif ti.is_enum():
+        elif frame(ti): # FIXME: is this right, how many zeroes do we pad?
+            ea = interface.range.start(interface.function.by_frame(ti))
+            erasedname = "$ F{:#0{:d}X}".format(interface.database.bits() // 8, ea)
+        elif isinstance(ti, idaapi.tinfo_t) and ti.is_enum():
             erasedname = "enum_{:d}".format(ordinal)
+        elif isinstance(ti, idaapi.tinfo_t) and ti.is_struct():
+            erasedname = "struc_{:d}".format(ordinal)
+        elif isinstance(ti, idaapi.tinfo_t):
+            erasedname = "type{:s}_{:d}".format(ordinal, 'ref' if ti.is_typeref() else '')
 
-        # If this structure type is a frame, then figure out the address its for
-        # and set the type name to what we think IDA will name it.
-        # FIXME: Check if the address is padded to some number of digits.
-        elif False:
-            erasedname = "$ F{:#X}".format(ordinal)
-
-        # Otherwise, we just use a generic name here.
+        # Now we need to handle the older naming for the older structure api.
+        elif idaapi.get_enum_idx(sid) == idaapi.BADADDR:
+            erasedname = "struc_{:d}".format(ordinal)
         else:
-            erasedname = "type_{:d}".format(ordinal)
+            erasedname = "enum_{:d}".format(ordinal)
 
         # If our type is a `struc_t`, then use the old api to apply the erased
         # name to the structure type.
