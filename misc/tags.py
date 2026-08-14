@@ -2085,7 +2085,6 @@ class typeinfo(object):
 
         til, ordinal, name = interface.tinfo.library(ti), interface.tinfo.ordinal(ti), utils.string.of(internal.structure.naming.get(ti))
         repeatable, is_frame = True, ti.is_frame() if hasattr(ti, 'is_frame') else False
-        is_choosable = hasattr(idaapi, 'is_type_choosable') and idaapi.is_type_choosable(til, ordinal)
         type_description = 'frame' if is_frame else 'union' if internal.structure.union(ti) else 'structure'
 
         # Grab both types of comments for the specified type, and then we can
@@ -2103,11 +2102,13 @@ class typeinfo(object):
         for d in order:
             res.update(d)
 
-        # If this type is auto-sync'd to a structure, then we can add an
-        # implicit variable referencing the structure id.
+        # Start by grabbing the tags that have been applied to the type.
+        available = reference.structure.get(sid)
+
+        # If we have an implicit "__name__" tag, then we're good to add it.
         name = utils.string.of(internal.structure.naming.get(ti))
-        if hasattr(idaapi, 'is_autosync') and idaapi.is_autosync(name, ti):
-            res.setdefault('__sid__', sid)
+        if name and '__name__' in available:
+            res.setdefault('__name__', name)
 
         # Here we use the tagindex to determine whether a specific type id has
         # the implicit "__typeinfo__" tag applied to it. This is for tracking
@@ -2121,14 +2122,6 @@ class typeinfo(object):
         if is_frame:
             ea = ti.get_frame_func() if hasattr(ti, 'get_frame_func') else idaapi.BADADDR
             ea != idaapi.BADADDR and res.setdefault('__ea__', ea)
-
-        # If this type is choosable or has a non-anonymous name, then add the
-        # name as the implicit "__name__" tag.
-        elif is_choosable:
-            res.setdefault('__name__', name)
-
-        elif hasattr(ti, 'is_anonymous_udt') and not ti.is_anonymous_udt():
-            res.setdefault('__name__', name)
 
         # Now we can return our dictionary of tags as the result.
         return res
@@ -2280,10 +2273,11 @@ class typeinfo_member(object):
         idaname = utils.string.of(internal.structure.v9member.get_name(tinfo, mindex))
         mname = utils.string.of(idaname)
         mtype = interface.tinfo.copy(udm.type)
+        available = reference.members.get(mid)
 
-        # Check if the member has a name and assign it as an implicit tag if so.
+        # Check if the member has a name and is tagged before assigning it.
         aname = mname if internal.structure.v9member.has_name(tinfo, mindex) else ''
-        if aname:
+        if aname and '__name__' in available:
             res.setdefault('__name__', aname)
 
         # If the member is not a gap, or it is a basic type, then there is no
@@ -2441,20 +2435,18 @@ class structure(object):
 
         # check for duplicate keys
         if d1keys & d2keys:
-            logging.info(u"{:s}({:#x}).tag() : The repeatable and non-repeatable comment for structure {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format(cls.__name__, sptr.id, utils.string.repr(utils.string.of(idaapi.get_struc_name(sptr.id))), ', '.join(d1keys & d2keys), 'repeatable' if repeatable else 'non-repeatable'))
+            logging.info(u"{:s}.get({:#x}) : The repeatable and non-repeatable comment for structure {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), sptr.id, utils.string.repr(utils.string.of(idaapi.get_struc_name(sptr.id))), ', '.join(d1keys & d2keys), 'repeatable' if repeatable else 'non-repeatable'))
 
         # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
         res = {}
         [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
 
         # Now we need to add implicit tags which are related to the structure.
+        available = reference.structure.get(sptr.id)
 
-        # If we're a frame or we're unlisted, then we don't add the implicit
-        # "__name__" tag. This way the user can select for "__name__" and use
-        # it to distinguish local types and ghost types (which always have a name).
-        excluded = ['SF_FRAME', 'SF_NOLIST']
+        # If we have the implicit name tagged, then add it to the dictionary.
         name = utils.string.of(idaapi.get_struc_name(sptr.id))
-        if name and not any([sptr.props & getattr(idaapi, attribute) for attribute in excluded if hasattr(idaapi, attribute)]):
+        if name and '__name__' in available:
             res.setdefault('__name__', name)
 
         # Now we need to do the '__typeinfo__' tag. This is going to be a little
@@ -2481,7 +2473,7 @@ class structure(object):
     def set(cls, sptr, key, value):
         '''Set the tag specified by `key` to `value` for the structure `sptr`.'''
         if value is None:
-            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format(cls.__name__, sptr.id, key, value, utils.string.escape(key, '"'), value))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.set({:#x}, {!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format('.'.join([__name__, cls.__name__]), sptr.id, key, value, utils.string.escape(key, '"'), value))
 
         # All structure tags are prioritized within repeatable comments.
         repeatable = True
@@ -2501,7 +2493,7 @@ class structure(object):
         duplicates = {item for item in state_right} & {item for item in state_wrong}
         if key in duplicates:
             sometimes_name = utils.string.of(idaapi.get_struc_name(sptr.id))
-            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for structure {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format(cls.__name__, sptr.id, key, value, "{:#x}".format(sptr.id) if sometimes_name is None else utils.string.repr(sometimes_name), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+            logging.warning(u"{:s}.set({:#x}, {!r}, {!r}) : The repeatable and non-repeatable comment for structure {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), sptr.id, key, value, "{:#x}".format(sptr.id) if sometimes_name is None else utils.string.repr(sometimes_name), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
 
         # Now we can just update the dict and re-encode to the proper comment location.
         res, state[key] = state.get(key, None), value
@@ -2510,14 +2502,14 @@ class structure(object):
 
         except internal.exceptions.DisassemblerError:
             sometimes_name = utils.string.of(idaapi.get_struc_name(sptr.id))
-            raise internal.exceptions.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the structure {:s}.".format(cls.__name__, sptr.id, key, value, 'repeatable' if where else 'non-repeatable', "{:#x}".format(sptr.id) if sometimes_name is None else utils.string.repr(sometimes_name)))
+            raise internal.exceptions.DisassemblerError(u"{:s}.set({:#x}, {!r}, {!r}) : Unable to update the {:s} comment for the structure {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, key, value, 'repeatable' if where else 'non-repeatable', "{:#x}".format(sptr.id) if sometimes_name is None else utils.string.repr(sometimes_name)))
         return res
 
     @classmethod
     def remove(cls, sptr, key, none):
         '''Remove the tag specified by `key` from the structure `sptr`.'''
         if none is not None:
-            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format(cls.__name__, sptr.id, key, none, utils.string.escape(key, '"'), value))
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}).remove({!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format(cls.__name__, sptr.id, key, none, utils.string.escape(key, '"'), value))
 
         # We prioritize the repeatable comments for tags belonging to structures.
         repeatable = True
@@ -2532,7 +2524,7 @@ class structure(object):
             # exception that attempts to describe what causes them to exist. Hopefully
             # the user figures out that they can use them to find structures they created.
             message = message_typeinfo if key == '__typeinfo__' else message_name
-            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to remove the implicit tag \"{:s}\" due to the structure being {:s}.".format(cls.__name__, sptr.id, key, none, utils.string.escape(key, '"'), message))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.remove({:#x}, {!r}, {!r}) : Unable to remove the implicit tag \"{:s}\" due to the structure being {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, key, none, utils.string.escape(key, '"'), message))
 
         # We need to read both comments to figure out where the tag is that we're trying to remove.
         comment_right = internal.structure.comment.get(sptr, repeatable)
@@ -2548,14 +2540,14 @@ class structure(object):
         # remove it if it doesn't actually exist.
         if key not in state:
             sometimes_name = utils.string.of(idaapi.get_struc_name(sptr.id))
-            raise internal.exceptions.MissingTagError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the structure {:s}.".format(cls.__name__, sptr.id, key, none, utils.string.escape(key, '"'), "{:#x}".format(sptr.id) if sometimes_name is None else utils.string.repr(sometimes_name)))
+            raise internal.exceptions.MissingTagError(u"{:s}.remove({:#x}, {!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the structure {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, key, none, utils.string.escape(key, '"'), "{:#x}".format(sptr.id) if sometimes_name is None else utils.string.repr(sometimes_name)))
 
         # If the key is in both dictionaries, then be kind and warn the user about it
         # so that they'll know that their key will still be part of the dict.
         duplicates = {item for item in state_right} & {item for item in state_wrong}
         if key in duplicates:
             sometimes_name = utils.string.of(idaapi.get_struc_name(sptr.id))
-            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for structure {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format(cls.__name__, sptr.id, key, none, "{:#x}".format(sptr.id) if sometimes_name is None else utils.string.repr(sometimes_name), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+            logging.warning(u"{:s}.remove({:#x}), {!r}, {!r}) : The repeatable and non-repeatable comment for structure {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), sptr.id, key, none, "{:#x}".format(sptr.id) if sometimes_name is None else utils.string.repr(sometimes_name), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
 
         # Now we can just pop the value out of the dict and re-encode back into the comment.
         res = state.pop(key)
@@ -2564,7 +2556,7 @@ class structure(object):
 
         except internal.exceptions.DisassemblerError:
             sometimes_name = utils.string.of(idaapi.get_struc_name(sptr.id))
-            raise internal.exceptions.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the structure {:s}.".format(cls.__name__, sptr.id, key, none, 'repeatable' if repeatable else 'non-repeatable', "{:#x}".format(sptr.id) if sometimes_name is None else utils.string.repr(sometimes_name)))
+            raise internal.exceptions.DisassemblerError(u"{:s}.remove({:#x}, {!r}, {!r}) : Unable to update the {:s} comment for the structure {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, key, none, 'repeatable' if repeatable else 'non-repeatable', "{:#x}".format(sptr.id) if sometimes_name is None else utils.string.repr(sometimes_name)))
         return res
 
 class member(object):
@@ -2593,7 +2585,7 @@ class member(object):
 
         # Check if decoding from both comments results in duplicate keys.
         if d1keys & d2keys:
-            logging.info(u"{:s}({:#x}).tag() : The repeatable and non-repeatable comment for {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format(cls.__name__, mptr.id, utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id))), ', '.join(d1keys & d2keys), 'repeatable' if repeatable else 'non-repeatable'))
+            logging.info(u"{:s}.get({:#x}) : The repeatable and non-repeatable comment for {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), mptr.id, utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id))), ', '.join(d1keys & d2keys), 'repeatable' if repeatable else 'non-repeatable'))
 
         # Merge the dictionaries into one before adding implicit tags.
         res = {}
@@ -2603,10 +2595,11 @@ class member(object):
         # the name is not a default, and the other is to include it in the rendered type.
         idaname = idaapi.get_member_name(mptr.id) or ''
         name = utils.string.of(idaname)
+        available = reference.members.get(mptr.id)
 
-        # If the name is defined with something other than the default, then its a tag.
+        # If the name is defined and it's tagged, then go ahead and add it.
         aname = name if internal.structure.member.has_name(mptr) else ''
-        if aname:
+        if aname and '__name__' in available:
             res.setdefault('__name__', aname)
 
         # The next tag is the type information that we'll need to explicitly check for
@@ -2639,7 +2632,7 @@ class member(object):
         # be rendered. Hopefully it's not mangled in some way that will need
         # consideration if it's reapplied by the user.
         if ok and has_typeinfo:
-            realname = aname or ''
+            realname = name or internal.structure.member.default_name(sptr, mptr)
             validname = interface.name.member(realname) if realname else ''
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
             res.setdefault('__typeinfo__', ti_s)
@@ -2652,7 +2645,7 @@ class member(object):
 
         # Guard against a bunk type being used to set the value.
         if value is None:
-            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format(cls.__name__, mptr.id, key, value, utils.string.escape(key, '"'), value))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.set({:#x}, {!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, value, utils.string.escape(key, '"'), value))
 
         # Before we do absolutely anything, we need to check if the user is updating
         # one of the implicit tags and act on them by assigning their new value.
@@ -2678,19 +2671,19 @@ class member(object):
         # Check if the key is a dupe so that we can warn the user about it.
         duplicates = {item for item in state_right} & {item for item in state_wrong}
         if key in duplicates:
-            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for member {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), mptr.id, key, value, utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id))), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+            logging.warning(u"{:s}.set({:#x}, {!r}, {!r}) : The repeatable and non-repeatable comment for member {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), mptr.id, key, value, utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id))), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
 
         # Now we just need to modify the state with the new value and re-encode it.
         res, state[key] = state.get(key, None), value
         if not idaapi.set_member_cmt(mptr, utils.string.to(comment.encode(state)), where):
-            raise internal.exceptions.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, value, 'repeatable' if where else 'non-repeatable', utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id)))))
+            raise internal.exceptions.DisassemblerError(u"{:s}.set({:#x}, {!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, value, 'repeatable' if where else 'non-repeatable', utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id)))))
         return res
 
     @classmethod
     def remove(cls, mptr, key, none):
         '''Remove the tag specified by `key` from the structure member `mptr`.'''
         if none is not None:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type {!r}.".format('database', ea, key, none, utils.string.escape(key, '"'), none))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.remove({:#x}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type {!r}.".format('.'.join([__name__, cls.__name__]), ea, key, none, utils.string.escape(key, '"'), none))
         repeatable = True
 
         # Check if the key is an implicit tag that we're being asked to
@@ -2716,19 +2709,19 @@ class member(object):
         # If the key is not in the dictionary that we determined, then it's missing
         # and so we need to bail with an exception since it doesn't exist.
         if key not in state:
-            raise internal.exceptions.MissingTagError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, none, utils.string.escape(key, '"'), utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id)))))
+            raise internal.exceptions.MissingTagError(u"{:s}.remove({:#x}, {!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, none, utils.string.escape(key, '"'), utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id)))))
 
         # If there's any duplicate keys and the user's key is one of them, then warn
         # the user about it so they'll know that they'll need to remove it twice.
         duplicates = {item for item in state_right} & {item for item in state_wrong}
         if key in duplicates:
-            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for member {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), mptr.id, key, none, utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id))), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+            logging.warning(u"{:s}.remove({:#x}, {!r}, {!r}) : The repeatable and non-repeatable comment for member {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), mptr.id, key, none, utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id))), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
 
         # The very last thing to do is to remove the key from the dictionary
         # and then encode our updated state into the member's comment.
         res = state.pop(key)
         if not idaapi.set_member_cmt(mptr, utils.string.to(comment.encode(state)), where):
-            raise internal.exceptions.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, none, 'repeatable' if repeatable else 'non-repeatable', utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id)))))
+            raise internal.exceptions.DisassemblerError(u"{:s}.remove({:#x}, {!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, none, 'repeatable' if repeatable else 'non-repeatable', utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id)))))
         return res
 
 class hexfunction(object):
@@ -2985,10 +2978,10 @@ class hexvariable(object):
         # is basically handled by the `internal.hexrays.variable` namespace.
         name = internal.hexrays.variable.get_name(cfunc, locator)
         typeinfo = internal.hexrays.variable.get_type(cfunc, locator)
+        available = reference.hexvariable.get(locator, target=cfunc)
 
-        # when processing the name, we need to distinguish whether there's a
-        # custom name applied or a regular name chosen by the decompiler.
-        if internal.hexrays.variable.has_user_name(cfunc, locator, name):
+        # if the name was tagged, then we can add it to our dictionary.
+        if '__name__' in available:
             decoded.setdefault('__name__', name)
 
         # when determining whether the type has a tag, we need to distinguish
