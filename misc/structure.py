@@ -7168,7 +7168,7 @@ class structure_t(object):
         owner = self.ptr
         if isinstance(owner, idaapi.tinfo_t):
             cls, sid, til = self.__class__, interface.tinfo.identifier(owner), interface.tinfo.library(owner)
-            ordinal, name = interface.tinfo.ordinal(owner), utils.string.of(owner.get_type_name())
+            ordinal, name = interface.tinfo.ordinal(owner), naming.get(owner) or owner.get_type_name()
             if ordinal > 0:
                 ok = idaapi.del_numbered_type(til, ordinal)
             elif name:
@@ -7379,7 +7379,7 @@ class structure_t(object):
         ida_string = utils.string.to(string)
 
         # validate the name
-        res = interface.name.identifier(ida_string[:])
+        res = interface.name.identifier(ida_string[:] if ida_string else u'')
         if ida_string and ida_string != res:
             logging.info(u"{:s}({:#x}).name({!r}) : Stripping invalid chars from structure name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), sid, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
@@ -7397,7 +7397,7 @@ class structure_t(object):
             elif name == expected:
                 return expected
 
-            oldname = naming.set(owner, expected)
+            oldname = naming.set(owner, expected) if expected else naming.remove(owner)
 
             # we got an ordinal, so we can use that to get the new type.
             if ordinal:
@@ -7425,17 +7425,17 @@ class structure_t(object):
         # otherwise we're dealing with a `struc_t` which doesn't store a name
         # that we need to refresh due to using an identifier exclusively.
         else:
-            oldname = naming.set(owner, expected)
+            oldname = naming.set(owner, expected) if expected else naming.remove(owner)
             assigned = naming.get(owner) or ''
 
         # if we successfully assigned the new name, then we need to update our
         # cached name with it prior to returning the old name.
-        if assigned == expected:
+        if not expected or assigned == expected:
             self.__name__ = assigned
             return oldname
 
         # if they didn't match, then log a warning and return what was assigned.
-        logging.warning(u"{:s}({:#x}).name({!r}) : The name ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), sid, string, utils.string.repr(utils.string.of(assigned)), utils.string.repr(expected)))
+        logging.warning(u"{:s}({:#x}).name({!r}) : The name \"{:s}\" that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), sid, string, utils.string.escape(utils.string.of(assigned), '"'), utils.string.repr(expected)))
         return assigned
 
     @property
