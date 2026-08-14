@@ -2624,3 +2624,37 @@ class ctree(object):
         cfunc = function(func)
         ea, itp = internal.declaration.preciser.resolve(cfunc, item, position)
         return function.set_comment(cfunc, ea, itp, comment)
+
+class ctext(object):
+    """
+    This namespace provides various tools that can be used with the CTEXT
+    produced when decompiling a function and fetching the pseudocode. It
+    contains functionality for lexing the decompiled text, or finding the
+    position of an item within the text. The functions within this namespace are
+    primarily used with the decompiled function type or the lines from the
+    pseudocode.
+    """
+
+    @classmethod
+    def has(cls, func):
+        '''Return whether the decompiled function specified by `func` has generated its text.'''
+        if not isinstance(func, (idaapi.cfunc_t, idaapi.cfuncptr_t)):
+            raise exceptions.InvalidParameterError(u"{:s}.has({!r}) : Unable access the state of the given parameter due to it being of an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), func, func.__class__))
+        res = func.statebits & idaapi.CFS_TEXT
+        return True if res else False
+
+    @classmethod
+    def xy(cls, func, item):
+        '''Return the column and line of the specified CTREE `item` from the decompilation of the function `func`.'''
+        cfunc, index = func, item.index if isinstance(item, ida_hexrays.citem_t) else item
+        if not isinstance(func, (idaapi.cfunc_t, idaapi.cfuncptr_t)):
+            raise exceptions.InvalidParameterError(u"{:s}.xy({!r}, {:d}) : Unable access the state of the given parameter due to it being of an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), cfunc, index, func.__class__))
+        elif not cfunc.statebits & ida_hexrays.CFS_TEXT:
+            return ()
+        citem = cfunc.treeitems[index]
+        xy = cfunc.find_item_coords(citem)
+        if all(item is not None for item in xy):
+            return xy
+        if citem.op == ida_hexrays.cit_block and citem.cinsn.cblock.size():
+            return cls.xy(cfunc, citem.cinsn.cblock.front())
+        return None
