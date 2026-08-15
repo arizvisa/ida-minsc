@@ -779,10 +779,17 @@ class v9member(object):
         return mindex
 
     @classmethod
-    def has_name(cls, *args):
-        '''Return whether the name of the specified member is user-defined.'''
+    def has_name(cls, *args, **name):
+        '''Return whether the `name` of the specified member is user-defined.'''
         tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'has_name'])
-        mid, name = interface.tinfo.member_identifier(tinfo, mindex), utils.string.of(udm.name)
+        mid, mname = interface.tinfo.member_identifier(tinfo, mindex), utils.string.of(udm.name)
+
+        # If we were given an explicit name, then use that one.
+        if 'name' in name:
+            res = name.pop('name')
+        else:
+            res = mname or ''
+        name = res
 
         # If the member is a gap (v9 api), then we act as if there's no name
         # applied. This is different from the disassembler, because in the v9
