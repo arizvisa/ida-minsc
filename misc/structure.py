@@ -1423,16 +1423,19 @@ class member(object):
         return 0 if mptr.id == sptr.get_member(0).id else 1
 
     @classmethod
-    def has_name(cls, mptr):
-        '''Return whether the name of the member specified by `mptr` is user-defined.'''
+    def has_name(cls, mptr, **name):
+        '''Return whether the `name` of the member specified by `mptr` is user-defined.'''
         packed = idaapi.get_member_by_id(mptr.id)
         if not packed:
             raise E.MemberNotFoundError(u"{:s}.has_name({:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, mptr.id))
         mptr, fullname, sptr = packed
 
-        # now we can grab the name of the member. we could also extract
-        # it from `fullname`, but this is how i've been always doing it.
-        res = idaapi.get_member_name(mptr.id) or ''
+        # if the user gave us an explicit name to test against the member, then
+        # we will go ahead and use it. otherwise, we can just grab it normally.
+        if 'name' in name:
+            res = name.pop('name')
+        else:
+            res = utils.string.of(idaapi.get_member_name(mptr.id)) or ''
         name = utils.string.of(res)
 
         # if the sptr is not a function frame, then this is easy and we
