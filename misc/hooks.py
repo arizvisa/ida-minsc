@@ -2807,25 +2807,19 @@ class structurenaming(changingchanged):
     @classmethod
     def is_general_name(cls, sid, name):
         '''Return true if the structure or union in `sid` has a given `name` that is generic and was decided by the disassembler.'''
-        sptr = internal.structure.by_identifier(sid) if internal.structure.has(sid) else None
-        prefixes = {'struc', 'struct', 'union'}
+        excluded = [getattr(idaapi, attribute) for attribute in ['SF_FRAME', 'SF_NOLIST'] if hasattr(idaapi, attribute)]
+        sid, sptr = (sid, idaapi.get_struc(sid)) if isinstance(sid, internal.types.integer) else (sid.id, sid)
 
-        # If we couldn't get the structure, then we can only do a test for the
-        # prefixes since we can't check if the structure if a frame or a union.
-        if not sptr:
-            prefix, suffix = name.split('_', 1) if name.startswith(('struc_', 'union_')) else ('', name)
-            return prefix in prefixes and all(digit in '0123456789' for digit in suffix)
-
-        # Otherwise, we need to check if we were given a frame. Normally, the
-        # user shouldn't be able to rename a frame structure as the disassembler
-        # won't really like it, but we support doing this anyways.
-        if internal.structure.frame(sptr):
-            prefix, suffix = name.split(' ', 1) if name.startswith('$ ') else ('', name)
-            return prefix == '$' and all(digit in '0123456789ABCDEF' for digit in suffix.upper())
-
-        # Now we have a regular structure. We can just test its prefix normally.
-        prefix, suffix = name.split('_', 1) if name.startswith(('struc_', 'union_')) else ('', name)
-        return prefix in prefixes and all(digit in '0123456789' for digit in suffix)
+        # If the structure is invalid, unlisted, or a frame, then it's nameless.
+        if not getattr(cls, '__tracking_enabled__', False):
+            return True
+        elif not sptr:
+            return True
+        elif not excluded:
+            return not internal.structure.naming.has(sid, name)
+        elif not any([sptr.props & flag for flag in excluded]):
+            return not internal.structure.naming.has(sid, name)
+        return False
 
     @classmethod
     def enable_tracking(cls, *atype):
@@ -2891,12 +2885,9 @@ class structurenaming(changingchanged):
         sid = interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
 
         # All we need to do is grab its name and check if it's a general name or
-        # a user-specified one. We also check that the structure is listed,
-        # since if it isn't then it's technically nameless. If we discover it is
-        # listed and a user-specified name, then we can go ahead and increment
-        # its reference count for the "__name__" tag.
-        name, listedQ = internal.structure.naming.get(sptr), not sptr.props & idaapi.SF_NOLIST if hasattr(sptr, 'props') else True
-        if not cls.is_general_name(sid, name) and listedQ:
+        # a user-specified one.
+        name = internal.structure.naming.get(sptr)
+        if not cls.is_general_name(sptr, name):
             internal.tags.reference.structure.increment(sid, '__name__')
 
         # Next we need to increment the "__typeinfo__" tag. We don't have a real
@@ -3366,6 +3357,15 @@ class memberscopecommon(changingchanged):
     """
 
     @classmethod
+    def is_general_field(cls, sid, mid):
+        '''Return true if the specified `name` is the default field name that was chosen by the disassembler for the member `mid` of structure `sid`.'''
+        ok = internal.structure.has(sid) and internal.structure.member.has(mid)
+        if not ok:
+            return True
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sid, mid)
+        return not internal.structure.member.has_name(mptr)
+
+    @classmethod
     def delete_refs(cls, sid, mid):
         '''Remove all the references from the member `mid` belonging to the structure in `sid`.'''
         if not internal.structure.member.has(mid):
@@ -3400,9 +3400,14 @@ class memberscopecommon(changingchanged):
         '''struc_member_created(sptr, mptr)'''
         description = cls.__name__
         mowner, mindex, mptr = internal.structure.members.by_identifier(sid, mid)
-
-        # There really isn't anything for us to do, so we can just return.
         logging.debug(u"{:s}.created({:#x}, {:#x}) : Received memberscope.created event for member {:#x}.".format('.'.join([__name__, cls.__name__]), sid, mid, mid))
+
+        # Check if we need to adjust the "__name__" tag for the member.
+        available = internal.tags.reference.members.get(mid)
+        if cls.is_general_field(sid, mid):
+            internal.tags.reference.members.decrement(mid, '__name__') if '__name__' in available else ()
+        else:
+            internal.tags.reference.members.increment(mid, '__name__') if '__name__' not in available else ()
         return
 
     @classmethod
@@ -3643,10 +3648,7 @@ class membernamingcommon(changingchanged):
         # disassembler api. Then we can use them to grab the default name for
         # the member. Only thing left to do is to return the comparison result.
         mowner, mindex, mptr = internal.structure.members.by_identifier(sid, mid)
-        expected = internal.structure.member.default_name(mowner, mptr)
-
-        # FIXME: should we check for things like "anonymous" too?
-        return name == expected
+        return not internal.structure.member.has_name(mptr, name=name)
 
     @classmethod
     def updater(cls):
@@ -5137,98 +5139,29 @@ class localtypesmonitor_84(object):
         return
 
     @classmethod
-    def is_name_general(cls, ordinal, tid, name):
-        '''Return true if the `name` for the given `ordinal` and type `tid` is the default type name that was chosen by the disassembler.'''
-        prefixes = {'struct', 'struc', 'union', 'enum'}
+    def is_name_general(cls, ordinal, type, name):
+        '''Return true if the `name` for the given `ordinal` and `type` is the default type name that was chosen by the disassembler.'''
+        til = interface.tinfo.library(type)
 
-        # XXX: IDA uses both "struct" (in types) and "struc" (in structures)
-
-        # Technically the default name chosen by the disassembler for a new type
-        # is prefixed with either "struc_" or "enum_" and not "union_". Still,
-        # we check for it just in case the user explicitly specified it.
-        if not name.startswith(tuple(map("{:s}_".format, prefixes))):
-            return False
-
-        # Check if the type is anonymous. The disassembler assumes that a type
-        # is anonymous if it begins with a '$', but we also verify the length
-        # since in v8.4 the disassembler uses an MD5 hash for anonymous types.
-        elif name.startswith('$') and len(name[1:]) == 0x20:
+        # If we're not tracking anything yet, then we can assume the defaults.
+        if not getattr(cls, '__tracking_enabled__', False):
             return True
-
-        # Split up the prefix from its suffix, then verify the prefix is valid
-        # and that the suffix is numeric.
-        prefix, suffix = name.split('_', 1)
-        return prefix in prefixes and all(digit in '0123456789' for digit in suffix)
+        # If this type has an anonymous name, then we don't need to do anything.
+        elif hasattr(type, 'is_anonymous_udt') and type.is_anonymous_udt():
+            return True
+        # If the type is not chooseable, then the name is general.
+        elif hasattr(idaapi, 'is_type_choosable') and not idaapi.is_type_choosable(til, ordinal):
+            return True
+        # If we were given a bogus id, then assume it's an untouched name.
+        elif type == idaapi.BADADDR:
+            return True
+        return not internal.structure.naming.has(type, name, ordinal=ordinal)
 
     @classmethod
     def is_field_general(cls, ordinal, mindex, name):
         '''Return true if the `name` for the member at `mindex` of the type in `ordinal` is a default field name that was chosen by the disassembler.'''
         state = __import__('hook').localtypesmonitor
-        prefixes, tinfo = {'field'}, state.get_type(ordinal)
-
-        # Start by populating the `idaapi.udm_t` with the information for the
-        # given member. This way we can extract the offset and do a proper
-        # comparison of what we expect the field name to actually be.
-        udm = idaapi.udm_t()
-        udm.offset = mindex
-
-        # Now we can search for the member at the given index. If we couldn't
-        # find it then we can't really check its name. So, log our failure and
-        # return that the field is a general name (since it doesn't have one).
-        newindex = tinfo.find_udm(udm, idaapi.STRMEM_INDEX)
-        if newindex < 0:
-            logging.warning(u"{:s}.is_field_general({:d}, {:d}, {!r}) : Unable to find a member at index {:d} of the type at ordinal {:d}.".format('.'.join([__name__, cls.__name__]), ordinal, mindex, name, mindex, ordinal))
-            return True
-
-        # Before doing anything, we need to check if the name of the member is
-        # anonymous. Normally we explicitly check, but the disassembler gives us
-        # the `udm_t.is_anonymous_udm` method which we can use.
-        elif udm.is_anonymous_udm():
-            return True
-
-        # Next we'll figure out what the expected name should be. If our type is
-        # a union, then the field is suffixed with the index. Otherwise, the
-        # field is suffixed with the byte offset.
-        elif tinfo.is_union():
-            expected, suffix_integer = "field_{:d}".format(newindex), newindex
-
-        elif tinfo.is_struct():
-            bits = udm.offset
-            bytes, _ = divmod(bits, 8)
-            expected, suffix_integer = "field_{:X}".format(bytes), bytes
-
-        else:
-            logging.error(u"{:s}.is_field_general({:d}, {:d}, {!r}) : Unable to determine the default field name for the member at index {:d} of the unsupported type \"{:s}\" (ordinal {:d}).".format('.'.join([__name__, cls.__name__]), ordinal, mindex, name, mindex, interface.tinfo.quoted(tinfo), ordinal))
-            return True
-
-        # The only default field name that exists in v8.4 of the type library
-        # are names that begin with "field_". There are some defaults chosen
-        # when using "Create struct from selection" (CreateStructFromData), but
-        # since the default name for those is dependent on the type being used
-        # for the field we don't bother trying to track figure it out.
-
-        # FIXME: Is is worth attempting to distinguish the default field names
-        #        from the "CreateStrucFromData" action?
-
-        # So we now have a name that we expect to be used for the field. If we
-        # have an exact match, then can be sure that it was not from the user.
-        if name == expected:
-            return True
-
-        # Next in order to allow the user to specify a field name that will be
-        # treated as a default one, we'll check if it uses the "field_" prefix.
-        elif not name.startswith('field_'):
-            return False
-
-        # We now know that the member name is prefixed correctly, so we need
-        # to split it and then check that the pieces meet our requirements. Our
-        # requirements are that the suffix, containing the offset, is specified
-        # as either decimal (the default) or hexadecimal.
-        field, suffix = name.split('_', 1) if '_' in name else (name, '')
-        expected_base10, expected_base16 = (string.format(suffix_integer) for string in ["{:x}", "{:d}"])
-
-        # Finally we can do our tests against the field prefix and its suffix.
-        return field in prefixes and suffix.lower() in {expected_base10, expected_base16}
+        return not internal.structure.v9member.has_name(state.get_type(ordinal), mindex, name=name)
 
     @classmethod
     def enable_tracking(cls, *atype):
@@ -5355,6 +5288,7 @@ class localtypesmonitor_84(object):
         # also figure out which type id it uses.
         newsid, newname, newcomment, newmembers = state.added(ordinal, True)
         sid = oldsid if newsid == idaapi.BADADDR else newsid
+        available = internal.tags.reference.structure.get(sid)
 
         # First check its type, we only support structures and unions atm.
         tinfo, aliased = state.get_type(ordinal), interface.tinfo.at_ordinal(ordinal)
@@ -5365,10 +5299,10 @@ class localtypesmonitor_84(object):
             return sid, newname, newcomment, newmembers
 
         # Now check if we need to add a tag for the name or its type.
-        user_specified = not cls.is_name_general(ordinal, sid, newname)
+        user_specified = not cls.is_name_general(ordinal, tinfo, newname)
         if user_specified:
             logging.debug(u"{:s}.type_added({:d}, {:d}) : Addition of type at ordinal {:d} ({:#x}) with the name \"{!s}\" resulted in adding the implicit name tag.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(newname, '"')))
-            internal.tags.reference.structure.increment(sid, '__name__')
+            internal.tags.reference.structure.increment(sid, '__name__') if '__name__' not in available else ()
 
         if cls.is_type_tracked(ordinal, sid, newname):
             logging.debug(u"{:s}.type_added({:d}, {:d}) : Addition of type at ordinal {:d} ({:#x}) with the name \"{!s}\" was detected as needing to be tracked.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(newname, '"')))
@@ -5532,13 +5466,13 @@ class localtypesmonitor_84(object):
 
                 # If the name was originally user-specified, but there's no
                 # count for the tag attached to the member, then fix it.
-                elif renamed[0] and '__name__' not in original:
+                elif oldname != newname and not cls.is_field_general(ordinal, newindex, newname) and '__name__' not in original:
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Rename for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" required us to fix it.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, oldname, newname))
                     internal.tags.reference.members.increment(mid, '__name__')
 
                 # If the names aren't the same but the generality is, then we
                 # just log that we didn't need to do anything for it.
-                elif oldname != newname:
+                elif operator.eq(*renamed) and oldname != newname:
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Rename for the changed member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" did not need an adjustment.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, oldname, newname))
 
                 # Last thing we need to do is to figure out whether the type was
@@ -6285,19 +6219,31 @@ class decompilermonitor(object):
         # Next we go through all of the new variables and see if we can map it
         # to one of the previous values if they're available. First grab the
         # comments, decode them, and then increment their tag reference count.
-        for locator, variable in newvariables:
-            decoded = internal.comment.decode(variable.comment or '')
-            [internal.tags.reference.hexvariable.increment(locator, name, target=cfunc) for name in decoded]
+        for locatorish, newvariable in newvariables:
+            decoded = internal.comment.decode(newvariable.comment or '')
+            [internal.tags.reference.hexvariable.increment(locatorish, name, target=cfunc) for name in decoded]
 
             # Grab the previously preserved values for the variable.
-            id = locator.defea, locator.atype, locator.alocinfo
+            id = defea, atype, alocinfo = locatorish.defea, locatorish.atype, locatorish.alocinfo
+            locator = internal.hexrays.variable.new_locator(defea, internal.hexrays.variable.copy_vdloc(atype, alocinfo))
+
             oldvariable, oldtagged = preserved[id] if id in preserved else (None, {})
 
-            # If the name is user-specified, or the variable had the "__name__"
-            # tag, then increment it so that the user-specified name is tagged.
-            name, comment, type = variable
-            if '__name__' in oldtagged or name.is_user_name:
-                internal.tags.reference.hexvariable.increment(locator, '__name__', target=cfunc)
+            oldnameish, oldcomment, oldtype = oldvariable if oldvariable else (('', False), '', idaapi.tinfo_t())
+            newnameish, newcomment, newtype = newvariable
+
+            oldname, olduser = oldnameish
+            newname, newuer = newnameish
+
+            # If the name hasn't changed, then skip over it. This way we can
+            # avoid a potential inefficiency since `has_user_name` below
+            # executes in linear time.
+            if oldname == newname:
+                pass
+
+            # XXX: O(n) time.
+            elif internal.hexrays.variable.has_user_name(cfunc, locator, newname):
+                internal.tags.reference.hexvariable.increment(locator, '__name__', target=cfunc) if '__name__' not in oldtagged else ()
 
             # If the type was changed from the previous value or if the variable
             # had already been tagged with "__typeinfo__, then we go and restore
@@ -6509,6 +6455,14 @@ class decompilermonitor(object):
             internal.tags.reference.hexvariable.increment(newlocator, '__typeinfo__', target=cfunc)
         return
 
+    @classmethod
+    def is_general_name(cls, cfunc, locator, name):
+        '''Return true if the given `name` for the variable specified by `locator` of the decompiled function `cfunc` is the default.'''
+        if name:
+            expected = internal.hexrays.variable.default_name(cfunc, locator)
+            return name == expected
+        return False
+
     ### Utilities for maintaining the state of the decompiler variable names.
     @classmethod
     def __handle_lvar_name_changed(cls, function, old, new):
@@ -6517,30 +6471,41 @@ class decompilermonitor(object):
         fn = internal.hexrays.function.address(cfunc)
 
         # First unpack the parameters so that we can compare the names.
-        oldlocator, oldname, olduser = (None, '', False) if old is None else (old.locator, old.name, old.is_user_name)
-        newlocator, newname, newuser = new.locator, new.name, new.is_user_name
+        oldlocatorish, oldname, olduser = (None, '', False) if old is None else (old.locator, old.name, old.is_user_name)
+        newlocatorish, newname, newuser = new.locator, new.name, new.is_user_name
 
-        # If the variable location matches, then we will need to check whether
+        # Now we use the unpacked parameters to recreate the variable locators
+        # so that we can tell if the variables are as the same location.
+        defea, atype, alocinfo = newlocatorish
+        vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+        newlocator = internal.hexrays.variable.new_locator(defea, vdloc)
+
+        # If there is an old-variable, then create the actual locator.
+        # Otherwise, set it to None so that we know it might be a new variable.
+        if oldlocatorish:
+            defea, atype, alocinfo = oldlocatorish
+            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+            oldlocator = internal.hexrays.variable.new_locator(defea, vdloc)
+        else:
+            oldlocator = None
+
+        # If the variable location matches, then we will need to verify that
+        # the name was actually change. If it was changed to a general name,
+        # then decrement its count. Otherwise, go ahead and increment it.
         # the tag name exists or not. If the name was changed and the new name
         # has a value, then increment its reference count.
-        exists = '__name__' in internal.tags.reference.hexvariable.get(newlocator, target=cfunc)
-        if oldlocator == newlocator and oldname != newname and newname:
-            if not exists:
-                internal.tags.reference.hexvariable.increment(newlocator, '__name__', target=cfunc)
+        available = internal.tags.reference.hexvariable.get(newlocator, target=cfunc)
+        if oldlocatorish == newlocatorish and oldname != newname:
+            is_general_name = cls.is_general_name(cfunc, newlocator, newname)
+            if is_general_name:
+                internal.tags.reference.hexvariable.decrement(newlocator, '__name__', target=cfunc) if '__name__' in available else ()
+            else:
+                internal.tags.reference.hexvariable.increment(newlocator, '__name__', target=cfunc) if '__name__' not in available else ()
             return
 
-        # Otherwise, if the name was changed with the new name being empty, then
-        # the name is removed and we need to remove the tag reference to it.
-        elif oldlocator == newlocator and oldname != newname and not newname:
-            if exists:
-                internal.tags.reference.hexvariable.decrement(newlocator, '__name__', target=cfunc)
-            return
-
-        # If there was no previous name, then go ahead and add it.
-        elif oldlocator is None:
-            if not exists:
-                internal.tags.reference.hexvariable.increment(newlocator, '__name__', target=cfunc)
-            return
+        # If there was no previous name and it's not a default, then add it.
+        elif oldlocator is None and not cls.is_general_name(cfunc, newlocator, newname):
+            internal.tags.reference.hexvariable.increment(newlocator, '__name__', target=cfunc) if '__name__' not in available else ()
         return
 
     ### Entrypoints for all of the related hooks sent by the decompiler.
