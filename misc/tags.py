@@ -1537,9 +1537,9 @@ class address(object):
     @classmethod
     def set_typeinfo(cls, ea, value, forced=False):
         '''Apply the type information specified by `value` to the item at address `ea`.'''
-        ea, info, key = int(ea), interface.tinfo.parse(None, value, idaapi.PT_SIL) if isinstance(value, internal.types.string) else value, '__typeinfo__'
+        ea, info = int(ea), interface.tinfo.parse(None, value, idaapi.PT_SIL) if isinstance(value, internal.types.string) else value
         if info is None:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to parse the provided string ({!s}) into a type declaration.".format('database', ea, key, value, utils.string.repr(value), ea))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set_typeinfo({:#x}, {!r}) : Unable to parse the provided string ({!s}) into a type declaration.".format('.'.join([__name__, cls.__name__]), ea, value, utils.string.repr(value), ea))
 
         try:
             rt, entrypoint = interface.addressOfRuntimeOrStatic(ea)
@@ -1549,29 +1549,36 @@ class address(object):
         except LookupError:
             result, ok = interface.address.typeinfo(ea), interface.address.apply_typeinfo(ea, info)
             if not ok:
-                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply the given type {!s} to the address ({:#x}).".format('database', ea, key, value, interface.tinfo.quoted(info), ea))
+                raise internal.exceptions.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!r}) : Unable to apply the given type {!s} to the address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, value, interface.tinfo.quoted(info), ea))
             return result
 
         # Now we can apply the type to the address if it's runtime-linked.
         if rt:
-            ti = info if forced else interface.function.pointer(info)
+            if forced:
+                ti = info
+            elif info.is_funcptr() or info.is_func():
+                ti = interface.function.pointer(info)
+            elif not info.is_ptr():
+                ti = interface.tinfo.pointer(info)
+            else:
+                ti = info
 
             # If we didn't get a type back, then we failed during promotion.
             if ti is None:
-                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to promote type {!s} to a function pointer for the runtime-linked address ({:#x}).".format('database', ea, key, value, interface.tinfo.quoted(ti) if ti else "\"{:s}\"".format(utils.string.escape(value, '"')), ea))
+                raise internal.exceptions.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!r}) : Unable to promote type {!s} to a function pointer for the runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, value, interface.tinfo.quoted(ti) if ti else "\"{:s}\"".format(utils.string.escape(value, '"')), ea))
 
             # Otherwise warn the user about the dirty thing we just did.
             elif ti is not info:
-                logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Promoted the given type {!s} to a pointer before applying it to the runtime-linked address ({:#x}).".format('database', ea, key, value, interface.tinfo.quoted(ti), ea))
+                logging.warning(u"{:s}.set_typeinfo({:#x}, {!r}) : Promoted the given type {!s} to a pointer before applying it to the runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, value, interface.tinfo.quoted(ti), ea))
 
             # Now we can just apply our tinfo_t to the address.
             result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, ti)
             if not ok:
-                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply the given type {!s} to runtime-linked address ({:#x}).".format('database', ea, key, value, interface.tinfo.quoted(ti), ea))
+                raise internal.exceptions.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!r}) : Unable to apply the given type {!s} to runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, value, interface.tinfo.quoted(ti), ea))
             return result
 
         # Otherwise, we're tagging a function and this is the wrong classmethod.
-        raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply the given type {!s} to function prototype ({:#x}).".format('database', ea, key, value, interface.tinfo.quoted(info), ea))
+        raise internal.exceptions.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!r}) : Unable to apply the given type {!s} to function prototype ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, value, interface.tinfo.quoted(info), ea))
 
     @classmethod
     def remove(cls, ea, key, none):
