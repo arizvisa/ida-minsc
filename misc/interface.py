@@ -15050,8 +15050,20 @@ class name(object):
         elif node.identifier(ea):
             return internal.netnode.name.get(ea)
 
-        # otherwise we can use `idaapi.get_ea_name` with the flags for the address name.
-        aname = idaapi.get_ea_name(ea, *flags) if flags else idaapi.get_ea_name(ea, idaapi.GN_LOCAL)
+        # now we need to check if we were given a `GN_LOCAL` flag, which only
+        # makes sense inside a function. this is because the disassembler will
+        # fall back to a global name if a `GN_LOCAL` one is not found. so, to
+        # differentiate, we do an equivalence check between the local and global
+        # names.
+        fn, [flag] = idaapi.get_func(ea), flags if flags else [0]
+        iterable = (idaapi.get_ea_name(ea, flags) for flags in [0, idaapi.GN_LOCAL])
+        globalname, localname = map(internal.utils.string.of, iterable)
+        if flag & idaapi.GN_LOCAL and fn and range.start(fn) == ea:
+            aname = '' if localname == globalname else localname
+
+        # otherwise, we can just trust the flag that we were given.
+        else:
+            aname = idaapi.get_ea_name(ea, flag)
         return internal.utils.string.of(aname) or None
 
     @classmethod
