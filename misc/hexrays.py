@@ -1526,7 +1526,8 @@ class variable(object):
         # grab the function and then use everything to get the default name so
         # that we can apply it and return the old one back to the caller.
         cfunc = function(lvar.defea) if fn is None else fn
-        default = cls.member_name(cfunc, lvar) or cls.default_name(cfunc, lvar)
+        #default = cls.member_name(cfunc, lvar) or cls.default_name(cfunc, lvar)
+        default = cls.default_name(cfunc, lvar)
         return cls.set_name(cfunc, lvar, default)
 
     @classmethod
