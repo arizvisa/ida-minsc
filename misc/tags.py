@@ -1537,19 +1537,19 @@ class address(object):
     @classmethod
     def set_typeinfo(cls, ea, value, forced=False):
         '''Apply the type information specified by `value` to the item at address `ea`.'''
-        info, key = interface.tinfo.parse(None, value, idaapi.PT_SIL) if isinstance(value, internal.types.string) else value, '__typeinfo__'
+        ea, info, key = int(ea), interface.tinfo.parse(None, value, idaapi.PT_SIL) if isinstance(value, internal.types.string) else value, '__typeinfo__'
         if info is None:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to parse the provided string ({!s}) into a type declaration.".format('database', ea, key, value, utils.string.repr(value), ea))
 
         try:
-            rt, ea = interface.addressOfRuntimeOrStatic(ea)
+            rt, entrypoint = interface.addressOfRuntimeOrStatic(ea)
 
         # If we hit an exception, then we're not a function and all
         # we need to do is to apply our tinfo_t to the address.
         except LookupError:
             result, ok = interface.address.typeinfo(ea), interface.address.apply_typeinfo(ea, info)
             if not ok:
-                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply the given type ({!s}) to the address ({:#x}).".format('database', ea, key, value, utils.string.repr("{!s}".format(info)), ea))
+                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply the given type {!s} to the address ({:#x}).".format('database', ea, key, value, interface.tinfo.quoted(info), ea))
             return result
 
         # Now we can apply the type to the address if it's runtime-linked.
@@ -1558,20 +1558,20 @@ class address(object):
 
             # If we didn't get a type back, then we failed during promotion.
             if ti is None:
-                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to promote type (\"{:s}\") to a pointer for the runtime-linked address ({:#x}).".format('database', ea, key, value, utils.string.repr("{!s}".format(ti)), ea))
+                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to promote type {!s} to a function pointer for the runtime-linked address ({:#x}).".format('database', ea, key, value, interface.tinfo.quoted(ti) if ti else "\"{:s}\"".format(utils.string.escape(value, '"')), ea))
 
             # Otherwise warn the user about the dirty thing we just did.
             elif ti is not info:
-                logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Promoted the given type (\"{:s}\") to a pointer before applying it to the runtime-linked address ({:#x}).".format('database', ea, key, value, utils.string.repr("{!s}".format(ti)), ea))
+                logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Promoted the given type {!s} to a pointer before applying it to the runtime-linked address ({:#x}).".format('database', ea, key, value, interface.tinfo.quoted(ti), ea))
 
             # Now we can just apply our tinfo_t to the address.
             result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, ti)
             if not ok:
-                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply the given type ({!s}) to runtime-linked address ({:#x}).".format('database', ea, key, value, utils.string.repr("{!s}".format(ti)), ea))
+                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply the given type {!s} to runtime-linked address ({:#x}).".format('database', ea, key, value, interface.tinfo.quoted(ti), ea))
             return result
 
         # Otherwise, we're tagging a function and this is the wrong classmethod.
-        return function.set_typeinfo(ea, info)
+        raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply the given type {!s} to function prototype ({:#x}).".format('database', ea, key, value, interface.tinfo.quoted(info), ea))
 
     @classmethod
     def remove(cls, ea, key, none):
