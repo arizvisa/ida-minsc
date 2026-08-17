@@ -872,7 +872,7 @@ def on_ready():
         state = scheduler.modulate(scheduler.database.ready)
         logging.debug(u"{:s}.on_ready() : Transitioned from {!s} to {!s} due to the auto queue being empty.".format(__name__, state, scheduler.database.ready))
 
-        # update tagcache using function state
+        # update tagging database using function state
         __process_functions()
 
     elif scheduler.is_ready():
@@ -909,7 +909,7 @@ def __process_functions(percentage=0.10):
 
     # Now that we have our imports, we can iterate through all of the functions.
     total, funcs = 0, [ea for ea in database.functions()]
-    P.update(current=0, max=len(funcs), title=u"Pre-building the tag cache and its index...")
+    P.update(current=0, max=len(funcs), title=u"Populating the tagging database for function contents.")
     P.open()
     six.print_(u"Indexing the tags for {:d} functions.".format(len(funcs)))
     for i, fn in enumerate(funcs):
@@ -918,7 +918,7 @@ def __process_functions(percentage=0.10):
         # Check to see if the progress bar was cancelled for "some reason". If
         # so, we double-check if that's what the user really wanted.
         if P.canceled:
-            six.print_(u"User opted to cancel building the tag cache at function {:#x} ({:d} of {:d}) after having indexed {:d} tag{:s}.".format(fn, 1 + i, len(funcs), total, '' if total == 1 else 's'))
+            six.print_(u"User opted to cancel building the tagging database at function {:#x} ({:d} of {:d}) after having indexed {:d} tag{:s}.".format(fn, 1 + i, len(funcs), total, '' if total == 1 else 's'))
 
             # Confirm with the user that they really don't care for indexing.
             message = []
@@ -927,11 +927,11 @@ def __process_functions(percentage=0.10):
             message.append(u"If you cancel now, some of the notations made by the application prior to this process will be non-queryable via select.")
             message.append(u'Are you sure?')
             if ui.ask.yn('\n'.join(message), no=True):
-                six.print_(u"User aborted the build of the tag cache at function {:#x} ({:d} of {:d}) and has indexed only {:d} tag{:s}.".format(fn, 1 + i, len(funcs), total, '' if total == 1 else 's'))
+                six.print_(u"User aborted the build of the tagging database at function {:#x} ({:d} of {:d}) and has indexed only {:d} tag{:s}.".format(fn, 1 + i, len(funcs), total, '' if total == 1 else 's'))
                 break
 
             # Okay, so they changed their mind...
-            six.print_(u"Resuming build of tag cache at function {:#x} ({:d} of {:d}) with {:d} tag{:s} having been indexed.".format(fn, 1 + i, len(funcs), total, '' if total == 1 else 's'))
+            six.print_(u"Resuming population of the tagging database at function {:#x} ({:d} of {:d}) with {:d} tag{:s} having been indexed.".format(fn, 1 + i, len(funcs), total, '' if total == 1 else 's'))
             P.canceled = False
 
         # If the current function is in our imports, then we skip it because
@@ -949,9 +949,12 @@ def __process_functions(percentage=0.10):
         # If the current function is not in our globals, but it has a name tag, then
         # we need to include it. IDA seems to name some addresses before promoting
         # them to a function.
-        available = {} if fn in globals else internal.tags.function.get(fn)
-        if fn not in globals and available:
-            [ internal.tags.reference.globals.increment(fn, k) for k in implicit if k in available ]
+        available = internal.tags.reference.globals.get(fn)
+        if fn not in globals and '__name__' in internal.tags.function.get(fn):
+            internal.tags.reference.globals.increment(fn, '__name__') if '__name__' not in available else ()
+
+        if '__typeinfo__' not in internal.tags.reference.globals.get(fn) and interface.address.has_typeinfo(fn):
+            internal.tags.reference.globals.increment(fn, '__typeinfo__') if '__typeinfo__' not in available else ()
 
         # Grab the currently existing cache for the current function, and use
         # it to tally up all of the reference counts for the tags.
@@ -975,7 +978,7 @@ def __process_functions(percentage=0.10):
             continue
         continue
     else:
-        six.print_(u"Successfully seeded the tag cache with its index which was composed of {:d} tag{:s}.".format(total, '' if total == 1 else 's'))
+        six.print_(u"Successfully seeded the tagging database with the contents of all discovered functions which was composed of {:d} tag{:s}.".format(total, '' if total == 1 else 's'))
     P.close()
 
 def __execute_rcfile():
