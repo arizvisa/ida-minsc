@@ -868,7 +868,7 @@ def on_ready():
     scheduler = hook.scheduler
 
     # Queues have just been emptied, so now we can enable the relevant hooks.
-    if scheduler.is_loaded():
+    if scheduler.is_completed():
         state = scheduler.modulate(scheduler.database.ready)
         logging.debug(u"{:s}.on_ready() : Transitioned from {!s} to {!s} due to the auto queue being empty for the final time.".format(__name__, state, scheduler.database.ready))
 
@@ -882,14 +882,17 @@ def on_ready():
     return
 
 def auto_queue_empty(type):
-    """This waits for the analysis queue to be empty.
+    """This waits for the processor module to tell us that it has completed and the queue is empty.
 
-    If the database is ready to be tampered with, then we proceed by executing
-    the `on_ready` function which will perform any tasks required to be done
-    on the database at startup.
+    That basically means that the database was loaded, and everything related to
+    the disassembly is completed other than propagation. We need this to track
+    the information propagated by FLIRT and other passes that happen.
     """
-    if type == idaapi.AU_FINAL:
-        on_ready()
+    import hook
+    scheduler = hook.scheduler
+    if type == idaapi.AU_FINAL and not scheduler.is_ready():
+        state = scheduler.modulate(scheduler.database.completed)
+        logging.debug(u"{:s}.auto_queue_empty({:d}) : Transitioned from {!s} to {!s} due to the auto queue being empty.".format(__name__, type, state, scheduler.database.completed))
     return
 
 def __process_functions(percentage=0.10):
@@ -6906,18 +6909,21 @@ def make_ida_not_suck_cocks(nw_code):
         scheduler.default(hook.idp, 'ev_init', on_init, -100)
         scheduler.default(hook.idp, 'ev_newfile', on_newfile, -100)
         scheduler.default(hook.idp, 'ev_oldfile', on_oldfile, -100)
+        scheduler.default(hook.idp, 'ev_auto_queue_empty', auto_queue_empty, -100)
         scheduler.default(hook.idb, 'auto_empty_finally', on_ready, -100)
 
     elif idaapi.__version__ >= 6.9:
         scheduler.default(hook.idp, 'init', on_init, -100)
         scheduler.default(hook.idp, 'newfile', on_newfile, -100)
         scheduler.default(hook.idp, 'oldfile', on_oldfile, -100)
+        scheduler.default(hook.idp, 'ev_auto_queue_empty', auto_queue_empty, -100)
         scheduler.default(hook.idb, 'auto_empty_finally', on_ready, -100)
 
     else:
         scheduler.default(hook.notification, idaapi.NW_OPENIDB, nw_on_init, -50)
         scheduler.default(hook.notification, idaapi.NW_OPENIDB, nw_on_newfile, -20)
         scheduler.default(hook.notification, idaapi.NW_OPENIDB, nw_on_oldfile, -20)
+        scheduler.default(hook.idp, 'ev_auto_queue_empty', auto_queue_empty, -10)
         scheduler.default(hook.idb, 'auto_empty_finally', on_ready, 0)
 
     scheduler.default(hook.idb, 'closebase', on_close, 10000) if 'closebase' in hook.idb.available else scheduler.default(hook.idp, 'closebase', on_close, 10000)
@@ -7307,6 +7313,7 @@ class Scheduler(object):
         unavailable = DatabaseState('database.unavailable')
         initialized = DatabaseState('database.initialized')
         loaded = DatabaseState('database.loaded')
+        completed = DatabaseState('database.completed')
         ready = DatabaseState('database.ready')
 
     def __init__(self):
@@ -7556,6 +7563,24 @@ class Scheduler(object):
         Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.database.loaded} else (hook.disable, hook.enabled)
         return Fmodulate(target) if target in required_state else True
 
+    def completed(self, hook, target, callable, priority):
+        '''Assign the specified `hook` and `target` to only be enabled when the processor module is done..'''
+        self.__hooks.setdefault(self.database.completed, {empty for empty in []}).add((hook, target))
+        F = self.__guard_closure(self.database.completed, callable)
+        if not hook.add(target, F, priority):
+            hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
+            logging.warning(u"{:s}.ready({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
+
+        # If the current hook and target has been used already, then there's nothing to do.
+        if (hook, target) in self.__used:
+            return True
+
+        # Add the current hook and target, and then enable it if we're currently
+        # in the correct state or disable it if we're not.
+        self.__used.add((hook, target))
+        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.database.completed} else (hook.disable, hook.enabled)
+        return Fmodulate(target) if target in required_state else True
+
     def ready(self, hook, target, callable, priority):
         '''Assign the specified `hook` and `target` to only be enabled when the database is ready.'''
         self.__hooks.setdefault(self.database.ready, {empty for empty in []}).add((hook, target))
@@ -7611,6 +7636,9 @@ class Scheduler(object):
     def is_loaded(self):
         '''Return true if the database has been loaded.'''
         return self.__state in {self.database.loaded}
+    def is_completed(self):
+        '''Return true when the processor module is done and propagation is about to occur.'''
+        return self.__state in {self.database.completed}
     def is_ready(self):
         '''Return true if the database is ready.'''
         return self.__state in {self.database.ready}
