@@ -873,7 +873,7 @@ def on_ready():
         logging.debug(u"{:s}.on_ready() : Transitioned from {!s} to {!s} due to the auto queue being empty for the final time.".format(__name__, state, scheduler.database.ready))
 
         # update tagging database using function state
-        __process_functions()
+        process_functions()
 
     elif scheduler.is_ready():
         logging.debug(u"{:s}.on_ready() : Ignoring request to transition to {!s} as database is currently at {!s}.".format(__name__, scheduler.database.ready, scheduler.get()))
@@ -895,7 +895,7 @@ def auto_queue_empty(type):
         logging.debug(u"{:s}.auto_queue_empty({:d}) : Transitioned from {!s} to {!s} due to the auto queue being empty.".format(__name__, type, state, scheduler.database.completed))
     return
 
-def __process_functions(percentage=0.10):
+def process_functions(percentage=0.10):
     """This prebuilds the tag cache and index for the entire database so that we can differentiate tags made by the user and the application.
 
     It's intended to be called once the database is ready to be tampered with.
