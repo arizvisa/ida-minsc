@@ -863,14 +863,14 @@ def __check_functions():
     return
 
 def on_ready():
-    '''IDP_Hooks.auto_empty'''
+    '''IDP_Hooks.auto_empty_finally'''
     import hook
     scheduler = hook.scheduler
 
     # Queues have just been emptied, so now we can enable the relevant hooks.
     if scheduler.is_loaded():
         state = scheduler.modulate(scheduler.database.ready)
-        logging.debug(u"{:s}.on_ready() : Transitioned from {!s} to {!s} due to the auto queue being empty.".format(__name__, state, scheduler.database.ready))
+        logging.debug(u"{:s}.on_ready() : Transitioned from {!s} to {!s} due to the auto queue being empty for the final time.".format(__name__, state, scheduler.database.ready))
 
         # update tagging database using function state
         __process_functions()
@@ -6906,19 +6906,19 @@ def make_ida_not_suck_cocks(nw_code):
         scheduler.default(hook.idp, 'ev_init', on_init, -100)
         scheduler.default(hook.idp, 'ev_newfile', on_newfile, -100)
         scheduler.default(hook.idp, 'ev_oldfile', on_oldfile, -100)
-        scheduler.default(hook.idp, 'ev_auto_queue_empty', auto_queue_empty, -100)
+        scheduler.default(hook.idb, 'auto_empty_finally', on_ready, -100)
 
     elif idaapi.__version__ >= 6.9:
         scheduler.default(hook.idp, 'init', on_init, -100)
         scheduler.default(hook.idp, 'newfile', on_newfile, -100)
         scheduler.default(hook.idp, 'oldfile', on_oldfile, -100)
-        scheduler.default(hook.idp, 'auto_empty', on_ready, -100)
+        scheduler.default(hook.idb, 'auto_empty_finally', on_ready, -100)
 
     else:
         scheduler.default(hook.notification, idaapi.NW_OPENIDB, nw_on_init, -50)
         scheduler.default(hook.notification, idaapi.NW_OPENIDB, nw_on_newfile, -20)
         scheduler.default(hook.notification, idaapi.NW_OPENIDB, nw_on_oldfile, -20)
-        scheduler.default(hook.idp, 'auto_empty', on_ready, 0)
+        scheduler.default(hook.idb, 'auto_empty_finally', on_ready, 0)
 
     scheduler.default(hook.idb, 'closebase', on_close, 10000) if 'closebase' in hook.idb.available else scheduler.default(hook.idp, 'closebase', on_close, 10000)
 
