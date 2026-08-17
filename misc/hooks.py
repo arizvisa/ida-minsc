@@ -875,6 +875,9 @@ def on_ready():
         # update tagging database using function state
         process_functions()
 
+        # update tagging database using database imports
+        process_imports()
+
     elif scheduler.is_ready():
         logging.debug(u"{:s}.on_ready() : Ignoring request to transition to {!s} as database is currently at {!s}.".format(__name__, scheduler.database.ready, scheduler.get()))
     else:
@@ -983,6 +986,29 @@ def process_functions(percentage=0.10):
     else:
         six.print_(u"Successfully seeded the tagging database with the contents of all discovered functions which was composed of {:d} tag{:s}.".format(total, '' if total == 1 else 's'))
     P.close()
+
+def process_imports():
+    imports = {item for item in []}
+
+    # First we'll iterate through all of the imports to gather all of the
+    # addresses that we'll need to do.
+    for index in range(idaapi.get_import_module_qty()):
+        idaapi.enum_import_names(index, lambda ea, name, ordinal: imports.add(ea) or True)
+
+    # FIXME: It would be more efficient interacting with imports if we built an
+    #        inverse lookup table that maps between address and import.
+    count = 0
+    for ea in sorted(imports):
+        available = internal.tags.reference.globals.get(ea)
+        if '__typeinfo__' in available:
+            continue
+        if interface.address.has_typeinfo(ea):
+            internal.tags.reference.globals.increment(ea, '__typeinfo__')
+            count += 1
+        continue
+
+    six.print_(u"Successfully seeded the tagging database with the type information for {:d} import{:s} composed of {:d} tag{:s}.".format(len(imports), '' if len(imports) == 1 else 's', count, '' if count == 1 else 's'))
+    return count
 
 def __execute_rcfile():
     '''Look in the current IDB directory for an rcfile that might need to be executed.'''
