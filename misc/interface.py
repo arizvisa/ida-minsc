@@ -15094,20 +15094,22 @@ class name(object):
         # start out by checking if we're supposed to rename a netnode.
         if node.identifier(ea):
             Fget_name, Fapply_name = internal.netnode.name.get, internal.netnode.name.set
-            used, wanted, parameters = 0, 0, []
+            used, wanted, get_parameters, apply_parameters = 0, 0, [], []
 
         # if we're not within a function, then we're naming outside any kind of scope
         # and so our default flags only disable the ones that don't make any sense.
         elif not function.has(ea):
             default[idaapi.SN_LOCAL] = default[idaapi.SN_NON_AUTO] = 0
             used, wanted = functools.reduce(operator.or_, default, 0), functools.reduce(operator.or_, (item for _, item in default.items()), 0)
-            parameters = [(used & wanted & ~requested) | flags]
+            apply_parameters = [(used & wanted & ~requested) | flags]
+            get_parameters = []
 
         # otherwise, we're within a function and we have a whole lot of work to do.
         else:
             default.update(cls.__name_within(ea, flags, requested))
             used, wanted = functools.reduce(operator.or_, default, 0), functools.reduce(operator.or_, (item for _, item in default.items()), 0)
-            parameters = [(used & wanted & ~requested) | flags]
+            apply_parameters = [(used & wanted & ~requested) | flags]
+            get_parameters = [idaapi.GN_LOCAL]
 
         # Apply the name in `string` to the address `ea` with the specified `flags`.
         ida_string = internal.utils.string.to(string or u'')
@@ -15119,7 +15121,7 @@ class name(object):
             ida_string = res
 
         # fetch the old name and set the new one at the same time.
-        res, ok = Fget_name(ea), Fapply_name(ea, ida_string, *parameters)
+        res, ok = Fget_name(ea, *get_parameters), Fapply_name(ea, ida_string, *apply_parameters)
         if not ok:
             raise internal.exceptions.DisassemblerError(u"{:s}.name({:#x}, \"{:s}\", {:#x}) : Unable to call `{:s}({:#x}, \"{:s}\", {:#0{:d}x} & {:#0{:d}x} | {:#0{:d}x})`.".format('database', ea, internal.utils.string.escape(string, '"'), flags, internal.utils.pycompat.fullname(Fapply_name), ea, internal.utils.string.escape(string, '"'), idaapi.BADADDR & used & wanted, 2 + 8, idaapi.BADADDR & ~requested, 2 + 8, idaapi.BADADDR & flags, 2 + 8))
         return res
