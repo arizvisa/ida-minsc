@@ -1934,7 +1934,7 @@ class function(object):
     def remove(cls, func, key, none):
         '''Remove the tag specified by `key` from the function `func`.'''
         if none is not None:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:s}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type ({!s}).".format('function', ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), key, none, utils.string.escape(key, '"'), none))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.remove({!s}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), key, none, utils.string.escape(key, '"'), none))
 
         # Check to see if function tag is being applied to an import
         try:
@@ -1942,21 +1942,26 @@ class function(object):
 
         # If we're not even in a function, then use a database tag.
         except internal.exceptions.FunctionNotFoundError:
-            logging.warning(u"{:s}.tag({:s}, {!r}, {!s}) : Attempted to clear the tag for a non-function. Falling back to a database tag.".format('function', ('{:#x}' if isinstance(func, types.integer) else '{!r}').format(func), key, none))
+            logging.warning(u"{:s}.remove({:#x}, {!r}, {!s}) : Attempted to clear the tag for a non-function. Falling back to a database tag.".format('.'.join([__name__, cls.__name__]), ('{:#x}' if isinstance(func, types.integer) else '{!r}').format(func), key, none))
             return address.remove(func, key, none)
 
         # If so, then write the tag to the import
         if rt:
-            logging.warning(u"{:s}.tag({:#x}, {!r}, {!s}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format('function', ea, key, none))
+            logging.warning(u"{:s}.remove({:#x}, {!r}, {!s}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format('.'.join([__name__, cls.__name__]), ea, key, none))
             return address.remove(ea, key, none)
 
         # Otherwise, it's a function.
         fn = interface.function.by_address(ea)
+        entrypoint = interface.range.start(fn)
 
         # If the user wants to remove any of the implicit tags, then we need to
         # dispatch to the correct function in order to clear the requested value.
         if key == '__name__':
-            return name(fn, None)
+            flag = idaapi.SN_NOWARN | (0 if idaapi.is_in_nlist(entrypoint) else idaapi.SN_NOLIST)
+            flag |= idaapi.SN_NON_PUBLIC if rt else 0
+            flag |= idaapi.SN_PUBLIC if not rt and idaapi.is_public_name(entrypoint) else idaapi.SN_NON_PUBLIC
+            flag |= idaapi.SN_WEAK if not rt and idaapi.is_weak_name(entrypoint) else idaapi.SN_NON_WEAK
+            return interface.name.set(entrypoint, None, flag)
         elif key == '__color__':
             DEFCOLOR = 0xffffffff
             res = interface.function.color(fn, DEFCOLOR)
@@ -1974,7 +1979,7 @@ class function(object):
         # If the user's key was not in any of the decoded dictionaries, then raise
         # an exception because the key doesn't exist within the function's tags.
         if key not in state:
-            raise internal.exceptions.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove non-existent tag (\"{:s}\") from function.".format('function', ea, key, none, utils.string.escape(key, '"')))
+            raise internal.exceptions.MissingFunctionTagError(u"{:s}.remove({:#x}, {!r}, {!s}) : Unable to remove non-existent tag (\"{:s}\") from function.".format('.'.join([__name__, cls.__name__]), ea, key, none, utils.string.escape(key, '"')))
         res = state.pop(key)
 
         # Before modifying the comment, we first need to guard its modification
