@@ -4780,6 +4780,7 @@ class address(object):
         if info is None and any(hasattr(idaapi, attribute) for attribute in ['del_tinfo', 'del_tinfo2']):
             oldinfo, nbytes = idaapi.tinfo_t(), cls.size(ea)
             guessed = node.aflags(ea, idaapi.AFL_TYPE_GUESSED if hasattr(idaapi, 'AFL_TYPE_GUESSED') else idaapi.AFL_USERTI)
+            delete = False if idaapi.segtype(ea) == idaapi.SEG_XTRN or idaapi.get_func(ea) else True
 
             # If there's no type here at this address, then we just go ahead and
             # delete the address item anyways... However, it seems that this api
@@ -4787,17 +4788,27 @@ class address(object):
             # deleted, `del_items` can still fail. So if the item size is one
             # byte, then we check its flags to see if we can delete it or not.
             if not get_tinfo(oldinfo, ea):
-                nbytes = 0 if nbytes <= 1 and cls.flags(ea, idaapi.MS_CLS) == idaapi.FF_UNK else nbytes
+                if not delete:
+                    nbytes = 0
+                elif nbytes <= 1 and cls.flags(ea, idaapi.MS_CLS) == idaapi.FF_UNK:
+                    nbytes = 0
+                else:
+                    nbytes = nbytes
                 return idaapi.del_items(ea, 0, nbytes) if nbytes else True
 
             # Now we can remove the type, and then check if there is still a
             # type applied to determine whether we succeeded or not.
             ok = False if del_tinfo(ea) or get_tinfo(idaapi.tinfo_t(), ea) else True
 
+            # If already moved the type, but we need to make sure that we don't
+            # tamper with anything that was already created by the loader.
+            if ok and not delete:
+                return True
+
             # If we successfully removed the type, then we should be okay to
             # delete the items. If that fails, then we can easily restore the
             # old type back to the same address before returning failure.
-            if ok and idaapi.del_items(ea, 0, nbytes):
+            elif ok and idaapi.del_items(ea, 0, nbytes):
                 return True
 
             # Now we go ahead and restore the type back to the address. If we
@@ -4872,9 +4883,9 @@ class address(object):
                 logging.error(u"{:s}.apply_typeinfo({:#x}, {!r}{:s}) : Error trying to restore the original type {!s} to the specified address ({:#x}) during type application failure.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), ", {:#x}".format(*flags) if flags else '', tinfo.quoted(oldinfo), ea))
             return False
 
-        # If the address is a function, then there's no reason to delete any
-        # items since you can't delete code in functions like that anyways.
-        elif function.has(ea):
+        # If the address is a function or an external, then there's no reason to
+        # delete anything since you can't delete code in those places anyways.
+        elif function.has(ea) or idaapi.segtype(ea) == idaapi.SEG_XTRN:
             if flags and tflags & idaapi.TINFO_GUESSED:
                 node.aflags(ea, idaapi.AFL_USERTI, 0)
             return True
@@ -4882,8 +4893,7 @@ class address(object):
         # We've written the type successfully, so we can now delete the data for
         # the given address, and then attempt to reapply without rechecking
         # afterwards. Unfortunately, it's rare but this api can actually fail...
-        nbytes = tinfo.size(written)
-        if not idaapi.del_items(ea, 0, nbytes):
+        elif not idaapi.del_items(ea, 0, tinfo.size(written)):
             if flags and tflags == idaapi.TINFO_GUESSED and definitive:
                 node.aflags(ea, idaapi.AFL_USERTI, oldflags)
 
