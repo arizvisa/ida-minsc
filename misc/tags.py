@@ -2110,18 +2110,20 @@ class typeinfo(object):
         if name and '__name__' in available:
             res.setdefault('__name__', name)
 
+        # If the type is a frame, then we don't need to set a name or anything,
+        # but we will need to assign the entrypoint address of the function.
+        if is_frame and interface.function.by_frame(ti):
+            ea = interface.range.start(interface.function.by_frame(ti))
+            ea != idaapi.BADADDR and res.setdefault('__ea__', ea)
+            typename = name if name else "{:X}".format(ea)
+            res.setdefault('__typeinfo__', typename) if '__typeinfo__' in available else ()
+
         # Here we use the tagindex to determine whether a specific type id has
         # the implicit "__typeinfo__" tag applied to it. This is for tracking
         # types created by the user from types created by the disassembler.
-        if '__typeinfo__' in internal.tags.reference.structure.get(sid):
+        elif '__typeinfo__' in available:
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, '', '')
             res.setdefault('__typeinfo__', ti_s)
-
-        # If the type is a frame, then we don't need to set a name or anything,
-        # but we will need to assign the entrypoint address of the function.
-        if is_frame:
-            ea = ti.get_frame_func() if hasattr(ti, 'get_frame_func') else idaapi.BADADDR
-            ea != idaapi.BADADDR and res.setdefault('__ea__', ea)
 
         # Now we can return our dictionary of tags as the result.
         return res
@@ -2280,10 +2282,8 @@ class typeinfo_member(object):
         if aname and '__name__' in available:
             res.setdefault('__name__', aname)
 
-        # If the member is not a gap, or it is a basic type, then there is no
-        # type information associated with it.
-        has_typeinfo = False if udm.is_gap() or interface.tinfo.basic(mtype) else True
-        if has_typeinfo:
+        # If our hooks tagged this with "__typeinfo__" then we can add it.
+        if '__typeinfo__' in available:
             realname = aname or ''
             validname = interface.name.member(realname) if realname else ''
             ti_s = idaapi.print_tinfo('', 0, 0, 0, mtype, utils.string.to(validname), '')
@@ -2320,7 +2320,7 @@ class typeinfo_member(object):
         elif key == '__typeinfo__':
             parsed = value if isinstance(value, idaapi.tinfo_t) else interface.tinfo.parse(None, value, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC) or interface.tinfo.parse(None, value, idaapi.PT_SIL)
             _, mtype = ('', parsed) if isinstance(parsed, idaapi.tinfo_t) else parsed
-            tags, original = cls.get(mptr), internal.structure.v9member.set_typeinfo(tinfo, mindex, mtype)
+            tags, original = cls.get(*args), internal.structure.v9member.set_typeinfo(tinfo, mindex, mtype, flags=getattr(idaapi, 'ETF_MAY_DESTROY', 4))
             return tags.pop(key, None)
 
         # Now we need to grab both comment types so that we can figure out which
@@ -2443,30 +2443,25 @@ class structure(object):
 
         # Now we need to add implicit tags which are related to the structure.
         available = reference.structure.get(sptr.id)
+        is_frame = internal.structure.frame(sptr)
 
         # If we have the implicit name tagged, then add it to the dictionary.
         name = utils.string.of(idaapi.get_struc_name(sptr.id))
         if name and '__name__' in available:
             res.setdefault('__name__', name)
 
-        # Now we need to do the '__typeinfo__' tag. This is going to be a little
-        # bit different than how we usually determine it, because we're going to
-        # use it to determine whether the user created this type themselves or it
-        # was created automatically. So, if it was copied from the type library
-        # (SF_TYPLIB), from the local types (SF_GHOST), or the user chose not to
-        # list it (SF_NOLIST), then we don't assign '__typeinfo__'.
-        excluded = ['SF_FRAME', 'SF_GHOST', 'SF_TYPLIB', 'SF_NOLIST']
-        if any([sptr.props & getattr(idaapi, attribute) for attribute in excluded if hasattr(idaapi, attribute)]):
-            pass
+        if is_frame and interface.function.by_frame(sptr):
+            ea = interface.range.start(interface.function.by_frame(sptr))
+            ea != idaapi.BADADDR and res.setdefault('__ea__', ea)
+            typename = name if name else "{:X}".format(ea)
+            res.setdefault('__typeinfo__', typename) if '__typeinfo__' in available else ()
 
-        # SF_NOLIST is justified because if the user didn't want the structure to
-        # be listed, then we're just doing as we're told. Everything else should
-        # be justifiable because if the user did anything with the type, then
-        # the other flags should've been cleared.
-        else:
+        # Now we need to add the tag for the implicit type if it was applied.
+        elif '__typeinfo__' in available:
             ti = interface.address.typeinfo(sptr.id)
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, '', '')
             res.setdefault('__typeinfo__', ti_s)
+
         return res
 
     @classmethod
@@ -2602,36 +2597,11 @@ class member(object):
         if aname and '__name__' in available:
             res.setdefault('__name__', aname)
 
-        # The next tag is the type information that we'll need to explicitly check for
-        # because IDA will always figure it out and only want to include it iff the
-        # user has created the type through some explicit action.
-
-        # FIXME: We really should be tracking the application of types using a
-        #        hook. Checking the flags like we are trying to do will likely
-        #        fail on later versions of the disassembler.
-
-        # If we belong to a frame, then we can trust the MF_HASTI property. We
-        # can also use NSUP_TYPEINFO(0x3000) to confirm that type information of
-        # some sort was applied. Although, it's not really that unnecessary.
-        if internal.structure.frame(sptr):
-            ti, has_typeinfo = idaapi.tinfo_t(), mptr.flag & idaapi.MF_HASTI
-            ok = idaapi.get_or_guess_member_tinfo2(mptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, mptr)
-
-        # Otherwise we need to do something different since structures defined
-        # by the user will _always_ be considered user-defined types and the
-        # MF_HASTI property will _always_ be set for them. So, to come up with
-        # some temporary way to accomplish this (without tracking it with a
-        # hook), we identify a type as being user specified by distinguishing
-        # whether it's a compiler type or an explicit one.
-        else:
-            ti = idaapi.tinfo_t()
-            ok = idaapi.get_or_guess_member_tinfo2(mptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, mptr)
-            has_typeinfo = ok and not interface.tinfo.basic(ti)
-
-        # Now we need to attach the member name to our type so that it can
-        # be rendered. Hopefully it's not mangled in some way that will need
-        # consideration if it's reapplied by the user.
-        if ok and has_typeinfo:
+        # If the typeinfo is tagged, and we can grab its type, then we can go
+        # ahead and add it to our dictionary.
+        ti = idaapi.tinfo_t()
+        ok = idaapi.get_or_guess_member_tinfo2(mptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, mptr)
+        if ok and '__typeinfo__' in available:
             realname = name or internal.structure.member.default_name(sptr, mptr)
             validname = interface.name.member(realname) if realname else ''
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
@@ -2654,7 +2624,7 @@ class member(object):
             return tags.pop(key, None)
 
         elif key == '__typeinfo__':
-            tags, original = cls.get(mptr), internal.structure.member.set_typeinfo(mptr, value)
+            tags, original = cls.get(mptr), internal.structure.member.set_typeinfo(mptr, value, flags=getattr(idaapi, 'SET_MEMTI_MAY_DESTROY', 1))
             return tags.pop(key, None)
 
         # We need to grab both types of comments so that we can figure out
@@ -2943,8 +2913,8 @@ class hexvariable(object):
         elif args:
             if isinstance(func, internal.hexrays.ida_hexrays_types.hexrays_func_types):
                 ea = internal.hexrays.function.address(func)
-                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}).tag() : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), ea, arg))
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}({!r}, {!r}).tag() : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), func, arg))
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), ea, arg))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), func, arg))
 
         elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
             locator = internal.hexrays.variables.by(arg)
@@ -2966,7 +2936,7 @@ class hexvariable(object):
 
         # otherwise an exception needs to be raised.
         else:
-            raise internal.exceptions.InvalidParameterError(u"{:s}({!r}, {!r}).tag() : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported length ({:d}).".format('.'.join([__name__, cls.__name__]), func, arg, arg, len(arg)))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.get({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported length ({:d}).".format('.'.join([__name__, cls.__name__]), func, arg, arg, len(arg)))
 
         # now we can get the function from the parameters, and then use the
         # locator to grab the comment for the variable and decode it.
@@ -2987,7 +2957,7 @@ class hexvariable(object):
         # when determining whether the type has a tag, we need to distinguish
         # between a native compiler type and a user-specified one. the following
         # function attempts to do this, but it's likely completely incorrect.
-        if internal.hexrays.variable.has_user_type(cfunc, locator, typeinfo):
+        if '__typeinfo__' in available:
             validname = interface.name.member(name) # FIXME: types have different character requirements
             typeinfo_string = idaapi.print_tinfo('', 0, 0, 0, typeinfo, validname, '')
             decoded.setdefault('__typeinfo__', typeinfo_string)
