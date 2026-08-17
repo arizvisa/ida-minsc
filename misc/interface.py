@@ -9322,6 +9322,14 @@ class tinfo(object):
         return
 
     @classmethod
+    def nonpointer(cls, info):
+        '''Reify the type information specified as `info` to a non-pointer type.'''
+        ti = cls.copy(info)
+        while ti.is_ptr():
+            ti = ti.get_pointed_object()
+        return tinfo.concretize(ti)
+
+    @classmethod
     def pointer(cls, info, size=0, attributes=[], **fields):
         '''Reify the type information specified as `info` to a pointer type of the specified `size` with the given `attributes`.'''
         pi = idaapi.ptr_type_data_t()
