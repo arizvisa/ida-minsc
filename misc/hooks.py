@@ -638,8 +638,11 @@ class globals(changingchanged):
         return
 
 class typeinfo(changingchanged):
-    # FIXME: should check whether the type was applied as a solid type, or if it
-    #        was guessed.
+    """
+    This class handles 2-part events that are used to modify the type
+    information associated with an address. This includes both address types
+    that are global, and function types..also global.
+    """
     @classmethod
     def updater(cls):
         # All typeinfo are global tags unless they're being applied to an
@@ -648,16 +651,17 @@ class typeinfo(changingchanged):
 
         # Receive the changing_ti event...
         ea, original, expected = (yield)
+        old_type, old_fname = original
+        new_type, new_fname = expected
 
         # First check if we need to remove the typeinfo that's stored at the
         # given address. Afterwards we can unpack our original values.
         if any(original):
-            ctx.decrement(ea, '__typeinfo__') if '__typeinfo__' in ctx.get(ea) else ctx.decrement
-        old_type, old_fname = original
+            ctx.decrement(ea, '__typeinfo__') if '__typeinfo__' in ctx.get(ea) else ()
 
         # Wait until we get the ti_changed event...
         try:
-            new_ea, tidata = (yield)
+            new_ea, applied = (yield)
 
         # If we end up catching a GeneratorExit then that's because
         # this event is being violently closed due to receiving a
@@ -670,28 +674,28 @@ class typeinfo(changingchanged):
         # to use by both events. If they're not the same, then we need to make
         # an assumption and that assumption is to take the values given to us
         # by the changing_ti event.
-        if (ea, expected) != (new_ea, tidata):
-            logging.warning(u"{:s}.updater() : The {:s} event has a different address ({:#x} != {:#x}) and type information ({!r} != {!r}) than what was given by the {:s} event. Using the values from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'ti_changed', ea, new_ea, bytes().join(expected), bytes().join(tidata), 'changing_ti', 'ti_changed'))
+        if (ea, expected) != (new_ea, applied):
+            logging.warning(u"{:s}.updater() : The {:s} event has a different address ({:#x} != {:#x}) and type information ({!r} != {!r}) than what was given by the {:s} event. Using the values from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'ti_changed', ea, new_ea, bytes().join(expected), bytes().join(applied), 'changing_ti', 'ti_changed'))
         elif ea != new_ea:
             logging.warning(u"{:s}.updater() : The {:s} event has a different address ({:#x} != {:#x}) than what was given by the {:s} event. Using the address {:#x} from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, new_ea, 'ti_changed', ea, 'changing_ti'))
             new_ea = ea
-        elif expected != tidata:
-            logging.warning(u"{:s}.updater() : The {:s} event for address {:#x} has different type information ({!r} != {!r}) than what was received by the {:s} event. Re-fetching the type information for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, bytes().join(expected), bytes().join(tidata), 'ti_changed', new_ea))
-            tidata, _, _ = interface.address.typeinfo(ea)
+        elif expected != applied:
+            logging.warning(u"{:s}.updater() : The {:s} event for address {:#x} has different type information ({!r} != {!r}) than what was received by the {:s} event. Re-fetching the type information for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, bytes().join(expected), bytes().join(applied), 'ti_changed', new_ea))
+            applied, _, _ = interface.address.typeinfo(ea)
 
         # Okay, we now have the data that we need to compare in order to determine
         # if we're removing typeinfo, adding it, or updating it. Since we
         # already decremented the tag from the previous address, we really
         # only need to determine if we need to add its reference back.
-        if any(tidata):
-            ctx.increment(new_ea, '__typeinfo__')
-            logging.debug(u"{:s}.updater() : Updated the type information at address {:#x} and {:s} its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, 'kept' if original == tidata else 'increased', bytes().join(original), bytes().join(tidata)))
+        if any(applied):
+            ctx.increment(new_ea, '__typeinfo__') if '__typeinfo__' not in ctx.get(new_ea) else ()
+            logging.debug(u"{:s}.updater() : Updated the type information at address {:#x} and {:s} its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, 'kept' if original == applied else 'increased', bytes().join(original), bytes().join(applied)))
 
         # For the sake of debugging, log that we just removed the typeinfo
         # from the current address. We don't need to decrease our reference
         # here because we did it already when we git our "changing" event.
         else:
-            logging.debug(u"{:s}.updater() : Removed the type information from address {:#x} and its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, bytes().join(original), bytes().join(tidata)))
+            logging.debug(u"{:s}.updater() : Removed the type information from address {:#x} and its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, bytes().join(original), bytes().join(applied)))
         return
 
     @classmethod
@@ -3834,6 +3838,34 @@ class membertypeinfocommon(changingchanged):
     """
 
     @classmethod
+    def is_tracked_type(cls, sid, mid, oldtype, newtype):
+        def tracked(type):
+            if not type:
+                return False
+            resolved = interface.tinfo.copy(type)
+            while resolved.is_array():
+                resolved, _ = interface.tinfo.array(resolved)
+            return not interface.tinfo.primitive(resolved)
+
+        oldtyped, newtyped = map(tracked, [oldtype, newtype])
+        applied = oldtyped, newtyped
+        available = internal.tags.reference.members.get(mid)
+
+        # If the change added a type, then increment the reference.
+        if applied == (False, True):
+            return None if '__typeinfo__' in available else True
+
+        # If the change removed the type, then decrement the reference.
+        elif applied == (True, False):
+            return False if '__typeinfo__' in available else None
+
+        # If the old type exists but the "__typeinfo__" tag is missing, then
+        # we need to add a reference to "__typeinfo__" since we missed it.
+        elif oldtyped and '__typeinfo__' not in available:
+            return True
+        return None
+
+    @classmethod
     def updater(cls):
         oldsid, oldmid, typedata, fnamesdata = (yield)
 
@@ -3866,31 +3898,29 @@ class membertypeinfocommon(changingchanged):
             oldtyped, newtyped = oldtype is not None, newtype is not None
             applied = oldtyped, newtyped
 
-            # If the change added a type, then increment the reference.
-            if applied == (False, True):
-                internal.tags.reference.members.increment(mid, '__typeinfo__') if '__typeinfo__' not in available else ()
+            res = cls.is_tracked_type(newsid, newmid, oldtype, newtype)
 
-            # If the change removed the type, then decrement the reference.
-            elif applied == (True, False):
-                internal.tags.reference.members.decrement(mid, '__typeinfo__') if '__typeinfo__' in available else ()
-
-            # If the old type exists but the "__typeinfo__" tag is missing, then
-            # we need to add a reference to "__typeinfo__" since we missed it.
-            elif oldtyped and '__typeinfo__' not in available:
-                internal.tags.reference.members.increment(mid, '__typeinfo__')
-
-            # Otherwise there is nothing to do since the updating of the type
-            # didn't actually affect the previous type.
-            else:
+            # If we got None, there was nothing to do since the updating of the
+            # type didn't actually affect the previous type.
+            if res is None:
                 old = "\"{!s}\"".format(utils.string.escape("{!s}".format(oldtype), '"') if oldtype else '')
                 new = "\"{!s}\"".format(utils.string.escape("{!s}".format(newtype), '"') if newtype else '')
                 logging.debug(u"{:s}.updater() : Member type information update for member {:#x} from {!s} to {!s} did not need an adjustment.".format('.'.join([__name__, cls.__name__]), mid, old, new))
+
+            # If the type is tracked, then increment the reference.
+            elif res:
+                internal.tags.reference.members.increment(mid, '__typeinfo__')
+
+            # If the type is not tracked, then decrement the reference.
+            else:
+                internal.tags.reference.members.decrement(mid, '__typeinfo__')
+            # FIXME: check if we need to update the parent typeinfo
             return
 
         # If the events didn't match at all, then somehow the events didn't
         # arrive in the correct order. So, we fix it by deleting the reference
         # to the "__typeinfo__" tag, and then recreating if it exists.
-        logging.fatal(u"{:s}.updater() : Member type events for member {:#x} are out of sync. Expected member {:#x}, but event gave us member {:#x}.".format('.'.join([__name__, cls.__name__]), oldmid, oldmid, newmid))
+        logging.error(u"{:s}.updater() : Member type events for member {:#x} are out of sync. Expected member {:#x}, but event gave us member {:#x}.".format('.'.join([__name__, cls.__name__]), oldmid, oldmid, newmid))
 
         if '__typeinfo__' in available:
             internal.tags.reference.members.decrement(mid, '__typeinfo__')
@@ -5205,16 +5235,15 @@ class localtypesmonitor_84(object):
         return til is not None
 
     @classmethod
-    def is_field_tracked(cls, ordinal, mindex, type):
-        '''Return true if the `type` for the member at `mindex` of the specified `ordinal` should be tracked with tags.'''
-        basic = interface.tinfo.basic(type)
-
-        # We only need to check if the type is considered a basic type or a
-        # non-trivial type. This way we can track members with types that have
-        # significantly more details than the others.
-        if type and not basic:
-            return True
-        return False
+    def is_field_tracked(cls, ordinal, index, type):
+        '''Return true if the `type` for the member at `index` of the specified `ordinal` should be tracked with tags.'''
+        old = None if type is None else not interface.tinfo.primitive(type)
+        if type is None:
+            return False
+        resolved = interface.tinfo.copy(type)
+        while resolved.is_array():
+            resolved, _ = interface.tinfo.array(resolved)
+        return not interface.tinfo.primitive(resolved)
 
     @classmethod
     def delete_member_refs(cls, sid, mid):
@@ -5299,14 +5328,9 @@ class localtypesmonitor_84(object):
             return sid, newname, newcomment, newmembers
 
         # Now check if we need to add a tag for the name or its type.
-        user_specified = not cls.is_name_general(ordinal, tinfo, newname)
-        if user_specified:
+        if not cls.is_name_general(ordinal, tinfo, newname):
             logging.debug(u"{:s}.type_added({:d}, {:d}) : Addition of type at ordinal {:d} ({:#x}) with the name \"{!s}\" resulted in adding the implicit name tag.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(newname, '"')))
             internal.tags.reference.structure.increment(sid, '__name__') if '__name__' not in available else ()
-
-        if cls.is_type_tracked(ordinal, sid, newname):
-            logging.debug(u"{:s}.type_added({:d}, {:d}) : Addition of type at ordinal {:d} ({:#x}) with the name \"{!s}\" was detected as needing to be tracked.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(newname, '"')))
-            internal.tags.reference.structure.increment(sid, '__typeinfo__')
 
         # Now we can go ahead and decode its comments if it has any.
         newtags = internal.comment.decode(newcomment)
@@ -5380,7 +5404,7 @@ class localtypesmonitor_84(object):
 
         # If the name was originally user-specified but the tag doesn't exist,
         # then our monitor didn't track this change and we need to adjust it.
-        elif renamed[0] and '__name__' not in original:
+        elif renamed[0] and oldname != newname and '__name__' not in original:
             logging.debug(u"{:s}.type_updater({:d}, {:d}) : Rename for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" required us to fix it.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
             internal.tags.reference.structure.increment(newsid, '__name__')
 
@@ -5388,21 +5412,6 @@ class localtypesmonitor_84(object):
         # then we don't have to do anything since the current state is the same.
         elif oldname != newname:
             logging.debug(u"{:s}.type_updater({:d}, {:d}) : Rename for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" did not need an adjustment.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
-
-        # The next thing we need to check is if the type being updated is
-        # something that we're supposed to track or not. This is easy since if
-        # it's tracked, we increment the tag. If it's not, we decrement the tag.
-        tracked = cls.is_type_tracked(ordinal, newsid, newname)
-        if tracked and '__typeinfo__' not in original:
-            logging.debug(u"{:s}.type_updater({:d}, {:d}) : Change for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" required us to track it.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
-            internal.tags.reference.structure.increment(newsid, '__typeinfo__') if '__typeinfo__' not in original else ()
-
-        elif not tracked and '__typeinfo__' in original:
-            logging.debug(u"{:s}.type_updater({:d}, {:d}) : Change for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" required us to track it.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
-            internal.tags.reference.structure.decrement(newsid, '__typeinfo__') if '__typeinfo__' in original else ()
-
-        else:
-            logging.debug(u"{:s}.type_updater({:d}, {:d}) : Tracking for type at ordinal {:d} ({:#x}) did not need to be adjusted.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid))
 
         # Grab the comment that's been applied to the type, and update its refs.
         oldcomment, newcomment = state.cachedcomment(ordinal), state.comment(ordinal)
@@ -5429,6 +5438,13 @@ class localtypesmonitor_84(object):
         sid = state.cachedidentifier(ordinal)
         sid = state.identifier(ordinal) if sid == idaapi.BADADDR else sid
         parameter = "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal)
+        tinfo = state.get_type(ordinal)
+        til = interface.tinfo.library(tinfo)
+
+        if hasattr(idaapi, 'is_type_choosable'):
+            user_choosable = idaapi.is_type_choosable(til, ordinal)
+        else:
+            user_choosable = True
 
         if sid == idaapi.BADADDR:
             return logging.error(u"{:s}.member_updater({:d}, {:#x}, {!s}) : Unable to handle an update for the members of type {!s} due to its identifier ({:#x}) being invalid.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', parameter, sid))
@@ -5491,7 +5507,7 @@ class localtypesmonitor_84(object):
 
                 # If the original type was something for us to track, but it
                 # doesn't include our tag, then we fix it by incrementing.
-                elif tracked[0] and '__typeinfo__' not in original:
+                elif tracked[0] and not interface.tinfo.same(oldtype, newtype):
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from {!s} to {!s} required us to fix it.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, interface.tinfo.quoted(oldtype), interface.tinfo.quoted(newtype)))
                     internal.tags.reference.members.increment(mid, '__typeinfo__')
 
@@ -5545,8 +5561,13 @@ class localtypesmonitor_84(object):
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Skipping the specified member at index {:d} ({:#x}) of type {!s} ({:#x}) due to it not existing within the structure.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid))
                     continue
 
-                # If the field name is not a general one, then increment the
-                # reference count for its "__name__" tag.
+                # If it isn't choosable, then we assume that it didn't come from
+                # the user and instead came from a type library of some sort.
+                elif not user_choosable:
+                    continue
+
+                # Otherwise, the type is definitely created by the user. So, we
+                # check if it's generally named, and if we're tracking it.
                 changed = []
                 if not cls.is_field_general(ordinal, mindex, mname):
                     internal.tags.reference.members.increment(mid, '__name__'), changed.append('__name__')
@@ -6255,10 +6276,33 @@ class decompilermonitor(object):
             #        did. What we're attempting to do is to find out if a
             #        variable type has been changed from its previous value, or
             #        to potentially identify is it was applied or propagated.
-            is_user_type_initial = oldvariable is None and internal.hexrays.variable.has_user_type(cfunc, locator,  type)
-            is_user_type_changed = oldvariable is not None and not interface.tinfo.same(type, oldvariable.type)
-            if '__typeinfo__' in oldtagged or any([is_user_type_initial, is_user_type_changed]):
-                internal.tags.reference.hexvariable.increment(locator, '__typeinfo__', target=cfunc)
+            has_user_type = internal.hexrays.variable.has_user_type(cfunc, locator, newtype)
+            is_user_type_created = oldvariable is None and has_user_type
+            is_user_type_same = oldvariable is not None and interface.tinfo.same(oldtype, newtype)
+
+            # If the new type was created and user-specified, then go ahead and
+            # increment our "__typeinfo__" tag.
+            if is_user_type_created:
+                internal.tags.reference.hexvariable.increment(locator, '__typeinfo__', target=cfunc) if '__typeinfo__' not in oldtagged else ()
+
+            # If the type hasn't changed, then we avoid doing anything...
+            # trusting the tag attached to the previous variable.
+            elif is_user_type_same:
+                pass
+
+            # If we're modifying a variable and it's not a user type, then we
+            # need to check the tags to figure out if we decrement the tag.
+            elif oldvariable is not None and not has_user_type:
+                internal.tags.reference.hexvariable.decrement(locator, '__typeinfo__', target=cfunc) if '__typeinfo__' in oldtagged else ()
+
+            # Otherwise, the type was changed from whatever it was previously.
+            # So, we need to check if it's a user type to decide to increment.
+            elif has_user_type:
+                internal.tags.reference.hexvariable.increment(locator, '__typeinfo__', target=cfunc) if '__typeinfo__' not in oldtagged else ()
+
+            # Otherwise, it's not a user type and we need to decrement it.
+            else:
+                internal.tags.reference.hexvariable.decrement(locator, '__typeinfo__', target=cfunc) if '__typeinfo__' not in oldtagged else ()
             continue
         return
 
@@ -6446,13 +6490,33 @@ class decompilermonitor(object):
         # First unpack the parameters so that we can compare the types.
         oldlocator, oldtype = (None, None) if old is None else (old.locator, old.type)
         newlocator, newtype = new.locator, new.type
+        oldtags = {} if oldlocator is None else internal.tags.reference.hexvariable.get(oldlocator, target=cfunc)
+        newtags = oldtags if oldlocator == newlocator else internal.tags.reference.hexvariable.get(newlocator, target=cfunc)
+        has_user_type = internal.hexrays.variable.has_user_type(function, newlocator, newtype)
 
-        # If the variable locators match, then we will need to check if the tag
-        # doesn't already exist and then update the tag if the type changed.
-        if oldlocator == newlocator and '__typeinfo__' not in internal.tags.reference.hexvariable.get(newlocator, target=cfunc):
+        # If the oldlocator doesn't exist, then we just need to check the type.
+        if not oldlocator and has_user_type:
             internal.tags.reference.hexvariable.increment(newlocator, '__typeinfo__', target=cfunc)
-        elif oldlocator is None:
-            internal.tags.reference.hexvariable.increment(newlocator, '__typeinfo__', target=cfunc)
+
+        # If the old and newlocator are the same and the types are the same,
+        # then we don't need to do anything and can trust whatever the tag is.
+        elif oldlocator == newlocator and interface.tinfo.same(oldtype, newtype):
+            pass
+
+        # If they're the same and we got a user type, then increment here.
+        elif oldlocator == newlocator and has_user_type:
+            internal.tags.reference.hexvariable.increment(newlocator, '__typeinfo__', target=cfunc) if '__typeinfo__' not in oldtags else ()
+
+        # Otherwise, if they're the same but don't have a user type, then we
+        # will need to go ahead and decrement the reference count here...
+        elif oldlocator == newlocator:
+            internal.tags.reference.hexvariable.decrement(newlocator, '__typeinfo__', target=cfunc) if '__typeinfo__' in oldtags else ()
+
+        # Otherwise, the locators are different from one another which requires
+        # us to clear the old one and check the user type of the new one.
+        elif has_user_type:
+            internal.tags.reference.hexvariable.decrement(oldlocator, '__typeinfo__', target=cfunc) if '__typeinfo__' in oldtags else ()
+            internal.tags.reference.hexvariable.increment(newlocator, '__typeinfo__', target=cfunc) if '__typeinfo__' not in newtags else ()
         return
 
     @classmethod
