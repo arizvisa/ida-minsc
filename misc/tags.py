@@ -1507,26 +1507,31 @@ class address(object):
     @classmethod
     def clear_typeinfo(cls, ea, none):
         '''Remove the type information from the item at address `ea`.'''
-        key = '__typeinfo__'
+        ea = int(ea)
         if none is not None:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to remove the type information from the given address with an unsupported type {!r}.".format('database', ea, key, none, none))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.clear_typeinfo({:#x}, {!s}) : Tried to remove the type information from the given address with an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__]), ea, none if none is none else "{!r}".format(none), none))
 
+        # First we need to figure out if we're removing the typeinfo from a
+        # function or not, because this is the wrong method for doing that.
         try:
-            rt, ea = interface.addressOfRuntimeOrStatic(ea)
+            has_address_type, entrypoint = interface.addressOfRuntimeOrStatic(ea)
+            is_entrypoint = entrypoint == ea
 
-        # If we hit an exception, then we're not a function and all
-        # we need to do is to apply our tinfo_t to the address.
+        # If we hit an exception, then we're not a function and all we need to
+        # do is to apply our tinfo_t to the address.
         except LookupError:
-            result, ok = interface.address.typeinfo(ea), interface.address.apply_typeinfo(ea, none)
-            if not ok:
-                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to remove the type information from the given address ({:#x}).".format('database', ea, key, none, ea))
-            return result
+            has_address_type = True
 
-        # Otherwise we're being used on a function, and we need to do
-        # the exact same thing but with the interface.function api.
-        result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, none)
+        # If this is a function, not a global address or import then we need to
+        # abort here.
+        if not has_address_type:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.clear_typeinfo({:#x}, {!s}) : Unable to remove the type information from the given address ({:#x}) due to it being a function.".format('.'.join([__name__, cls.__name__]), ea, none, ea))
+
+        # Otherwise we can just go ahead and apply the type to the address,
+        # because it's either a global or an import of some kind.
+        result, ok = interface.address.typeinfo(ea), interface.address.apply_typeinfo(ea, none)
         if not ok:
-            raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to remove the type information from the given function ({:#x}).".format('database', ea, key, none, ea))
+            raise internal.exceptions.DisassemblerError(u"{:s}.clear_typeinfo({:#x}, {!s}) : Unable to remove the type information from the given address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, none, ea))
         return result
 
     @classmethod
