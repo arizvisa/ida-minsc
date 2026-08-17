@@ -1718,16 +1718,15 @@ class variable(object):
             locator = variable
 
         # use the function and locator to get the variable and any indexed tags.
+        # we need to be careful with `default_name`, because it's executing in
+        # linear time due to variables being suffixed with their index.
         lvar = variables.get(function, locator)
         available = internal.tags.reference.hexvariable.get(locator, target=function)
-
-        # if the `lvar_t.has_user_name` property is set, then we're good to go.
-        if lvar.has_user_name:
-            return True
-
-        # FIXME: we need a way to check if the name returned is default or not.
+        default = cls.default_name(function, locator)
         [realname] = name if name else utils.string.of(lvar.name)
-        return False
+
+        # if the name is default, then we don't have a user-specified name.
+        return False if realname == default else True
 
     @classmethod
     def has_user_type(cls, function, variable, *type):
