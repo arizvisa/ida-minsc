@@ -5025,7 +5025,14 @@ class type(object):
         # If we didn't get an exception and we're pointing at a runtime-linked
         # address, then we need to ensure that our type is a pointer to apply it.
         if rt:
-            ti = info if builtins.next((guessed[kwd] for kwd in ['force', 'forced'] if kwd in guessed), False) else interface.function.pointer(info)
+            if builtins.next((guessed[kwd] for kwd in ['force', 'forced'] if kwd in guessed), False):
+                ti = info
+            elif info.is_funcptr() or info.is_func():
+                ti = interface.function.pointer(info)
+            elif not info.is_ptr():
+                ti = interface.tinfo.pointer(info)
+            else:
+                ti = info
 
             # If we didn't get a type back, then we failed during promotion.
             if ti is None:
