@@ -1271,13 +1271,18 @@ class address(object):
         # we need to ensure that we're using non-repeatable comments.
         try:
             func = interface.function.by_address(ea)
-            rt, _ = interface.addressOfRuntimeOrStatic(ea if func is None else func)
+            rt, entrypoint = interface.addressOfRuntimeOrStatic(ea if func is None else func)
 
         # If the address is not within a function, then assign some variables
         # so that we will use a repeatable comment.
         except LookupError:
-            rt, func = False, None
+            rt, func, entrypoint = False, None, idaapi.BADADDR
         repeatable = False if func and interface.function.has(ea) and not rt else True
+
+        # We store whether we are at a function entrypoint so that we can be
+        # sure that the "__name__" and "__typeinfo__" tags are not applied to a
+        # contents address unless done explicitly.
+        is_entrypoint = False if rt else entrypoint == ea
 
         # Read both repeatable and non-repeatable comments from the chosen
         # address so that we can decode both of them into dictionaries to
@@ -1305,7 +1310,7 @@ class address(object):
 
         # First thing we need to figure out is whether the name exists and if
         # it's actually special in that we need to demangle it for the real name.
-        aname = interface.name.get(ea)
+        aname = interface.name.get(ea, idaapi.GN_LOCAL) if is_entrypoint else interface.name.get(ea)
         mangled_t = interface.name.mangled(ea, aname)
 
         # If we found a name and it is mangled for code or data, then we use the
@@ -1344,7 +1349,7 @@ class address(object):
         # If there was some type information associated with the address, then
         # we need its name so that we can format it and add it as an implicit tag.
         try:
-            if interface.address.has_typeinfo(ea):
+            if not is_entrypoint and interface.address.has_typeinfo(ea):
                 typeinfo = interface.address.typeinfo(ea)
                 ti = interface.tinfo.lower_function_type(typeinfo) if typeinfo.is_func() or typeinfo.is_funcptr() else typeinfo
                 validname = interface.name.typename(realname)
