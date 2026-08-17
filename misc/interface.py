@@ -4731,7 +4731,8 @@ class address(object):
     @classmethod
     def has_typeinfo(cls, ea):
         '''Return if the address at `ea` has any type information associated with it.'''
-        ok = cls.typeinfo(int(ea)) is not None
+        ea, get_tinfo = int(ea), (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        ok = True if get_tinfo(idaapi.tinfo_t(), ea) else False
 
         # If we couldn't find any type information, then we need to check if
         # the name is mangled since a mangled name can be used to guess for it.
