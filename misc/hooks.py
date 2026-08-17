@@ -7061,10 +7061,15 @@ def make_ida_not_suck_cocks(nw_code):
     if idaapi.__version__ >= 7.2:
         scheduler.default(hook.idp, 'ev_init', typeinfo.database_init, 0)
 
-        # XXX: we keep these hooks scheduled all the time because i personally
-        #      care about types, and you probably should too.
-        scheduler.default(hook.idb, 'changing_ti', typeinfo.changing, 0)
-        scheduler.default(hook.idb, 'ti_changed', typeinfo.changed, 0)
+        # we only enable this when the processor module has completed, so that
+        # we can identify the types made by propagating inferred information.
+        scheduler.completed(hook.idb, 'changing_ti', typeinfo.changing, 0)
+        scheduler.completed(hook.idb, 'ti_changed', typeinfo.changed, 0)
+
+        # these will fire whenever the database is ready and the user is already
+        # tampering with the contents of the database.
+        scheduler.ready(hook.idb, 'changing_ti', typeinfo.changing, 0)
+        scheduler.ready(hook.idb, 'ti_changed', typeinfo.changed, 0)
 
     # earlier versions of IDAPython don't expose anything about "extra" comments
     # so we can't do anything here.
