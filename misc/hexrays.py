@@ -1755,25 +1755,16 @@ class variable(object):
         lvar = variables.get(function, locator)
         available = internal.tags.reference.hexvariable.get(locator, target=function)
 
-        # if the `lvar_t.has_user_type` property is set, then we're good to go.
-        if lvar.has_user_type:
-            return True
+        if not lvar.has_user_type:
+            return False
 
-        # first try and resolve the type from a pointer to its final target, or
-        # from an array to its final element type.
+        # if it's a primitive type, the decompiler doesn't ever use them, so it
+        # must be user-specified. despite that, we want to be able to reset the
+        # type to a default, so we assume a primitive is not user-specified.
         [resolved] = map(interface.tinfo.copy, type if type else [lvar.tif])
-        while resolved.is_ptr() or resolved.is_array():
-            resolved, _ = interface.tinfo.array(resolved) if resolved.is_array() else (resolved, 0)
-            resolved = resolved.get_pointed_object() if resolved.is_ptr() else resolved
-
-        # if it's a primitive type, the decompiler does not ever use these. so
-        # it must be user-specified. if it's _not_ a compiler type, then it is
-        # also not likely to be user-specified since they tend to be chosen.
-        if interface.tinfo.primitive(resolved):
-            return True
-        elif not interface.tinfo.compiler(resolved):
-            return True
-        return False
+        while resolved.is_array():
+            resolved, _ = interface.tinfo.array(resolved)
+        return not interface.tinfo.primitive(resolved)
 
 class function(object):
     """
