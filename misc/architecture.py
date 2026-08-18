@@ -703,11 +703,24 @@ else:
         @utils.multicase(name=types.string)
         def has(self, name):
             '''Return whether the architecture contains a microregister with the specified `name`.'''
-            return super(uarchitecture_t, self).has(identifier)
+            return super(uarchitecture_t, self).has(name)
         @utils.multicase(index=types.integer)
         def has(self, index):
             '''Return whether the architecture contains a microregister with the specified `index`.'''
             return index in self.__cache__
+        @utils.multicase(register=interface.register_t)
+        def has(self, register):
+            '''Return whether the architecture contains the specified `register`.'''
+            if isinstance(register.realname, types.string) and hasattr(idaapi, 'reg2mreg'):
+                return ida_hexrays.reg2mreg(register.id) in self.__cache__
+            elif isinstance(register.realname, types.integer):
+                return register.realname in self.__cache__
+            return False
+        @utils.multicase(register=(interface.register_t, types.integer, types.string), bits=types.integer)
+        def has(self, register, bits):
+            '''Return true if the specified `register` exists within the architecture at the size specified by `bits`.'''
+            selected = self.by_index(register) if isinstance(register, types.integer) else self.by_name(register) if isinstance(register, types.string) else register
+            return super(uarchitecture_t, self).has(selected, bits)
 
         def by_index(self, index):
             '''Return the (complete) microregister for the given `index`.'''
