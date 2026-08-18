@@ -967,8 +967,8 @@ class variables(object):
         raise exceptions.InvalidTypeOrValueError(u"{:s}.has({:#x}, {!r}) : Unable to locate a variable in the given function ({:#x}) with an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), ea, arg, ea, arg.__class__))
 
     @classmethod
-    def storage(cls, func, locator):
-        '''Return the storage location for the variable identified by the given `locator` in the function `func`.'''
+    def storage(cls, func, locator, *size):
+        '''Return the storage location for the variable identified by the given `locator` and `size` in the function `func`.'''
         cfunc = function(func)
         locator = cls.by(cfunc, locator)
 
@@ -979,7 +979,7 @@ class variables(object):
         if lvar is None:
             ea, description = cfunc.entry_ea, variable.repr_locator(locator)
             raise exceptions.ItemNotFoundError(u"{:s}.storage({:#x}, {:s}) : Unable to find a variable with the specified locator in the function at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, description, ea))
-        return variable.get_storage(locator, lvar.width)
+        return variable.get_storage(locator, *size if size else [lvar.width])
 
     @classmethod
     def address(cls, *args):
