@@ -1500,7 +1500,7 @@ class variable(object):
         # then build an index for the storage of all of the argument variables.
         else:
             iterable = enumerate(interface.tinfo.function(cfunc.type))
-            iterable = ((index, isinstance(storage, interface.register_t), storage) for index, (_, _, storage) in iterable)
+            iterable = ((index, isinstance(storage, interface.register_t), storage) for index, (_, _, storage) in iterable if storage)
             arguments = {microarchitecture.select(storage, 8 * lvar.width) if register else idaapi.get_frame_retsize(fn) + storage : index for index, register, storage in iterable}
 
             # now we can look up the index using our variable storage.
