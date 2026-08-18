@@ -3407,8 +3407,16 @@ class memberscopecommon(changingchanged):
         if not internal.structure.member.has(mid):
             return internal.tags.reference.members.erase_member(sid, mid)
 
+        # Find what tags are used and then go through and decrease their count.
         used = internal.tags.reference.members.get(mid)
         [internal.tags.reference.members.decrement(mid, key) for key in used]
+
+        # Now that we've deleted the member, we need to check the parent to see
+        # if we need to remove its "__typeinfo__" tag.
+        if '__typeinfo__' not in internal.tags.reference.members.name(sid):
+            owner = internal.tags.reference.structure.get(sid)
+            internal.tags.reference.structure.decrement(sid, '__typeinfo__') if '__typeinfo__' in owner else ()
+        return
 
     @classmethod
     def updater(cls):
@@ -3930,7 +3938,7 @@ class membertypeinfocommon(changingchanged):
             oldtyped, newtyped = oldtype is not None, newtype is not None
             applied = oldtyped, newtyped
 
-            res = cls.is_tracked_type(newsid, newmid, oldtype, newtype)
+            count, res = 0, cls.is_tracked_type(newsid, newmid, oldtype, newtype)
 
             # If we got None, there was nothing to do since the updating of the
             # type didn't actually affect the previous type.
@@ -3942,11 +3950,25 @@ class membertypeinfocommon(changingchanged):
             # If the type is tracked, then increment the reference.
             elif res:
                 internal.tags.reference.members.increment(mid, '__typeinfo__')
+                count = +1
 
             # If the type is not tracked, then decrement the reference.
             else:
                 internal.tags.reference.members.decrement(mid, '__typeinfo__')
-            # FIXME: check if we need to update the parent typeinfo
+                count = -1
+
+            # Now we figure out how to update the parent structure depending on
+            # whether we added a tag or removed one from the member.
+
+            # If we added, then just increment the "__typeinfo__" on the owner.
+            owner = internal.tags.reference.structure.get(sid)
+            if count > 0:
+                internal.tags.reference.structure.increment(sid, '__typeinfo__') if '__typeinfo__' not in owner else ()
+
+            # If we removed, then we need to check if any other members are
+            # tagged. If not, then decrement the "__typeinfo__" on the owner.
+            elif count < 0 and '__typeinfo__' not in internal.tags.reference.members.name(sid):
+                internal.tags.reference.structure.decrement(sid, '__typeinfo__') if '__typeinfo__' in owner else ()
             return
 
         # If the events didn't match at all, then somehow the events didn't
@@ -3959,6 +3981,13 @@ class membertypeinfocommon(changingchanged):
 
         if newtype is not None:
             internal.tags.reference.members.increment(mid, '__typeinfo__')
+
+        # Now we need to update the parent "__typeinfo__".
+        owner = internal.tags.reference.structure.get(sid)
+        if newtype is not None:
+            internal.tags.reference.structure.increment(sid, '__typeinfo__') if '__typeinfo__' not in owner else ()
+        elif count < 0 and '__typeinfo__' not in internal.tags.reference.members.name(sid):
+            internal.tags.reference.structure.decrement(sid, '__typeinfo__') if '__typeinfo__' in owner else ()
         return
 
     @classmethod
