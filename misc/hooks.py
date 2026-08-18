@@ -5309,7 +5309,15 @@ class localtypesmonitor_84(object):
     @classmethod
     def delete_member_refs(cls, sid, mid):
         '''Remove all of the tags associated with the member `mid` belonging to the type `sid`.'''
-        return internal.tags.reference.members.erase_member(sid, mid)
+        res = internal.tags.reference.members.erase_member(sid, mid)
+
+        # We've deleted a member, so we need to check our owning type to see if
+        # it has any members tagged with "__typeinfo__". If not, then we can
+        # clear the "__typeinfo__" tag that is associated with it.
+        if '__typeinfo__' not in internal.tags.reference.members.name(sid):
+            owner = internal.tags.reference.structure.get(sid)
+            internal.tags.reference.structure.decrement(sid, '__typeinfo__') if '__typeinfo__' in owner else ()
+        return res
 
     @classmethod
     def delete_type(cls, sid):
@@ -5559,23 +5567,38 @@ class localtypesmonitor_84(object):
                 if tracked == (False, True):
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from {!s} to {!s} resulted in the addition of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, interface.tinfo.quoted(oldtype), interface.tinfo.quoted(newtype)))
                     internal.tags.reference.members.increment(mid, '__typeinfo__') if '__typeinfo__' not in original else ()
+                    owner_adjustment = +1
 
                 # If the new type was lowered to a trivial (basic) type, then go
                 # ahead and decrement it.
                 elif tracked == (True, False):
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from {!s} to {!s} resulted in the removal of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, interface.tinfo.quoted(oldtype), interface.tinfo.quoted(newtype)))
                     internal.tags.reference.members.decrement(mid, '__typeinfo__') if '__typeinfo__' in original else ()
+                    owner_adjustment = -1
 
                 # If the original type was something for us to track, but it
                 # doesn't include our tag, then we fix it by incrementing.
                 elif tracked[0] and not interface.tinfo.same(oldtype, newtype):
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from {!s} to {!s} required us to fix it.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, interface.tinfo.quoted(oldtype), interface.tinfo.quoted(newtype)))
                     internal.tags.reference.members.increment(mid, '__typeinfo__')
+                    owner_adjustment = +1
 
                 # Next we'll figure out whether we should log that no changes to
                 # the reference counts for "__typeinfo__" were needed.
                 elif not interface.tinfo.same(oldtype, newtype):
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from {!s} to {!s} did not need an adjustment.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, interface.tinfo.quoted(oldtype), interface.tinfo.quoted(newtype)))
+                    owner_adjustment = 0
+
+                else:
+                    owner_adjustment = 0
+
+                # Then we can check whether we need to increase the reference
+                # count for the "__typeinfo__" tag in regards to our owner.
+                owner = internal.tags.reference.structure.get(sid) if owner_adjustment else {}
+                if owner_adjustment > 0:
+                    internal.tags.reference.structure.increment(sid, '__typeinfo__') if '__typeinfo__' not in owner else ()
+                elif owner_adjustment < 0 and '__typeinfo__' not in internal.tags.reference.members.name(sid):
+                    internal.tags.reference.structure.decrement(sid, '__typeinfo__') if '__typeinfo__' in owner else ()
 
                 # The very last thing we need to do is to check the tags that
                 # have been encoded into the comments. We pretty much just hand
@@ -5635,6 +5658,11 @@ class localtypesmonitor_84(object):
 
                 if cls.is_field_tracked(ordinal, mindex, mtype):
                     internal.tags.reference.members.increment(mid, '__typeinfo__'), changed.append('__typeinfo__')
+
+                # Now we need to check if we need to update our owner tracking.
+                if '__typeinfo__' in changed:
+                    owner = internal.tags.reference.structure.get(sid)
+                    internal.tags.reference.structure.increment(sid, '__typeinfo__') if '__typeinfo__' not in owner else ()
 
                 logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Added the specified tags ({!s}) to the member at index {:d} ({:#x}) of type {!s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', ', '.join(map("{!r}".format, changed)), mindex, mid, parameter, sid))
             continue
