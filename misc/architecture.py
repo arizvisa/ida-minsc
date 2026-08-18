@@ -424,6 +424,30 @@ class architecture_t(object):
         else:
             ridx = -1
         return self.has(ridx)
+    @utils.multicase(register=(interface.register_t, types.integer, types.string), bits=types.integer)
+    def has(self, register, bits):
+        '''Return true if the specified `register` exists within the architecture at the size specified by `bits`.'''
+        selected = self.by_index(register) if isinstance(register, types.integer) else self.by_name(register) if isinstance(register, types.string) else register
+        if selected.bits == bits:
+            return True
+
+        # If the selected bits are less than requested, then climb the parents.
+        elif selected.bits < bits:
+            parent = internal.utils.fcompose(operator.attrgetter('__parent__'), (lambda *items: items), functools.partial(filter, None), iter)
+            while selected and selected.bits < bits:
+                iterable = parent(selected)
+                selected = next(iterable, None)
+            return True if selected else False
+
+        # Otherwise descend through the children until we find one specifically.
+        childitems = internal.utils.fcompose(operator.attrgetter('__children__'), operator.methodcaller('items'))
+        firsttype = internal.utils.fcompose(childitems, lambda items: ((key, value) for key, value in items if key[1] == type), iter)
+        firstchild = internal.utils.fcompose(childitems, functools.partial(sorted, key=internal.utils.fcompose(operator.itemgetter(0), operator.itemgetter(0))), iter)
+        while selected and selected.bits > bits:
+            iterable = firstchild(selected)
+            selected = next(iterable, None)
+            selected = selected[1] if selected else None
+        return True if selected else False
 
     def promote(self, register, bits=None):
         '''Promote the specified `register` to its next larger size as specified by `bits`.'''
