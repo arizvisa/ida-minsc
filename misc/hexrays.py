@@ -1476,7 +1476,12 @@ class variable(object):
             cfunc = function(locator.defea) if fn is None else fn
             lvar = variables.get(cfunc, locator)
 
-        # otherwise, the locator was completely invalid and we should abort.
+        elif fn:
+            cfunc, description = fn, cls.repr_locator(locator)
+            logging.warning(u"{:s}.default_name({:#x}, {!s}) : The specified variable is using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, description, idaapi.as_signed(locator.defea, interface.database.bits())))
+            lvar = variables.get(cfunc, locator)
+
+        # if we were given just the locator, then we abort with an exception.
         else:
             description = cls.repr_locator(locator)
             raise exceptions.DecompilerError(u"{:s}.default_name({!s}{!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), description if fn is None else "{:#x}".format(fn.entry_ea), '' if fn is None else ", {:s}".format(description), idaapi.as_signed(locator.defea, interface.database.bits())))
@@ -1500,12 +1505,35 @@ class variable(object):
         # then build an index for the storage of all of the argument variables.
         else:
             iterable = enumerate(interface.tinfo.function(cfunc.type))
-            iterable = ((index, isinstance(storage, interface.register_t), storage) for index, (_, _, storage) in iterable if storage)
-            arguments = {microarchitecture.select(storage, 8 * lvar.width) if register else idaapi.get_frame_retsize(fn) + storage : index for index, register, storage in iterable}
+            iterable = ((index, isinstance(storage, interface.register_t), storage) for index, (_, _, storage) in iterable if storage is not None)
+            arguments = {}
+            for index, register, storage in iterable:
+                if not storage:
+                    continue
+                elif register and microarchitecture.has(storage, 8 * lvar.width):
+                    key = microarchitecture.select(storage, 8 * lvar.width)
+                elif register:
+                    key = microarchitecture.full(storage)
+                elif isinstance(storage, interface.location_t):
+                    key = idaapi.get_frame_retsize(fn) + storage
+                elif isinstance(storage, internal.types.list):
+                    key = tuple(microarchitecture.select(item) for item in storage)
+                elif isinstance(storage, (internal.types.integer, internal.types.tuple)):
+                    key = storage
+                else:
+                    description = cls.repr_locator(locator)
+                    logging.warning(u"{:s}.default_name({:#x}, {!s}) : Unable to handle the storage ({!r}) for the current argument ({:d}) due to it being of an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, description, storage, index, storage.__class__))
+                    continue
+                arguments[key] = index
 
             # now we can look up the index using our variable storage.
             store = cls.get_storage(locator, lvar.width)
-            key = microarchitecture.select(store, 8 * lvar.width) if isinstance(store, interface.register_t) else store
+            if isinstance(store, interface.register_t) and microarchitecture.has(store, 8 * lvar.width):
+                key = microarchitecture.select(store, 8 * lvar.width)
+            elif isinstance(store, interface.register_t):
+                key = microarchitecture.full(storage)
+            else:
+                key = store
             prefix, suffix = 'a', arguments.get(key, -1)
 
         # check the index in the suffix. if it is invalid, then return an empty
