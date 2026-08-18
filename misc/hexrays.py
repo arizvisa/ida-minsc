@@ -967,19 +967,52 @@ class variables(object):
         raise exceptions.InvalidTypeOrValueError(u"{:s}.has({:#x}, {!r}) : Unable to locate a variable in the given function ({:#x}) with an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), ea, arg, ea, arg.__class__))
 
     @classmethod
-    def storage(cls, func, locator, *size):
+    def storage(cls, *args):
         '''Return the storage location for the variable identified by the given `locator` and `size` in the function `func`.'''
-        cfunc = function(func)
-        locator = cls.by(cfunc, locator)
+        if len(args) > 2:
+            fn, locator, size, count = itertools.chain(args, [2])
+        elif len(args) > 1 and isinstance(args[1], types.integer):
+            fn, locator, size, count = itertools.chain([None], args, [1])
+        elif len(args) > 1:
+            fn, locator, size, count = itertools.chain(args, [0], [-1])
+        else:
+            fn, locator, size, count = itertools.chain([None], args, [0, -1])
 
-        # next we need to grab the lvars for the function and use the locator to
-        # find our variable in order to grab the width to return its storage.
-        lvars = cls(cfunc)
+        # Get the variable locator so that we can use it to find the function if
+        # we weren't given one. We complain if its address is not in a function.
+        locator = cls.by(locator) if fn is None else cls.by(fn, locator)
+        if fn is None and not variable.has_location(locator):
+            description = variable.repr_locator(locator)
+            raise exceptions.DecompilerError(u"{:s}.storage({!s}{:s}) : Unable to determine the function for the variable `{!s}` due to its usage of an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), description, ", {:d}".format(size) if count > 0 else '', variable.repr_locator(locator), idaapi.as_signed(locator.defea, interface.database.bits())))
+
+        # Now we can use the locator to grab the function, or use the parameter
+        # if we were actually given one. With that, we can grab its variables.
+        cfunc = function(locator.defea) if fn is None else fn if isinstance(fn, (ida_hexrays.cfuncptr_t, ida_hexrays.cfunc_t)) else function(fn)
+        ea, lvars = cfunc.entry_ea, cls(cfunc)
+        iterable = itertools.chain(["{:#x}".format(ea), variable.repr_locator(locator)], ["{:d}".format(size)] if count > 0 else [])
+        descriptions = [description for description in iterable]
+
+        # Search through the list of variables for the specified locator, and
+        # figure out what the variable size is so we can find a register later.
         lvar = lvars.find(locator)
         if lvar is None:
-            ea, description = cfunc.entry_ea, variable.repr_locator(locator)
-            raise exceptions.ItemNotFoundError(u"{:s}.storage({:#x}, {:s}) : Unable to find a variable with the specified locator in the function at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, description, ea))
-        return variable.get_storage(locator, *size if size else [lvar.width])
+            raise exceptions.ItemNotFoundError(u"{:s}.storage({!s}) : Unable to find the variable for the locator `{!s}` in the function at {:#x}.".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions), variable.repr_locator(locator), ea))
+        width = size if count > 0 else lvar.width
+
+        # Use the cached bytecode to copy out the stacksize for the frame, so
+        # that our vantage point is from the perspective of the function
+        # entrypoint. Essentially, offset 0 should be pointing directly at our
+        # return address which requires us to translate it by this stacksize.
+        mba = cfunc.mba
+        tmpstk_size = mba.tmpstk_size
+        stacksize = mba.stacksize
+        delta = -stacksize
+
+        # Now we can return the location information translated by our delta if
+        # itś actually a variable in the stack frame.
+        alocinfo = interface.tinfo.location_raw(locator.location)
+        location = interface.tinfo.location(width, microarchitecture, *alocinfo)
+        return location + delta if isinstance(location, interface.integerish) else location
 
     @classmethod
     def address(cls, *args):
