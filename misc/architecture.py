@@ -486,6 +486,17 @@ class architecture_t(object):
             return self.promote(register, res)
         return self.by(register, register.size)
 
+    def full(self, register):
+        '''Return the register that is responsible for containing the specified `register`.'''
+        parent = internal.utils.fcompose(operator.attrgetter('__parent__'), (lambda *items: items), functools.partial(filter, None), iter)
+        selected = self.by_index(register) if isinstance(register, types.integer) else self.by_name(register) if isinstance(register, types.string) else register
+        result = selected
+        while selected:
+            result = selected
+            iterable = parent(selected)
+            selected = next(iterable, None)
+        return result
+
 ## Hex-Rays (decompiler) architecture
 try:
     import ida_hexrays
