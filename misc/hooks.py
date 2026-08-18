@@ -2874,10 +2874,6 @@ class structurenaming(changingchanged):
         '''Return true if the structure `sid` with specified `name` should not be tracked with tags.'''
         sptr = internal.structure.by_identifier(sid) if internal.structure.has(sid) else None
 
-        # FIXME: distinguish between types that were created after the database
-        #        was loaded and types that were created while it was being
-        #        loaded. Use the `IDB_Hooks.auto_empty_finally` hook event.
-
         # Before actually checking if this structure should be tracked, check
         # our flag to ensure that the database has done its initial analysis.
         if not getattr(cls, '__tracking_enabled__', False):
@@ -2904,7 +2900,10 @@ class structurenaming(changingchanged):
         # these in v9.0, we stick to only things from the type library.
         elif hasattr(sptr, 'props') and sptr.props & getattr(idaapi, 'SF_TYPLIB', 0):
             return False
-        return True
+
+        # Check if there are any members (for some reason) which have their
+        # "__typeinfo__" tag applied to them
+        return '__typeinfo__' in internal.tags.reference.members.name(sid)
 
     @classmethod
     def created(cls, struc_id):
@@ -2926,10 +2925,9 @@ class structurenaming(changingchanged):
         if not cls.is_general_name(sptr, name):
             internal.tags.reference.structure.increment(sid, '__name__')
 
-        # Next we need to increment the "__typeinfo__" tag. We don't have a real
-        # way of distinguishing whether a structure has been created by the user
-        # or the disassembler, so we rely on whether the structure was created
-        # at the same time as the database or after the analysis has completed.
+        # Next we need to check if the "__typeinfo__" tag needs to be added.
+        # We do this by checking to see if any of its members have a
+        # "__typeinfo__" tag applied to them, and adjust our count if so.
         if cls.is_tracked(sid, name):
             internal.tags.reference.structure.increment(sid, '__typeinfo__')
         return
