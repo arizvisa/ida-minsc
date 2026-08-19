@@ -2975,10 +2975,10 @@ class structurenaming(changingchanged):
         # assume that the new structure id is correct. If the latter, then log a
         # warning since the disassembler might have just filtered the name.
         if newsid != sid:
-            logging.fatal(u"{:s}.updater() : Structure renaming events for structure {:#x} are out of sync. Expected structure {:#x}, but event gave us structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, sid, newsid))
+            logging.fatal(u"{:s}.updater() : Structure renaming events for structure {:#x} are out of sync. Expected structure, but event gave us structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, sid, newsid))
 
         if applied != newname:
-            logging.warning(u"{:s}.updater() : Structure renaming events for structure {:#x} are out of sync. Expected structure {:#x} to have name \"{:s\", but the name \"{:s}\" was applied.".format('.'.join([__name__, cls.__name__]), newsid, utils.string.escape(newname, '"'), utils.string.escape(applied, '"')))
+            logging.warning(u"{:s}.updater() : Structure renaming events for structure {:#x} are out of sync. Expected structure to have name \"{:s\", but the name \"{:s}\" was applied.".format('.'.join([__name__, cls.__name__]), newsid, utils.string.escape(newname, '"'), utils.string.escape(applied, '"')))
 
         # Now we'll figure out whether we are renaming to a default-ish name, or
         # something that was user-specified. We use this to compare the names
