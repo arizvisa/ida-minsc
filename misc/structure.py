@@ -455,6 +455,53 @@ class naming(object):
         return utils.string.of(res)
 
     @classmethod
+    def default(cls, type, **ordinal):
+        '''Return the default name of the specified `type` using the given `ordinal` if provided.'''
+        ti = idaapi.tinfo_t()
+        if isinstance(type, idaapi.tinfo_t):
+            ti, sid = interface.tinfo.copy(type), interface.tinfo.identifier(type)
+        elif isinstance(type, types.integer) and interface.node.identifier(type) and ti.get_type_by_tid(type):
+            ti, sid = ti, type
+        elif isinstance(type, structure_t):
+            ti, sid = type.ptr, type.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
+            ti, sid = type, type.id
+        elif hasattr(idaapi, 'get_struc') and isinstance(type, types.integer) and interface.node.identifier(type):
+            ti, sid = idaapi.get_struc(type), type
+        elif isinstance(type, types.integer):
+            raise E.ItemNotFoundError(u"{:s}.default({:#x}{:s}) : Unable to locate the type with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type, ", {:s}".format(utils.string.kwargs(ordinal)) if ordinal else '', type))
+        else:
+            raise E.InvalidParameterError(u"{:s}.default({!s}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, ", {:s}".format(utils.string.kwargs(ordinal)) if ordinal else '', type.__class__))
+
+        # First thing is to figure out what our default ordinal is.
+        if 'ordinal' in ordinal:
+            ordinal = ordinal['ordinal']
+        elif isinstance(ti, idaapi.tinfo_t):
+            ordinal = interface.tinfo.ordinal(ti)
+        elif idaapi.get_enum_idx(sid) == idaapi.BADADDR:
+            ordinal = idaapi.get_struc_idx(sid)
+        else:
+            ordinal = idaapi.get_enum_idx(sid)
+
+        # Now we can use the type to figure out what its default name would be.
+        if union(ti):
+            res = "union_{:d}".format(ordinal)
+        elif frame(ti): # FIXME: is this right, how many zeroes do we pad?
+            ea = interface.range.start(interface.function.by_frame(ti))
+            res = "$ F{:#0{:d}X}".format(interface.database.bits() // 8, ea)
+        elif isinstance(ti, idaapi.tinfo_t) and ti.is_enum():
+            res = "enum_{:d}".format(ordinal)
+        elif isinstance(ti, idaapi.tinfo_t) and ti.is_struct():
+            res = "struc_{:d}".format(ordinal)
+        elif isinstance(ti, idaapi.tinfo_t):
+            res = "type{:s}_{:d}".format(ordinal, 'ref' if ti.is_typeref() else '')
+        elif idaapi.get_enum_idx(sid) == idaapi.BADADDR:
+            res = "struc_{:d}".format(ordinal)
+        else:
+            res = "enum_{:d}".format(ordinal)
+        return res
+
+    @classmethod
     def has(cls, type, *name, **ordinal):
         '''Return whether the `name` of the specified `type` has a non-default name using the `ordinal` if provided.'''
         ti = idaapi.tinfo_t()
