@@ -1046,7 +1046,7 @@ class select_v1(object):
             Ftag = function.get if is_function else address.get
             tags, owners = Ftag(ea), {f for f in interface.function.owners(ea)} if is_function else {ea}
             selected = {key : value for key, value in tags.items() if key in used}
-            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
+            explicit = {key : value for key, value in tags.items() if not key.startswith('__')}
             if ea not in owners:
                 pass
             elif selection:
@@ -1063,7 +1063,7 @@ class select_v1(object):
         for ea, used in query_v1.contents(*args, **kwargs):
             is_function = interface.function.has(cls.navigation.procedure(ea))
             owners = {f for f in interface.function.owners(ea)} if is_function else {ea}
-            explicit = {key for key in used if key and not key.startswith('__')}
+            explicit = {key for key in used if not key.startswith('__')}
             if ea not in owners:
                 pass
             elif selection:
@@ -1080,7 +1080,7 @@ class select_v1(object):
         for ea, used in query_v1.function(func, *args, **kwargs):
             tags = address.get(cls.navigation.analyze(ea))
             selected = {key : value for key, value in tags.items() if key in used}
-            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
+            explicit = {key : value for key, value in tags.items() if not key.startswith('__')}
             if selection:
                 yield ea, selected
             elif explicit:
@@ -1095,7 +1095,7 @@ class select_v1(object):
         for sid, used in query_v1.structures(*args, **kwargs):
             tags = structure.get(sid)
             selected = {key : value for key, value in tags.items() if key in used}
-            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
+            explicit = {key : value for key, value in tags.items() if not key.startswith('__')}
             if selection:
                 yield sid, selected
             elif explicit:
@@ -1108,7 +1108,7 @@ class select_v1(object):
         '''Query the members in the database and yield a tuple containing the owning structure identifier for the member and a set of the matching `required` tags with any `included` ones.'''
         selection = True if any([args, kwargs]) else False
         for sid, used in query_v1.owners(*args, **kwargs):
-            explicit = {key for key in used if key and not key.startswith('__')}
+            explicit = {key for key in used if not key.startswith('__')}
             if selection:
                 yield sid, used
             elif explicit:
@@ -1121,7 +1121,7 @@ class select_v1(object):
         '''Query the frame members in the database and yield a tuple containing the owning function address for the frame and a set of the matching `required` tags with any `included` ones.'''
         selection = True if any([args, kwargs]) else False
         for ea, used in query_v1.frames(*args, **kwargs):
-            explicit = {key for key in used if key and not key.startswith('__')}
+            explicit = {key for key in used if not key.startswith('__')}
             if selection:
                 yield ea, used
             elif explicit:
@@ -1137,7 +1137,7 @@ class select_v1(object):
         # Go through each member from our query so that we can filter out the
         # empty tag and any implicit ones.. Now we're left with explicit tags.
         for mid, used in query_v1.members(*args, **kwargs):
-            explicit = {key for key in used if key and not key.startswith('__')}
+            explicit = {key for key in used if not key.startswith('__')}
             if selection:
                 yield mid, used
             elif explicit:
@@ -1152,7 +1152,7 @@ class select_v1(object):
         for mid, used in query_v1.structure(sid, *args, **kwargs):
             tags = member.get(mid) if idaapi.__version__ < 8.5 else typeinfo_member.get(mid)
             selected = {key : value for key, value in tags.items() if key in used}
-            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
+            explicit = {key : value for key, value in tags.items() if not key.startswith('__')}
             if selection:
                 yield mid, selected
             elif explicit:
@@ -1167,7 +1167,7 @@ class select_v1(object):
         for bb, used in query_v1.blocks(func, *args, **kwargs):
             tags = block.get(bb)
             selected = {key : value for key, value in tags.items() if key in used}
-            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
+            explicit = {key : value for key, value in tags.items() if not key.startswith('__')}
             if selection:
                 yield bb, selected
             elif explicit:
@@ -1182,7 +1182,7 @@ class select_v1(object):
         for ea, used in query_v1.hexfunctions(*args, **kwargs):
             is_function = interface.function.has(cls.navigation.procedure(ea))
             owners = {f for f in interface.function.owners(ea)} if is_function else {ea}
-            explicit = {key for key in used if key and not key.startswith('__')}
+            explicit = {key for key in used if not key.startswith('__')}
             if ea not in owners:
                 pass
             elif selection:
@@ -1200,7 +1200,7 @@ class select_v1(object):
             key = internal.declaration.preciser.exactly(cfunc, instance.ea, instance.itp & 0xFFFFFFFF)
             tags = hexfunction.get(cfunc, (instance.ea, instance.itp))
             selected = {key : value for key, value in tags.items() if key in used}
-            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
+            explicit = {key : value for key, value in tags.items() if not key.startswith('__')}
             if selection:
                 yield key, selected
             elif explicit:
@@ -1215,7 +1215,7 @@ class select_v1(object):
         for ea, used in query_v1.hexvariables(*args, **kwargs):
             is_function = interface.function.has(cls.navigation.procedure(ea))
             owners = {f for f in interface.function.owners(ea)} if is_function else {ea}
-            explicit = {key for key in used if key and not key.startswith('__')}
+            explicit = {key for key in used if not key.startswith('__')}
             if ea not in owners:
                 pass
             elif selection:
@@ -1232,7 +1232,7 @@ class select_v1(object):
         for locator, used in query_v1.hexvariable(cfunc, *args, **kwargs):
             tags, defea = hexvariable.get(cfunc, locator), cls.navigation.analyze(locator.defea)
             selected = {key : value for key, value in tags.items() if key in used}
-            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
+            explicit = {key : value for key, value in tags.items() if not key.startswith('__')}
             if selection:
                 yield locator, selected
             elif explicit:
