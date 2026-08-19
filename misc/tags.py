@@ -2489,11 +2489,27 @@ class structure(object):
     @classmethod
     def set(cls, sptr, key, value):
         '''Set the tag specified by `key` to `value` for the structure `sptr`.'''
+        repeatable, sptr = True, idaapi.get_struc(int(sptr)) if isinstance(sptr, internal.types.integer) else sptr
+        is_frame = internal.structure.frame(sptr)
+
+        # Guard against a bunk type being used to set the value.
         if value is None:
             raise internal.exceptions.InvalidParameterError(u"{:s}.set({:#x}, {!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format('.'.join([__name__, cls.__name__]), sptr.id, key, value, utils.string.escape(key, '"'), value))
 
-        # All structure tags are prioritized within repeatable comments.
-        repeatable = True
+        # Before we apply the chosen tag to a comment, we need to check if the
+        # user is updating an implicit tag and selecting the correct one.
+        elif key == '__name__':
+            tags, res = cls.get(sptr), internal.structure.naming.set(sptr, value)
+            return tags.pop(key, None)
+
+        # If it's a frame, we can't modify any other implicit tags.
+        elif is_frame:
+            pass
+
+        elif key == '__typeinfo__':
+            tags, available = cls.get(sptr), internal.tags.reference.structure.get(sptr.id)
+            res = internal.tags.reference.structure.increment(sptr.id, '__typeinfo__') if '__typeinfo__' not in available else ()
+            return tags.pop(key, None)
 
         # First we need to read both comments to figure out what the user is trying to say.
         comment_right = internal.structure.comment.get(sptr, repeatable)
