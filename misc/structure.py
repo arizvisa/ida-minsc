@@ -7024,11 +7024,16 @@ class members(object):
                 logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : The {:s} owning the member ({:#x}) at {:s} that is attempting to be removed does not actually belong to us ({:#x}) and will not have its type information copied.".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, 'union' if union(owner) else 'frame' if frame(owner) else 'structure', mptr.id, "index {:d}".format(mptr.soff) if union(sptr) else "offset {:+#x}".format(base + offset), sptr.id))
                 continue
 
-            # Apply any type information that we were able to snag to the newly created member.
-            # XXX: we should catch any exceptions raised here so that we don't interrupt the
-            #      application of type information and other metadata to any missed members.
+            # Apply any type information that we were able to snag to the newly
+            # created member. We stray from the default `SET_MEMTI_COMPATIBLE`
+            # to the `SET_MEMTI_USERTI` option to ensure it is user-specified.
+
+            # XXX: we should catch any exceptions raised here so that we don't
+            #      interrupt the application of type information and other
+            #      metadata to any missed members.
             if opinfo is not None and tinfo and tinfo.get_size() != idaapi.BADSIZE:
-                member.set_typeinfo(mptr, tinfo)
+                setflags = getattr(idaapi, 'SET_MEMTI_USERTI', 0)
+                member.set_typeinfo(mptr, tinfo, flags=setflags)
 
             # Apply any comments that we might've needed to copy.
             for repeatable, string in enumerate(comments):
