@@ -1893,27 +1893,27 @@ class function(object):
         rt, ea = interface.addressOfRuntimeOrStatic(func)
 
         # First we'll try and parse the type if it was given to us as a string.
-        info, key = interface.tinfo.parse(None, value, idaapi.PT_SIL) if isinstance(value, internal.types.string) else value, '__typeinfo__'
+        info = interface.tinfo.parse(None, value, idaapi.PT_SIL) if isinstance(value, internal.types.string) else value
         if info is None:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to parse the provided string ({!s}) into a type declaration.".format('function', ea, key, value, utils.string.repr("{!s}".format(value)), ea))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set_typeinfo({:#x}, {!r}) : Unable to parse the provided string ({!s}) into a type declaration.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(value), utils.string.repr("{!s}".format(value)), ea))
 
         # If the type is not a function type whatsoever, then bail.
         if not any([info.is_func(), info.is_funcptr()]):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.tag({:#x}, {!r}, {!r}) : Refusing to apply a non-function type ({!r}) to the given {:s} ({:#x}).".format('function', ea, key, value, "{!s}".format(info), 'address' if rt else 'function', ea))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set_typeinfo({:#x}, {!r}) : Refusing to apply a non-function type ({!r}) to the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(value), "{!s}".format(info), 'address' if rt else '.'.join([__name__, cls.__name__]), ea))
 
         # If we're being used against an export, then we need to make sure that
         # our type is a function pointer and we need to promote it if not.
-        ti = interface.function.pointer(info)
+        ti = interface.function.pointer(info) if rt else info
         if rt and ti is None:
-            raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to promote type to a pointer due to being applied to a function pointer.".format('function', ea, key, value))
+            raise internal.exceptions.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!r}) : Unable to promote type to a pointer due to being applied to a function pointer.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(value)))
 
         elif ti is not info:
-            logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Promoted type ({!r}) to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('function', ea, key, value, "{!s}".format(info), "{!s}".format(ti), ea))
+            logging.warning(u"{:s}.set_typeinfo({:#x}, {!r}) : Promoted type ({!r}) to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(value), "{!s}".format(info), "{!s}".format(ti), ea))
 
         # and then we just need to apply the type to the given address.
         result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, ti)
         if not ok:
-            raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply typeinfo ({!r}) to the {:s} ({:#x}).".format('function', ea, key, value, "{!s}".format(ti), 'address' if rt else 'function', ea))
+            raise internal.exceptions.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!r}) : Unable to apply typeinfo ({!r}) to the {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(value), "{!s}".format(ti), 'address' if rt else 'function', ea))
         return result
 
     @classmethod
