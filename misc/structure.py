@@ -7314,7 +7314,7 @@ class structure_t(object):
     @utils.string.decorate_arguments('key')
     def tag(self, key):
         '''Return the tag identified by `key` for the structure.'''
-        owner = self.ptr
+        cls, owner = self.__class__, self.ptr
         if isinstance(owner, idaapi.tinfo_t):
             res = internal.tags.typeinfo.get(owner)
             sid = interface.tinfo.identifier(owner)
@@ -7324,8 +7324,9 @@ class structure_t(object):
 
         if key in res:
             return res[key]
-        cls = self.__class__
-        raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the structure {:s}.".format('.'.join([__name__, cls.__name__]), sid, key, utils.string.escape(key, '"'), utils.string.repr(self.name)))
+        elif key not in {'__name__'}:
+            raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the structure {:s}.".format('.'.join([__name__, cls.__name__]), sid, key, utils.string.escape(key, '"'), utils.string.repr(self.name)))
+        return naming.get(owner)
     @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
