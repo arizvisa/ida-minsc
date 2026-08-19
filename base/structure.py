@@ -253,19 +253,19 @@ def selectmembers(**boolean):
         yield internal.structure.new(sid, 0), res
     return
 
-@utils.multicase(string=(types.string, types.tuple))
 @utils.string.decorate_arguments('string', 'suffix')
-def new(string, *suffix, **offset):
+def new(*string, **offset):
     """Create a new structure or union using the name specified by `string` and return it.
 
     If the boolean `union` is provided, then create a union instead of a structure.
     If the integer `offset` is provided, then use it as the base offset for the newly created structure.
     """
-    res = string if isinstance(string, types.tuple) else (string,)
-    name = interface.tuplename(*(res + suffix))
+    iterable = itertools.chain(*((part if isinstance(part, internal.types.tuple) else [part]) for part in string))
+    packed = tuple(iterable)
+    name = interface.tuplename(*packed)
     sptr = internal.structure.create(name, offset.get('union', False))
     if not sptr:
-        raise E.DisassemblerError(u"{:s}.new({:s}{:s}) : Unable to add a new {:s} to the database with the name \"{:s}\".".format(__name__, ', '.join(map("{!r}".format, res + suffix)), u", {:s}".format(utils.string.kwargs(offset)) if offset else '', 'union' if offset.get('union', False) else 'structure', utils.string.escape(name, '"')))
+        raise E.DisassemblerError(u"{:s}.new({:s}{:s}) : Unable to add a new {:s} to the database with the name \"{:s}\".".format(__name__, ', '.join(map("{!r}".format, packed)), u", {:s}".format(utils.string.kwargs(offset)) if offset else '', 'union' if offset.get('union', False) else 'structure', utils.string.escape(name, '"')))
     return internal.structure.new(sptr, offset.get('offset', 0))
 
 @utils.multicase(string=types.string)
