@@ -1841,17 +1841,16 @@ class member(object):
             raise E.MemberNotFoundError(u"{:s}.remove_typeinfo({:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, mptr.id))
         mptr, fullname, sptr = packed
 
-        # Next we need to check if the correct api for removing member type
-        # information, `idaapi.del_member_tinfo`, is available and use it if so.
-        if hasattr(idaapi, 'del_member_tinfo') and idaapi.del_member_tinfo(sptr, mptr):
-            return original
+        # If there was no original type associated with the member, then there's
+        # nothing for us to do really.
+        if original is None:
+            return None
 
-        # Otherwise the best we can do is to re-assign an empty type to clear it. We
-        # try to create an unknown type since it's the best we can do without the api.
-        ti = idaapi.tinfo_t()
-        if not ti.create_simple_type(idaapi.BTF_UNK):
-            logging.warning(u"{:s}.remove_typeinfo({:#x}) : Unable to create an unknown {:s}({:d}) type to assign to the {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, 'BTF_UNK', idaapi.BTF_UNK, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
-        return cls.set_typeinfo(mptr, info)
+        # Next we'll need to reduce the specified type to a native type so that
+        # way it appears that we've removed the type from the specified member.
+        # Once reduced, we just need to apply it and then return the result.
+        reduced = interface.tinfo.reduce(interface.tinfo.copy(original))
+        return cls.set_typeinfo(mptr, reduced, 0)
 
     @classmethod
     def get_comment(cls, mptr, *repeatable):
