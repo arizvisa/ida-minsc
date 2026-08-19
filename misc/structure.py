@@ -1504,9 +1504,10 @@ class member(object):
     @classmethod
     def has_name(cls, mptr, **name):
         '''Return whether the `name` of the member specified by `mptr` is user-defined.'''
-        packed = idaapi.get_member_by_id(mptr.id)
+        mid = getattr(mptr, 'id', mptr)
+        packed = idaapi.get_member_by_id(mid)
         if not packed:
-            raise E.MemberNotFoundError(u"{:s}.has_name({:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, mptr.id))
+            raise E.MemberNotFoundError(u"{:s}.has_name({:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         mptr, fullname, sptr = packed
 
         # if the user gave us an explicit name to test against the member, then
@@ -1711,9 +1712,10 @@ class member(object):
         flag, typeid, nbytes = interface.typemap.resolve(type)
 
         # First, we'll need to get the structure associated with the member.
-        packed = idaapi.get_member_by_id(mptr.id)
+        mid = getattr(mptr, 'id', mptr)
+        packed = idaapi.get_member_by_id(mid)
         if not packed:
-            raise E.MemberNotFoundError(u"{:s}.set_type({:#x}, {!s}{:s}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr if isinstance(mptr, types.integer) else mptr.id, ", {:#x}".format(*map(int, offset)) if offset else '', type, mptr if isinstance(mptr, types.integer) else mptr.id))
+            raise E.MemberNotFoundError(u"{:s}.set_type({:#x}, {!s}{:s}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, ", {:#x}".format(*map(int, offset)) if offset else '', type, mid))
         mptr, fullname, sptr = packed
         [moffset] = map(int, offset) if offset else [0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff]
 
@@ -1752,6 +1754,11 @@ class member(object):
     def get_typeinfo(cls, mptr):
         '''Return the type information of the member given by `mptr` guessing it if necessary.'''
         ti = idaapi.tinfo_t()
+        mid = getattr(mptr, 'id', mptr)
+        packed = idaapi.get_member_by_id(mid)
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.get_typeinfo({:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+        mptr, fullname, sptr = packed
 
         # Guess the typeinfo for the current member. If we're unable to get the
         # typeinfo then we just return whatever we have. Let IDA figure it out.
@@ -1793,9 +1800,10 @@ class member(object):
         ti, info_description = (info, utils.string.repr("{!s}".format(info))) if isinstance(info, idaapi.tinfo_t) else (interface.tinfo.parse(None, info, idaapi.PT_SIL), utils.string.repr(info))
 
         # Then we need the sptr for the member so that we can actually apply the type.
-        packed = idaapi.get_member_by_id(mptr.id)
+        mid = getattr(mptr, 'id', mptr)
+        packed = idaapi.get_member_by_id(mid)
         if not packed:
-            raise E.MemberNotFoundError(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, info_description, flags, mptr.id))
+            raise E.MemberNotFoundError(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, info_description, flags, mid))
         mptr, fullname, sptr = packed
 
         # We want to detect type changes, so we need to get the previous type information of
@@ -1836,9 +1844,10 @@ class member(object):
         original = ti if get_member_tinfo(ti, mptr) else None
 
         # Then we need the sptr for the member so that we can actually remove the type.
-        packed = idaapi.get_member_by_id(mptr.id)
+        mid = getattr(mptr, 'id', mptr)
+        packed = idaapi.get_member_by_id(mid)
         if not packed:
-            raise E.MemberNotFoundError(u"{:s}.remove_typeinfo({:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, mptr.id))
+            raise E.MemberNotFoundError(u"{:s}.remove_typeinfo({:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         mptr, fullname, sptr = packed
 
         # If there was no original type associated with the member, then there's
@@ -1858,7 +1867,7 @@ class member(object):
 
         If `repeatable` is given as a boolean, return only that specific comment type from the member.
         """
-        identifier = mptr.id if isinstance(mptr, idaapi.member_t) else mptr
+        identifier = mptr.id if isinstance(mptr, membertypes) else mptr
         res = idaapi.get_member_cmt(identifier, *repeatable) if repeatable else idaapi.get_member_cmt(identifier, True) or idaapi.get_member_cmt(identifier, False)
         return utils.string.of(res or '')
 
@@ -1868,6 +1877,12 @@ class member(object):
 
         If `repeatable` is given as a boolean, then affect only that specific comment type of the member.
         """
+        mid = getattr(mptr, 'id', mptr)
+        packed = idaapi.get_member_by_id(mid)
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.set_comment({:#x}, {!r}{!s}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, string, ", {!s}".format(*repeatable) if repeatable else ''))
+        mptr, fullname, sptr = packed
+
         if not repeatable:
             comment_r, comment_n = (utils.string.of(idaapi.get_member_cmt(mptr.id, repeatable)) for repeatable in [True, False])
             prioritized = all([comment_r, comment_n]) or not any([comment_r, comment_n])
@@ -1877,7 +1892,7 @@ class member(object):
         result = idaapi.get_member_cmt(mptr.id, *repeatable)
         if not idaapi.set_member_cmt(mptr, utils.string.to(string or ''), *repeatable):
             [repeat], description = repeatable, cls.fullname(mptr)
-            raise E.DisassemblerError(u"{:s}.set_comment({:#x}, {!r}, {!s}) : Unable to assign the specified {:s}comment to the given member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, string, repeat, 'repeatable ' if repeat else '', "\"{:s}\"".format(utils.string.escape(description, '"')) if description else "{:#x}".format(mptr.id)))
+            raise E.DisassemblerError(u"{:s}.set_comment({:#x}, {!r}{!s}) : Unable to assign the specified {:s}comment to the given member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, string, ", {:s}".format(*repeatable) if repeatable else '', 'repeatable ' if repeat else '', "\"{:s}\"".format(utils.string.escape(description, '"')) if description else "{:#x}".format(mptr.id)))
         return utils.string.of(result or '')
 
     @classmethod
@@ -1923,9 +1938,16 @@ class member(object):
     def at(cls, mptr, offset):
         '''Return the distance of the given `offset` from the member in `mptr` as a tuple composed of an array index and element offset.'''
         get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
-        opinfo, moffset, msize = idaapi.opinfo_t(), 0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff, idaapi.get_member_size(mptr)
+
+        # Get the member and its owning structure.
+        mid = getattr(mptr, 'id', mptr)
+        packed = idaapi.get_member_by_id(mid)
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.at({:#x}, {:d}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, offset, mid))
+        mptr, fullname, sptr = packed
 
         # Get any information about the member and use it to get the size of the type.
+        opinfo, moffset, msize = idaapi.opinfo_t(), 0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff, idaapi.get_member_size(mptr)
         retrieved = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
         element = get_data_elsize(mptr.id, mptr.flag, opinfo if retrieved else None)
 
@@ -1935,12 +1957,17 @@ class member(object):
     @classmethod
     def packed(cls, offset, mptr):
         '''Pack the information about the member `mptr` with its structure at the specified `offset` into a tuple in case it is to be removed.'''
-        is_union_member = True if mptr.props & idaapi.MF_UNIMEM else False
+        mid = getattr(mptr, 'id', mptr)
+        packed = idaapi.get_member_by_id(mid)
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.packed({:d}, {:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), offset, mid, mid))
+        mptr, fullname, sptr = packed
 
         # first we'll grab the name and the size. we need the size in order
         # to dissolve the member into an actual type of some sort.
         mname = utils.string.of(idaapi.get_member_name(mptr.id)) or ''
         msize = idaapi.get_member_size(mptr)
+        is_union_member = True if mptr.props & idaapi.MF_UNIMEM else False
 
         # then we'll need to figure out the offset and use it to calculate
         # the location. the member's offset is the parameter unless we're
