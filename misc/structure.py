@@ -28,10 +28,35 @@ def new(identifier, offset):
 def create(string, union):
     '''Create a new structure or `union` type using the name specified by `string` and return it.'''
     make_union = union
+    ordinal = idaapi.get_struc_qty() if idaapi.__version__ < 8.5 else interface.tinfo.quantity()
+
+    # figure out the correct formatter to use depending on the specified name.
+    if string:
+        formatter = "{:s}_{:s}".format(string, '{:s}').format
+    elif make_union:
+        formatter = "union_{:s}".format
+    else:
+        formatter = "struc_{:s}".format
+
+    # if a structure already exists with that name, and suffixing the ordinal is
+    # not enough, then we increment a counter until we get a unique name.
+    if has(string) and has(formatter("{:d}".format(ordinal))):
+        count, formatter = 0, formatter("{:s}_{:s}".format('{:d}', "{:d}".format(ordinal))).format
+        while has(formatter(count)):
+            count += 1
+        realname = formatter(count)
+
+    # if there's a duplicate name, then suffix the ordinal and be good to go.
+    elif has(string):
+        realname = formatter("{:d}".format(ordinal))
+
+    # otherwise, we can just use the name as-is and be good to go.
+    else:
+        realname = string or formatter("{:d}".format(ordinal))
 
     # add a structure with the specified name on older versions.
     if idaapi.__version__ < 8.5:
-        sid = idaapi.add_struc(idaapi.BADADDR, utils.string.to(string), make_union)
+        sid = idaapi.add_struc(idaapi.BADADDR, utils.string.to(realname), make_union)
         return None if sid == idaapi.BADADDR else idaapi.get_struc(sid)
 
     # create a new union or structure using `idaapi.tinfo_t.create_udt`.
