@@ -2165,15 +2165,29 @@ class typeinfo(object):
         else:
             raise internal.exceptions.InvalidParameterError(u"{:s}({!r}, {!r}, {!r}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__, 'set']), type, key, value, type.__class__))
 
+        # All tags for a type are prioritized as a repeatable comment.
+        repeatable, is_frame = True, ti.is_frame() if hasattr(ti, 'is_frame') else False
+        type_description = 'frame' if is_frame else 'union' if internal.structure.union(ti) else 'structure'
+
         # Guard against a null value being used for a tag.
         if value is None:
             raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}, {!r}, {!s}) : Tried to set the tag named \"{:s}\" with an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__, 'set']), sid, key, value if value is None else "{!r}".format(value), utils.string.escape(key, '"'), value))
 
-        # All tags for a type are prioritized as a repeatable comment. Then we
-        # start by reading both comments to figure out what's being requested.
-        repeatable, is_frame = True, ti.is_frame() if hasattr(ti, 'is_frame') else False
-        type_description = 'frame' if is_frame else 'union' if internal.structure.union(ti) else 'structure'
+        # Before everything, we check if the implicit tags are being modified.
+        elif key == '__name__':
+            tags, res = cls.get(sptr), internal.structure.naming.set(sptr, value)
+            return tags.pop(key, None)
 
+        # If it's a frame, then we can't modify any other implicit tags.
+        elif is_frame:
+            pass
+
+        elif key == '__typeinfo__':
+            tags, available = cls.get(sptr), internal.tags.reference.structure.get(sptr.id)
+            res = internal.tags.reference.structure.increment(sptr.id, '__typeinfo__') if '__typeinfo__' not in available else ()
+            return tags.pop(key, None)
+
+        # Then we start by reading both comments to figure out what's being requested.
         comment_right = internal.structure.comment.get(ti, repeatable)
         comment_wrong = internal.structure.comment.get(ti, not repeatable)
 
@@ -2214,15 +2228,28 @@ class typeinfo(object):
         else:
             raise internal.exceptions.InvalidParameterError(u"{:s}({!r}, {!r}, {!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__, 'remove']), type, key, none if none is None else "{!r}".format(none), type.__class__))
 
+        # First check if the key is one of the supported implicit tags. These
+        # cannot be modified since they only exist in special circumstances.
+        repeatable, is_frame = True, internal.structure.frame(ti)
+        type_description = 'frame' if is_frame else 'union' if internal.structure.union(ti) else 'structure'
+
         # Guard against a non-null value being used for a tag.
         if none is not None:
             raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}, {!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__, 'remove']), sid, key, none, utils.string.escape(key, '"'), none))
 
-        # First check if the key is one of the supported implicit tags. These
-        # cannot be modified since they only exist in special circumstances.
-        repeatable, is_frame = True, ti.is_frame() if hasattr(ti, 'is_frame') else False
-        type_description = 'frame' if is_frame else 'union' if internal.structure.union(ti) else 'structure'
+        elif key == '__name__':
+            tags, original = cls.get(sptr), internal.structure.naming.remove(sptr)
+            return tags.pop(key, None)
 
+        elif is_frame:
+            pass
+
+        elif key == '__typeinfo__':
+            tags, available = cls.get(sptr), internal.tags.reference.structure.get(sptr.id)
+            res = internal.tags.reference.structure.decrement(sptr.id, '__typeinfo__') if '__typeinfo__' in available else ()
+            return tags.pop(key, None)
+
+        # Then we can get both comment types.
         comment_right = internal.structure.comment.get(ti, repeatable)
         comment_wrong = internal.structure.comment.get(ti, not repeatable)
 
