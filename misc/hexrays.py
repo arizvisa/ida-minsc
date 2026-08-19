@@ -1423,17 +1423,8 @@ class variable(object):
     def member_name(cls, *args):
         '''Return the matching or default name (disassembler) for the variable identified by the given `args`.'''
         fn = function(*args[:1]) if len(args) > 1 else None
-        locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
-
-        # validate the locator, then determine the function, then the variable.
-        if cls.has_location(locator):
-            cfunc = function(locator.defea) if fn is None else fn
-            lvar = variables.get(cfunc, locator)
-
-        # if it didn't validate, the locator was corrupted in some way.
-        else:
-            description = cls.repr_locator(locator)
-            raise exceptions.DecompilerError(u"{:s}.member_name({!s}{!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), description if fn is None else "{:#x}".format(fn.entry_ea), '' if fn is None else ", {:s}".format(description), idaapi.as_signed(locator.defea, interface.database.bits())))
+        lvar = variables.get(*itertools.chain(args if fn is None else [fn], args[1:]))
+        cfunc = function(locator.defea) if fn is None else fn
 
         # grab all information about the function containing the variable.
         ea, locator = cfunc.entry_ea, cls.get_locator(lvar)
@@ -1448,7 +1439,7 @@ class variable(object):
 
         # grab the storage location for the variable. if it's a register, figure
         # out whether its an arg or var and suffix its name with the register.
-        store = cls.get_storage(locator, lvar.width)
+        store = variables.storage(cfunc, locator, lvar.width)
         if not isinstance(store, interface.location_t):
             res = 'arg' if lvar.is_arg_var else 'var', store.name
             return interface.tuplename(*res)
