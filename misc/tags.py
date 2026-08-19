@@ -498,7 +498,7 @@ class select_v0(object):
         # Nothing specific was queried, so just yield all tags that are
         # available while making sure to exclude any implicit ones.
         for ea, res in query_v0.globals(*args, **kwargs):
-            explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
+            explicit = {tag : value for tag, value in res.items() if not tag.startswith('__')}
             if explicit:
                 yield ea, explicit
             continue
@@ -515,7 +515,7 @@ class select_v0(object):
         # No specific tags were selected, so just yield all tagnames that are
         # available while being sure to exclude the empty and any implicit tags.
         for ea, res in query_v0.contents(*args, **kwargs):
-            explicit = {tag for tag in res if tag and not tag.startswith('__')}
+            explicit = {tag for tag in res if not tag.startswith('__')}
             if explicit:
                 yield ea, explicit
             continue
@@ -532,7 +532,7 @@ class select_v0(object):
         # If nothing specific was selected, then yield all tags that are not the
         # empty tag or are an implicit tag that is dunder-prefixed.
         for ea, res in query_v0.function(func, *args, **kwargs):
-            explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
+            explicit = {tag : value for tag, value in res.items() if not tag.startswith('__')}
             if explicit:
                 yield ea, explicit
             continue
@@ -549,7 +549,7 @@ class select_v0(object):
         # If nothing specified to filter the tags, then we need to filter the
         # empty tag and any dunder-prefixed tags from our query.
         for sid, res in query_v0.structures(*args, **kwargs):
-            explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
+            explicit = {tag : value for tag, value in res.items() if not tag.startswith('__')}
             if explicit:
                 yield sid, explicit
             continue
@@ -566,7 +566,7 @@ class select_v0(object):
         # Otherwise we're being asked to yield everything but the empty tag and
         # any implicit tags. We also convert the member id into a `member_t`.
         for mid, res in query_v0.structure(sid, *args, **kwargs):
-            explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
+            explicit = {tag : value for tag, value in res.items() if not tag.startswith('__')}
             if explicit:
                 yield mid, explicit
             continue
@@ -583,7 +583,7 @@ class select_v0(object):
         # We weren't given any tags, meaning we are being asked to yield all of
         # them. So we filter out the empty tag and any implicit tags by default.
         for sid, res in query_v0.owners(*args, **kwargs):
-            explicit = {tag for tag in res if tag and not tag.startswith('__')}
+            explicit = {tag for tag in res if not tag.startswith('__')}
             if explicit:
                 yield sid, explicit
             continue
@@ -600,7 +600,7 @@ class select_v0(object):
         # We weren't given any tags, meaning we are being asked to yield all of
         # them. So we filter out the empty tag and any implicit tags by default.
         for ea, res in query_v0.frames(*args, **kwargs):
-            explicit = {tag for tag in res if tag and not tag.startswith('__')}
+            explicit = {tag for tag in res if not tag.startswith('__')}
             if explicit:
                 yield ea, explicit
             continue
@@ -623,7 +623,7 @@ class select_v0(object):
         # If no tags were provided, then we're supposed to yield all of them.
         # Still, be filter out the empty tag along with any implicit ones.
         for mid, res in query_v0.members(*args, **kwargs):
-            explicit = {tag for tag in res if tag and not tag.startswith('__')}
+            explicit = {tag for tag in res if not tag.startswith('__')}
             if explicit:
                 yield mid, explicit
             continue
@@ -640,7 +640,7 @@ class select_v0(object):
         # If we weren't asked to select anything specifically, then we yield
         # everything but the empty tag and any implicit tags.
         for bb, res in query_v0.blocks(func, *args, **kwargs):
-            explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
+            explicit = {tag : value for tag, value in res.items() if not tag.startswith('__')}
             if explicit:
                 yield bb, explicit
             continue
