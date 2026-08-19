@@ -1497,30 +1497,15 @@ class variable(object):
     def default_name(cls, *args):
         '''Return the default name (decompiler) for the variable identified by the given `args`.'''
         fn = function(*args[:1]) if len(args) > 1 else None
-        locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
+        lvar = variables.get(*itertools.chain(args if fn is None else [fn], args[1:]))
+        cfunc = function(locator.defea) if fn is None else fn
 
-        # check the locator is valid, and then get the function and variable.
-        if cls.has_location(locator):
-            cfunc = function(locator.defea) if fn is None else fn
-            lvar = variables.get(cfunc, locator)
-
-        elif fn:
-            cfunc, description = fn, cls.repr_locator(locator)
-            logging.warning(u"{:s}.default_name({:#x}, {!s}) : The specified variable is using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, description, idaapi.as_signed(locator.defea, interface.database.bits())))
-            lvar = variables.get(cfunc, locator)
-
-        # if we were given just the locator, then we abort with an exception.
-        else:
-            description = cls.repr_locator(locator)
-            raise exceptions.DecompilerError(u"{:s}.default_name({!s}{!s}) : Unable to access the location for the specified variable due to it using an invalid address ({:#x}).".format('.'.join([__name__, cls.__name__]), description if fn is None else "{:#x}".format(fn.entry_ea), '' if fn is None else ", {:s}".format(description), idaapi.as_signed(locator.defea, interface.database.bits())))
-
-        # fetch all of the details from the function owning our variable.
+        # fetch all of the details from the function owning our variable, and
+        # then grab the variables for it so that we can figure out the variable
+        # index so that we can distinguish the correct prefix for us to use.
         ea, locator = cfunc.entry_ea, cls.get_locator(lvar)
         fn = interface.function.by(ea)
         specials = saved, returned = [' s', ' r'] if idaapi.__version__ < 8.5 else ['__saved_registers', '__return_address']
-
-        # grab the variables for the function so that we can figure out the
-        # variable index and to distinguish the correct prefix for us to use.
         lvars = variables(cfunc)
 
         # if it's not an argument, then we just need the index of the variable
@@ -1555,7 +1540,7 @@ class variable(object):
                 arguments[key] = index
 
             # now we can look up the index using our variable storage.
-            store = cls.get_storage(locator, lvar.width)
+            store = variables.storage(cfunc, locator, lvar.width)
             if isinstance(store, interface.register_t) and microarchitecture.has(store, 8 * lvar.width):
                 key = microarchitecture.select(store, 8 * lvar.width)
             elif isinstance(store, interface.register_t):
