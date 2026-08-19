@@ -2541,23 +2541,26 @@ class structure(object):
     @classmethod
     def remove(cls, sptr, key, none):
         '''Remove the tag specified by `key` from the structure `sptr`.'''
+        repeatable, sptr = True, idaapi.get_struc(int(sptr)) if isinstance(sptr, internal.types.integer) else sptr
+        is_frame = internal.structure.frame(sptr)
+
+        # If we were given the wrong type, then guard things with an exception.
         if none is not None:
             raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}).remove({!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format(cls.__name__, sptr.id, key, none, utils.string.escape(key, '"'), value))
 
-        # We prioritize the repeatable comments for tags belonging to structures.
-        repeatable = True
+        # We need to first check if an implicit tag is being removed.
+        elif key == '__name__':
+            tags, original = cls.get(sptr), internal.structure.naming.remove(sptr)
+            return tags.pop(key, None)
 
-        # First we check if the key is one of the implicit tags that we support. These
-        # aren't we can modify since they only exist in special circumstances.
-        if key in {'__name__', '__typeinfo__'} and key in cls.get(sptr):
-            message_typeinfo = 'modified by the user from the default type library'
-            message_name = 'flagged as listed by the user'
+        # If it's a frame, then quit since we can't set any other implicit tags.
+        elif is_frame:
+            pass
 
-            # The characteristics aren't actually documented anywhere, so we'll raise an
-            # exception that attempts to describe what causes them to exist. Hopefully
-            # the user figures out that they can use them to find structures they created.
-            message = message_typeinfo if key == '__typeinfo__' else message_name
-            raise internal.exceptions.InvalidParameterError(u"{:s}.remove({:#x}, {!r}, {!r}) : Unable to remove the implicit tag \"{:s}\" due to the structure being {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, key, none, utils.string.escape(key, '"'), message))
+        elif key == '__typeinfo__':
+            tags, available = cls.get(sptr), internal.tags.reference.structure.get(sptr.id)
+            res = internal.tags.reference.structure.decrement(sptr.id, '__typeinfo__') if '__typeinfo__' in available else ()
+            return tags.pop(key, None)
 
         # We need to read both comments to figure out where the tag is that we're trying to remove.
         comment_right = internal.structure.comment.get(sptr, repeatable)
