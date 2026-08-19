@@ -7495,7 +7495,7 @@ class structure_t(object):
         if isinstance(owner, idaapi.tinfo_t):
             removed = v9members.layout_setslice(owner, index, items, 8 * offset)
             iterable = ((mname, mtype, mbitlocation, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo, mcomments in removed)
-            iterable = ((mname, isinstance(mtype, structure_t), mtype, (mbitlocation - base) / 8 + base, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo in iterable)
+            iterable = ((mname, isinstance(mtype, structure_t), mtype, (mbitlocation - offset) / 8 + offset, mtypeinfo) for mname, mtype, mbitlocation, mtypeinfo in iterable)
             iterable = ((mname, mtype - mtype.offset + int(mlocation) if is_structure else mtype, mlocation, mtypeinfo) for mname, is_structure, mtype, mlocation, mtypeinfo in iterable)
             return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo in iterable]
 
