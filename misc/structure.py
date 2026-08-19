@@ -8082,10 +8082,36 @@ class member_t(object):
             mid, mfullname = self.ptr.id, member.fullname(self.ptr)
             res = internal.tags.member.get(self.ptr)
 
-        # If the key is in our tags then we can return it. Otherwise we bail.
+        # If the key is in our tags then we can return it. Otherwise we check if
+        # it's "__typeinfo__" so that we can secretly return it.
         if key in res:
             return res[key]
-        raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the member {:s}.".format('.'.join([__name__, cls.__name__]), mid, key, utils.string.escape(key, '"'), utils.string.repr(mfullname)))
+        elif key not in {'__typeinfo__', '__name__'}:
+            raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the member {:s}.".format('.'.join([__name__, cls.__name__]), mid, key, utils.string.escape(key, '"'), utils.string.repr(mfullname)))
+
+        # This tag is mostly used for tracking, but it's still useful being able
+        # to render a member type and its name into a parseable string.
+        elif isinstance(mowner.ptr, idaapi.tinfo_t):
+            named, idaname = v9member.has_name(mid), utils.string.of(v9member.get_name(mid))
+            realname = idaname if named else v9member.default_name(mid)
+            ti = v9member.get_typeinfo(mid)
+        else:
+            named, idaname = member.has_name(mid), utils.string.of(member.get_name(mid))
+            realname = idaname if named else member.default_name(mowner.ptr, self.ptr)
+            ti = member.get_typeinfo(mid)
+
+        # If the key requested is the member name, then go ahead and return it.
+        if named and key == '__name__':
+            return realname
+
+        elif key == '__name__':
+            raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the member {:s}.".format('.'.join([__name__, cls.__name__]), mid, key, utils.string.escape(key, '"'), utils.string.repr(mfullname)))
+
+        # Now we just need to use the name to render our type to a string. Once
+        # that's done we can just return the rendered type back to the caller.
+        validname = interface.name.member(realname)
+        res = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
+        return utils.string.of(res)
     @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
