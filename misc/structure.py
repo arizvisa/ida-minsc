@@ -603,6 +603,8 @@ class comment(object):
             ti, sid = type.ptr, type.id
         elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
             ti, sid = type, type.id
+        elif hasattr(idaapi, 'get_struc') and isinstance(type, types.integer) and interface.node.identifier(type):
+            ti, sid = idaapi.get_struc(type), type
         else:
             raise E.InvalidParameterError(u"{:s}.get({!s}, repeatable={!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, repeatable, type.__class__))
 
@@ -631,6 +633,8 @@ class comment(object):
             ti, sid = type.ptr, type.id
         elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
             ti, sid = type, type.id
+        elif hasattr(idaapi, 'get_struc') and isinstance(type, types.integer) and interface.node.identifier(type):
+            ti, sid = idaapi.get_struc(type), type
         else:
             raise E.InvalidParameterError(u"{:s}.set({!s}, {!r}, repeatable={!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, string, repeatable, type.__class__))
 
@@ -663,6 +667,8 @@ class comment(object):
             ti, sid = type.ptr, type.id
         elif hasattr(idaapi, 'struc_t') and isinstance(type, idaapi.struc_t):
             ti, sid = type, type.id
+        elif hasattr(idaapi, 'get_struc') and isinstance(type, types.integer) and interface.node.identifier(type):
+            ti, sid = idaapi.get_struc(type), type
         else:
             raise E.InvalidParameterError(u"{:s}.remove({!s}, repeatable={!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, repeatable, type.__class__))
 
