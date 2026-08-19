@@ -5100,7 +5100,9 @@ class v9members(object):
                 _, tinfo = ('', parsed) if isinstance(parsed, idaapi.tinfo_t) else parsed
 
             # Now we can go and update each of the available member fields.
-            ok = ti.set_udm_type(mindex, tinfo) if tinfo else idaapi.TERR_OK
+            # FIXME: This only works in 8.4, and we should really be using
+            #        `v9member.set_typeinfo` so that we can add compatibility.
+            ok = ti.set_udm_type(mindex, tinfo, 0) if tinfo else idaapi.TERR_OK
             if ok != idaapi.TERR_OK:
                 errname, errdesc = interface.tinfo.format_type_error(ok)
                 description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
