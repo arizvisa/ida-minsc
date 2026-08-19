@@ -1164,7 +1164,7 @@ class v9member(object):
         mfullname, flags = cls.fullname(tinfo, mindex), 0
 
         # Finally we can just apply the reduced type back to the member.
-        res, terr = interface.tinfo.copy(reduced), tinfo.set_udm_type(mindex, reduced, flags)
+        res, terr = ti, tinfo.set_udm_type(mindex, reduced, flags)
         if terr != idaapi.TERR_OK:
             errname, errdesc = interface.tinfo.format_type_error(terr)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
