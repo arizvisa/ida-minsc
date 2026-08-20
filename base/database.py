@@ -7971,6 +7971,9 @@ class set(object):
         if dtype == FF_STRLIT:
             _, length = type if isinstance(type, internal.types.list) else (type, None)
             width, layout, terminals, encoding = interface.string.unpack(tid)
+            bounds = interface.bounds_t(ea, ea + nbytes)
+            if nbytes:
+                return cls.string(bounds, width, layout, encoding)
             return cls.string(ea, width, layout, encoding) if layout else cls.string(ea, width, terminals, encoding)
 
         elif dtype == FF_STRUCT:
