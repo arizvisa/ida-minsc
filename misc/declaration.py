@@ -1655,6 +1655,8 @@ class preciser(object):
 
     The ``ida_hexrays.item_preciser_t`` integer constants from the SDK as
     specified using the ``ida_hexrays.ITP_*`` enumerations are also supported.
+
+    Some of the functions in this namespace were brute-forced with Claude.
     """
 
     locations = {'above', 'after', 'open', 'close', 'do'}
@@ -1682,6 +1684,8 @@ class preciser(object):
         idaapi.cit_while: idaapi.ITP_BRACE2,
         idaapi.cit_switch: idaapi.ITP_BRACE2,
         idaapi.cit_block: idaapi.ITP_CURLY1,
+        idaapi.cit_empty: idaapi.ITP_SEMI,
+        idaapi.cit_asm: idaapi.ITP_CURLY2,
     }
 
     fixed = {
@@ -1689,6 +1693,8 @@ class preciser(object):
         'close': idaapi.ITP_CURLY2,
         'do': idaapi.ITP_DO,
     }
+
+    simple = {idaapi.cit_expr, idaapi.cit_return, idaapi.cit_goto, idaapi.cit_break, idaapi.cit_continue, idaapi.cit_asm}
 
     inversed = {
         idaapi.ITP_BLOCK1: 'above',
@@ -1736,6 +1742,41 @@ class preciser(object):
         return next(iterable, None)
 
     @classmethod
+    def descend(cls, cfunc, item):
+        '''Return the smallest address contained within the subtree of the specified `item` from the decompiled function `cfunc`.'''
+        if isinstance(item, idaapi.citem_t):
+            cindex = item.index
+        elif 0 <= item < cfunc.treeitems.size():
+            cindex = item
+        else:
+            return None
+        iterable = itertools.chain([cindex], internal.hexrays.ctree.down(cfunc, cindex))
+        addresses = [cfunc.treeitems[index].ea for index in iterable if cfunc.treeitems[index].ea != idaapi.BADADDR]
+        return min(addresses) if addresses else None
+
+    @classmethod
+    def leaves(cls, cfunc, item, result=None):
+        '''Collect each addressable simple statement within the subtree of the specified `item` from the decompiled function `cfunc`.'''
+        result = [] if result is None else result
+        citem = item if isinstance(item, idaapi.citem_t) else cfunc.treeitems[item]
+        if citem.op == idaapi.cit_block:
+            cblock = citem.cinsn.cblock
+            [ cls.leaves(cfunc, cblock.at(index), result) for index in builtins.range(cblock.size()) ]
+        elif citem.op == idaapi.cit_if:
+            cif = citem.cinsn.cif
+            if cif.ithen: cls.leaves(cfunc, cif.ithen, result)
+            if cif.ielse: cls.leaves(cfunc, cif.ielse, result)
+        elif citem.op in {idaapi.cit_for, idaapi.cit_while, idaapi.cit_do}:
+            body = citem.cinsn.cfor.body if citem.op == idaapi.cit_for else citem.cinsn.cwhile.body if citem.op == idaapi.cit_while else citem.cinsn.cdo.body
+            if body: cls.leaves(cfunc, body, result)
+        elif citem.op == idaapi.cit_switch:
+            cswitch = citem.cinsn.cswitch
+            [ cls.leaves(cfunc, cswitch.cases[index], result) for index in builtins.range(cswitch.cases.size()) ]
+        elif citem.op in cls.simple and citem.ea != idaapi.BADADDR:
+            result.append(citem)
+        return result
+
+    @classmethod
     def resolve(cls, cfunc, item, location='above'):
         '''Return the first ancestor containing an address for the specified `item` from the decompiled function `cfunc`.'''
         where, length = cls.aliases.get(location.lower(), location.lower()) if isinstance(location, types.string) else location, cfunc.treeitems.size()
@@ -1780,7 +1821,7 @@ class preciser(object):
             else:
                 description = location if isinstance(location, internal.types.integer) else "{!r}".format(location)
                 raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({:#x}, {:d}, {!s}) : The location {!s} is invalid for the `{:s}` of type `{:s}` at index {:d}.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, citem.index, description, "{:d} ({:#x})".format(where, where) if isinstance(where, types.integer) else "{!r)".format(where), utils.pycompat.fullname(idaapi.cinsn_t), '.'.join(['ida_hexrays', 'cit_switch']), citem.index))
-            return citem.ea, res
+            return citem.ea, res | idaapi.ITP_CASE
 
         # if we were given an integer, then just use it as-is.
         elif isinstance(where, types.integer):
@@ -1807,17 +1848,60 @@ class preciser(object):
                 return citem.ea, res
             where = 'after'
 
-        # figure out the preferred location to appear on the same line as the
-        # specified item. if we can't, then fallthrough to using "above".
+        # if we're targeting a case block from a switch instruction, and it
+        # doesn't have any braces, then a majority of the available positions
+        # would cause the comment to orphan. to avoid that we try to find the
+        # first or last statement in the case that is addressable.
+        if citem.op == idaapi.cit_block and where in {'open', 'close', 'after', 'do'}:
+            parent = next(internal.hexrays.ctree.climb(cfunc, citem.index, lambda item: True), None)
+            if parent is not None and cfunc.treeitems[parent].op == idaapi.cit_switch:
+                statements = cls.leaves(cfunc, citem)
+                if statements and where in {'open', 'do'}:
+                    [target] = statements[:1]
+                elif statements:
+                    [target] = statements[-1:]
+                else:
+                    target = None
+                if target is not None:
+                    return cls.resolve(cfunc, target, 'after')
+                address = cls.descend(cfunc, citem)
+                if address is not None:
+                    return address, idaapi.ITP_SEMI
+                return cls.resolve(cfunc, citem, 'above')
+
+        # figure out the preferred position to appear on the same line as the
+        # item. if this is not possible, then we fall back to using "above".
         if where in {'after'}:
             res = cls.preferred(cfunc, citem)
             if res:
                 anchor = cls.ancestor(cfunc, citem)
-                ea = citem.ea if anchor is None else cfunc.treeitems[anchor].ea
-                return ea, res
-            where = 'above'
+                target = citem if anchor is None else cfunc.treeitems[anchor]
 
-        # if our comment goes above the item, then find the ancestor to use.
+                # if it's braced with a single block, we will always need to
+                # know it's body for the comment to be on the same line.
+                if res in {idaapi.ITP_CURLY1, idaapi.ITP_CURLY2} and target.op == idaapi.cit_block and target.cinsn.cblock.size() <= 1:
+                    front = target.cinsn.cblock.front() if target.cinsn.cblock.size() else None
+                else:
+                    front = None
+                return (target.ea, res) if front is None else cls.resolve(cfunc, front, 'after')
+
+            # we couldn't find a preferred position.. so, we always fall back to
+            # "above" unless we can descend into the treeitem.
+            if citem.is_expr():
+                position = 'above'
+            elif citem.ea != idaapi.BADADDR:
+                position = 'above'
+            elif citem.op not in cls.simple:
+                position = 'above'
+            else:
+                address = cls.descend(cfunc, citem)
+                if address is not None:
+                    return address, idaapi.ITP_SEMI
+                position = 'above'
+            where = position
+
+        # if the requested position is above the treeitem, then we need to try
+        # to figure out which ancestor is the best for us to use.
         if where in {'above'}:
             res = cls.ancestor(cfunc, citem)
             if res is None:
@@ -1825,8 +1909,28 @@ class preciser(object):
                 raise internal.exceptions.ItemNotFoundError(u"{:s}.resolve({:#x}, {:d}, {!s}) : Cannot find the ancestor for the `{!s}` at index {:d} of the decompiled function ({:#x})".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, citem.index, description, utils.pycompat.fullname(idaapi.citem_t), citem.index, cfunc.entry_ea))
             return cfunc.treeitems[res].ea, idaapi.ITP_BLOCK1
 
-        # for a switch, we need to get the address of the right expression.
-        elif where in {'open', 'close'} and citem.op != idaapi.cit_block:
+        # otherwise the position is a "do" or a brace of some kind, then we need
+        # to handle the available treeitem types explicitly.
+        elif where in {'open', 'close', 'do'}:
+            if where in {'do'}:
+                if citem.op == idaapi.cit_do:
+                    return citem.ea, cls.fixed[where]
+                return cls.resolve(cfunc, citem, 'after')
+
+            # if it's a switch, then we can just use the fixed position for it.
+            elif citem.op == idaapi.cit_switch:
+                return citem.ea, cls.fixed[where]
+
+            # if there is more than one block, then we can also used a fixed
+            # position for it.
+            elif citem.op == idaapi.cit_block:
+                if citem.cinsn.cblock.size() > 1:
+                    return citem.ea, cls.fixed[where]
+                front = citem.cinsn.cblock.front() if citem.cinsn.cblock.size() else None
+                return cls.resolve(cfunc, front, 'after') if front is not None else (citem.ea, idaapi.ITP_CURLY1)
+
+            # for a compound statement of any kind, we need to choose the right
+            # property in order to get the body of the statement to attach to.
             body = None
             if citem.op == idaapi.cit_if:
                 body = citem.cinsn.cif.ithen
@@ -1836,20 +1940,11 @@ class preciser(object):
                 body = citem.cinsn.cwhile.body
             elif citem.op == idaapi.cit_do:
                 body = citem.cinsn.cdo.body
-
-            # next we need to check whether the block has braces or not. this
-            # way we can normalize "open" and "close" to "above" and "after".
-            if body and body.op == idaapi.cit_block and body.cblock.size() > 1:
+            if body is not None and body.op == idaapi.cit_block and body.cblock.size() > 1:
                 return body.ea, cls.fixed[where]
-            elif not body:
-                return citem.ea, cls.fixed[where]
-            elif where in {'open'}:
-                return cls.resolve(cfunc, citem, 'above')
-            elif body.op == idaapi.cit_block:
-                res = body.cblock.front() if body.cblock.size() else None
-            else:
-                res = body
-            return cls.resolve(cfunc, *[res, 'after'] if res else [citem, 'above'])
+            return cls.resolve(cfunc, citem, 'after')
+
+        # we shouldn't ever get here, but just in case.
         return citem.ea, cls.fixed[where]
 
     @classmethod
@@ -1899,12 +1994,18 @@ class preciser(object):
     @classmethod
     def where(cls, cfunc, ea, itp):
         '''Return the index and location for the address `ea` of the decompiled function `cfunc` with the preciser specified by `itp`.'''
-        intervals = internal.hexrays.function.intervals(cfunc)
-        if not intervals:
-            raise internal.exceptions.DecompilerError(u"{:s}.where({:#x}, {:#x}, {:d}) : Could not return the instruction boundaries from the decompiled function {:#x}.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, ea, itp, cfunc.entry_ea))
-        index = cls.contained(cfunc, intervals, ea)
-        if index is None:
-            index = cls.nearest(intervals, ea)
+        is_case = True if itp & idaapi.ITP_CASE else False
+        is_inner = (not is_case) and (idaapi.ITP_EMPTY <= itp & ~(idaapi.ITP_SIGN | idaapi.ITP_CASE) <= idaapi.ITP_BRACE1)
+        if not is_inner:
+            intervals = internal.hexrays.function.intervals(cfunc)
+            if not intervals:
+                raise internal.exceptions.DecompilerError(u"{:s}.where({:#x}, {:#x}, {:d}) : Could not return the instruction boundaries from the decompiled function {:#x}.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, ea, itp, cfunc.entry_ea))
+            index = cls.contained(cfunc, intervals, ea)
+            if index is None:
+                index = cls.nearest(intervals, ea)
+            pass
+        else:
+            index = cls.at(cfunc, ea, itp)
         if itp in cls.inversed:
             return index, cls.inversed[itp]
         elif cfunc.treeitems[index].op == idaapi.cit_switch:
@@ -1919,7 +2020,9 @@ class preciser(object):
     def at(cls, cfunc, ea, itp):
         '''Return the index for the at the address `ea` of the decompiled function `cfunc` with the preciser specified by `itp`.'''
         is_case = True if itp & idaapi.ITP_CASE else False
+        base_itp = itp & ~(idaapi.ITP_SIGN | idaapi.ITP_CASE)
         is_arg = (not is_case) and (idaapi.ITP_ARG1 <= itp & 0xFFFFFFFF <= idaapi.ITP_ARG64)
+        is_inner = (not is_case) and (idaapi.ITP_EMPTY <= itp & 0xFFFFFFFF <= idaapi.ITP_BRACE1)
 
         # Define a closure for ranking an item if we couldn't find its address.
         def rank(index):
@@ -1932,13 +2035,15 @@ class preciser(object):
                 base = 2
             elif is_arg:
                 base = 1 if citem.is_expr() else 0
+            elif is_inner:
+                base = 1 if citem.is_expr() else 0
             else:
                 base = 0 if citem.is_expr() else 2
             return exact, base
 
         # If it's not an argument, then go ahead and try getting the treeitem
         # index for the address we were given directly.
-        candidates = [] if is_arg else internal.hexrays.ctree.at(cfunc, ea)
+        candidates = [] if is_inner else internal.hexrays.ctree.at(cfunc, ea)
         if candidates:
             return max(candidates, key=lambda index: (rank(index), index))
 
@@ -1980,7 +2085,7 @@ class preciser(object):
         res = None
         if best is not None:
             _, index = best
-            if not (is_arg or is_case) and cfunc.treeitems[index].is_expr():
+            if not (is_inner or is_case) and cfunc.treeitems[index].is_expr():
                 F = lambda it: not it.is_expr() and it.ea != idaapi.BADADDR
                 return next(internal.hexrays.ctree.climb(cfunc, index, F), index)
             res = index
