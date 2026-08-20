@@ -723,7 +723,7 @@ class query_v1(object):
         rmask, imask = (cls.mask(names) for names in [require, include])
         requested, selection = rmask | imask, require or include
         for ea, used in internal.tagindex.globals.iterate():
-            if not(used):
+            if not(used) or interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_TAIL:
                 continue
             elif not(selection) and used:
                 yield ea, internal.tagindex.tags.names(used)
@@ -740,7 +740,7 @@ class query_v1(object):
         rmask, imask = (cls.mask(names) for names in [require, include])
         requested, selection = rmask | imask, require or include
         for ea, used in internal.tagindex.contents.select():
-            if not(used):
+            if not(used) or interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_TAIL:
                 continue
             elif not(selection) and used:
                 yield ea, internal.tagindex.tags.names(used)
