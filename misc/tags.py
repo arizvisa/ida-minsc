@@ -3257,6 +3257,9 @@ class reference_v0(object):
         def iterate(cls):
             return internal.tagcache.globals.iterate()
         @classmethod
+        def range(cls, start, stop):
+            return internal.tagcache.globals.range(start, stop)
+        @classmethod
         def counts(cls):
             return {tag : count for tag, count in internal.tagcache.globals.counts()}
         @classmethod
@@ -3265,6 +3268,16 @@ class reference_v0(object):
             if start <= ea < stop and any(idaapi.get_cmt(ea, repeatable) for repeatable in [True, False]):
                 return internal.tagcache.globals.erase(ea)
             return internal.tagcache.globals.destroy(ea)
+        @classmethod
+        def erase_range(cls, start, stop):
+            count = 0
+            for ea, _ in cls.range(start, stop):
+                if any(idaapi.get_cmt(ea, repeatable) for repeatable in [True, False]):
+                    res = internal.tagcache.globals.erase(ea)
+                else:
+                    res = 1 if internal.tagcache.globals.destroy(ea) else 0
+                count += res
+            return count
 
     class contents(object):
         """
@@ -3292,6 +3305,9 @@ class reference_v0(object):
         def iterate(cls):
             return internal.tagcache.contents.iterate()
         @classmethod
+        def range(cls, start, stop):
+            return internal.tagcache.contents.range(start, stop)
+        @classmethod
         def name(cls, address, **target):
             return internal.tagcache.contents.name(address, target=target.get('target'))
         @classmethod
@@ -3314,6 +3330,13 @@ class reference_v0(object):
         @classmethod
         def erase(cls, func):
             return internal.tagcache.contents.erase(func)
+        @classmethod
+        def erase_range(cls, func, start, stop):
+            count = 0
+            for ea, _ in cls.range(start, stop):
+                res = internal.tagcache.contents.erase_address(func, ea)
+                count += 1
+            return count
 
     class structure(object):
         """
