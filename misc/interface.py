@@ -288,6 +288,10 @@ class typemap(object):
         idaapi.BTMT_SPECFLT | idaapi.BT_FLOAT: (float, 10),
     }
 
+    typeinfo_strings = {
+        idaapi.BTMT_CHAR | idaapi.BT_INT8: (chr, 1),
+    }
+
     typeinfo_integers = {
         idaapi.BT_INT: None,
         idaapi.BT_INT8: (int, 1),
@@ -352,6 +356,7 @@ class typemap(object):
     typeinfo_typemap = {
         int:typeinfo_integers, float:typeinfo_floats,
         type:typeinfo_pointers, bool:typeinfo_booleans,
+        chr:typeinfo_strings, str:typeinfo_strings,
     }
 
     # Next we can precalculate the inverted lookup table that will be used for
@@ -498,6 +503,9 @@ class typemap(object):
         integering = idaapi.BT_VOID | idaapi.BTMT_SIZE48 if bits < 64 else idaapi.BT_UNK | idaapi.BTMT_SIZE48
         cls.typeinfo_inverted[int] = integering
         cls.typeinfo_inverted[chr] = idaapi.BTMT_CHAR | idaapi.BT_INT8
+        cls.typeinfo_inverted[chr, 1] = idaapi.BTMT_CHAR | idaapi.BT_INT8
+        cls.typeinfo_inverted[chr, 2] = idaapi.BTMT_SIZE12 | idaapi.BT_UNK
+        cls.typeinfo_inverted[chr, 4] = idaapi.BTMT_SIZE48 | idaapi.BT_VOID
 
     @classmethod
     def __ev_newprc__(cls, pnum, keep_cfg):
@@ -512,6 +520,7 @@ class typemap(object):
     def dissolve(cls, flag, typeid, size, offset=None):
         '''Convert the specified `flag`, `typeid`, and `size` into a pythonic type at the optional `offset`.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+        FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
         get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
         dtype, dsize = flag & cls.FF_MASK, flag & cls.FF_MASKSIZE
         sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
@@ -532,7 +541,7 @@ class typemap(object):
             elif ti.get_type_by_tid(typeid):
                 element, variableQ, sid = tinfo.size(ti), ti.is_varstruct(), tinfo.identifier(ti)
             else:
-                raise internal.exceptions.StructureNotFoundError(u"{:s}.dissolve({:#x}, {:s}, {:+d}, {:+#x}) : Unable to locate a type matching the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), flag, "{:#x}".format(typeid) if isinstance(typeid, internal.types.integer) else "{!s}".format(typeid), size, offset, idaapi.BADADDR if typeid is None else typeid))
+                raise internal.exceptions.StructureNotFoundError(u"{:s}.dissolve({:#x}, {:s}, {:+d}{!s}) : Unable to locate a type matching the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), flag, "{:#x}".format(typeid) if isinstance(typeid, internal.types.integer) else "{!s}".format(typeid), size, '' if offset is None else ", {:+#x}".format(offset), idaapi.BADADDR if typeid is None else typeid))
 
             # grab the structure_t and check the flags to figure out if we need to size it.
             structure = internal.structure.new(sid, 0 if offset is None else offset)
@@ -542,9 +551,32 @@ class typemap(object):
                 return (structure, size) if variableQ else [structure, size // element]
             return [structure, size]
 
+        # We need to specially handle all string types here.
+        elif dsize == FF_STRLIT:
+            width, length, terminals, encoding = string.unpack(typeid)
+            if size == length:
+                if width > 1 and length > 0:
+                    return (str, width, length)
+                elif width > 1:
+                    return (str, width)
+                return str
+
+            # Otherwise, we have an array that we need to figure out.
+            if not length:
+                count, extra = divmod(max(0, size - length), width)
+                pythonType = (chr, width) if width > 1 else chr
+                return [pythonType, count] if count > 1 else pythonType
+
+            # This is the special handling if the user is trying to make a weird
+            # array of length-prefixed, random-width'd strings... prolly busted.
+            count, extra = divmod(max(0, size - length), width)
+            if count > 1:
+                return [(str, width, length), count]
+            return (str, width, length)
+
         # Verify that we actually have the datatype in our typemap and that we can look it up.
         elif all(item not in cls.inverted for item in [dsize, dtype, (dtype, typeid), (dtype, strtype)]):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({:#x}, {:s}, {:+d}, {:+#x}) : Unable to locate a pythonic type that matches the specified type ({:#x}) or identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), flag, "{:#x}".format(typeid) if isinstance(typeid, internal.types.integer) else "{!s}".format(typeid), size, offset, dtype, idaapi.BADADDR if typeid is None else typeid))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({:#x}, {:s}, {:+d}{!s}) : Unable to locate a pythonic type that matches the specified type ({:#x}) or identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), flag, "{:#x}".format(typeid) if isinstance(typeid, internal.types.integer) else "{!s}".format(typeid), size, '' if offset is None else ", {:+#x}".format(offset), dtype, idaapi.BADADDR if typeid is None else typeid))
 
         # Now that we know the datatype exists, extract the actual dtype (DT_TYPE with MS_0TYPE
         # and MS_1TYPE) and the type's dsize (DT_TYPE) from the inverted map while giving priority
@@ -659,17 +691,21 @@ class typemap(object):
             res, count = pythonType
             flag, info, sz = cls.resolve(res)
 
-            # Now we need to check the flag if the type is a string, because if so
-            # we'll need to adjust our size to only use the character width in its product.
+            # Now we need to check the flag if the type is a string, because if
+            # so we'll need to adjust our size to use the width in its product.
             if flag & cls.FF_MASKSIZE == FF_STRLIT:
                 strtype = info
                 width, layout, _, _ = string.unpack(strtype)
 
-                # Verify that our resolved array element has the exact size that we expect
-                # so that we can calculate the size of the string correctly and return it.
-                if sz != width + layout:
-                    logging.warning(u"{:s}.resolve({!s}) : Resolving the given type ({!s}) to a string resulted in a size ({:+d}) that does not correspond to the sum of the determined width ({:d}) and length ({:d}).".format('.'.join([__name__, cls.__name__]), pythonType, pythonType, size, width, layout))
-                return flag | (idaapi.FF_SIGN if sz < 0 else 0), strtype, layout + width * count
+                # If we were given a string size, then we just verify it. When
+                # it doesn't have a size, we just return it with the prefix.
+                if sz and sz != width + layout:
+                    logging.warning(u"{:s}.resolve({!s}) : Resolving the given type ({!s}) to a string resulted in a size ({:+d}) that does not correspond to the sum of the determined width ({:d}) and length ({:d}).".format('.'.join([__name__, cls.__name__]), pythonType, pythonType, sz, width, layout))
+
+                # Now we need to figure out the flags if the size was signed.
+                if sz < 0:
+                    return flag | idaapi.FF_SIGN, strtype, layout + width * count
+                return flag, strtype, layout + width * count
 
             # Otherwise we can just multiply our element width by the array length.
             tid = idaapi.BADADDR if info < 0 else info
@@ -729,6 +765,11 @@ class typemap(object):
             # calculate the correct size for the value returned by our table.
             opinfo, typeid = idaapi.opinfo_t(), idaapi.BADADDR if typeid < 0 else typeid
             opinfo.tid = typeid
+
+            # We need to special-case string since without a length it is
+            # null-terminated and should be treated as such.
+            if pythonType is str:
+                return flag, typeid, 0
             return flag, typeid, get_data_elsize(idaapi.BADADDR, flag, opinfo)
 
         # This is our catch-all so that we can compain about it to the user.
@@ -746,33 +787,52 @@ class typemap(object):
     @classmethod
     def dissolvetype(cls, ea, type, *offset):
         '''Convert the specified `type` for the address `ea` into a pythonic type at the optional `offset`.'''
-        ti, offset = idaapi.tinfo_t(), offset if offset is None else int(offset)
+        FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        ti, [moffset] = idaapi.tinfo_t(), map(int, offset) if offset else [None]
         if isinstance(type, idaapi.tinfo_t):
             ti, sid = tinfo.copy(type), tinfo.identifier(type)
         elif isinstance(type, internal.types.integer) and node.identifier(type) and ti.get_type_by_tid(type):
             ti, sid = ti, type
         else:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.dissolvetype({:#x}, {!s}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), ea, "{!r}".format(type), '' if offset is None else ", offset={:#x}".format(offset), type.__class__))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.dissolvetype({:#x}, {!s}{:s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), ea, "{!r}".format(type), ", {:#x}".format(moffset) if offset else '', type.__class__))
+
+        # A type can't describe a string, so if we were given a member then we
+        # use its representation for the string type and the type for its size.
+        owner, udm, info = idaapi.tinfo_t(), udm_t(), idaapi.opinfo_t()
+        if node.identifier(ea) and owner.get_udm_by_tid(udm, ea) >= 0 and udm.repr.get_vtype() == idaapi.FRB_STRLIT:
+            return cls.dissolve(FF_STRLIT, udm.repr.strtype, tinfo.size(ti), offset=moffset)
+
+        # If we were given an address with a string, then its flags have the
+        # string type and its size is the size of the item instead of the type.
+        elif ea != idaapi.BADADDR and not node.identifier(ea) and address.flags(ea, cls.FF_MASKSIZE) == FF_STRLIT:
+            flags, size = address.flags(ea), address.size(ea)
+            ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+            return cls.dissolve(flags, info.strtype if ok else idaapi.BADADDR, size, offset=moffset)
 
         # If our type is a structure type, then return an internal structure.
         if ti.is_struct() or ti.is_union():
-            return internal.structure.new(ti, offset or 0)
+            return internal.structure.new(ti, moffset or 0)
 
         # If our type is an array type, then get its base type and length so we
         # can return it as a list of things.
         elif ti.is_array():
             element, length = tinfo.array(ti)
-            return [cls.dissolvetype(ea, element, offset=offset), length]
+            return [cls.dissolvetype(ea, element, *offset), length]
 
-        # Otherwise, we unpack the declaration type and flags for the type.
+        # Otherwise, we unpack the declaration type and flags of the real type,
+        # so that we use the type a typedef refers to instead of the typedef.
         masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
-        decl, size = ti.get_decltype(), tinfo.size(ti)
+        decl, size = ti.get_realtype(), tinfo.size(ti)
         base, flags, modifiers = (decl & mask for mask in masks)
 
         # First figure out if our declaration type is something that we couldn't
         # fit into the tables. Afterwards, we figure out the group for our type.
         if base in {idaapi.BT_PTR, idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD}:
             pass
+        elif cls.typeinfo_strings.get(base | flags) is not None and size == abs(cls.typeinfo_strings[base | flags][-1]):
+            res = pythonic, width = cls.typeinfo_strings[base | flags]
+            return res if width > 1 else pythonic
         elif cls.typeinfo_booleans.get(base | flags) is not None and size == abs(cls.typeinfo_booleans[base | flags][-1]):
             return cls.typeinfo_booleans[base | flags]
         elif cls.typeinfo_floats.get(base | flags) is not None and size == abs(cls.typeinfo_floats[base | flags][-1]):
@@ -815,7 +875,29 @@ class typemap(object):
         # length in order to create an array from the element type.
         if isinstance(pythonType, internal.types.list):
             [res, count] = pythonType
-            element = cls.resolvetype(res)
+            pythonic = (internal.types.type, internal.types.tuple, internal.types.none, internal.structure.structuretypes)
+
+            # If we didnt get a pythonic atom or a structure, then resolve it.
+            if not isinstance(res, pythonic):
+                element = cls.resolvetype(res)
+
+            # If we got a string, then we convert it manually to a character.
+            elif res in {str, (str, 1), (str, 2), (str, 4)}:
+                _, sz = (0, 1) if res is str else res
+                element = cls.resolvetype((chr, sz))
+
+            # A length-prefixed string only has one prefix for all characters,
+            # and a member has to be a whole number of them, so we round up.
+            elif isinstance(res, internal.types.tuple) and len(res) == 3 and res in cls.stringmap:
+                t, width, length = res
+                size = length + width * count
+                strlen, extra = divmod(size, width)
+                characters = 1 + strlen if extra else strlen
+                element, count = idaapi.tinfo_t(cls.typeinfo_inverted[chr, width]), characters
+
+            # Otherwise we can just resolve the type naturally..
+            else:
+                element = cls.resolvetype(res)
 
             atd = idaapi.array_type_data_t()
             atd.elem_type = element
@@ -840,6 +922,15 @@ class typemap(object):
             if pythonType in cls.typeinfo_inverted:
                 decl = cls.typeinfo_inverted[pythonType]
                 return idaapi.tinfo_t(decl)
+
+            # A string with a length prefix is its prefix and one character,
+            # rounded up to whole characters since that's what a member needs.
+            elif len(pythonType) == 3 and pythonType in cls.stringmap:
+                t, width, length = pythonType
+                strlen, extra = divmod(length + width, width)
+                characters = 1 + strlen if extra else strlen
+                bytes = bytearray([idaapi.BT_ARRAY | idaapi.BTMT_NONBASED, 1 + characters, cls.typeinfo_inverted[chr, width]])
+                return tinfo.get(None, bytes)
 
             elif len(pythonType) != 2:
                 raise internal.exceptions.InvalidParameterError(u"{:s}.resolvetype({!s}) : Unable to resolve the type {!s} to a corresponding local type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
