@@ -3848,12 +3848,12 @@ class address(object):
     @classmethod
     def prevref(cls, ea, predicate, **count):
         '''Return the previous address from the address `ea` that has anything referencing it and satisfies the provided `predicate`.'''
-        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_REF), ea, predicate, **count)
+        return cls.prevflag(idaapi.MS_COMM & idaapi.FF_REF, ea, predicate, **count)
     @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def prevref(cls, ea, count):
         '''Return the previous `count` addresses from the address `ea` that has anything referencing it.'''
-        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_REF), ea, count)
+        return cls.prevflag(idaapi.MS_COMM & idaapi.FF_REF, ea, count)
 
     @utils.multicase()
     @classmethod
@@ -3874,12 +3874,12 @@ class address(object):
     @classmethod
     def nextref(cls, ea, predicate, **count):
         '''Return the next address from the address `ea` that has anything referencing it and satisfies the provided `predicate`.'''
-        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_REF), ea, predicate, **count)
+        return cls.nextflag(idaapi.MS_COMM & idaapi.FF_REF, ea, predicate, **count)
     @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def nextref(cls, ea, count):
         '''Return the next `count` addresses from the address `ea` that has anything referencing it.'''
-        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_REF), ea, count)
+        return cls.nextflag(idaapi.MS_COMM & idaapi.FF_REF, ea, count)
 
     @utils.multicase()
     @classmethod
@@ -4463,12 +4463,12 @@ class address(object):
     @classmethod
     def prevlabel(cls, ea, predicate, **count):
         '''Return the address of the previous label from the address `ea` that satisfies the provided `predicate`.'''
-        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_LABL|idaapi.FF_NAME), ea, predicate, **count)
+        return cls.prevflag(idaapi.MS_COMM & (idaapi.FF_LABL|idaapi.FF_NAME), ea, predicate, **count)
     @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def prevlabel(cls, ea, count):
         '''Return the address of the previous `count` labels from the address `ea`.'''
-        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_LABL|idaapi.FF_NAME), ea, count)
+        return cls.prevflag(idaapi.MS_COMM & (idaapi.FF_LABL|idaapi.FF_NAME), ea, count)
 
     @utils.multicase()
     @classmethod
@@ -4489,12 +4489,12 @@ class address(object):
     @classmethod
     def nextlabel(cls, ea, predicate, **count):
         '''Return the address of the next label from the address `ea` that satisfies the provided `predicate`.'''
-        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_LABL|idaapi.FF_NAME), ea, predicate, **count)
+        return cls.nextflag(idaapi.MS_COMM & (idaapi.FF_LABL|idaapi.FF_NAME), ea, predicate, **count)
     @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def nextlabel(cls, ea, count):
         '''Return the address of the next `count` labels from the address `ea`.'''
-        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_LABL|idaapi.FF_NAME), ea, count)
+        return cls.nextflag(idaapi.MS_COMM & (idaapi.FF_LABL|idaapi.FF_NAME), ea, count)
 
     @utils.multicase()
     @classmethod
@@ -4523,7 +4523,7 @@ class address(object):
             F = utils.fcompose(utils.fmap(Fcheck_comment, predicate), builtins.all)
         else:
             F = predicate
-        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, F, **repeatable)
+        return cls.prevflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, F, **repeatable)
     @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def prevcomment(cls, ea, count, **repeatable):
@@ -4533,8 +4533,8 @@ class address(object):
         """
         if 'repeatable' in repeatable:
             Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable.pop('repeatable')), utils.fpartial(operator.is_, None))
-            return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, Fcheck_comment, **repeatable)
-        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, count, **repeatable)
+            return cls.prevflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, Fcheck_comment, **repeatable)
+        return cls.prevflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, count, **repeatable)
 
     @utils.multicase()
     @classmethod
@@ -4563,7 +4563,7 @@ class address(object):
             F = utils.fcompose(utils.fmap(Fcheck_comment, predicate), builtins.all)
         else:
             F = predicate
-        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, F, **repeatable)
+        return cls.nextflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, F, **repeatable)
     @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     def nextcomment(cls, ea, count, **repeatable):
@@ -4573,8 +4573,8 @@ class address(object):
         """
         if 'repeatable' in repeatable:
             Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable.pop('repeatable')), utils.fpartial(operator.is_, None))
-            return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, Fcheck_comment, **repeatable)
-        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, count, **repeatable)
+            return cls.nextflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, Fcheck_comment, **repeatable)
+        return cls.nextflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, count, **repeatable)
 
     # FIXME: We should add the Or= or And= tests to this or we should allow specifying a set of tags.
     @utils.multicase()
@@ -4602,9 +4602,9 @@ class address(object):
         '''Return the previous address from `ea` that contains a tag using the specified `tagname` and satisfies the provided `predicate`.'''
         tags = builtins.next((tagname.pop(kwd) for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
         if tags is None:
-            return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, **tagname)
+            return cls.prevflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, **tagname)
         Ftests = [utils.frpartial(operator.contains, tags)] if isinstance(tags, internal.types.string) else [builtins.set, functools.partial(operator.and_, {item for item in tags})]
-        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(internal.tags.address.get, *Ftests), **tagname)
+        return cls.prevflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, utils.fcompose(internal.tags.address.get, *Ftests), **tagname)
     @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     @utils.string.decorate_arguments('tagname', 'tag', 'name')
@@ -4642,9 +4642,9 @@ class address(object):
         '''Return the next address from `ea` that contains a tag using the specified `tagname` and satisfies the provided `predicate`.'''
         tags = builtins.next((tagname.pop(kwd) for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
         if tags is None:
-            return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, **tagname)
+            return cls.nextflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, **tagname)
         Ftests = [utils.frpartial(operator.contains, tags)] if isinstance(tags, internal.types.string) else [builtins.set, functools.partial(operator.and_, {item for item in tags})]
-        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(internal.tags.address.get, *Ftests), **tagname)
+        return cls.nextflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, utils.fcompose(internal.tags.address.get, *Ftests), **tagname)
     @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
     @classmethod
     @utils.string.decorate_arguments('tagname', 'tag', 'name')
@@ -4652,9 +4652,9 @@ class address(object):
         '''Return the next `count` addresses from `ea` that contains a tag using the specified `tagname`.'''
         tags = builtins.next((tagname.pop(kwd) for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
         if tags is None:
-            return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, count, **tagname)
+            return cls.nextflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, count, **tagname)
         Ftests = [utils.frpartial(operator.contains, tags)] if isinstance(tags, internal.types.string) else [builtins.set, functools.partial(operator.and_, {item for item in tags})]
-        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(internal.tags.address.get, *Ftests), **tagname)
+        return cls.nextflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, utils.fcompose(internal.tags.address.get, *Ftests), **tagname)
 
     @utils.multicase()
     @classmethod
