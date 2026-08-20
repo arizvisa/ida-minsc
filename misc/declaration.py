@@ -1992,28 +1992,64 @@ class preciser(object):
         return res
 
     @classmethod
-    def where(cls, cfunc, ea, itp):
-        '''Return the index and location for the address `ea` of the decompiled function `cfunc` with the preciser specified by `itp`.'''
+    def locate(cls, cfunc, intervals, ea, itp=None):
+        '''Return the index of the item from `intervals` that best matches the address specified by `ea`.'''
+        '''Return the treeitem index best matching `ea`, preferring the enclosing statement when `ea` is not an exact anchor.'''
+        index = cls.at(cfunc, ea, itp) if itp is not None else None
+        if index is not None and cfunc.treeitems[index].ea == ea:
+            return index
+
+        # If there are no intervals, then we have to explicitly trust the index.
+        elif not intervals:
+            return index
+
+        # Otherwise find the treeitem that contains the specified address.
+        res = cls.contained(cfunc, intervals, ea)
+        return cls.nearest(intervals, ea) if res is None else res
+
+    @classmethod
+    def caseindex(cls, cfunc, index, itp):
+        '''Translate the case preciser `itp` on the ``ida_hexrays.cit_switch`` at `index` into a 0-based case index.'''
+        cswitch = cfunc.treeitems[index].cinsn.cswitch
+        target = idaapi.as_signed(itp, 32)
+
+        # Grab every case and build an index for mapping the address to index.
+        cases = [cswitch.cases[index] for index in builtins.range(cswitch.cases.size())]
+        iterable = ([case.value(index) for index in builtins.range(case.size())] for case in cases)
+        values = sorted({value for value in itertools.chain(*iterable)})
+
+        # now we can just scan the index of values for our target address.
+        iterable = enumerate(values)
+        iterable = (index for index, value in enumerate(values) if idaapi.as_signed(value | idaapi.ITP_CASE, 32) == target)
+        return next(iterable, itp)
+
+    @classmethod
+    def where(cls, cfunc, intervals, ea, location):
+        '''Return the index and location for the address `ea` of the decompiled function `cfunc` with the preciser or desired position specified by `location`.'''
+        itp = location
+
+        # if we were given an address and a location, we can use the intervals
+        # to locate the treeitem that is nearest to the given address.
+        if isinstance(location, types.string):
+            where = cls.aliases.get(location.lower(), location.lower())
+            if where not in cls.locations:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.where({:#x}, {:#x}, {!r}) : The location ({!r}) is not one of the supported locations ({:s}).".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, ea, location, location, ', '.join(sorted(cls.locations))))
+            index = cls.locate(cfunc, intervals, ea, None)
+            if index is None:
+                raise internal.exceptions.DecompilerError(u"{:s}.where({:#x}, {:#x}, {!r}) : Could not locate a treeitem for the given address within the decompiled function {:#x}.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, ea, location, cfunc.entry_ea))
+            return index, where
+
+        # if we were given an integer location, then we need to do our very best
+        # to convert it back into one of the available verbal locations.
         is_case = True if itp & idaapi.ITP_CASE else False
         is_inner = (not is_case) and (idaapi.ITP_EMPTY <= itp & ~(idaapi.ITP_SIGN | idaapi.ITP_CASE) <= idaapi.ITP_BRACE1)
-        if not is_inner:
-            intervals = internal.hexrays.function.intervals(cfunc)
-            if not intervals:
-                raise internal.exceptions.DecompilerError(u"{:s}.where({:#x}, {:#x}, {:d}) : Could not return the instruction boundaries from the decompiled function {:#x}.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, ea, itp, cfunc.entry_ea))
-            index = cls.contained(cfunc, intervals, ea)
-            if index is None:
-                index = cls.nearest(intervals, ea)
-            pass
-        else:
-            index = cls.at(cfunc, ea, itp)
-        if itp in cls.inversed:
+        index = cls.locate(cfunc, intervals, ea, itp if (is_inner or is_case) else None)
+        if index is None:
+            raise internal.exceptions.DecompilerError(u"{:s}.where({:#x}, {:#x}, {:d}) : Could not locate a treeitem for the given address within the decompiled function {:#x}.".format('.'.join([__name__, cls.__name__]), cfunc.entry_ea, ea, itp, cfunc.entry_ea))
+        if (not is_case) and itp in cls.inversed:
             return index, cls.inversed[itp]
-        elif cfunc.treeitems[index].op == idaapi.cit_switch:
-            flag_sign, flag_case = (itp & flag for flag in [idaapi.ITP_SIGN, idaapi.ITP_CASE])
-            case = itp & ~(idaapi.ITP_SIGN | idaapi.ITP_CASE)
-            # FIXME: need to translate the case value back to a case index,
-            #        value, or location.
-            return index, itp
+        elif is_case and cfunc.treeitems[index].op == idaapi.cit_switch:
+            return index, cls.caseindex(cfunc, index, itp)
         return index, itp
 
     @classmethod
@@ -2101,12 +2137,8 @@ class preciser(object):
         index = cls.at(cfunc, ea, itp)
         if itp in cls.inversed:
             return index, cls.inversed[itp]
-        elif cfunc.treeitems[index].op == idaapi.cit_switch:
-            flag_sign, flag_case = (itp & flag for flag in [idaapi.ITP_SIGN, idaapi.ITP_CASE])
-            case = itp & ~(idaapi.ITP_SIGN | idaapi.ITP_CASE)
-            # FIXME: need to translate the case value back to a case index,
-            #        value, or location.
-            return index, itp
+        elif cfunc.treeitems[index].op == idaapi.cit_switch and (itp & idaapi.ITP_CASE):
+            return index, cls.caseindex(cfunc, index, itp)
         return index, itp
 
 class mangled(object):
