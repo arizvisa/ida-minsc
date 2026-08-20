@@ -672,6 +672,22 @@ class contents(tagging):
             yield ea, res
         return
 
+    @classmethod
+    def range(cls, start, stop):
+        '''Yield each address and names for all of the contents tags from `start` to `stop` according to what is written into the tagging supval.'''
+        node = cls.node()
+        iterable = netnode.sup.forward(node, start, type=memoryview)
+        ea, view = next(iterable, (stop, memoryview(b'')))
+        while ea < stop:
+            encdata = view.tobytes()
+            data, sz = cls.codec.decode(encdata)
+            if len(encdata) != sz:
+                logging.warning(u"{:s}.range({:#x}, {:#x}) : Error while decoding the tag names out of the sup cache for address {:#x} due to the length of encoded data not matching the expected size ({:#x}<>{:#x}).".format('.'.join([__name__, cls.__name__]), start, stop, ea, len(encdata), sz))
+            res = cls.marshaller.loads(data)
+            yield ea, res
+            ea, res = next(iterable, (stop, memoryview(b'')))
+        return
+
     # FIXME: the next 4 functions are a hack in order to facilitate bulk updates
     #        of the addresses in the contents of a function. this means things
     #        like translating the addresses to a different base address. these
@@ -1075,6 +1091,17 @@ class globals(tagging):
         node = cls.node()
         for ea, count in netnode.alt.fitems(node):
             yield ea, count
+        return
+
+    @classmethod
+    def range(cls, start, stop):
+        '''Yield the address and count for each of the globals from `start` to `stop` according to what is written in the altvals.'''
+        node = cls.node()
+        iterable = netnode.alt.forward(node, start)
+        ea, count = next(iterable, (stop, 0))
+        while ea < stop:
+            yield ea, count
+            ea, count = next(iterable, (stop, 0))
         return
 
     @classmethod
