@@ -7923,6 +7923,15 @@ class set(object):
         > database.set.structure(ea, structure.by('mystructure'))
 
     """
+    @utils.multicase()
+    def __new__(cls, type):
+        '''Set the type at the current address to the specified pythonic `type` or the given type information.'''
+        return cls.type(ui.current.address(), type)
+    @utils.multicase(ea=internal.types.integer)
+    def __new__(cls, ea, type):
+        '''Set the type at the address `ea` to the specified pythonic `type` or the given type information.'''
+        return cls.type(ea, type)
+
     @utils.multicase(info=(internal.types.string, idaapi.tinfo_t))
     @classmethod
     def type(cls, info):
