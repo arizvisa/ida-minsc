@@ -718,10 +718,10 @@ class typemap(object):
                 if idaapi.__version__ < 7.3:
                     info = idaapi.get_inf_structure()
                     Fprocessor_name = operator.attrgetter('procname' if hasattr(info, 'procname') else 'procName')
-                    processor_name = Fprocessor_name(info)
+                    processor_name = Fprocessor_name(info) if info else ''
                 else:
                     processor_name = idaapi.inf_get_procname()
-                why = '' if info and Fprocessor_name(info) else ' due to the processor size not being detected or a database not currently open.'
+                why = '' if processor_name else ' due to the processor size not being detected or a database not currently open.'
                 raise internal.exceptions.ItemNotFoundError(u"{:s}.resolve({!s}) : Unable to resolve the given type ({!s}) to a corresponding native type{:s}.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType, why))
             flag, typeid = table[None]
 
