@@ -7924,21 +7924,25 @@ class set(object):
 
     """
     @utils.multicase(info=(internal.types.string, idaapi.tinfo_t))
-    def __new__(cls, info):
+    @classmethod
+    def type(cls, info):
         '''Set the type information at the current address to `info`.'''
-        return cls(ui.current.address(), info)
+        return cls.type(ui.current.address(), info)
     @utils.multicase()
-    def __new__(cls, type):
+    @classmethod
+    def type(cls, type):
         '''Set the type information at the current address to the given pythonic `type`.'''
-        return cls(ui.current.address(), type)
+        return cls.type(ui.current.address(), type)
     @utils.multicase(ea=internal.types.integer, info=(internal.types.string, idaapi.tinfo_t))
-    def __new__(cls, ea, info):
+    @classmethod
+    def type(cls, ea, info):
         '''Set the type information at the address `ea` to `info`.'''
         ti, info_s = type(ea, info), "{!s}".format(info) if isinstance(info, idaapi.tinfo_t) else info
-        logging.debug(u"{:s}({:#x}, {:s}) : {:s} for address ({:#x}) to \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr("{!s}".format(info_s)), "Updated the type (\"{:s}\")".format(utils.string.escape("{!s}".format(ti), '"')) if ti else 'Set the type', ea, utils.string.escape(info_s, '"')))
+        logging.debug(u"{:s}.type({:#x}, {:s}) : {:s} for address ({:#x}) to \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr("{!s}".format(info_s)), "Updated the type (\"{:s}\")".format(utils.string.escape("{!s}".format(ti), '"')) if ti else 'Set the type', ea, utils.string.escape(info_s, '"')))
         return get.type(ea)
     @utils.multicase(ea=internal.types.integer)
-    def __new__(cls, ea, type):
+    @classmethod
+    def type(cls, ea, type):
         '''Set the type information at the address `ea` to the given pythonic `type`.'''
         FF_ALIGN, FF_STRLIT, FF_STRUCT = map(idaapi.as_uint32, [idaapi.FF_ALIGN, idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI, idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU])
         Fcreate_string = idaapi.make_ascii_string if idaapi.__version__ < 7.0 else idaapi.create_strlit
@@ -7946,7 +7950,7 @@ class set(object):
         # Now we have the flags and other stuff, so we need to make sure that we're
         # being called with an address of some sort before applying the type.
         if interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
-            raise E.InvalidTypeOrValueError(u"{:s}{:#x}, {!s}) : Unable to apply the given type ({!s}) to an address ({:#x}) that is defined as code.".format('.'.join([__name__, cls.__name__]), ea, type, type, ea))
+            raise E.InvalidTypeOrValueError(u"{:s}.type({:#x}, {!s}) : Unable to apply the given type ({!s}) to an address ({:#x}) that is defined as code.".format('.'.join([__name__, cls.__name__]), ea, type, type, ea))
 
         # Last thing to do is to assign the operand information to the address. We're
         # lazy, so we'll try to hand the type off to the correct function for the work.
@@ -7976,11 +7980,11 @@ class set(object):
 
         # Otherwise, we just need to use what we were given to create the data.
         elif not idaapi.create_data(ea, flags, nbytes, tid):
-            raise E.DisassemblerError(u"{:s}{:#x}, {!s}) : Unable to apply the given type ({!s}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, type, type, ea))
+            raise E.DisassemblerError(u"{:s}.type({:#x}, {!s}) : Unable to apply the given type ({!s}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, type, type, ea))
 
         interface.address.update_refinfo(ea, flags)
         return get(ea)
-    info = typeinfo = utils.alias(__new__, 'set')
+    info = typeinfo = utils.alias(type, 'set')
 
     @utils.multicase()
     @classmethod
