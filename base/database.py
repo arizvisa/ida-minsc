@@ -4576,6 +4576,58 @@ class address(object):
             return cls.nextflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, Fcheck_comment, **repeatable)
         return cls.nextflag(idaapi.MS_COMM & idaapi.FF_COMM, ea, count, **repeatable)
 
+    @utils.multicase()
+    @classmethod
+    def prevextra(cls, **count):
+        '''Return the previous address from the current one that has an extra comment.'''
+        return cls.prevextra(ui.current.address(), count.pop('count', 1), **count)
+    @utils.multicase(predicate=internal.types.callable)
+    @classmethod
+    def prevextra(cls, predicate, **count):
+        '''Return the previous address from the current one that has an extra comment and satisfies the provided `predicate`.'''
+        return cls.prevextra(ui.current.address(), predicate, **count)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t))
+    @classmethod
+    def prevextra(cls, ea, **count):
+        '''Return the previous address from the address `ea` that has an extra comment.'''
+        return cls.prevextra(ea, count.pop('count', 1))
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def prevextra(cls, ea, predicate, **count):
+        '''Return the previous address from the address `ea` that has an extra comment and satisfies the provided `predicate`.'''
+        return cls.prevflag(idaapi.FF_COMM & idaapi.FF_LINE, ea, predicate, **count)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
+    @classmethod
+    def prevextra(cls, ea, count):
+        '''Return the previous `count` addresses from the address `ea` that have an extra comment.'''
+        return cls.prevflag(idaapi.FF_COMM & idaapi.FF_LINE, ea, count)
+
+    @utils.multicase()
+    @classmethod
+    def nextextra(cls, **count):
+        '''Return the next address from the current one that has an extra comment.'''
+        return cls.nextextra(ui.current.address(), count.pop('count', 1), **count)
+    @utils.multicase(predicate=internal.types.callable)
+    @classmethod
+    def nextextra(cls, predicate, **count):
+        '''Return the next address from the current one that has an extra comment and satisfies the provided `predicate`.'''
+        return cls.nextextra(ui.current.address(), predicate, **count)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t))
+    @classmethod
+    def nextextra(cls, ea, **count):
+        '''Return the next address from the address `ea` that has an extra comment.'''
+        return cls.nextextra(ea, count.pop('count', 1), **count)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), predicate=internal.types.callable)
+    @classmethod
+    def nextextra(cls, ea, predicate, **repeatable):
+        '''Return the next address from the address `ea` that has an extra comment and satisfies the provided `predicate`.'''
+        return cls.nextflag(idaapi.FF_COMM & idaapi.FF_LINE, ea, F, **repeatable)
+    @utils.multicase(ea=(internal.types.integer, interface.location_t, interface.bounds_t), count=internal.types.integer)
+    @classmethod
+    def nextextra(cls, ea, count, **repeatable):
+        '''Return the next `count` addresses from the address `ea` that have an extra comment.'''
+        return cls.nextflag(idaapi.FF_COMM & idaapi.FF_LINE, ea, count, **repeatable)
+
     # FIXME: We should add the Or= or And= tests to this or we should allow specifying a set of tags.
     @utils.multicase()
     @classmethod
