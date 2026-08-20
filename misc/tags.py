@@ -3594,8 +3594,8 @@ class reference_v1(object):
             return iterable
         @classmethod
         def iterate(cls):
-            iterable = ((ea, used) for ea, used in internal.tagindex.globals.forward())
-            return ((ea, len(internal.tagindex.tags.names(used))) for ea, used in iterable)
+            iterable = internal.tagindex.globals.forward()
+            return ((ea, internal.tagindex.tags.names(used)) for ea, used in iterable)
         @classmethod
         def counts(cls):
             res, used = {}, (integer for ea, integer in internal.tagindex.globals.forward())
