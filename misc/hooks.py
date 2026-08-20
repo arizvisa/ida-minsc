@@ -1614,6 +1614,20 @@ def item_color_changed(ea, color):
         ctx.increment(ea, '__color__')
     return
 
+def make_code(insn):
+    """This callback is used to trap when code is applied to an address.
+
+    Basically, if the code overlaps with a tag we need to remove all of the tags
+    that aren't at the item head since you can't comment there anymore anyways.
+    """
+    ea, isize = insn.ea, insn.size
+    fn, res = idaapi.get_func(ea), interface.location_t(1 + ea, isize - 1)
+    if fn:
+        count = internal.tags.reference.contents.erase_range(fn, *res.bounds)
+    else:
+        count = internal.tags.reference.globals.erase_range(*res.bounds)
+    return
+
 def make_data(ea, flags, tid, asize):
     """This callback is used to trap when data is applied to an address.
 
@@ -7083,6 +7097,7 @@ def make_ida_not_suck_cocks(nw_code):
         scheduler.ready(hook.idp, 'rename', naming.rename, 0)
 
     ## hook type changes that require deleting tags due to being overwritten.
+    scheduler.ready(hook.idb, 'make_code', make_code, 0)
     scheduler.ready(hook.idb, 'make_data', make_data, 0)
 
     ## hook function transformations so we can shuffle their tags between types
