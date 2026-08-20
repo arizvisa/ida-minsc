@@ -39,6 +39,8 @@ class query_v0(object):
         # Nothing specific was queried, so just yield all tags that are available.
         if not(required or included):
             for ea in internal.tagcache.globals.address():
+                if interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_TAIL:
+                    continue
                 cls.navigation.set(ea)
                 Ftag, owners = (function.get, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (address.get, {ea})
                 tags = Ftag(ea)
@@ -48,6 +50,8 @@ class query_v0(object):
 
         # Walk through every tagged address so we can cross-check them with the query.
         for ea in internal.tagcache.globals.address():
+            if interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_TAIL:
+                continue
             Ftag, owners = (function.get, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (address.get, {ea})
             tags = Ftag(cls.navigation.set(ea))
 
@@ -76,7 +80,9 @@ class query_v0(object):
         # Nothing specific was queried, so just yield all tagnames that are available.
         if not(required or included):
             for ea, _ in internal.tagcache.contents.iterate():
-                if interface.function.has(cls.navigation.procedure(ea)):
+                if interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_TAIL:
+                    continue
+                elif interface.function.has(cls.navigation.procedure(ea)):
                     owners, Flogging = {f for f in interface.function.owners(ea)}, logging.info
                     contents = internal.tagcache.contents.name(ea, target=ea)
                 else:
@@ -92,6 +98,8 @@ class query_v0(object):
         for ea, cache in internal.tagcache.contents.iterate():
             if not interface.function.has(cls.navigation.procedure(ea)):
                 logging.warning(u"{:s}.contents({!s}, {!s}) : Detected cache inconsistency where address ({:#x}) should be referencing a function.".format('.'.join([__name__, cls.__name__]), sorted(required), sorted(included), ea))
+                continue
+            elif interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_TAIL:
                 continue
 
             # Now start aggregating the tagnames that the user is searching for.
