@@ -3597,6 +3597,10 @@ class reference_v1(object):
             iterable = internal.tagindex.globals.forward()
             return ((ea, internal.tagindex.tags.names(used)) for ea, used in iterable)
         @classmethod
+        def range(cls, start, stop):
+            iterable = internal.tagindex.globals.range(start, stop)
+            return ((ea, internal.tagindex.tags.names(used)) for ea, used in iterable)
+        @classmethod
         def counts(cls):
             res, used = {}, (integer for ea, integer in internal.tagindex.globals.forward())
             for name in itertools.chain(*map(internal.tagindex.tags.names, used)):
@@ -3606,6 +3610,9 @@ class reference_v1(object):
         def erase_address(cls, ea):
             count = internal.tagindex.globals.erase(ea)
             return count
+        @classmethod
+        def erase_range(cls, start, stop):
+            return internal.tagindex.globals.erase(start, stop)
 
     class contents(object):
         """
@@ -3638,6 +3645,10 @@ class reference_v1(object):
             iterable = internal.tagindex.contents.select()
             return ((ea, internal.tagindex.tags.names(used)) for ea, used in iterable)
         @classmethod
+        def range(cls, start, stop):
+            iterable = internal.tagindex.contents.range(start, stop)
+            return ((ea, internal.tagindex.tags.names(used)) for ea, used in iterable)
+        @classmethod
         def name(cls, address, **target):
             used = internal.tagindex.contents.usage(address)
             return internal.tagindex.tags.names(used)
@@ -3663,6 +3674,10 @@ class reference_v1(object):
         @classmethod
         def erase(cls, func):
             return internal.tagindex.contents.erase(func)
+        @classmethod
+        def erase_range(cls, func, start, stop):
+            res = internal.tagindex.contents.erase_bounds(func, start, stop)
+            return len(res)
 
     class structure(object):
         """
