@@ -2135,6 +2135,237 @@ class string(object):
             index = min([index for index in iterable if 0 <= index] or [-1])
         return
 
+    # XXX: this namespace was implemented by Claude. Thanks Claude.
+    class elision(object):
+        """
+        Render a dictionary type on a width-bounded line. This namespace is
+        basically a stand-in for the `repr` function, but includes a width so
+        that you can ensure the representation will fit in most conditions.
+
+        The `width` parameter doubles as a way to fall-back to the regular
+        implementation of the `repr` function. The function for this namespace
+        will try to render the entire container within the `width`. If there
+        isn't enough space for the container, then we degrade the information
+        being displayed about the mapping.
+
+        Some of the other parameters let you customize the text used to elide
+        the container you give it. The `ellipsis` parameter lets you customize
+        the marker to use when hiding elements. The `depth` lets you control the
+        number of nested levels before it gets clamped. For controlling the
+        maximum width that one value may occupy, you may use the `cap`
+        parameter. The `least` parameter lets you customize the lowest number of
+        items to render until the values are dropped in favor of the keys.
+
+        Some examples of using this namespace are as follows::
+
+            > elision(tags)                 # do not perform elision.
+            > elision(tags, width)          # elided to fit `width` columns.
+            > elision.value(obj, width)     # elide a single value to the width.
+            > elision.text(text, width)     # truncate a plain string with an ellipsis.
+
+        This namespace was mostly written by Claude, with some minor fixes to
+        the documentation and the written code.
+        """
+
+        # options
+        ellipsis = '...'    # marker substituted wherever information is hidden.
+        depth = 2           # levels a container is expanded before collapsing.
+        width = -1          # default width. a width less than 0 means infinite.
+        least = 1           # least number of elements to keep.
+        truncate = -1       # width for an element. less than 0 means infinite.
+        comma = ', '        # separator between container elements.
+
+        # container parts definitions.
+        Fordered = lambda iterable: sorted((item for item in iterable), key="{!r}".format)
+        Flistable = lambda iterable: [item for item in iterable]
+
+        __containers__ = {
+            internal.types.list:        ('[', ']', Flistable, '[]'),
+            internal.types.tuple:       ('(', ')', Flistable, '()'),
+            internal.types.dictionary:  ('{', '}', fcompose(operator.methodcaller('items'), Flistable), '{}'),
+            internal.types.frozenset:   ('frozenset({', '})', Fordered, 'frozenset()'),
+            internal.types.set:         ('set([', '])', Fordered, 'set()'),
+        }
+        del(Fordered, Flistable)
+
+        ## front door
+        def __new__(cls, container, width=width, **options):
+            '''Render the items from the specified `container` within the given `width`.'''
+            if isinstance(container, internal.types.dictionary):
+                iterable = mapping.items()
+            elif isinstance(container, internal.types.string):
+                return cls.text(container, width)
+            else:
+                return cls.value(container, width)
+            return cls.mapping(iterable, width, **options)
+
+        ## public renderers
+        @classmethod
+        def value(cls, object, width=width, ellipsis=ellipsis, depth=depth):
+            '''Shorten the specified `object` to one line of the given `width`.'''
+            if width < 0:
+                return repr(object)
+            return cls.text(cls.__shorten(object, width, depth, ellipsis), width, ellipsis)
+
+        @classmethod
+        def mapping(cls, items, width=width, ellipsis=ellipsis, truncate=-1, depth=depth, least=least):
+            '''Render the given dictionary `items` on one line within the specified `width`.'''
+            ellipsis = cls.ellipsis if ellipsis is None else ellipsis
+            items = list(items)
+
+            # the verbatim, order-preserving rendering
+            full = ('{' + cls.comma.join('{0!r}: {1!r}'.format(key, value) for key, value in items) + '}') if items else '{}'
+
+            # unbounded (no width, or a signed/non-positive one), or it already fits
+            if width < 0 or len(full) <= width:
+                return full
+            elif not items:
+                return cls.text('{}', width, ellipsis)
+
+            # figure out a reasonable maximum number of elements to have before
+            # clamping them down into a line that fits.
+            clamp = max(12, width // 3) if truncate < 0 else truncate
+
+            # values kept but individually capped, trailing items elided
+            text, shown, complete = cls.__valued(items, width, ellipsis, clamp, depth)
+            if complete or shown >= max(1, least):
+                return cls.text(text, width, ellipsis)
+
+            # avoid dispalying the values, only the keys eliding if necessary.
+            text, _, _ = cls.__keys(items, width, ellipsis)
+            return cls.text(text, width, ellipsis)
+
+        ## public string utilities
+        @classmethod
+        def text(cls, text, width=width, ellipsis=ellipsis):
+            '''Clip the specified `text` to `width` characters, truncating it with an `ellipsis`.'''
+            if width <= 0:
+                return '' if width == 0 else text
+            elif len(text) <= width:
+                return text
+            elif width <= len(ellipsis):
+                return ellipsis[:width]
+            return ''.join([text[:width - len(ellipsis)], ellipsis])
+
+        @classmethod
+        def quoted(cls, text, width=width, ellipsis=ellipsis):
+            '''Clip the quoted representation string in `text` whilst preserving its closing quote.'''
+            if width < 0:
+                return text
+            elif len(text) <= width:
+                return text
+
+            # calculate the room for the content with ellipsis and a quote.
+            keep = width - len(ellipsis) - 1
+            if keep > 0:
+                return ''.join([text[:keep], ellipsis, text[-1]])
+            return cls.text(text, width, ellipsis)
+
+        ## mapping stages
+        @classmethod
+        def __valued(cls, items, width, ellipsis, truncate, depth):
+            '''Pack the specified `items` as pairs with each being clamped to the length given by `truncate`.'''
+            def render(index, budget):
+                key, value = items[index]
+                head = '{0!r}: '.format(key)
+                room = budget - len(head)
+                return None if room < len(ellipsis) else head + cls.__shorten(value, min(truncate, room), depth, ellipsis)
+            return cls.__pack('{', '}', len(items), render, width, ellipsis)
+
+        @classmethod
+        def __keys(cls, items, width, ellipsis):
+            '''Pack the keys of the specified `items`, dropping their values if there is no space.'''
+            render = lambda index, budget: cls.text('{0!r}'.format(items[index][0]), budget, ellipsis)
+            return cls.__pack('{', '}', len(items), render, width, ellipsis)
+
+        ## element-aware single-value rendering
+        @classmethod
+        def __shorten(cls, object, width, depth, ellipsis):
+            '''Shorten the `object` to the given `width`, expanding its nested elements up to the specified `depth`.'''
+            if width <= 0:
+                return ''
+            if isinstance(object, (str, bytes)):
+                return cls.quoted(repr(object), width, ellipsis)
+            if depth > 0 and cls.__container(object) is not None:
+                return cls.__elements(object, width, depth, ellipsis)
+            return cls.text(repr(object), width, ellipsis)
+
+        @classmethod
+        def __elements(cls, object, width, depth, ellipsis):
+            '''Pack the elements of the `object` with the specified `width`, and `depth`, using the `ellipsis` as a signal.'''
+            opening, closing, elements, empty = cls.__container(object)
+
+            # if there are no elements, then we just return the empty string.
+            if not elements:
+                return empty
+
+            # create a closure for rendering a dictionary.
+            def render_dictionary(index, budget):
+                key, value = elements[index]
+                head = "{!r}: ".format(key)
+                room = budget - len(head)
+                return None if room < len(ellipsis) else head + cls.__shorten(value, room, depth - 1, ellipsis)
+
+            # otherwise create a closure for rendering a container.
+            def render_container(index, budget):
+                return cls.__shorten(elements[index], budget, depth - 1, ellipsis)
+
+            # choose the correct render and then use it.
+            render = render_dictionary if isinstance(object, internal.types.dictionary) else render_container
+            text, _, _ = cls.__pack(opening, closing, len(elements), render, width, ellipsis)
+            return text
+
+        @classmethod
+        def __container(cls, object):
+            '''Decompose the container in `object` into its individual components for rendering.'''
+            object_t = object.__class__
+            iterable = (description for container_t, description in cls.__containers__.items() if isinstance(object, container_t))
+            packed = cls.__containers__[object_t] if object_t in cls.__containers__ else next(iterable, None)
+            if packed:
+                open, close, F, empty = packed
+                return open, close, F(object), empty
+            return packed
+
+        @classmethod
+        def __pack(cls, opening, closing, count, render, width, ellipsis):
+            '''Pack the text produced by `render` surrounded by `opening` and `closing` within the specified `width` truncating with `ellipsis` as necessary.'''
+            def step(state, index):
+                parts, used, done = state
+                if done:
+                    return state
+
+                lead = '' if not parts else cls.comma
+                last = index == count - 1
+
+                # leave room for a trailing comma and ellipsis.
+                reserve = 0 if last else sum(map(len, [cls.comma, ellipsis]))
+                budget = width - used - len(lead) - len(closing) - reserve
+                if budget <= 0:
+                    return parts, used, True
+
+                item = render(index, budget)
+                if item is None:
+                    overflows = True
+                elif used + sum(map(len, [lead, item, closing])) + reserve > width:
+                    overflows = True
+                else:
+                    overflows = False
+
+                if overflows:
+                    return parts, used, True
+                parts.append(item)
+                return parts, used + sum(map(len, [lead, item])), False
+
+            # step through the state machine processing the available elements.
+            parts, _, _ = functools.reduce(step, range(count), ([], len(opening), False))
+            if len(parts) == count:
+                body = cls.comma.join(parts)
+            elif parts:
+                body = ''.join([cls.comma.join(parts), cls.comma, ellipsis])
+            else:
+                body = ellipsis
+            return opening + body + closing, len(parts), len(parts) == count
+
 ### wrapping functions with another caller whilst preserving the wrapped function
 class wrap(object):
     """
