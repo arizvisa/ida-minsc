@@ -1614,6 +1614,30 @@ def item_color_changed(ea, color):
         ctx.increment(ea, '__color__')
     return
 
+def make_data(ea, flags, tid, asize):
+    """This callback is used to trap when data is applied to an address.
+
+    Basically, if the data overlaps with a tag we need to remove all of the tags
+    that aren't at the item head since you can't comment there anymore anyways.
+    """
+    oldflags, newflags = interface.address.flags(ea), flags
+    oldclass, newclass = (flags & idaapi.MS_CLS for flags in [oldflags, newflags])
+    oldcommon, newcommon = (flags & idaapi.MS_COMM for flags in [oldflags, newflags])
+
+    # Store the data type, or the code type. These are the same for either the
+    # FF_CODE or FF_CODE classes.
+    oldtype, newtype = (flags & idaapi.DT_TYPE for flags in [oldflags, newflags])
+    oldcode, newcode = (flags & idaapi.MS_CODE for flags in [oldflags, newflags])
+
+    # Go through and delete each the tags that have just been overwritten while
+    # being sure to skip over the first address that the data was created at.
+    fn, res = idaapi.get_func(ea), interface.location_t(1 + ea, asize - 1)
+    if fn:
+        count = internal.tags.reference.contents.erase_range(fn, *res.bounds)
+    else:
+        count = internal.tags.reference.globals.erase_range(*res.bounds)
+    return
+
 ### function scope
 def thunk_func_created(pfn):
     # XXX: This might be interesting to track, but the disassembler generally
@@ -7057,6 +7081,9 @@ def make_ida_not_suck_cocks(nw_code):
 
     else:
         scheduler.ready(hook.idp, 'rename', naming.rename, 0)
+
+    ## hook type changes that require deleting tags due to being overwritten.
+    scheduler.ready(hook.idb, 'make_data', make_data, 0)
 
     ## hook function transformations so we can shuffle their tags between types
     if idaapi.__version__ >= 7.0:
