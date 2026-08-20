@@ -3178,6 +3178,7 @@ class frame(object):
             fn = interface.function.by(func)
             return fn.frsize
     lvars = vars = variables    # XXX: ns alias
+    size = utils.alias(variables.size, 'frame')
 
     class registers(object):
         """
