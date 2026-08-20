@@ -1478,6 +1478,21 @@ class extra_cmt(changingchanged):
            implicit tags in order to zero them entirely prior to re-applying them
            which would result in us losing track of the "__name__" tag.
     """
+    # BUG: So.. because we can't tell when an extra comment is actually removed,
+    #      there is a state which results in an inability to track an anterior
+    #      comment that is inside a function. The issue occurs only when you are
+    #      creating data inside a function over an address with an anterior
+    #      comment. To reproduce, find some code inside a function and undefine
+    #      it or turn it into byte data. Then create an anterior comment on any
+    #      of the addresses in the middle of your undefined data. At this point
+    #      you will see "__extra_prefix__" in the tagging index for that
+    #      address. Now if you create a data item in front of the anterior
+    #      comment, you will see the anterior comment disappear. However, if you
+    #      check in the tagging index it was not removed at all. Then if you
+    #      undefine that data again, the disassembler will show the original
+    #      anterior comment as if it wasn't deleted or overwritten in any way.
+    #      This doesn't happen on all functions, but I haven't narrowed it down
+    #      to figure out why that is.
     MAX_ITEM_LINES = (idaapi.E_NEXT - idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV - idaapi.E_NEXT
 
     @classmethod
