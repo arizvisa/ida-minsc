@@ -4863,7 +4863,7 @@ class address(object):
                     nbytes = 0
                 else:
                     nbytes = nbytes
-                return idaapi.del_items(ea, 0, nbytes) if nbytes else True
+                return idaapi.del_items(ea, idaapi.DELIT_DELNAMES, nbytes) if nbytes else True
 
             # Now we can remove the type, and then check if there is still a
             # type applied to determine whether we succeeded or not.
@@ -4877,7 +4877,7 @@ class address(object):
             # If we successfully removed the type, then we should be okay to
             # delete the items. If that fails, then we can easily restore the
             # old type back to the same address before returning failure.
-            elif ok and idaapi.del_items(ea, 0, nbytes):
+            elif ok and idaapi.del_items(ea, idaapi.DELIT_DELNAMES, nbytes):
                 return True
 
             # Now we go ahead and restore the type back to the address. If we
@@ -4962,7 +4962,7 @@ class address(object):
         # We've written the type successfully, so we can now delete the data for
         # the given address, and then attempt to reapply without rechecking
         # afterwards. Unfortunately, it's rare but this api can actually fail...
-        elif not idaapi.del_items(ea, 0, tinfo.size(written)):
+        elif not idaapi.del_items(ea, idaapi.DELIT_DELNAMES, tinfo.size(written)):
             if flags and tflags == idaapi.TINFO_GUESSED and definitive:
                 node.aflags(ea, idaapi.AFL_USERTI, oldflags)
 
