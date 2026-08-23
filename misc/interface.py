@@ -12099,46 +12099,46 @@ class xref(object):
 
     @internal.utils.multicase(ea=internal.types.integer)
     @classmethod
-    def to(cls, ea):
+    def to(cls, ea, **user):
         '''Iterate through the cross-references that reference the identifier `ea`.'''
-        return cls.to(ea, idaapi.XREF_ALL)
+        return cls.to(ea, idaapi.XREF_ALL, **user)
     @internal.utils.multicase(ea=internal.types.integer, flags=internal.types.integer)
     @classmethod
-    def to(cls, ea, flags):
+    def to(cls, ea, flags, **user):
         '''Iterate through the cross-references of the type `flags` that reference the identifier `ea`.'''
-        X = idaapi.xrefblk_t()
+        X, has_user = idaapi.xrefblk_t(), user.get('user', False)
 
         # Check to see if we can find the first one and bail if we couldn't.
         if not X.first_to(ea, flags):
             return
-        yield (X.frm, X.iscode, X.type)
+        yield (X.frm, X.iscode, X.type) if not has_user else (X.frm, X.iscode, X.type, X.user)
 
         # Since we were able to find one, we just continue to iterate through the
         # rest of the xrefblk_t while yielding the necessary properties.
         while X.next_to():
-            yield (X.frm, X.iscode, X.type)
+            yield (X.frm, X.iscode, X.type) if not has_user else (X.frm, X.iscode, X.type, X.user)
         return
 
     @internal.utils.multicase(ea=internal.types.integer)
     @classmethod
-    def of(cls, ea):
+    def of(cls, ea, **user):
         '''Iterate through the cross-references that originate from the identifier `ea`.'''
-        return cls.of(ea, idaapi.XREF_ALL)
+        return cls.of(ea, idaapi.XREF_ALL, **user)
     @internal.utils.multicase(ea=internal.types.integer, flags=internal.types.integer)
     @classmethod
-    def of(cls, ea, flags):
+    def of(cls, ea, flags, **user):
         '''Iterate through the cross-references of the type `flags` that originate from the identifier `ea`.'''
-        X = idaapi.xrefblk_t()
+        X, has_user = idaapi.xrefblk_t(), user.get('user', False)
 
         # Check to see if we can find the first one and bail if we couldn't.
         if not X.first_from(ea, flags):
             return
-        yield (X.to, X.iscode, X.type)
+        yield (X.to, X.iscode, X.type) if not user else (X.to, X.iscode, X.type, X.user)
 
         # Since we were able to find one, we just continue to iterate through the
         # rest of whatever xrefblk_t returns while yielding the necessary properties.
         while X.next_from():
-            yield (X.to, X.iscode, X.type)
+            yield (X.to, X.iscode, X.type) if not user else (X.to, X.iscode, X.type, X.user)
         return
 
     @internal.utils.multicase(ea=internal.types.integer, target=internal.types.integer, flowtype=internal.types.integer)
