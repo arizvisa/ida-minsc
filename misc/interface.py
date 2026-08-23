@@ -4797,6 +4797,303 @@ class address(object):
         b, r = (operator.and_(original, 0xff * shift) // shift for shift in [0x010000, 0x000001])
         return original if original == DEFCOLOR else sum([0x010000 * r, 0x00ff00 & original, 0x000001 * b])
 
+    # This one is a little beastly, but creates and populated a `tid_array`. We
+    # will delete it when we are done using it.
+    utils = internal.utils
+    Ftidpath = utils.fcompose(utils.fthrough(utils.fcompose(utils.funpack(utils.fcar(idaapi.tid_array)), itertools.repeat), utils.funpack(utils.fcar(utils.fcompose(builtins.range, utils.fpartial(utils.imap, utils.fsetitem)))), utils.funpack(utils.fcdr(utils.fpack(utils.fidentity)))), utils.funpack(utils.fthrough(utils.fcdr(utils.fcompose(utils.izip, utils.fpartial(utils.imap, utils.funpack(utils.fapplyto())))), utils.fcar(utils.fidentity))), utils.funpack(utils.izip), utils.fpartial(utils.imap, utils.funpack(utils.fapplyto())), builtins.list, operator.itemgetter(0))
+    del(utils)
+
+    # This dictionary contains all of the information needed to snapshot and
+    # restore the operands associated with instructions.
+    __operands__ = {
+        idaapi.FF_0NUMH: (None, lambda ea, n, info: idaapi.op_hex(ea, n)),
+        idaapi.FF_0NUMD: (None, lambda ea, n, info: idaapi.op_dec(ea, n)),
+        idaapi.FF_0CHAR: (None, lambda ea, n, info: idaapi.op_chr(ea, n)),
+        idaapi.FF_0SEG:  (None, lambda ea, n, info: idaapi.op_seg(ea, n)),
+        idaapi.FF_0NUMB: (None, lambda ea, n, info: idaapi.op_bin(ea, n)),
+        idaapi.FF_0NUMO: (None, lambda ea, n, info: idaapi.op_oct(ea, n)),
+        idaapi.FF_0FLT:  (None, lambda ea, n, info: idaapi.op_flt(ea, n)),
+    }
+    __operands__[idaapi.FF_0OFF] = (lambda opinfo: (opinfo.ri.flags, opinfo.ri.base, opinfo.ri.target, opinfo.ri.tdelta), lambda ea, n, info: idaapi.op_offset_ex(ea, n, (lambda refinfo: refinfo.init(*info) or refinfo)(idaapi.refinfo_t())))
+    __operands__[idaapi.FF_0ENUM] = (lambda opinfo: (opinfo.ec.tid, opinfo.ec.serial), lambda ea, n, info: idaapi.op_enum(ea, n, info[0], info[1]))
+    __operands__[idaapi.FF_0STRO] = (lambda opinfo: (opinfo.path.delta, [opinfo.path.ids[index] for index in builtins.range(opinfo.path.len)]), lambda ea, n, info, Ftidpath=Ftidpath: idaapi.op_stroff(instruction.at(ea), n, Ftidpath(info[1]).cast(), len(info[1]), info[0]))
+    __operands__[getattr(idaapi, 'FF_0CUST', 0x00D00000)] = (lambda opinfo: opinfo.cd.fid, idaapi.op_custfmt)
+
+    _pairs = [
+        (idaapi.FF_0NUMH, idaapi.FF_1NUMH),
+        (idaapi.FF_0NUMD, idaapi.FF_1NUMD),
+        (idaapi.FF_0CHAR, idaapi.FF_1CHAR),
+        (idaapi.FF_0SEG, idaapi.FF_1SEG),
+        (idaapi.FF_0NUMB, idaapi.FF_1NUMB),
+        (idaapi.FF_0NUMO, idaapi.FF_1NUMO),
+        (idaapi.FF_0FLT, idaapi.FF_1FLT),
+        (idaapi.FF_0OFF, idaapi.FF_1OFF),
+        (idaapi.FF_0ENUM, idaapi.FF_1ENUM),
+        (idaapi.FF_0STRO, idaapi.FF_1STRO),
+        (getattr(idaapi, 'FF_0CUST', 0x00D00000), getattr(idaapi, 'FF_1CUST', 0x0D000000)),
+    ]
+
+    for opnum0, opnum1 in _pairs:
+        __operands__[opnum1] = __operands__[opnum0]
+    del(Ftidpath, _pairs, opnum0, opnum1)
+
+    @classmethod
+    @contextlib.contextmanager
+    def reserve(cls, ea, flags, size):
+        '''Reserve space for `size` bytes at the address `ea`, restoring changes made in that range upon the raising of an exception.'''
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        del_tinfo = idaapi.del_tinfo2 if idaapi.__version__ < 7.0 else idaapi.del_tinfo
+        get_opinfo = (lambda info, ea, opnum, flags: idaapi.get_opinfo(ea, opnum, flags, info)) if idaapi.__version__ < 7.0 else idaapi.get_opinfo
+        get_forced  = idaapi.get_forced_operand if hasattr(idaapi, 'get_forced_operand') else (lambda ea, n: '')
+        Fnext_that = idaapi.next_that if hasattr(idaapi, 'next_that') else idaapi.nextthat
+
+        # Some constants that we'll need.
+        FF_STRLIT = getattr(idaapi, 'FF_STRLIT', getattr(idaapi, 'FF_ASCI', 0x50000000))
+        FF_STRUCT = getattr(idaapi, 'FF_STRUCT', getattr(idaapi, 'FF_STRU', 0x60000000))
+        DEFCOLOR  = getattr(idaapi, 'DEFCOLOR', 0xFFFFFFFF)
+
+        items = [('FF_ALIGN', 0xB0000000), ('FF_CUSTOM', 0xF0000000)]
+        iterable = (getattr(idaapi, name, dtype) for name, dtype in items)
+        FF_ALIGN, FF_CUSTOM = map(idaapi.as_uint32, iterable)
+
+        # Start by creating the dictionaries to store our snapshotted data.
+        addresses = []
+        names, types, arrays, operands = {}, {}, {}, {}
+        strings, forced, altflags, colors = {}, {}, {}, {}
+        tids, customs, aligns, references = {}, {}, {}, {}
+
+        # Now we can create our test and start our iteration loop.
+        Ftest = functools.partial(operator.and_, idaapi.FF_NAME | idaapi.FF_DATA)
+        start, stop = Fnext_that(max(0, ea - 1), ea + size, Ftest), ea + size
+        while start < stop:
+            fn, res = idaapi.get_func(start), cls.flags(start)
+            klass, dtype, common = (res & mask for mask in [idaapi.MS_CLS, idaapi.as_uint32(idaapi.DT_TYPE), idaapi.MS_COMM])
+
+            # Altflags.
+            altflags[start] = node.aflags(start)
+            nbytes = idaapi.get_item_size(start)
+
+            # Colors.
+            bgr = idaapi.get_item_color(start)
+            if bgr != DEFCOLOR:
+                colors[start] = bgr
+
+            # Names.
+            if common & idaapi.FF_ANYNAME == idaapi.FF_NAME:
+                local = fn and not idaapi.is_in_nlist(start)
+                aname = name.get(start, idaapi.GN_LOCAL) if local else name.get(start)
+                iterable = itertools.chain([aname], (F(start) for F in [idaapi.is_public_name, idaapi.is_weak_name]), [local])
+                names[start] =  tuple(iterable)
+
+            # Operands.
+            reprs = []
+            for opnum, mask in [(0, idaapi.MS_0TYPE), (1, idaapi.MS_1TYPE)]:
+                opinfo, getter_setter = idaapi.opinfo_t(), cls.__operands__.get(res & mask)
+                if getter_setter is None:
+                    continue
+
+                # Get the operand information.
+                Fget, Fset = getter_setter
+                opinfo = Fget(opinfo) if Fget and get_opinfo(opinfo, start, opnum, res) else None
+
+                # Pack it all into the list.
+                packed = opnum, Fset, opinfo
+                reprs.append(packed)
+
+            operands.setdefault(start, reprs) if reprs else operands
+
+            # Forced operands
+            fo = {opnum: get_forced(start, opnum) for opnum in builtins.range(2) if get_forced(start, opnum)}
+            forced.setdefault(start, fo) if fo else forced
+
+            # Code.
+            if klass == idaapi.FF_CODE:
+                addresses.append((start, klass, nbytes))
+
+                userrefs = [(address, xiscode, xrtype) for address, xiscode, xrtype, user in xref.of(start, idaapi.XREF_ALL, user=True) if user]
+                references.setdefault(start, userrefs) if userrefs else references
+
+            # Data.
+            elif klass == idaapi.FF_DATA:
+                ti = idaapi.tinfo_t()
+                ap = idaapi.array_parameters_t()
+                opinfo = idaapi.opinfo_t()
+
+                # Addresses.
+                addresses.append((start, klass | dtype, nbytes))
+
+                # Types.
+                types[start] = ti.serialize() if get_tinfo(ti, start) else None
+
+                # Arrays.
+                arrays[start] = ap if idaapi.get_array_parameters(ap, start) != -1 else None
+
+                # Strings.
+                if dtype == FF_STRLIT:
+                    strings[start] = opinfo.strtype if get_opinfo(opinfo, start, 0, res) else None
+                elif dtype == FF_STRUCT:
+                    tids[start] = cls.structure(start)
+                elif dtype == FF_CUSTOM:
+                    customs[start] = cls.custom(start)
+                elif dtype == FF_ALIGN:
+                    exponent = idaapi.get_alignment(start)
+                    aligns[start] = 0 if idaapi.as_signed(exponent, 32) == -1 else exponent
+                pass
+
+            # Continue to the next address matching our flags in Ftest.
+            start = Fnext_that(start, stop, Ftest)
+
+        # If we're ok, then we can just continue as intended.
+        if idaapi.can_define_item(ea, size, flags):
+            ok = True
+
+        # Otherwise, try and delete the items and retry.
+        elif idaapi.del_items(ea, idaapi.DELIT_SIMPLE, size) and idaapi.can_define_item(ea, size, flags):
+            ok = True
+
+        # Otherwise, try and delete all the heads and then retry again.
+        elif idaapi.del_items(ea, idaapi.DELIT_SIMPLE | idaapi.DELIT_DELNAMES, size) and idaapi.can_define_item(ea, size, flags):
+            ok = True
+
+        # If we failed still, then let the caller know that we can't do shit and
+        # they need to tell us to roll everything back after informing the user.
+        else:
+            ok = False
+
+        # If we succeeded, then go ahead and delete all of the type information.
+        if ok:
+            [del_tinfo(address) for address, ti in types.items() if ti is not None]
+
+        # If we deleted, yield that everything is okay back to the caller.
+        committed = ok
+        try:
+            yield committed
+
+        # If we caught an exception, then we need to roll everything back.
+        except Exception as E:
+            committed = False
+            raise E
+
+        # If we didn't commit successfully, then roll back all of the options.
+        finally:
+            til = tinfo.library()
+
+            # First thing is to try deleting everything that was applied, and
+            # then gather the layout from the list of addresses and stuff.
+            if not committed and not idaapi.del_items(ea, idaapi.DELIT_SIMPLE | idaapi.DELIT_DELNAMES, size):
+                logging.error(u"{:s}.reserve({:#x}, {:#x}, {:+#x}) : Error during rollback while trying to clear the region at {:s}.".format('.'.join([__name__, cls.__name__]), ea, flags, size, location_t(ea, size).bounds))
+            layout = {address : (idaapi.as_uint32(itemflags & idaapi.DT_TYPE), nbytes) for address, itemflags, nbytes in addresses}
+
+            # Start recreating the items that were deleted.
+            iterable = [] if committed else addresses
+            for address, itemflags, nbytes in iterable:
+                klass, dtype = itemflags & idaapi.MS_CLS, idaapi.as_uint32(itemflags & idaapi.DT_TYPE)
+                if klass == idaapi.FF_CODE and idaapi.create_insn(address):
+                    ok = True
+                elif klass == idaapi.FF_CODE:
+                    logging.error(u"{:s}.reserve({:#x}, {:#x}, {:+#x}) : Unable to create an instruction ({:#x}) at the specified address ({:#x}) during rollback.".format('.'.join([__name__, cls.__name__]), ea, flags, size, klass, address))
+                    ok = False
+                elif dtype == FF_STRLIT and strings.get(address) is None and idaapi.create_data(address, FF_STRLIT, nbytes, idaapi.BADADDR):
+                    ok = True
+                elif dtype == FF_STRLIT and strings.get(address) is None:
+                    logging.error(u"{:s}.reserve({:#x}, {:#x}, {:+#x}) : Unable to create an untyped string ({:#x}) at the specified address ({:#x}) during rollback.".format('.'.join([__name__, cls.__name__]), ea, flags, size, dtype, address))
+                    ok = False
+                elif dtype == FF_STRLIT and idaapi.create_strlit(address, nbytes, strings[address]):
+                    ok = True
+                elif dtype == FF_STRLIT:
+                    logging.error(u"{:s}.reserve({:#x}, {:#x}, {:+#x}) : Unable to create a string ({:#x}) of the given type ({:#x}) at the specified address ({:#x}) during rollback.".format('.'.join([__name__, cls.__name__]), ea, flags, size, dtype, strings[address], address))
+                    ok = False
+                elif dtype == FF_STRUCT and tids.get(address) not in (None, idaapi.BADNODE) and idaapi.create_struct(address, nbytes, tids[address]):
+                    ok = True
+                elif dtype == FF_STRUCT and tids.get(address) not in (None, idaapi.BADNODE):
+                    logging.error(u"{:s}.reserve({:#x}, {:#x}, {:+#x}) : Unable to create a structure ({:#x}) of the given type ({:#x}) at the specified address ({:#x}) during rollback.".format('.'.join([__name__, cls.__name__]), ea, flags, size, dtype, tids[address], address))
+                elif dtype == FF_ALIGN and idaapi.create_align(address, nbytes, aligns.get(address, 0)):
+                    ok = True
+                elif dtype == FF_ALIGN:
+                    logging.error(u"{:s}.reserve({:#x}, {:#x}, {:+#x}) : Unable to create alignment ({:#x}) at the specified address ({:#x}) during rollback.".format('.'.join([__name__, cls.__name__]), ea, flags, size, dtype, address))
+                elif dtype == FF_CUSTOM and customs.get(address) and idaapi.create_custdata(address, nbytes, *(lambda dtid, fids: [dtid, fids[0] if fids else 0])(*customs[address])):
+                    ok = True
+                elif dtype == FF_CUSTOM and customs.get(address):
+                    ok, Fdescribe = False, lambda dtid, fids: "{:#x}:{:#x}".format(dtid, fids[0] if fids else 0)
+                    logging.error(u"{:s}.reserve({:#x}, {:#x}, {:+#x}) : Unable to create a custom ({:#x}) type ({!s}) at the specified address ({:#x}) during rollback.".format('.'.join([__name__, cls.__name__]), ea, flags, size, dtype, Fdescribe(*customs[address]), address))
+                elif types.get(address) is None and idaapi.create_data(address, dtype, nbytes, idaapi.BADADDR):
+                    ok = True
+                elif types.get(address) is None:
+                    ok = False
+                    logging.error(u"{:s}.reserve({:#x}, {:#x}, {:+#x}) : Unable to create untyped data ({:#x}) at the specified address ({:#x}) during rollback.".format('.'.join([__name__, cls.__name__]), ea, flags, size, dtype, address))
+                continue
+
+            # Now we start applying the type information we captured.
+            iterable = [] if committed else types.items() 
+            for address, packed in iterable:
+                dtype, nbytes = layout.get(address, (idaapi.FF_BYTE, 0))
+                ti = tinfo.get(til, *packed) if packed else tinfo.get(til, ())
+                if ti:
+                    res = cls.apply_typeinfo(address, ti)
+                elif dtype in {FF_ALIGN, FF_CUSTOM}:
+                    pass
+                elif idaapi.create_data(address, dtype, nbytes, idaapi.BADADDR):
+                    logging.warning(u"{:s}.reserve({:#x}, {:#x}, {:+#x}) : Failure rebuilding the type for the specified address ({:#x}). An item of {:d} byte{:s} with the original type ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, flags, size, address, nbytes, '' if nbytes == 1 else 's', dtype))
+                else:
+                    logging.error(u"{:s}.reserve({:#x}, {:#x}, {:+#x}) : Error during rollback while trying to clear the region at {:s}.".format('.'.join([__name__, cls.__name__]), ea, flags, size, location_t(ea, size).bounds))
+                continue
+
+            # Then we can do the array parameters if specified.
+            iterable = [] if committed else arrays.items()
+            for address, ap in iterable:
+                if ap:
+                    idaapi.set_array_parameters(address, ap)
+                continue
+
+            # Then we do the operands and the forced operands.
+            iterable = [] if committed else operands.items()
+            for address, res in iterable:
+                for opnum, Fset, info in res:
+                    Fset(address, opnum, info)
+                continue
+
+            iterable = [] if committed else forced.items()
+            for address, fo in iterable:
+                for opnum, text in fo.items():
+                    idaapi.set_forced_operand(address, opnum, text)
+                continue
+
+            # Then the references.
+            iterable = [] if committed else references.items()
+            for address, refs in iterable:
+                for target, xiscode, xtype in refs:
+                    Fadd = xref.add_code if xiscode else xref.add_data
+                    Fadd(address, target, xtype | idaapi.XREF_USER)
+                continue
+
+            # Now we can do the altflags.
+            iterable = [] if committed else altflags.items()
+            for address, word in iterable:
+                node.aflags(address, 0xFFFFFFFF, word)
+
+            # Then the colors.
+            iterable = [] if committed else colors.items()
+            for item, bgr in iterable:
+                idaapi.set_item_color(item, bgr)
+
+            # And finally...the names.
+            iterable = [] if committed else names.items()
+            for address, packed in iterable:
+                aname, is_public, is_weak, local = packed
+                if not aname:
+                    continue
+
+                snflags = (idaapi.SN_PUBLIC if is_public else 0) | (idaapi.SN_WEAK if is_weak else 0)
+                if local:
+                    name.set(address, aname, idaapi.SN_LOCAL, idaapi.SN_LOCAL)
+                else:
+                    name.set(address, aname, snflags)
+                continue
+
+            # Wait until everything applies before finally leaving.
+            idaapi.auto_wait()
+        return
+
     @classmethod
     def has_typeinfo(cls, ea):
         '''Return if the address at `ea` has any type information associated with it.'''
