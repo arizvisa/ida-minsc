@@ -5084,7 +5084,7 @@ class address(object):
             return
 
         # Extract the custom data type and unpack all of its format identifiers.
-        cd = oi.cd
+        cd = info.cd
         if hasattr(cd.fids, 'bytes'):
             paired = zip(*[iter(bytearray(cd.fids.bytes))] * 2)
             fids = [ 0x100 * hi + lo for lo, hi in paired ]
