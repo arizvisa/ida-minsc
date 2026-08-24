@@ -8930,9 +8930,14 @@ class set(object):
         # now we can figure out its IDA type and create the data. after
         # that, though, we need to update its refinfo before we leave.
         flags, typeid, nbytes = interface.typemap.resolve(realtype)
-        if not idaapi.create_data(ea, flags, nbytes, typeid):
-            raise E.DisassemblerError(u"{:s}.array({:#x}, {!r}, {:d}) : Unable to define the specified address ({:#x}) as an array of the requested length ({:d}).".format('.'.join([__name__, cls.__name__]), ea, type, length, ea, length))
-        interface.address.update_refinfo(ea, flags)
+        with interface.address.reserve(ea, flags, nbytes) as ok:
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.array({:#x}, {!r}, {:d}) : Unable to reserve {:d} byte{:s} at the specified address ({:#x}) for an array ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, type, length, ea, length, flags))
+
+            elif not idaapi.create_data(ea, flags, nbytes, typeid):
+                raise E.DisassemblerError(u"{:s}.array({:#x}, {!r}, {:d}) : Unable to define the specified address ({:#x}) as an array of the requested length ({:d}).".format('.'.join([__name__, cls.__name__]), ea, type, length, ea, length))
+
+            interface.address.update_refinfo(ea, flags)
 
         # return the array that we just created.
         return get.array(ea, length=reallength)
