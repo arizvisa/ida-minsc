@@ -4965,14 +4965,18 @@ class address(object):
             [del_tinfo(address) for address, ti in types.items() if ti is not None]
 
         # If we deleted, yield that everything is okay back to the caller.
-        committed = ok
+        committed = False
         try:
-            yield committed
+            yield ok
 
-        # If we caught an exception, then we need to roll everything back.
-        except Exception as E:
+        # If we received a StopIteration, then roll back but do not reraise it.
+        except StopIteration:
             committed = False
-            raise E
+
+        # If we caught an exception, then we need to roll everything back and
+        # let the exception get re-raised so it can be caught.
+        else:
+            committed = ok
 
         # If we didn't commit successfully, then roll back all of the options.
         finally:
