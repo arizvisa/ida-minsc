@@ -1775,16 +1775,24 @@ class function(object):
         else:
             realname = fname or ''
 
+        # Use the reference namespace to find the source of our tag information.
+        if reference == reference_v0:
+            available = {}
+            available.setdefault('__name__', True) if interface.address.flags(interface.range.start(fn), idaapi.FF_NAME) else available
+            available.setdefault('__typeinfo__', True) if interface.function.has_typeinfo(ea) else available
+        else:
+            available = reference.globals.get(ea)
+
         # Add any of the implicit tags for the given function into our results.
         fname = fname
-        if fname and interface.address.flags(interface.range.start(fn), idaapi.FF_NAME):
+        if fname and '__name__' in available:
             res.setdefault('__name__', realname)
 
         # For the function's type information within the implicit "__typeinfo__"
         # tag, we'll need to extract the prototype and the function's name. This
         # is so that we can use the name to emit a proper function prototype.
         try:
-            if interface.function.has_typeinfo(fn):
+            if '__typeinfo__' in available:
                 typeinfo = interface.function.typeinfo(fn)
                 ti = interface.tinfo.lower_function_type(typeinfo) if typeinfo.is_func() or typeinfo.is_funcptr() else typeinfo
                 validname = interface.name.typename(realname)
@@ -1801,8 +1809,8 @@ class function(object):
 
         # Add the color to the result if one was actually set.
         fcolor, DEFCOLOR = interface.function.color(fn), 0xffffffff
-        if fcolor != DEFCOLOR: res.setdefault('__color__', fcolor)
-
+        if fcolor != DEFCOLOR:
+            res.setdefault('__color__', fcolor)
         return res
 
     @classmethod
