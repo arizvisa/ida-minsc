@@ -7991,10 +7991,12 @@ class set(object):
             return cls.array(ea, type, length)
 
         # Otherwise, we just need to use what we were given to create the data.
-        elif not idaapi.create_data(ea, flags, nbytes, tid):
-            raise E.DisassemblerError(u"{:s}.type({:#x}, {!s}) : Unable to apply the given type ({!s}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, type, type, ea))
-
-        interface.address.update_refinfo(ea, flags)
+        with interface.address.reserve(ea, flags, nbytes) as ok:
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.type({:#x}, {!s}) : Unable to reserve {:d} byte{:s} for applying the given type ({!s}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, type, nbytes, '' if nbytes == 1 else 's', type, ea))
+            elif not idaapi.create_data(ea, flags, nbytes, tid):
+                raise E.DisassemblerError(u"{:s}.type({:#x}, {!s}) : Unable to apply the given type ({!s}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, type, type, ea))
+            interface.address.update_refinfo(ea, flags)
         return get(ea)
     info = typeinfo = utils.alias(type, 'set')
 
