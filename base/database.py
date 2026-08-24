@@ -8107,22 +8107,37 @@ class set(object):
         # Check if we're supposed to create a struct and if we can actually create one.
         if create_struct and is_struct:
             tid = type if interface.node.identifier(type) else interface.tinfo.identifier(type)
-            ok = create_struct(ea, size, tid)
+            Fcreate, args = create_struct, [ea, size, tid]
+            flags = idaapi.FF_DATA | FF_STRUCT
 
         # Check if we're supposed to create alignment and if can actually create it.
         elif type == idaapi.FF_ALIGN and create_align:
-            ok = create_align(ea, size, 0)
+            Fcreate, args = create_align, [ea, size, 0]
+            flags = idaapi.FF_DATA | idaapi.FF_ALIGN
 
         # Check if we need to use older IDA logic which uses ida_byinftes.do_data_ex.
         elif idaapi.__version__ < 7.0:
-            ok = create_data(ea, FF_STRUCT if isinstance(type, internal.structure.structuretypes) else type, size, type.id if isinstance(type, internal.structure.structuretypes) else idaapi.BADADDR)
+            Fcreate, args = create_data, [ea, FF_STRUCT if isinstance(type, internal.structure.structuretypes) else type, size, type.id if isinstance(type, internal.structure.structuretypes) else idaapi.BADADDR]
+            flags = FF_STRUCT if isinstance(type, internal.structure.structuretypes) else type
+            flags|= idaapi.FF_DATA
 
         # Anything else is just regular data that we can fall back to ida_bytes.create_data.
         else:
-            ok = idaapi.create_data(ea, type, size, idaapi.BADADDR)
+            Fcreate, args = create_data, [ea, type, size, idaapi.BADADDR]
+            flags = type
 
         # Return our new size if we were successful.
-        return interface.address.size(ea) if ok else 0
+        description = "{:#x}".format(flags) if isinstance(type, internal.types.integer) else "{!r}".format(flags)
+        with interface.address.reserve(ea, flags, size) as ok:
+            if not ok:
+                logging.warning(u"{:s}.data({:#x}, {:+d}, {!s}) : Unable to reserve {:d} byte{:s} to apply the given flags ({:#x}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, size, description, size, '' if size == 1 else 's', flags, ea))
+                raise StopIteration
+
+            elif not Fcreate(*args):
+                logging.error(u"{:s}.data({:#x}, {:+d}, {!s}) : Unable to define {:d} byte{:s} of the specified address ({:#x}) with the given data ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, size, description, size, '' if size == 1 else 's', ea, flags))
+                raise StopIteration
+            pass
+        return interface.address.size(ea)
 
     @utils.multicase()
     @classmethod
