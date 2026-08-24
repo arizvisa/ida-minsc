@@ -1061,6 +1061,14 @@ class widget(object):
             raise internal.exceptions.ItemNotFoundError(u"{:s}.by({!r}) : Unable to locate a widget with the specified title ({!r}).".format('.'.join([__name__, cls.__name__]), title, title))
         return cls.of(res)
 
+    @internal.utils.multicase(title=internal.types.string)
+    @classmethod
+    @internal.utils.string.decorate_arguments('title')
+    def exists(cls, title):
+        '''Return whether a widget with the specified window `title` exists.'''
+        res = idaapi.find_widget(internal.utils.string.to(title))
+        return res is not None
+
     @classmethod
     def of(cls, form):
         '''Return the UI widget for the IDA `form` that is provided.'''
@@ -1079,6 +1087,72 @@ class widget(object):
         if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
             return True
         raise internal.exceptions.MissingMethodError
+
+    @classmethod
+    def window(cls, widget):
+        '''Return the top-level window that contains the specified `widget`.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.window({!s}) : Unable to query the window of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        return twidget.window()
+
+    @classmethod
+    def ancestors(cls, widget):
+        '''Return each of the parent widgets for the specified `widget` ascending to its top-level window.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.ancestors({!s}) : Unable to query the parents of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        result, iterable = [], twidget.parentWidget()
+        while iterable is not None:
+            result.append(iterable)
+            iterable = iterable.parentWidget()
+        return result
+
+    @classmethod
+    def parent(cls, widget):
+        '''Return the parent widget for the specified `widget`.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.parent({!s}) : Unable to query the parent of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        return twidget.parentWidget()
+
+    @classmethod
+    def __type_by_name__(cls, name):
+        '''Return the widget type with the specified `name` for the current UI.'''
+        raise internal.exceptions.MissingMethodError
+
+    @internal.utils.multicase(name=internal.types.string)
+    @classmethod
+    @internal.utils.string.decorate_arguments('name')
+    def child(cls, widget, name):
+        '''Return the first child widget from the specified `widget` that is instantiated with the specified `name`.'''
+        return cls.child(widget, cls.__type_by_name__(name))
+    @internal.utils.multicase()
+    @classmethod
+    def child(cls, widget, type):
+        '''Return the first child widget for the specified `widget` that is instantiated with the specified `type`.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.child({!s}, {!s}) : Unable to query the children of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget, type))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        result = twidget.findChild(type)
+        if result is None:
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.child({!s}, {!s}) : Unable to locate a widget that is instantiated with the specified type ({!s}).".format('.'.join([__name__, cls.__name__]), widget, type, type))
+        return result
+
+    @internal.utils.multicase(name=internal.types.string)
+    @classmethod
+    @internal.utils.string.decorate_arguments('name')
+    def children(cls, widget, name):
+        '''Return each child widget from the specified `widget` that are instantiated with the given `name`.'''
+        return cls.children(widget, cls.__type_by_name__(name))
+    @internal.utils.multicase()
+    @classmethod
+    def children(cls, widget, type):
+        '''Return each child widget from the specified `widget` that are instnatiated with the given `type`.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.children({!s}, {!s}) : Unable to query the children of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget, type))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        return twidget.findChildren(type)
 
 class clipboard(object):
     """
@@ -1393,7 +1467,7 @@ class keyboard(object):
 ### PyQt5-specific functions and namespaces
 ## these can overwrite any of the classes defined above
 try:
-    import PyQt5.Qt
+    import PyQt5.Qt, PyQt5.QtWidgets, PyQt5.QtGui, PyQt5.QtCore
     from PyQt5.Qt import QObject, QWidget
 
     class application(application):
@@ -1586,6 +1660,16 @@ try:
             '''Return whether the given `object` is a PyQt widget.'''
             return isinstance(widget, QWidget)
 
+        @classmethod
+        def __type_by_name__(cls, name):
+            '''Return the Qt type with the specified `name` from the PyQt5 modules.'''
+            modules = [PyQt5.QtWidgets, PyQt5.QtGui, PyQt5.QtCore]
+            iterable = (getattr(module, name) for module in modules if hasattr(module, name))
+            result = next(iterable, None)
+            if result is None:
+                raise internal.exceptions.ItemNotFoundError(u"{:s}.__type_by_name__({!r}) : Unable to resolve a widget type for the specified name ({!r}).".format('.'.join([__name__, cls.__name__]), name, name))
+            return result
+
 except StopIteration:
     pass
 
@@ -1681,6 +1765,16 @@ try:
         def isinstance(cls, object):
             '''Return whether the given `object` is a PySide widget.'''
             return isinstance(object, PySide.QtCore.QObject)
+
+        @classmethod
+        def __type_by_name__(cls, name):
+            '''Return the Qt type with the specified `name` from the PySide modules.'''
+            modules = [PySide.QtGui, PySide.QtCore]
+            iterable = (getattr(module, name) for module in modules if hasattr(module, name))
+            result = next(iterable, None)
+            if result is None:
+                raise internal.exceptions.ItemNotFoundError(u"{:s}.__type_by_name__({!r}) : Unable to resolve a widget type for the specified name ({!r}).".format('.'.join([__name__, cls.__name__]), name, name))
+            return result
 
 except StopIteration:
     pass
