@@ -54,6 +54,40 @@ class application(object):
     def beep(cls):
         '''Beep using the application interface.'''
         return idaapi.beep()
+
+    @classmethod
+    def __execute_sync(cls, flags, callable, *args, **kwargs):
+        '''Execute the specified `callable` enabled for the given `flags` on the user-interface thread and return its result.'''
+        results, exceptions = [], []
+        def closure():
+            try:
+                res = callable(*args, **kwargs)
+                results.append(res) if not isinstance(res, internal.types.integer) else results
+            except Exception as E:
+                return exceptions.append(E) and 0
+            return res
+        ret = idaapi.execute_sync(closure, flags)
+        if not exceptions:
+            [res] = results if results else [ret]
+            return res
+        [E] = exceptions
+        raise E
+
+    @classmethod
+    def dispatch(cls, callable, *args, **kwargs):
+        '''Execute the specified `callable` on the user-interface thread and return its result.'''
+        return cls.__execute_sync(idaapi.MFF_FAST, callable, *args, **kwargs)
+
+    @classmethod
+    def observe(cls, callable, *args, **kwargs):
+        '''Execute the specified `callable` enabled for reading on the user-interface thread and return its result.'''
+        return cls.__execute_sync(idaapi.MFF_READ, callable, *args, **kwargs)
+
+    @classmethod
+    def commit(cls, callable, *args, **kwargs):
+        '''Execute the specified `callable` enabled for writing on the user-interface thread and return its result.'''
+        return cls.__execute_sync(idaapi.MFF_WRITE, callable, *args, **kwargs)
+
 beep = internal.utils.alias(application.beep, 'application')
 
 class ask(object):
@@ -1711,7 +1745,7 @@ try:
             '''Return all of the available windows for the application.'''
             app = cls()
             items = app.topLevelWidgets()
-            return [item for item in items if top.isWindow()]
+            return [item for item in items if item.isWindow()]
 
     class mouse(mouse):
         """
