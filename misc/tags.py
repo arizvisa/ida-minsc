@@ -1346,8 +1346,16 @@ class address(object):
         else:
             realname = aname or ''
 
+        # Use the reference namespace to find the source of our tag information.
+        if reference == reference_v0:
+            available = {}
+            available.setdefault('__name__', True) if interface.address.flags(ea, idaapi.FF_NAME) else available
+            available.setdefault('__typeinfo__', True) if interface.address.has_typeinfo(ea) else available
+        else:
+            available = reference.contents.get(ea) if func else reference.globals.get(ea)
+
         # Add any of the implicit tags for the specified address to our results.
-        if aname and interface.address.flags(ea, idaapi.FF_NAME):
+        if aname and '__name__' in available:
             res.setdefault('__name__', realname)
         if comment.extra.has_prefix(ea):
             res.setdefault('__extra_prefix__', comment.extra.get_prefix(ea))
@@ -1357,7 +1365,7 @@ class address(object):
         # If there was some type information associated with the address, then
         # we need its name so that we can format it and add it as an implicit tag.
         try:
-            if not is_entrypoint and interface.address.has_typeinfo(ea):
+            if not is_entrypoint and '__typeinfo__' in available:
                 typeinfo = interface.address.typeinfo(ea)
                 ti = interface.tinfo.lower_function_type(typeinfo) if typeinfo.is_func() or typeinfo.is_funcptr() else typeinfo
                 validname = interface.name.typename(realname)
