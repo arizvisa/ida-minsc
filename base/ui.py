@@ -1090,6 +1090,24 @@ class clipboard(object):
         clp = application()
         return clp.clipboard()
 
+    @classmethod
+    def get(cls):
+        '''Return the text that is residing within the current clipboard.'''
+        '''Apply the specified `text` to the current clipboard.'''
+        object = cls()
+        res = object.text()
+        return internal.utils.string.of(res)
+
+    @classmethod
+    def set(cls, text):
+        '''Apply the specified `text` to the current clipboard.'''
+        object = cls()
+        res, _ = internal.utils.string.of(object.text()), object.setText(internal.utils.string.to(text))
+        ok = internal.utils.string.of(object.text()) == text
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.set({!r}) : Unable to apply the specified text to the current clipboard.".format('.'.join([__name__, cls.__name__]), text))
+        return res
+
 class mouse(object):
     """
     Base namespace for interacting with the mouse input.
