@@ -8327,6 +8327,7 @@ class set(object):
     def string(cls, bounds, width, length, encoding):
         '''Set data at the specified `bounds` to a string of the given `encoding` with the provided character `width` and `length` prefix size.'''
         Fcreate_string = idaapi.make_ascii_string if idaapi.__version__ < 7.0 else idaapi.create_strlit
+        FF_STRLIT = getattr(idaapi, 'FF_STRLIT', getattr(idaapi, 'FF_ASCI', 0x50000000))
 
         # First we need the string size from the boundaries we we were given.
         ea, _ = sorted(bounds)
@@ -8359,10 +8360,14 @@ class set(object):
 
         # Now we can make a string at the undefined address and decode the string
         # that we just made if we were successful. Otherwise, we bail (of course).
-        if Fcreate_string(ea, size, res):
+        flags = idaapi.FF_DATA | FF_STRLIT
+        with interface.address.reserve(ea, flags, size) as ok:
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.string({:s}, {:d}, {:d}, {:d}) : Unable to reserve {:d} byte{:s} at the specified address ({:#x}) for a string ({:#x}) of the requested strtype {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), bounds, width, length, encoding, size, '' if size == 1 else 's', ea, flags, res, 2 + 8))
+            elif not Fcreate_string(ea, size, res):
+                raise E.DisassemblerError(u"{:s}.string({:s}, {:d}, {:d}, {:d}) : Unable to define the specified address ({:#x}) as a string of the requested strtype {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), bounds, width, length, encoding, ea, res, 2 + 8))
             bounds = interface.bounds_t(ea + length, ea + length + size)
-            return get.string(bounds, width, encoding)
-        raise E.DisassemblerError(u"{:s}.string({:s}, {:d}, {:d}, {:d}) : Unable to define the specified address ({:#x}) as a string of the requested strtype {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), bounds, width, length, encoding, ea, res, 2 + 8))
+        return get.string(bounds, width, encoding)
 
     class integer(object):
         """
