@@ -1029,6 +1029,12 @@ class names(object):
         `code` - Filter the symbol names for any that are defined as code
         `data` - Filter the symbol names for any that are defined as data
         `unknown` - Filter the symbol names for any that are defined as unknown
+        `string` - Filter the symbol names for any that are defined as a string
+        `structure` - Filter the symbol names for any that are defined as a structure
+        `float` - Filter the symbol names for any that are defined as floating-point
+        `integer` - Filter the symbol names for any that are defined as integers
+        `array` - Filter the symbol names for any that are defined as an array
+        `listed` - Filter the symbol names for any that are listed
         `typed` - Filter the symbol names for any that have type information applied to them
         `tagged` - Filter the symbol names for any that use the specified tag(s)
         `predicate` - Filter the symbols by passing their address to a callable
@@ -1062,6 +1068,12 @@ class names(object):
     __matcher__.alias('tag', 'tagged'), __matcher__.alias('tags', 'tagged')
     __matcher__.mapping('typed', operator.truth, idaapi.get_nlist_ea, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t, operator.attrgetter('contains')))), idaapi.get_nlist_ea)
+    __matcher__.mapping('string', utils.fcompose(interface.address.flags, utils.fpartial(operator.and_, idaapi.as_uint32(idaapi.DT_TYPE | idaapi.MS_CLS)), utils.fpartial(operator.eq, idaapi.FF_DATA | idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI)), idaapi.get_nlist_ea)
+    __matcher__.mapping('structure', utils.fcompose(interface.address.flags, utils.fpartial(operator.and_, idaapi.as_uint32(idaapi.DT_TYPE | idaapi.MS_CLS)), utils.fpartial(operator.eq, idaapi.FF_DATA | idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU)), idaapi.get_nlist_ea)
+    __matcher__.mapping('float', utils.fcompose(interface.address.flags, utils.fpartial(operator.and_, idaapi.as_uint32(idaapi.DT_TYPE | idaapi.MS_CLS)), utils.fpartial(operator.contains, {idaapi.as_uint32(idaapi.FF_DATA | ff) for ff in [idaapi.FF_FLOAT, idaapi.FF_DOUBLE, idaapi.FF_PACKREAL, getattr(idaapi, 'FF_TBYTE', getattr(idaapi, 'FF_TBYT', 0x40000000))]})), idaapi.get_nlist_ea)
+    __matcher__.mapping('integer', utils.fcompose(interface.address.flags, utils.fpartial(operator.and_, idaapi.as_uint32(idaapi.DT_TYPE | idaapi.MS_CLS)), utils.fpartial(operator.contains, {idaapi.as_uint32(idaapi.FF_DATA | ff) for ff in [idaapi.FF_BYTE, idaapi.FF_WORD, getattr(idaapi, 'FF_DWORD', getattr(idaapi, 'FF_DWRD', 0x20000000)), getattr(idaapi, 'FF_QWORD', getattr(idaapi, 'FF_QWRD', 0x30000000)), getattr(idaapi, 'FF_OWORD', getattr(idaapi, 'FF_OWRD', 0x60000000)), getattr(idaapi, 'FF_YWORD', getattr(idaapi, 'FF_YWRD', 0xE0000000)), getattr(idaapi, 'FF_ZWORD', 0xF0000000)]})), idaapi.get_nlist_ea)
+    __matcher__.mapping('array', utils.fcompose(utils.fthrough(utils.fcompose(interface.address.flags, utils.fpartial(operator.and_, idaapi.as_uint32(idaapi.MS_CLS)), utils.fpartial(operator.eq, idaapi.FF_DATA)), utils.fcompose(utils.fthrough(interface.address.size, interface.address.element), utils.funpack(operator.ne))), builtins.all), idaapi.get_nlist_ea)
+    __matcher__.mapping('listed', utils.fcompose(interface.address.flags, utils.fpartial(operator.and_, idaapi.as_uint32(idaapi.FF_ANYNAME)), utils.fpartial(operator.eq, idaapi.FF_NAME)), idaapi.get_nlist_ea)
     __matcher__.predicate('predicate', idaapi.get_nlist_ea), __matcher__.alias('pred', 'predicate')
     __matcher__.attribute('index')
 
