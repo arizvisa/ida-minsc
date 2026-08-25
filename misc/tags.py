@@ -1597,6 +1597,42 @@ class address(object):
         raise internal.exceptions.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!r}) : Unable to apply the given type {!s} to function prototype ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, value, interface.tinfo.quoted(info), ea))
 
     @classmethod
+    def name(cls, ea, entrypoint):
+        '''Return the real name for the item or `entrypoint` specified by the address `ea`.'''
+        localname, globalname = interface.name.get(ea, idaapi.GN_LOCAL), interface.name.get(ea)
+
+        # First thing we need to figure out is whether the name exists and if
+        # it's actually special in that we need to demangle it for the real name.
+        aname = localname if entrypoint else globalname
+        mangled_t = interface.name.mangled(ea, aname)
+        if mangled_t not in {idaapi.FF_CODE, idaapi.FF_DATA}:
+            return aname or ''
+
+        # If we found a name and it is mangled for code or data, then we use the
+        # declaration module to clean up any extraneous characters. If an
+        # exception is raised during this process, then we fall back to the
+        # unmangled name for the address.
+        try:
+            parsed = declaration.symbol(aname) if mangled_t == idaapi.FF_DATA else declaration.function(aname)
+            string = parsed.string
+
+        # If we encountered a formatting error while using the declaration
+        # module, take the name we already have, and make it parsable.
+        except internal.exceptions.InvalidFormatError:
+            string = aname or ''
+
+        # Next we will use the declaration module to convert any invalid
+        # characters, spaces, templates, backticks, and the like into a
+        # string that the disassembler won't complain about when it gets
+        # parsed. If the string is empty, then use the original name.
+        try:
+            realname = declaration.unmangled.parsable(string) or declaration.unmangled.parsable(aname) or aname
+
+        except internal.exceptions.InvalidFormatError:
+            return aname or ''
+        return realname
+
+    @classmethod
     def remove(cls, ea, key, none):
         '''Remove the tag specified by `key` from the item at address `ea`.'''
         if none is not None:
