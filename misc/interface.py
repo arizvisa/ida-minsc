@@ -4136,6 +4136,424 @@ class priorityhook_hexrays(priorityhook):
         # Now we can modify our state that disables our instance.
         self.__hexrays_ready__ = False
 
+class priorityeventfilter(prioritybase):
+    """
+    This is a helper class that allows one to dispatch a callable in response to
+    an event from a specified Qt user-interface object. It does this by
+    installing a Qt event filter on a widget and dispatches the events it
+    observes to a callable registered by the user.
+
+    When registering a callable for an event, the target widget along with the
+    ``QEvent`` type must be used. As a result, each of the public methods of
+    this class have had their prototype changed in order to support the
+    additional parameters.
+
+    When a hooked widget is destroyed, its event filter is detached from the
+    widget while preserving the callables that are attached to it. At this point
+    is it up to the user to detach their callables from the targetted widget and
+    event.
+    """
+    __strict__ = False
+
+    __catalog__ = {
+        'Resize':               'the widget was resized',
+        'Move':                 'the widget was moved',
+        'Show':                 'the widget was shown',
+        'Hide':                 'the widget was hidden',
+        'Close':                'the widget received a close request',
+        'Enter':                'the mouse entered the widget',
+        'Leave':                'the mouse left the widget',
+        'FocusIn':              'the widget gained keyboard focus',
+        'FocusOut':             'the widget lost keyboard focus',
+        'KeyPress':             'a key was pressed',
+        'KeyRelease':           'a key was released',
+        'Shortcut':             'a registered shortcut was activated',
+        'ShortcutOverride':     'a key press may override a shortcut',
+        'MouseButtonPress':     'a mouse button was pressed',
+        'MouseButtonRelease':   'a mouse button was released',
+        'MouseButtonDblClick':  'a mouse button was double-clicked',
+        'MouseMove':            'the mouse was moved over the widget',
+        'Wheel':                'the mouse wheel was rotated',
+        'ContextMenu':          'a context menu was requested',
+        'WindowActivate':       'the window became active',
+        'WindowDeactivate':     'the window became inactive',
+        'WindowStateChange':    "the window's state (min/max/full) changed",
+        'FontChange':           "the widget's font changed",
+        'PaletteChange':        "the widget's palette changed",
+        'StyleChange':          "the widget's style changed",
+        'DragEnter':            'a drag entered the widget',
+        'DragMove':             'a drag moved within the widget',
+        'DragLeave':            'a drag left the widget',
+        'Drop':                 'a drop occurred on the widget',
+        'ToolTip':              'a tooltip was requested',
+    }
+
+    def __init__(self):
+        super(priorityeventfilter, self).__init__()
+
+        # Responsible for mapping a widget to a dictionary containing the Qt
+        # event properties associated with it.
+        self.__filters = {}
+
+        # Maps a target into the closures attached to the event filter. This
+        # dictionary is specifically for maintaining a reference to them to
+        # avoid them being released out from underneath us.
+        self.__scopes = {}
+
+        # All the widgets that have gone sale. This is basically a reference
+        # that we can use to look them up if necessary to build a target.
+        self.__stale = {item for item in []}
+
+        # Our Qt module so that we can instantiate our class with or without
+        # access to the Qt interface.
+        self.__qtcore = None
+
+        # Mapping an event type into names and types.
+        self.__eventnames = None
+        self.__eventtypes = None
+
+    @staticmethod
+    def __execute_sync(flags, callable, *args, **kwargs):
+        '''Execute the specified `callable` enabled for the given `flags` on the user-interface thread and return its result.'''
+        results, exceptions = [], []
+        def closure():
+            try:
+                res = callable(*args, **kwargs)
+                results.append(res) if not isinstance(res, internal.types.integer) else results
+            except Exception as E:
+                return exceptions.append(E) and 0
+            return res
+        ret = idaapi.execute_sync(closure, flags)
+        if not exceptions:
+            [res] = results if results else [ret]
+            return res
+        [E] = exceptions
+        raise E
+
+    def __toolkit__(self):
+        '''Cache and return the ``QtCore`` module that is used by this class.'''
+        if self.__qtcore is not None:
+            return self.__qtcore
+
+        cls = self.__class__
+        try:
+            import PyQt5.QtCore as QtCore
+        except ImportError:
+            try:
+                import PySide.QtCore as QtCore
+            except ImportError:
+                raise internal.exceptions.UnsupportedCapability(u"{:s}.__toolkit__() : Unable to hook the user-interface as neither the PyQt5 nor PySide Qt bindings are available.".format('.'.join([__name__, cls.__name__])))
+        self.__qtcore = QtCore
+        return QtCore
+
+    def __eventtype__(self, type):
+        '''Resolve the specified event `type` to an integer.'''
+        cls = self.__class__
+
+        if not isinstance(type, (internal.types.integer, internal.types.string)):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.__eventtype__({!r}) : Unable to get the specified event ({!s}) due to it being of an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), type, type, type.__class__))
+
+        elif isinstance(type, internal.types.integer):
+            return int(type)
+
+        if self.__eventtypes is None:
+            QtCore = self.__toolkit__()
+            types = {}
+            for name in dir(QtCore.QEvent):
+                if name.startswith('_'):
+                    continue
+                try:
+                    candidate = int(getattr(QtCore.QEvent, name))
+                except (TypeError, ValueError):
+                    continue
+                types.setdefault(name.lower(), candidate)
+            self.__eventtypes = types
+
+        res = self.__eventtypes.get(type.lower())
+        if res is None:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.__eventtype__({!r}) : The specified event name ({!r}) is not a valid event type.".format('.'.join([__name__, cls.__name__]), type, type))
+        return res
+
+    def __eventname__(self, type):
+        '''Return the `type` containing the specified event as an event name.'''
+        if self.__eventnames is None:
+            QtCore = self.__toolkit__()
+            names = {}
+            for name in dir(QtCore.QEvent):
+                if name.startswith('_'):
+                    continue
+                try:
+                    candidate = int(getattr(QtCore.QEvent, name))
+                except (TypeError, ValueError):
+                    continue
+                names.setdefault(candidate, name)
+            self.__eventnames = names
+        res = int(type)
+        return self.__eventnames.get(res, "QEvent({:#x})".format(res))
+
+    def __target__(self, widget, type):
+        '''Pack the specified `widget` and event `type` into a tuple.'''
+        return widget, self.__eventtype__(type)
+
+    def __formatter__(self, target):
+        if not (isinstance(target, tuple) and len(target) == 2):
+            return "{!s}".format(target)
+        widget, type = target
+
+        # Convert the target type into a name that we can use.
+        try:
+            eventname = self.__eventname__(self.__eventtype__(type))
+        except Exception:
+            eventname = "{!s}".format(type)
+
+        # Now we can return the widget rendered as a string.
+        try:
+            description = widget.objectName() or widget.windowTitle() or widget.__class__.__name__
+        except RuntimeError:
+            description = "<destroyed>"
+        except Exception:
+            description = "{!s}".format(widget)
+        return "{:s}:{:s}".format(description or widget.__class__.__name__, eventname)
+
+    @property
+    def available(self):
+        '''Return the curated set of ``QEvent.Type`` values that may be hooked.'''
+        QtCore, result = self.__toolkit__(), {event for event in []}
+        for name in self.__catalog__:
+            if hasattr(QtCore.QEvent, name):
+                res = getattr(QtCore.QEvent, name)
+                result.add(int(res))
+            continue
+        return result
+
+    def list(self, *pattern):
+        """List all of the hookable events with their value and a description.
+
+        If a glob is passed as a `pattern`, only the events whose name matches
+        the pattern are listed.
+        """
+        QtCore, entries = self.__toolkit__(), []
+        for name in sorted(self.__catalog__):
+            if hasattr(QtCore.QEvent, name):
+                entries.append((name, int(getattr(QtCore.QEvent, name)), self.__catalog__[name]))
+            continue
+
+        if not entries:
+            return six.print_(u"There are no available user-interface events.")
+
+        Fmatch = re.compile(fnmatch.translate(*pattern), re.IGNORECASE).match if pattern else internal.utils.fconstant(True)
+        length = max(len("{:s}:".format(name)) for name, _, _ in entries)
+
+        six.print_(u"List of user-interface events")
+        for name, value, description in entries:
+            if Fmatch(name):
+                six.print_(u"{:<{:d}s} {:#06x} : {:s}".format("{:s}:".format(name), length, value, description))
+            continue
+        return
+
+    def __repr__(self):
+        cls, targets = self.__class__, [target for target in self]
+        if not targets:
+            return "Events currently attached to the user-interface: No widgets are attached."
+
+        def annotate(target):
+            widget, type = target
+            if widget in self.__stale:
+                return ' (destroyed)'
+            record = self.__filters.get(widget)
+            if record is None or self.__eventtype__(type) not in record['types']:
+                return ' (detached)'
+            return ' (disabled)' if target in self.disabled else ''
+
+        rows = []
+        for target in sorted(targets, key=self.__formatter__):
+            callables = ', '.join(internal.utils.pycompat.fullname(item) for item in super(priorityeventfilter, self).get(target)) if target in self else ''
+            rows.append("{:s}{:s} : {:s}".format(self.__formatter__(target), annotate(target), callables or '...nothing attached...'))
+        return '\n'.join(["Events currently attached to the user-interface:"] + rows)
+
+    def __eventfilter__(self, widget):
+        '''Bind an event-filter containing our dispatcher to the specified `widget`.'''
+        QtCore = self.__toolkit__()
+        dispatch, destroyed, events = self.__dispatch, self.__destroyed, ['Destroy', 'DeferredDelete']
+        destroy = {int(getattr(QtCore.QEvent, name)) for name in events if hasattr(QtCore.QEvent, name)}
+        class eventfilter(QtCore.QObject):
+            def eventFilter(self, object, event):
+                type = int(event.type())
+                if type in destroy:
+                    destroyed(widget)
+                    return False
+                return dispatch(widget, type, object, event)
+
+        return eventfilter()
+
+    def __dispatch(self, widget, type, object, event):
+        '''Dispatch to the closures for the specified `widget` and event `type`.'''
+        cls, target = self.__class__, (widget, type)
+        if target not in self or target in self.disabled:
+            return False
+
+        packed = self.__scopes.get(target)
+        if packed is None:
+            return False
+        start, resume, stop = packed
+
+        result = None
+        try:
+            try:
+                result = start(object, event)
+            finally:
+                stop(object, event)
+        except Exception:
+            logging.warning(u"{:s}.__dispatch({:s}) : Unable to dispatch the event for the specified target {:s}.".format('.'.join([__name__, cls.__name__]), self.__formatter__(target), self.__formatter__(target)), exc_info=True)
+            return False
+
+        return True if result is not None else False
+
+    def __destroyed(self, widget):
+        '''Callback used to process the destruction of the specified `widget`.'''
+        cls = self.__class__
+        if widget in self.__stale and widget not in self.__filters:
+            return
+
+        self.__stale.add(widget)
+
+        record = self.__filters.pop(widget, None)
+        if record is not None:
+            count = len(record['types'])
+            logging.info(u"{:s}.__destroyed() : Detaching the event filter from the destroyed widget with {:d} event{:s} attached.".format('.'.join([__name__, cls.__name__]), count, '' if count == 1 else 's'))
+        return
+
+    def attach(self, widget, type):
+        '''Attach the event filter for the specified `widget` and the given event `type`.'''
+        cls = self.__class__
+        widget, type = self.__target__(widget, type)
+        target = widget, type
+
+        # Check that the specified type is supported by us.
+        if self.__strict__ and type not in self.available:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.attach({:s}) : Unable to attach to the target {:s} due to its event not being available.".format('.'.join([__name__, cls.__name__]), self.__formatter__(target), self.__formatter__(target)))
+
+        # This closure is basically responsible for attaching an event filter to
+        # the target Qt widget. We also hook up the destroy callback here.
+        def install():
+            count, packed = super(priorityeventfilter, self).attach(target)
+            self.__scopes[target] = packed
+
+            record = self.__filters.get(widget)
+            if record is None:
+                try:
+                    instance = self.__eventfilter__(widget)
+                    widget.installEventFilter(instance)
+                    instance.setParent(widget)
+
+                    # Dispatch to our destroy method if we actually receive the
+                    # event from Qt.
+                    widget.destroyed.connect(lambda *_, widget=widget: self.__destroyed(widget))
+
+                except RuntimeError:
+                    self.__stale.add(widget)
+                    logging.warning(u"{:s}.attach({:s}) : Unable to install an event filter on a destroyed widget; the target's callables are preserved but detached.".format('.'.join([__name__, cls.__name__]), self.__formatter__(target)))
+                    return False
+                record = {'instance': instance, 'types': {item for item in []}}
+                self.__filters[widget] = record
+                self.__stale.discard(widget)
+            record['types'].add(type)
+            return True
+
+        ok = self.__execute_sync(idaapi.MFF_FAST, install)
+        if not ok:
+            logging.debug(u"{:s}.attach({:s}) : Unable to attach an event filter to the specified widget as it appears to have been destroyed.".format('.'.join([__name__, cls.__name__]), self.__formatter__(target)))
+        return True
+
+    def detach(self, widget, type):
+        '''Detach the event filter from the specified `widget` for the given event `type`.'''
+        cls = self.__class__
+        widget, type = self.__target__(widget, type)
+        target = widget, type
+
+        if target not in self:
+            logging.warning(u"{:s}.detach({:s}) : Unable to detach from the target {:s} as it is not currently attached.".format('.'.join([__name__, cls.__name__]), self.__formatter__(target), self.__formatter__(target)))
+            return False
+
+        def remove():
+            record = self.__filters.get(widget)
+            if record is None:
+                instance = None
+            else:
+                record['types'].discard(type)
+                instance = None if record['types'] else record['instance']
+
+            if instance is not None:
+                try:
+                    widget.removeEventFilter(instance)
+                    instance.setParent(None)
+                except RuntimeError:
+                    pass
+                self.__filters.pop(widget, None)
+
+            # Now we can release the references to our closures.
+            self.__scopes.pop(target, None)
+            return super(priorityeventfilter, self).detach(target)
+        return self.__execute_sync(idaapi.MFF_FAST, remove)
+
+    def add(self, widget, type, callable, priority=0):
+        '''Add the provided `callable` to the queue for the specified `widget` and event `type` with the given `priority`.'''
+        cls = self.__class__
+        widget, type = self.__target__(widget, type)
+        target = widget, type
+        if not self.attach(widget, type):
+            format = "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
+            raise internal.exceptions.DisassemblerError(u"{:s}.add({:s}, {!s}, {:s}) : Unable to attach to the specified target {:s}.".format('.'.join([__name__, cls.__name__]), self.__formatter__(target), callable, format(priority), self.__formatter__(target)))
+        return super(priorityeventfilter, self).add(target, callable, priority)
+
+    def close(self):
+        '''Remove all of the events and widgets that are currently attached.'''
+        cls, result = self.__class__, True
+        for target in {item for item in self.__cache__}:
+            widget, type = target
+            ok = self.detach(widget, type)
+            if ok:
+                self.__cache__.pop(target, None)
+            else:
+                logging.warning(u"{:s}.close() : Error while attempting to detach from the specified target {:s}.".format('.'.join([__name__, cls.__name__]), self.__formatter__(target)))
+            result = result and ok
+        return result
+
+    def get(self, widget, type):
+        '''Return all of the callables that are attached to the specified `widget` and event `type`.'''
+        widget, type = self.__target__(widget, type)
+        return super(priorityeventfilter, self).get((widget, type))
+
+    def pop(self, widget, type, index=-1):
+        '''Pop the callable at the specified `index` from the given `widget` and event `type`.'''
+        widget, type = self.__target__(widget, type)
+        return super(priorityeventfilter, self).pop((widget, type), index)
+
+    def discard(self, widget, type, callable):
+        '''Discard the `callable` for the specified `widget` and event `type`.'''
+        widget, type = self.__target__(widget, type)
+        return super(priorityeventfilter, self).discard((widget, type), callable)
+
+    def remove(self, widget, type, priority):
+        '''Remove the first callable with the given `priority` from the specified `widget` and event `type`.'''
+        widget, type = self.__target__(widget, type)
+        return super(priorityeventfilter, self).remove((widget, type), priority)
+
+    def empty(self, widget, type):
+        '''Iterate through the queue for the specified `widget` and event `type`, safely discarding each callable before yielding it.'''
+        widget, type = self.__target__(widget, type)
+        return super(priorityeventfilter, self).empty((widget, type))
+
+    def enable(self, widget, type):
+        '''Enable any callables for the specified `widget` and event `type` that have been previously disabled.'''
+        widget, type = self.__target__(widget, type)
+        return super(priorityeventfilter, self).enable((widget, type))
+
+    def disable(self, widget, type):
+        '''Disable the execution of all the callables for the specified `widget` and event `type`.'''
+        widget, type = self.__target__(widget, type)
+        return super(priorityeventfilter, self).disable((widget, type))
+
 class database(object):
     """
     This namespace provides tools that can be used to get specific
