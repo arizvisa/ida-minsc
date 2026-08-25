@@ -7958,6 +7958,9 @@ class module(object):
     # And a descriptor for managing any actions that we may want to register.
     action = singleton_descriptor(lambda cons, *args: cons(*args), internal.interface.priorityaction, __repr__=staticmethod(lambda item=idaapi.UI_Hooks:  'Actions currently being managed.'))
 
+    # And a descriptor for hooking Qt widgets that are available.
+    widget = singleton_descriptor(lambda cons, *args: cons(*args), internal.interface.priorityeventfilter, __repr__=staticmethod(lambda: 'Events currently attached to the user-interface.'))
+
     def close(self):
         '''Disconnect all of the hook instances associated with this object.'''
         try: hasattr(self, 'hx')
@@ -7965,8 +7968,9 @@ class module(object):
             logging.info(u"{:s} : Unable to close the \"{:s}\" hook type due to an exception raised while trying to access it.".format(__name__, 'hx'), exc_info=True)
         else: delattr(self, 'hx')
 
-        # Disconnect the managed actions first.
+        # Disconnect the managed actions and user-interface widgets first.
         hasattr(self, 'action') and delattr(self, 'action')
+        hasattr(self, 'widget') and delattr(self, 'widget')
 
         # Iterate through the other attributes and close those too.
         for phook in ['idp', 'idb', 'ui', 'hexrays']:
