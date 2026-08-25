@@ -8420,7 +8420,7 @@ class member_t(object):
         # with. since we're assigning an `idaapi.tinfo_t`, we set the flags so
         # that the applied member type will destroy whatever is underneath it.
         if isinstance(mowner.ptr, idaapi.tinfo_t):
-            return v9member.set_typeinfo(mowner.ptr, mindex, info, flags=idaapi.SET_MEMTI_MAY_DESTROY)
+            return v9member.set_typeinfo(mowner.ptr, mindex, info, flags=idaapi.ETF_MAY_DESTROY)
         return member.set_typeinfo(self.ptr, info, flags=idaapi.SET_MEMTI_MAY_DESTROY)
 
     @property
@@ -8444,9 +8444,9 @@ class member_t(object):
         # If we're being asked to assign None to the type information, then we
         # remove it..Otherwise, we'll make a compatible attempt to assign it.
         if isinstance(mowner.ptr, idaapi.tinfo_t):
-            return v9member.set_typeinfo(mowner.ptr, mindex, info) if info else v9member.remove_typeinfo(mowner.ptr, mindex)
+            return v9member.set_typeinfo(mowner.ptr, mindex, info, flags=0) if info else v9member.remove_typeinfo(mowner.ptr, mindex)
         sptr, mindex, mptr = members.by_index(mowner.ptr, mindex)
-        return member.set_typeinfo(mptr, info) if info else member.remove_typeinfo(mptr)
+        return member.set_typeinfo(mptr, info, flags=0) if info else member.remove_typeinfo(mptr)
 
     ### Private methods
     def __str__(self):
@@ -8744,7 +8744,7 @@ class member_t(object):
             #        then things like field alignment and such are not applied. This results
             #        in a struct->til conversion failed error when trying to calc alignments.
             try:
-                original = member.set_typeinfo(mptr, typeinfo)
+                original = member.set_typeinfo(mptr, typeinfo, flags=0)
 
             # if the type is not ideal, then we can pretty much ignore this because
             # the type is already there and IDA thinks that it's okay.
@@ -8767,7 +8767,7 @@ class member_t(object):
         elif typeinfo:
             ti, ok = member.get_typeinfo(mptr), False
             try:
-                original = member.set_typeinfo(mptr, ti)
+                original = member.set_typeinfo(mptr, ti, flags=0)
                 ok = True
 
             # if the type was not ideal, then this can be ignored because IDA
