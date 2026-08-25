@@ -10117,11 +10117,23 @@ class tinfo(object):
         return
 
     @classmethod
-    def nonpointer(cls, info):
-        '''Reify the type information specified as `info` to a non-pointer type.'''
-        ti = cls.copy(info)
+    def unwrap(cls, info):
+        '''Recursively unwrap the type information specified as `info` from an array or pointer type.'''
+        ti, failure = cls.copy(info), 0
         while ti.is_ptr():
+            pi = idaapi.ptr_type_data_t()
+            if not ti.get_ptr_details(pi):
+                failure += 1
+                break
             ti = ti.get_pointed_object()
+        while ti.is_array():
+            ai = idaapi.array_type_data_t()
+            if not ti.get_array_details(ai):
+                failure += 1
+                break
+            ti = ai.elem_type
+        if ti.is_array() or ti.is_ptr():
+            return cls.base(ti) if failure < 2 else tinfo.concretize(ti)
         return tinfo.concretize(ti)
 
     @classmethod
