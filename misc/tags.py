@@ -1955,6 +1955,41 @@ class function(object):
         return result
 
     @classmethod
+    def name(cls, ea):
+        '''Return the real name for the function specified by the address `ea`.'''
+        res, mangled = interface.function.name(ea), utils.string.of(idaapi.get_func_name(ea))
+
+        # If the name isn't mangled, then we can just return what we grabbed.
+        mangled_t = interface.name.mangled(ea, mangled)
+        if mangled_t not in {idaapi.FF_CODE, idaapi.FF_DATA}:
+            return res or ''
+
+        # If we found that the name is mangled for code or data, then we just
+        # use the declaration module to clean up into something that excludes
+        # any extraneous characters. If the name is mangled for data, then we
+        # also log a warning since this namespace is strictly for functions.
+        try:
+            if mangled_t == idaapi.FF_DATA:
+                logging.warning(u"{:s}.name({:#x}) : An unexpected type {:s} was detected for the mangled function name belonging to the function at address {:#x}.".format('function', ea, 'FF_DATA', ea))
+            parsed = declaration.function(mangled) if mangled_t == idaapi.FF_CODE else declaration.symbol(mangled)
+            string = parsed.string
+
+        # If a formatting error occurred, then use the original name that we
+        # had received, but convert it into something that is parsable.
+        except internal.exceptions.InvalidFormatError:
+            string = mangled or res or ''
+
+        # Finally we use the declaration module to convert any characters
+        # not parsable by the disassembler into a string that can actually
+        # be parsed by the disassembler without errors. If we get an empty
+        # string, then use the original function name.
+        try:
+            realname = declaration.unmangled.parsable(string) or declaration.unmangled.parsable(mangled) or mangled
+        except internal.exceptions.InvalidFormatError:
+            return mangled
+        return realname
+
+    @classmethod
     def remove(cls, func, key, none):
         '''Remove the tag specified by `key` from the function `func`.'''
         if none is not None:
