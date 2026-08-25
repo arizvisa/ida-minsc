@@ -5446,7 +5446,7 @@ class address(object):
                 continue
 
             # Now we start applying the type information we captured.
-            iterable = [] if committed else types.items() 
+            iterable = [] if committed else types.items()
             for address, packed in iterable:
                 dtype, nbytes = layout.get(address, (idaapi.FF_BYTE, 0))
                 ti = tinfo.get(til, *packed) if packed else tinfo.get(til, ())
