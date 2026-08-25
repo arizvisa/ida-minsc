@@ -321,7 +321,7 @@ def has(name, *suffix):
 @utils.multicase(structure=internal.structure.structuretypes)
 def has(structure):
     '''Return whether the database includes the given `structure`.'''
-    return internal.structure.has(structure.id)
+    return internal.structure.has(structure)
 @utils.multicase(member=internal.structure.membertypes)
 def has(member):
     '''Return whether the database contains the structure used or referenced by the given `member.'''
@@ -339,59 +339,20 @@ def has(member):
     # Otherwise, we need the type information so that we can check it.
     name = utils.string.of(idaapi.get_member_fullname(mptr.id))
     tinfo = internal.structure.member.get_typeinfo(mptr)
-
-    # Loop while our type has details that we can continue with. If any iteration
-    # of this loop lands us on a structure or union, then we found a structure.
-    while tinfo.has_details():
-        if tinfo.is_struct() or tinfo.is_union():
-            return True
-
-        # If we landed on an array, then we just need to unpack
-        # the type from it and then we can try again.
-        elif tinfo.is_array():
-            data = idaapi.array_type_data_t()
-            if not tinfo.get_array_details(data):
-                raise E.DisassemblerError(u"{:s}.has({:#x}) : Unable to get the array element from the type information ({!r}) within the given structure member (\"{:s}\").".format(__name__, mptr.id, "{!s}".format(tinfo), utils.string.escape(name, '"')))
-            tinfo = data.elem_type
-
-        # If we landed on a pointer, then only need to
-        # extract its target from the details, and try again.
-        elif tinfo.is_ptr():
-            data = idaapi.ptr_type_data_t()
-            if not tinfo.get_ptr_details(data):
-                raise E.DisassemblerError(u"{:s}.has({:#x}) : Unable to get the pointer target from the type information ({!r}) within the given structure member (\"{:s}\").".format(__name__, mptr.id, "{!s}".format(tinfo), utils.string.escape(name, '"')))
-            tinfo = data.obj_type
-
-        # If we don't know the details due to it being a bitfield, enumeration,
-        # or a function pointer, then it's definitely not a structure.
-        else:
-            break
-        continue
-    return False
-
+    res = interface.tinfo.structure(tinfo)
+    return internal.structure.has(res) if res else False
 @utils.multicase(tinfo=idaapi.tinfo_t)
 def has(tinfo):
     '''Return whether the database includes a structure for the specified `tinfo`.'''
-    if any([tinfo.is_struct(), tinfo.is_union()]):
-        return has(tinfo.get_type_name())
-
-    # If there's no details, then just bail because there nowhere to go
-    # if we want to proceed to find a structure type.
-    elif not tinfo.has_details():
-        return False
-
-    # If the type information we were given is a pointer, then dereference it
-    # and recurse until we get to a structure type of some sort.
-    pi = idaapi.ptr_type_data_t()
-    if tinfo.is_ptr() and tinfo.get_ptr_details(pi):
-        return has(pi.obj_type)
-
-    # If the type information we were given is an array, then get its element
-    # type and recurse until we get to a structure type of some sort.
-    ai = idaapi.array_type_data_t()
-    if tinfo.is_array() and tinfo.get_array_details(ai):
-        return has(ai.elem_type)
-    return False
+    res = interface.tinfo.structure(tinfo)
+    return internal.structure.has(res) if res else False
+@utils.multicase(pythonic=(types.tuple, types.list))
+def has(pythonic):
+    '''Return whether the specified `pythonic` type is related to a structure.'''
+    element, count = pythonic
+    while isinstance(element, (types.tuple, types.list)):
+        element, count = element
+    return isinstance(element, (internal.structure.structuretypes, idaapi.tinfo_t)) and has(element)
 
 @utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name', 'suffix')
