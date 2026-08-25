@@ -1821,9 +1821,9 @@ class hook(object):
     """
     This namespace exposes the ability to hook different parts of IDA.
 
-    There are 4 different event types in IDA that can be hooked. These
+    There are 6 different event types in IDA that can be hooked. These
     are available under the ``hook.idp``, ``hook.idb``, ``hook.ui``,
-    and ``hook.notification`` objects.
+    ``hook.action``, ``hook.widget``, and ``hook.notification`` objects.
 
     To add a hook for any of these event types, one can use
     the `add(target, callable, priority)` method to associate a python
@@ -1867,6 +1867,7 @@ class hook(object):
     idb = hook_descriptor('idb', getattr(idaapi, 'IDB_Hooks', None))
     ui = hook_descriptor('ui', getattr(idaapi, 'UI_Hooks', None))
     action = hook_descriptor('action', None)
+    widget = hook_descriptor('widget', None)
 
     # We're done, so we can remove the descriptor we defined.
     del(hook_descriptor)
@@ -1877,7 +1878,7 @@ class hook(object):
 
         # Iterate through all of our hook attributes so that we can attach the related
         # hooks object directly into our namespace for backwards compatibility.
-        for attribute in ['notification', 'idp', 'idb', 'ui', 'action']:
+        for attribute in ['notification', 'idp', 'idb', 'ui', 'action', 'widget']:
 
             # If the attribute has been assigned to us, then we can just return it.
             if hasattr(ns, attribute):
