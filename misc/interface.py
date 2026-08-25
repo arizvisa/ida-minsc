@@ -15713,7 +15713,7 @@ class name(object):
             iterable = itertools.chain([path], children(ti, path))
             return [item for item in iterable]
 
-        # define a closure for recursively walking through the subtypes that 
+        # define a closure for recursively walking through the subtypes that
         # compose a type sequentially, and registering the name in "slotnames".
         def children(ti, path):
             '''Walk through the subtypes that compose the type specified by `ti` in sequential order.'''
@@ -15804,7 +15804,7 @@ class name(object):
             return [], []
 
         # use our closures to gather the children names in serial order, and
-        # then we use another closure to gather the names in read order. 
+        # then we use another closure to gather the names in read order.
         ids = children(ti, ('root',))
         left, right = spiral(ti, ('root',))
         peelids, count = left + right, len(ids)
