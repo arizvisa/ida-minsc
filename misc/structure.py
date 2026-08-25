@@ -67,7 +67,9 @@ def create(string, union):
 def has(id):
     '''Return whether a structure with the specified `id` or name exists within the database.'''
     tinfo = idaapi.tinfo_t()
-    if isinstance(id, types.integer) and hasattr(idaapi, 'get_struc'):
+    if isinstance(id, idaapi.tinfo_t):
+        return id.is_udt()
+    elif isinstance(id, types.integer) and hasattr(idaapi, 'get_struc'):
         return True if interface.node.identifier(id) and idaapi.get_struc(id) else False
     elif isinstance(id, types.string) and hasattr(idaapi, 'get_struc_id'):
         return idaapi.get_struc_id(utils.string.to(id)) != idaapi.BADADDR
