@@ -2293,7 +2293,12 @@ def tag(ea, key):
     res = internal.tags.address.get(ea)
     if key in res:
         return res[key]
-    raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}) : Unable to read tag (\"{:s}\") from address.".format(__name__, ea, key, utils.string.escape(key, '"')))
+    elif key not in {'__name__'}:
+        raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}) : Unable to read tag (\"{:s}\") from address.".format(__name__, ea, key, utils.string.escape(key, '"')))
+    elif not interface.function.has(ea):
+        return internal.tags.address.name(ea, False)
+    entrypoint = interface.range.start(interface.function.by_address(ea))
+    return internal.tags.address.name(ea, entrypoint == ea)
 @utils.multicase(ea=internal.types.integer, key=internal.types.string)
 @utils.string.decorate_arguments('key', 'value')
 def tag(ea, key, value):
