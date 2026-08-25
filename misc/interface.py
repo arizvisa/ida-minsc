@@ -1058,8 +1058,24 @@ class typemap(object):
 
         # If it's a tuple, then we can unpack our size from the type and return it.
         elif isinstance(pythonType, internal.types.tuple):
-            _, size, _ = [item for item in itertools.chain(pythonType, 3 * [0])][:3]
-            return max(0, size) if isinstance(size, internal.types.integer) and len(pythonType) in {2, 3} else 0
+            res, size, length = [item for item in itertools.chain(pythonType, 3 * [0])][:3]
+
+            # Figure out the right condition to calculate the size correctly.
+            if res in cls.typemap and pythonType in cls.typemap[res]:
+                return size + length
+            elif res in cls.typemap and len(pythonType) == 2 and (res, abs(size)) in cls.typemap[res]:
+                return abs(size)
+            elif res in cls.typemap and len(pythonType) == 2 and res in cls.typemap[res]:
+                return abs(size)
+            elif not isinstance(res, internal.structure.structuretypes):
+                return 0
+
+            # Otherwise it is a structure and we need to determine if it is a
+            # variable-sized structure or just a plain old regulrar structure.
+            sptr = getattr(res, 'ptr', res)
+            is_var = sptr.is_varstruct() if isinstance(sptr, idaapi.tinfo_t) else sptr.props & idaapi.SF_VAR
+            minimum = cls.size(res)
+            return max(minimum, size) if is_var else minimum
 
         # If it's not a tuple, then it might be a structure to snag the size from.
         elif isinstance(pythonType, internal.structure.structuretypes):
