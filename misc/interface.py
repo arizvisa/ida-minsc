@@ -1218,7 +1218,7 @@ class string(object):
 
 class prioritybase(object):
     def __init__(self):
-        self.__cache, self.__traceback = {}, {}
+        self.__cache__, self.__traceback = {}, {}
 
         # cache for the scope that is allocated for each target. we call this "scope",
         # but really it's the three closures that capture the scope for each target.
@@ -1229,30 +1229,30 @@ class prioritybase(object):
 
     def __iter__(self):
         '''Iterate through each target that is currently attached to this object.'''
-        for target in self.__cache:
+        for target in self.__cache__:
             yield target
         return
 
     def __contains__(self, target):
         '''Return whether the specified `target` is currently attached to this object.'''
-        return target in self.__cache
+        return target in self.__cache__
 
     def __len__(self):
         '''Return the number of targets that are currently attached to this object.'''
-        return len(self.__cache)
+        return len(self.__cache__)
 
     def __formatter__(self, target):
         raise NotImplementedError
 
     def close(self):
         '''Disconnect from all of the targets that are currently attached'''
-        res, items = True, {item for item in self.__cache}
+        res, items = True, {item for item in self.__cache__}
 
         # Simply detach every available target one-by-one.
         for target in items:
             ok = self.detach(target)
             if ok:
-                self.__cache.pop(target)
+                self.__cache__.pop(target)
             else:
                 logging.warning(u"{:s}.close() : Error while attempting to detach from the specified target {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
             res = res and ok
@@ -1265,7 +1265,7 @@ class prioritybase(object):
         # This property is intended to be part of the public api and
         # thus it can reimplemented by one if considered necessary.
 
-        return {item for item in self.__cache}
+        return {item for item in self.__cache__}
 
     def list(self, *pattern):
         """List all of the targets that are available along with a description.
@@ -1298,7 +1298,7 @@ class prioritybase(object):
     @property
     def enabled(self):
         '''Return all of the attached targets that are currently enabled.'''
-        return {item for item in self.__cache} - {item for item in self.__disabled}
+        return {item for item in self.__cache__} - {item for item in self.__disabled}
 
     # Extract the parameters from a function. This is just a wrapper around
     # utils.pycompat.function.arguments so that we can extract the names.
@@ -1428,7 +1428,7 @@ class prioritybase(object):
         return cls.__repr_object__(object)
 
     def __repr__(self):
-        cls, enabled = self.__class__, {item for item in self.__cache} - {item for item in self.__disabled}
+        cls, enabled = self.__class__, {item for item in self.__cache__} - {item for item in self.__disabled}
 
         # Unpack a prioritytuple into its components so we can describe it.
         def repr_prioritytuple(tuple):
@@ -1437,7 +1437,7 @@ class prioritybase(object):
             return priority, name, args
 
         # If there aren't any targets available, then return immediately.
-        if not self.__cache:
+        if not self.__cache__:
             return '\n'.join(["{!s}".format(cls), "...No targets are being used...".format(cls)])
 
         alignment_enabled = max(len(self.__formatter__(target)) for target in enabled) if enabled else 0
@@ -1446,14 +1446,14 @@ class prioritybase(object):
 
         # First gather all our enabled hooks.
         for target in sorted(enabled):
-            _, queue_ = self.__cache[target]
+            _, queue_ = self.__cache__[target]
             hooks = sorted([(priority, callable) for priority, callable in queue_], key=operator.itemgetter(0))
             items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
             res.append("{:<{:d}s} : {!s}".format(self.__formatter__(target), alignment_enabled, ' '.join(items) if items else '...nothing attached...'))
 
         # Now we can append all the disabled ones.
         for target in sorted(self.__disabled):
-            _, queue_ = self.__cache[target]
+            _, queue_ = self.__cache__[target]
             hooks = sorted([(priority, callable) for priority, callable in queue_], key=operator.itemgetter(0))
             items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
             res.append("{:<{:d}s} : {!s}".format("{:s} (disabled)".format(self.__formatter__(target)), alignment_disabled, ' '.join(items) if items else '...nothing attached...'))
@@ -1464,7 +1464,7 @@ class prioritybase(object):
     def enable(self, target):
         '''Enable any callables for the specified `target` that have been previously disabled.'''
         cls = self.__class__
-        if target not in self.__cache:
+        if target not in self.__cache__:
             logging.fatal(u"{:s}.enable({!r}) : The requested target {:s} is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently disabled targets are: {:s}".format(', '.join(map(self.__formatter__, self.__disabled))) if self.__disabled else 'There are no disabled targets that may be enabled.'))
             return False
         if target not in self.__disabled:
@@ -1475,7 +1475,7 @@ class prioritybase(object):
         self.__disabled.discard(target)
 
         # But if there were no entries in the cache, then warn the user about it.
-        _, queue_ = self.__cache[target]
+        _, queue_ = self.__cache__[target]
         if not queue_:
             logging.warning(u"{:s}.enable({!r}) : The requested target {:s} does not have any callables in its priority queue to enable.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target)))
             return True
@@ -1483,8 +1483,8 @@ class prioritybase(object):
 
     def disable(self, target):
         '''Disable execution of all the callables for the specified `target`.'''
-        cls, enabled = self.__class__, {item for item in self.__cache} - self.__disabled
-        if target not in self.__cache:
+        cls, enabled = self.__class__, {item for item in self.__cache__} - self.__disabled
+        if target not in self.__cache__:
             logging.fatal(u"{:s}.disable({!r}) : The requested target {:s} is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently enabled targets are: {:s}".format(', '.join(map(self.__formatter__, enabled))) if enabled else 'All targets have already been disabled.' if self.__disabled else 'There are no currently attached targets to disable.'))
             return False
         if target in self.__disabled:
@@ -1503,7 +1503,7 @@ class prioritybase(object):
             raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable ({:s}) for the requested target {:s} with a non-integer priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, internal.utils.pycompat.fullname(callable), self.__formatter__(target), format(priority)))
 
         # grab the mutex for the target queue that we're going to add something to.
-        mutex, queue_ = self.__cache.setdefault(target, (threading.Lock(), []))
+        mutex, queue_ = self.__cache__.setdefault(target, (threading.Lock(), []))
         with mutex:
             queue = queue_
 
@@ -1535,25 +1535,25 @@ class prioritybase(object):
 
     def get(self, target):
         '''Return all of the callables that are attached to the specified `target`.'''
-        if target not in self.__cache:
+        if target not in self.__cache__:
             cls = self.__class__
-            raise NameError(u"{:s}.get({!r}) : The requested target {:s} is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no currently attached targets to get from.'))
+            raise NameError(u"{:s}.get({!r}) : The requested target {:s} is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache__))) if self.__cache__ else 'There are no currently attached targets to get from.'))
 
         # Return the callables attached to the specified target.
-        mutex, queue_ = self.__cache[target]
+        mutex, queue_ = self.__cache__[target]
         with mutex:
             result = tuple(callable for _, callable in queue_)
         return result
 
     def pop(self, target, index=-1):
         '''Pop the item at the specified `index` from the given `target`.'''
-        if target not in self.__cache:
+        if target not in self.__cache__:
             cls, format = self.__class__, "{:d}".format if isinstance(index, internal.types.integer) else "{!r}".format
-            raise NameError(u"{:s}.pop({!r}, {:d}) : The requested target {:s} is not attached. Currently attached targets are {:s}.".format('.'.join([__name__, cls.__name__]), target, format(index), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no targets currently attached to pop from.'))
+            raise NameError(u"{:s}.pop({!r}, {:d}) : The requested target {:s} is not attached. Currently attached targets are {:s}.".format('.'.join([__name__, cls.__name__]), target, format(index), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache__))) if self.__cache__ else 'There are no targets currently attached to pop from.'))
         state = []
 
         # Snapshot our current queue for the specified target.
-        mutex, queue_ = self.__cache[target]
+        mutex, queue_ = self.__cache__[target]
         with mutex:
             queue = queue_
 
@@ -1580,12 +1580,12 @@ class prioritybase(object):
 
     def discard(self, target, callable):
         '''Discard the `callable` from our priority queue for the specified `target`.'''
-        if target not in self.__cache:
+        if target not in self.__cache__:
             return False
         state = []
 
         # Snapshot our current queue for the specified target.
-        mutex, queue_ = self.__cache[target]
+        mutex, queue_ = self.__cache__[target]
         with mutex:
             queue = queue_
 
@@ -1614,13 +1614,13 @@ class prioritybase(object):
 
     def remove(self, target, priority):
         '''Remove the first callable from the specified `target` that has the provided `priority`.'''
-        if target not in self.__cache:
+        if target not in self.__cache__:
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
-            raise NameError(u"{:s}.remove({!r}, {:s}) : The requested target {:s} is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, format(priority), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no targets currently attached to remove from.'))
+            raise NameError(u"{:s}.remove({!r}, {:s}) : The requested target {:s} is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, format(priority), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache__))) if self.__cache__ else 'There are no targets currently attached to remove from.'))
         state, table = [], {}
 
         # First we'll need to snapshot the queue for our current target.
-        mutex, queue_ = self.__cache[target]
+        mutex, queue_ = self.__cache__[target]
         with mutex:
             queue = queue_
 
@@ -1655,12 +1655,12 @@ class prioritybase(object):
 
     def empty(self, target):
         '''Iterate through the queue for the specified `target` safely discarding each callable before yielding it.'''
-        if target not in self.__cache:
+        if target not in self.__cache__:
             cls = self.__class__
-            raise NameError(u"{:s}.empty({!r}) : The requested target {:s} is not attached. Currently attached targets are {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no targets currently attached to empty.'))
+            raise NameError(u"{:s}.empty({!r}) : The requested target {:s} is not attached. Currently attached targets are {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache__))) if self.__cache__ else 'There are no targets currently attached to empty.'))
 
         # Grab the queue we're supposed to empty for the specified target.
-        mutex, queue_ = self.__cache[target]
+        mutex, queue_ = self.__cache__[target]
         with mutex:
             queue = queue_
 
@@ -1699,7 +1699,7 @@ class prioritybase(object):
         # that it needs to execute in order for it to work properly.
         cached = self.__target_scopes.get(target)
 
-        mutex, queue_ = self.__cache.setdefault(target, (threading.Lock(), []))
+        mutex, queue_ = self.__cache__.setdefault(target, (threading.Lock(), []))
         with mutex:
             count = len(queue_)
 
@@ -1872,8 +1872,8 @@ class prioritybase(object):
 
             # If we're being called, then we need to first snapshot the list of callables
             # to execute. We sort them by priority so that we can hand them to a new coroutine.
-            if target in self.__cache:
-                mutex, queue_ = self.__cache[target]
+            if target in self.__cache__:
+                mutex, queue_ = self.__cache__[target]
                 with mutex: queue = queue_[:]
                 hookq = heapq.nsmallest(len(queue), queue, key=operator.attrgetter('priority'))
 
@@ -1883,7 +1883,7 @@ class prioritybase(object):
             # Now we can instantiate the coroutine using our sorted priority queue (hookq). If the
             # target has been disabled, we use "coroutine_when_disabled" instead to maintain state.
             logging.debug(u"{:s}.closure_start({!r}) : Coroutine #{:d} for the {:s}target {:s} was created and will be started with {:d} item{:s} to execute.".format('.'.join([__name__, self.__class__.__name__]), target, 1 + len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), len(hookq), '' if len(hookq) == 1 else 's'))
-            coro = coroutine_when_enabled(hookq) if target in self.__cache and target not in self.__disabled else coroutine_when_disabled(hookq)
+            coro = coroutine_when_enabled(hookq) if target in self.__cache__ and target not in self.__disabled else coroutine_when_disabled(hookq)
 
             # Then we can start this coroutine and ensure it gives us the start signal.
             ok, result = True, next(coro)
@@ -1941,7 +1941,7 @@ class prioritybase(object):
             # If the result we got back from the already-existing coroutine is not
             # State.END, then our last execution did not complete for some reason.
             if result != State.END:
-                logging.debug(u"{:s}.closure_cancel({!r}) : Coroutine #{:d} for the {:s}target {:s} returned an unexpected signal ({!r}) and will require consuming {:d} item{:s} from its queue.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), result, len(self.__cache.get(target, [])), '' if self.__cache.get(target, []) == 1 else 's'))
+                logging.debug(u"{:s}.closure_cancel({!r}) : Coroutine #{:d} for the {:s}target {:s} returned an unexpected signal ({!r}) and will require consuming {:d} item{:s} from its queue.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), result, len(self.__cache__.get(target, [])), '' if self.__cache__.get(target, []) == 1 else 's'))
 
                 logging.debug(u"{:s}.closure_cancel({!r}) : Coroutine #{:d} for the {:s}target {:s} has discarded the first {:s} due to being canceled.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), "ignored result ({!r})".format(result) if isinstance(result, (Signal, internal.types.none)) else "result ({!r})".format(result)))
                 while result != State.END:
@@ -1984,7 +1984,7 @@ class prioritybase(object):
             # If the result we got back from the coroutine is not State.END, then we're apparently not
             # really done. Still, our job is to close it out and so we proceed to empty the coroutine.
             if result != State.END:
-                logging.debug(u"{:s}.closure_stop({!r}) : Coroutine #{:d} for the {:s}target {:s} returned an unexpected signal ({!r}) and will require consuming {:d} item{:s} from its queue.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), result, len(self.__cache.get(target, [])), '' if self.__cache.get(target, []) == 1 else 's'))
+                logging.debug(u"{:s}.closure_stop({!r}) : Coroutine #{:d} for the {:s}target {:s} returned an unexpected signal ({!r}) and will require consuming {:d} item{:s} from its queue.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), result, len(self.__cache__.get(target, [])), '' if self.__cache__.get(target, []) == 1 else 's'))
 
                 logging.debug(u"{:s}.closure_stop({!r}) : Coroutine #{:d} for the {:s}target {:s} has discarded the first {:s} due to requested stop.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), "ignored result ({!r})".format(result) if isinstance(result, (Signal, internal.types.none)) else "result ({!r})".format(result)))
                 while result != State.END:
@@ -2028,7 +2028,7 @@ class prioritybase(object):
 
             # Before we do anything, though, we need to verify that the target has not
             # been explicitly disabled. If it has been, then we can just return nothing.
-            if target not in self.__cache or target in self.__disabled:
+            if target not in self.__cache__ or target in self.__disabled:
                 return
 
             # Now, we're safe to continuously feed it things until it actually gives up a result.
@@ -2064,7 +2064,7 @@ class prioritybase(object):
         cls = self.__class__
 
         # First count the number of references that we're going to return later.
-        mutex, queue_ = self.__cache.get(target, (threading.Lock(), []))
+        mutex, queue_ = self.__cache__.get(target, (threading.Lock(), []))
         with mutex:
             count = len(queue_)
 
