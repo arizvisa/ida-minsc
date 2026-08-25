@@ -616,12 +616,13 @@ def index(tinfo, position):
 @utils.multicase(structure=internal.structure.structuretypes)
 def size(structure):
     '''Return the size of the specified `structure`.'''
-    if isinstance(getattr(structure, 'ptr', structure), idaapi.tinfo_t):
-        return interface.tinfo.size(structure.ptr)
-    id = structure.id
-    if interface.node.identifier(id) and internal.structure.has(id):
-        return idaapi.get_struc_size(id)
-    raise E.StructureNotFoundError(u"{:s}.size({:#x}) : Unable to locate the structure with the specified identifier ({:#x}).".format(__name__, id, id))
+    sptr = getattr(structure, 'ptr', structure)
+    if isinstance(sptr, idaapi.tinfo_t):
+        return interface.tinfo.size(sptr)
+    sid = sptr.id
+    if interface.node.identifier(sid) and internal.structure.has(sid):
+        return idaapi.get_struc_size(sid)
+    raise E.StructureNotFoundError(u"{:s}.size({:#x}) : Unable to locate the structure with the specified identifier ({:#x}).".format(__name__, sid, osid))
 @utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name', 'suffix')
 def size(name, *suffix):
@@ -648,10 +649,16 @@ def size(index):
 @utils.multicase(tinfo=idaapi.tinfo_t)
 def size(tinfo):
     '''Return the size of the structure represented by `tinfo`.'''
-    if not tinfo.is_udt():
+    res = interface.tinfo.structure(tinfo)
+    if not res:
         raise E.StructureNotFoundError(u"{:s}.size({!r}) : Unable to locate a structure using the specified type {!s}.".format(__name__, "{!s}".format(tinfo), interface.tinfo.quoted(tinfo)))
-    id = interface.tinfo.identifier(tinfo)
-    return size(id)
+    return interface.tinfo.size(res)
+@utils.multicase(pythonic=(types.tuple, types.list))
+def size(pythonic):
+    '''Return the size of the structure specified as a `pythonic` type.'''
+    if not has(pythonic):
+        raise E.StructureNotFoundError(u"{:s}.size({!s}) : Unable to locate a structure using the specified pythonic type.".format(__name__, pythonic))
+    return interface.typemap.size(pythonic)
 
 class type(object):
     """
