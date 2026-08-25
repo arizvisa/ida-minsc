@@ -8939,7 +8939,7 @@ class tinfo(object):
 
         # If there's no details, then this is definitely not an array or a structure.
         if not tinfo.has_details():
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.structure({!r}) : The specified type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(tinfo), '"'), "{!s}".format(tinfo)))
+            return None
 
         # If our type is a pointer, then we need to use the pointer details to recurse.
         elif tinfo.is_ptr():
@@ -8956,14 +8956,14 @@ class tinfo(object):
             return cls.structure(ai.elem_type)
 
         # If it's still not a structure, then we have something else.
-        elif not any([tinfo.is_struct(), tinfo.is_union()]):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.structure({!r}) : Unable to determine the structure from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(tinfo), "{!s}".format(tinfo)))
+        elif not tinfo.is_udt():
+            return None
 
         # That's it and we only need to resolve its ordinals before returning it.
         til, resolved = cls.library(tinfo), cls.copy(tinfo)
         res = idaapi.replace_ordinal_typerefs(til, resolved) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
         if res < 0:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.structure({!r}) : Ignoring error {:d} while trying to concretize the structuire type \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(tinfo), internal.utils.string.escape("{!s}".format(tinfo), '"')))
+            logging.warning(u"{:s}.structure({!r}) : Ignoring error {:d} while trying to concretize the structuire type \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(tinfo), internal.utils.string.escape("{!s}".format(tinfo), '"')))
         return tinfo if res < 0 else resolved
 
     @classmethod
