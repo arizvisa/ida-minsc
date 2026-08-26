@@ -1862,6 +1862,23 @@ class output(appwindow):
         return application.dispatch(userinterface_callable, window)
 
     @classmethod
+    def dimensions(cls, window):
+        '''Return the character dimensions for the specified Output `window` as a 2-tuple containing the columns and rows.'''
+        def userinterface_callable(window):
+            area = cls.__textarea(window)
+            cwidth, cheight = widget.font.character(area)
+
+            viewport = area.viewport()
+            width, height = widget.size(viewport)
+
+            res, remainder = divmod(width, cwidth) if width else (0, 0)
+            columns = 1 + res if remainder else res
+            res, remainder = divmod(height, cheight) if height else (0, 0)
+            rows = 1 + res if remainder else res
+            return columns, rows
+        return application.dispatch(userinterface_callable, window)
+
+    @classmethod
     def __textarea(cls, window):
         '''Return the widget containing the contents of the specified Output `window`.'''
         return widget.child(window, 'QAbstractScrollArea')
