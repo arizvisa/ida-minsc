@@ -1188,6 +1188,49 @@ class widget(object):
         twidget = widget if cls.isinstance(widget) else cls.of(widget)
         return twidget.findChildren(type)
 
+    @classmethod
+    def boundaries(cls, widget):
+        '''Return the boundaries of the specified `widget` relative to its parent as a 4-tuple containing the x-coodrdinate, y-coordinate, width, and height.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.bounds({!s}) : Unable to query the boundaries of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        area = twidget.geometry()
+        return area.x(), area.y(), area.width(), area.height()
+
+    @classmethod
+    def size(cls, widget):
+        '''Return the dimensions of the specified `widget` as a 2-tuple containing the width and height.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.size({!s}) : Unable to query the dimensions of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        res = twidget.size()
+        return res.width(), res.height()
+
+    @classmethod
+    def position(cls, widget):
+        '''Return the screen-position of the specified `widget` as a 2-tuple containing the x-coordinate and y-coordinate.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.position({!s}) : Unable to query the position of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        res = twidget.mapToGlobal(twidget.rect().topLeft())
+        return res.x(), res.y()
+
+    @classmethod
+    def visible(cls, widget):
+        '''Return whether the specified `widget` is currently visible.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.visible({!s}) : Unable to query the visibility of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        return twidget.isVisible()
+
+    @classmethod
+    def name(cls, widget):
+        '''Return the name of the specified `widget`.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.name({!s}) : Unable to query the name of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        return internal.utils.string.of(twidget.objectName())
+
 class clipboard(object):
     """
     This namespace is for interacting with the current clipboard state.
