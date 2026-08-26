@@ -479,15 +479,26 @@ class appwindow(object):
     @classmethod
     def open(cls, *args):
         '''Open or show the window belonging to the namespace.'''
-        global widget
         res = cls.__open__(*args) if args else cls.__open__(*getattr(cls, '__open_defaults__', ()))
-        return widget.of(res)
+        return res if widget.isinstance(res) else widget.of(res)
 
     @classmethod
-    def close(cls):
+    def __open__(cls, *args):
+        '''This function is intended to be implemented by the class being derived.'''
+        raise internal.exceptions.MissingMethodError
+
+    @classmethod
+    def close(cls, *args):
         '''Close or hide the window belonging to the namespace.'''
         res = cls.open()
-        return res.deleteLater()
+        return cls.__close__(res, *args)
+
+    @classmethod
+    def __close__(cls, object, *args):
+        '''This function is intended to be implemented by the class being derived.'''
+        if widget.isinstance(object):
+            return object.deleteLater()
+        return idaapi.close_tform(object, *args) if idaapi.__version__ < 7.0 else idaapi.close_widget(object, *args)
 
 class breakpoints(appwindow):
     """
