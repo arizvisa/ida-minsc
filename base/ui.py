@@ -881,6 +881,196 @@ class types(appwindow):
     __open__ = staticmethod(idaapi.open_loctypes_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
+class output(appwindow):
+    """
+    Base namespace for interacting with the Output window.
+
+    There isn't really a way for opening up the output window except by using
+    the action from the palette. As such, we need to locate the window using its
+    title and fall back to the action when we can't find it.
+
+    There are some APIs for interacting with th econtents of the window, so we
+    try to implement as many of those as possible. Base namespace will only need
+    to implement the Qt-specific parts for the rest of this namespace to work.
+    """
+    __title__ = 'Output'
+    __action__ = 'OutputWindow'
+
+    @classmethod
+    def __open__(cls, *args):
+        '''Open or show the Output window and return its widget.'''
+        title, action = cls.__title__, cls.__action__
+
+        # The disassembler doesn't give us an `idaapi.open_output_window`, so
+        # we locate the window by its title. If it isn't currently available,
+        # then we ask the disassembler to open it using its action.
+        if not widget.exists(title):
+            idaapi.process_ui_action(action)
+
+        # If the widget still doesn't exist, after applying its action, then
+        # throw up an exception because there's nothing we can do.
+        if not widget.exists(title):
+            raise internal.exceptions.WidgetNotFoundError(u"{:s}.open({!s}) : Unable to locate the Output window using its title \"{!s}\".".format('.'.join([__name__, cls.__name__]), ', '.join(map(internal.utils.string.repr, args)), internal.utils.string.escape(cls.__title__, '"')))
+
+        return widget.by(title)
+
+    @classmethod
+    def __close__(cls, object, *args):
+        '''Close or hide the Output window.'''
+        return idaapi.process_ui_action(cls.__action__)
+
+    @classmethod
+    def clear(cls):
+        '''Clear the contents of the Output window.'''
+        return idaapi.msg_clear()
+
+    @classmethod
+    def count(cls):
+        '''Return the number of lines that are available from the Output window.'''
+        res = idaapi.msg_get_lines(-1)
+        return len(res)
+
+    @classmethod
+    def size(cls):
+        '''Return the number of characters that are available from the Output window.'''
+        return len(cls.text())
+
+    @internal.utils.multicase()
+    @classmethod
+    def get(cls):
+        '''Return the lines from the Output window as an ordered list.'''
+        res = idaapi.msg_get_lines(-1)
+
+        # The `msg_get_lines` API returns the lines from most recent to
+        # earliest, which is backwards. So, we need to reverse before returning.
+        return [internal.utils.string.of(item) for item in res[::-1]]
+    @internal.utils.multicase(count=internal.types.integer)
+    @classmethod
+    def get(cls, count):
+        '''Return the most recent number of lines as specified by `count` from the Output window.'''
+        res = idaapi.msg_get_lines(count)
+        return [internal.utils.string.of(item) for item in res[::-1]]
+
+    @internal.utils.multicase()
+    @classmethod
+    def last(cls):
+        '''Return the most recent line from the Output window.'''
+        res = idaapi.msg_get_lines(1)
+        iterable = (internal.utils.string.of(item) for item in res)
+        return next(iterable, u'')
+    @internal.utils.multicase(count=internal.types.integer)
+    @classmethod
+    def last(cls, count):
+        '''Return the most recent number of lines as specified by `count` from the Output window.'''
+        res = idaapi.msg_get_lines(count)
+        return [internal.utils.string.of(item) for item in res]
+
+    @classmethod
+    def iterate(cls):
+        '''Yield each line from the output window.'''
+        for item in cls.get():
+            yield item
+        return
+
+    @classmethod
+    def text(cls):
+        '''Return the contents of the messages from the Output window.'''
+        return '\n'.join(cls.get())
+
+    @classmethod
+    def line(cls):
+        '''Return the line number where the cursor is located within the Output window.'''
+        res = idaapi.get_output_curline(False)
+        return internal.utils.string.of(res)
+
+    @classmethod
+    def cursor(cls):
+        '''Return the position of the cursor within the Output window as an `(x, y)` tuple.'''
+        ok, x, y = idaapi.get_output_cursor()
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.cursor() : Unable to get the cursor position from the Output window.".format('.'.join([__name__, cls.__name__])))
+        return x, y
+
+    @classmethod
+    def selected(cls):
+        '''Return the currently selected text from the Output window.'''
+        res = idaapi.get_output_selected_text()
+        if res is None:
+            return u''
+        return internal.utils.string.of(res)
+
+    @internal.utils.multicase()
+    @classmethod
+    def save(cls):
+        '''Ask the user for a path to save the contents of the Output window.'''
+        return idaapi.msg_save('')
+    @internal.utils.multicase(path=internal.types.string)
+    @classmethod
+    @internal.utils.string.decorate_arguments('path')
+    def save(cls, path):
+        '''Save the contents of the Output window to the file specified by `path`.'''
+        res = internal.utils.string.to(path)
+        if not idaapi.msg_save(res):
+            raise internal.exceptions.DisassemblerError(u"{:s}.save({!r}) : Unable to save the contents of the Output window to the specified path ({!r}).".format('.'.join([__name__, cls.__name__]), path, path))
+        return path
+
+    @internal.utils.multicase(string=internal.types.string)
+    @classmethod
+    @internal.utils.string.decorate_arguments('string')
+    def write(cls, string):
+        '''Write the specified `string` into the Output window.'''
+        res = string
+
+        # This API is actually based on `printf(3)`, which is very primitive
+        # compared to Python's formatting. So, before doing anything, we escape
+        # all of the "%" characters to avoid them being interpreted.
+        res = res.replace('%', '%%')
+        return idaapi.msg(internal.utils.string.to(res))
+
+    @classmethod
+    def copy(cls):
+        '''Copy the current selection within the Output window to the clipboard and return it.'''
+        text = cls.selected()
+        return clipboard.set(text)
+
+    @classmethod
+    def columns(cls, window):
+        '''Return the number of visible characters that can be displayed across the specified Output `window`.'''
+        def userinterface_callable(window):
+            area = cls.__textarea(window)
+            cwidth, _ = widget.font.character(area)
+
+            viewport = area.viewport()
+            width, _ = widget.size(viewport)
+
+            res, remainder = divmod(width, cwidth) if width else (0, 0)
+            return 1 + res if remainder else res
+        return application.dispatch(userinterface_callable, window)
+
+    @classmethod
+    def rows(cls, window):
+        '''Return the number of visible rows that can be displayed across the specified Output `window`.'''
+        def userinterface_callable(window):
+            area = cls.__textarea(window)
+            _, cheight = widget.font.character(area)
+
+            viewport = area.viewport()
+            _, height = widget.size(viewport)
+
+            res, remainder = divmod(height, cheight) if height else (0, 0)
+            return 1 + res if remainder else res
+        return application.dispatch(userinterface_callable, window)
+
+    @classmethod
+    def __textarea(cls, window):
+        '''Return the widget containing the contents of the specified Output `window`.'''
+        return widget.child(window, 'QAbstractScrollArea')
+
+    @classmethod
+    def __commandline(cls, window):
+        '''Return the widget for the command-line belonging to the specified Output `window`.'''
+        return widget.child(window, 'QLineEdit')
+
 class timer(object):
     """
     This namespace is for registering a python callable to a timer in IDA.
