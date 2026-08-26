@@ -90,6 +90,698 @@ class application(object):
 
 beep = internal.utils.alias(application.beep, 'application')
 
+class timer(object):
+    """
+    This namespace is for registering a python callable to a timer in IDA.
+    """
+    clock = {}
+    @classmethod
+    def register(cls, id, interval, callable):
+        '''Register the specified `callable` with the requested `id` to be called at every `interval`.'''
+        if id in cls.clock:
+            idaapi.unregister_timer(cls.clock[id])
+
+        # XXX: need to create a closure that can terminate when signalled
+        cls.clock[id] = res = idaapi.register_timer(interval, callable)
+        return res
+    @classmethod
+    def unregister(cls, id):
+        '''Unregister the specified `id`.'''
+        raise internal.exceptions.UnsupportedCapability(u"{:s}.unregister({!s}) : A lock or a signal is needed here in order to unregister this timer safely.".format('.'.join([__name__, cls.__name__]), id))
+        idaapi.unregister_timer(cls.clock[id])
+        del(cls.clock[id])
+    @classmethod
+    def reset(cls):
+        '''Remove all the registered timers.'''
+        for id, clk in cls.clock.items():
+            idaapi.unregister_timer(clk)
+            del(cls.clock[id])
+        return
+
+class keyboard(object):
+    """
+    Base namespace for interacting with the keyboard input.
+    """
+    @classmethod
+    def modifiers(cls):
+        '''Return the current keyboard modifiers that are being used.'''
+        global application
+        q = application()
+        return q.keyboardModifiers()
+
+    @classmethod
+    def __of_key__(cls, key):
+        '''Convert the normalized hotkey tuple in `key` into a format that IDA can comprehend.'''
+        Separators = {'-', '+'}
+        Modifiers = {'ctrl', 'shift', 'alt'}
+
+        # Validate the type of our parameter
+        if not isinstance(key, internal.types.tuple):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.of_key({!r}) : A key combination of an invalid type was provided as a parameter.".format('.'.join([__name__, cls.__name__]), key))
+
+        # Find a separator that we can use, and use it to join our tuple into a
+        # string with each element capitalized. That way it looks good for the user.
+        separator = next(item for item in Separators)
+        modifiers, hotkey = key
+
+        components = [item.capitalize() for item in modifiers] + [hotkey.capitalize()]
+        return separator.join(components)
+
+    @classmethod
+    def __normalize_key__(cls, hotkey):
+        '''Normalize the string `key` to a tuple that can be used to lookup keymappings.'''
+        Separators = {'-', '+', '_'}
+        Modifiers = {'ctrl', 'shift', 'alt'}
+
+        # First check to see if we were given a tuple or list. If so, then we might
+        # have been given a valid hotkey. However, we still need to validate this.
+        # So, to do that we'll concatenate each component together back into a string
+        # and then recurse so we can validate using the same logic.
+        if isinstance(hotkey, internal.types.unordered):
+            try:
+                # If we were mistakenly given a set, then we need to reformat it.
+                if isinstance(hotkey, internal.types.set):
+                    raise ValueError
+
+                modifiers, key = hotkey
+
+                # If modifiers is not of the correct type, then still need to reformat.
+                if not isinstance(modifiers, internal.types.unorered):
+                    raise ValueError
+
+            # If the tuple we received was of an invalid format, then extract the
+            # modifiers that we can from it, and try again.
+            except ValueError:
+                modifiers = tuple(item for item in hotkey if item.lower() in Modifiers)
+                key = ''.join(item for item in hotkey if item.lower() not in Modifiers)
+
+            # Grab a separator, and join all our components together with it.
+            separator = next(item for item in Separators)
+            components = [item for item in modifiers] + [key]
+            return cls.__normalize_key__(separator.join(components))
+
+        # Next we need to normalize the separator used throughout the string by
+        # simply converting any characters we might consider a separator into
+        # a null-byte so we can split on it.
+        normalized = functools.reduce(lambda agg, item: agg.replace(item, '\0'), Separators, hotkey)
+
+        # Now we can split the normalized string so we can convert it into a
+        # set. We will then iterate through this set collecting all of our known
+        # key modifiers. Anything left must be a single key, so we can then
+        # validate the hotkey we were given.
+        components = { item.lower() for item in normalized.split('\0') }
+
+        modifiers = { item for item in components if item in Modifiers }
+        key = components ^ modifiers
+
+        # Now we need to verify that we were given just one key. If we were
+        # given any more, then this isn't a valid hotkey combination and we need
+        # to bitch about it.
+        if len(key) != 1:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.normalize_key({!s}) : An invalid hotkey combination ({!s}) was provided as a parameter.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(hotkey), internal.utils.string.repr(hotkey)))
+
+        res = next(item for item in key)
+        if len(res) != 1:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.normalize_key({!s}) : The hotkey combination {!s} contains the wrong number of keys ({:d}).".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(hotkey), internal.utils.string.repr(res), len(res)))
+
+        # That was it. Now to do the actual normalization, we need to sort our
+        # modifiers into a tuple, and return the single hotkey that we extracted.
+        res, = key
+        return tuple(sorted(modifiers)), res
+
+    # Create a cache to store the hotkey context, and the callable that was mapped to it
+    __cache__ = {}
+
+    @classmethod
+    def list(cls):
+        '''Display the current list of keyboard combinations that are mapped along with the callable each one is attached to.'''
+        maxkey, maxtype, maxinfo = 0, 0, 0
+
+        results = []
+        for mapping, (capsule, closure) in cls.__cache__.items():
+            key = cls.__of_key__(mapping)
+
+            # Check if we were passed a class so we can figure out how to
+            # extract the signature.
+            cons = ['__init__', '__new__']
+            if inspect.isclass(closure):
+                available = (item for item in cons if hasattr(closure, item))
+                attribute = next((item for item in available if inspect.ismethod(getattr(closure, item))), None)
+                callable = getattr(closure, attribute) if attribute else None
+                information = '.'.join([closure.__name__, internal.utils.multicase.prototype(callable)]) if attribute else "{:s}(...)".format(closure.__name__)
+            else:
+                information = internal.utils.multicase.prototype(closure)
+
+            # Figure out the type of the callable that is mapped.
+            if inspect.isclass(closure):
+                ftype = 'class'
+            elif inspect.ismethod(closure):
+                ftype = 'method'
+            elif inspect.isbuiltin(closure):
+                ftype = 'builtin'
+            elif inspect.isfunction(closure):
+                ftype = 'anonymous' if closure.__name__ in {'<lambda>'} else 'function'
+            else:
+                ftype = 'callable'
+
+            # Figure out if there's any class-information associated with the closure
+            if inspect.ismethod(closure):
+                klass = closure.im_self.__class__ if closure.im_self else closure.im_class
+                clsinfo = klass.__name__ if getattr(klass, '__module__', '__main__') in {'__main__'} else '.'.join([klass.__module__, klass.__name__])
+            elif inspect.isclass(closure) or isinstance(closure, internal.types.object):
+                clsinfo = '' if getattr(closure, '__module__', '__main__') in {'__main__'} else closure.__module__
+            else:
+                clsinfo = None if getattr(closure, '__module__', '__main__') in {'__main__'} else closure.__module__
+
+            # Now we can figure out the documentation for the closure that was stored.
+            documentation = closure.__doc__ or ''
+            if documentation:
+                filtered = [item.strip() for item in documentation.split('\n') if item.strip()]
+                header = next((item for item in filtered), '')
+                comment = "{:s}...".format(header) if header and len(filtered) > 1 else header
+            else:
+                comment = ''
+
+            # Calculate our maximum column widths inline
+            maxkey = max(maxkey, len(key))
+            maxinfo = max(maxinfo, len('.'.join([clsinfo, information]) if clsinfo else information))
+            maxtype = max(maxtype, len(ftype))
+
+            # Append each column to our results
+            results.append((key, ftype, clsinfo, information, comment))
+
+        # If we didn't aggregate any results, then raise an exception as there's nothing to do.
+        if not results:
+            raise internal.exceptions.SearchResultsError(u"{:s}.list() : Found 0 key combinations mapped.".format('.'.join([__name__, cls.__name__])))
+
+        # Now we can output what was mapped to the user.
+        six.print_(u"Found the following{:s} key combination{:s}:".format(" {:d}".format(len(results)) if len(results) > 1 else '', '' if len(results) == 1 else 's'))
+        for key, ftype, clsinfo, info, comment in results:
+            six.print_(u"Key: {:>{:d}s} -> {:<{:d}s}{:s}".format(key, maxkey, "{:s}:{:s}".format(ftype, '.'.join([clsinfo, info]) if clsinfo else info), maxtype + 1 + maxinfo, " // {:s}".format(comment) if comment else ''))
+        return
+
+    @classmethod
+    def map(cls, key, callable):
+        """Map the specified `key` combination to a python `callable` in IDA.
+
+        If the provided `key` is being re-mapped due to the mapping already existing, then return the previous callable that it was assigned to.
+        """
+
+        # First we'll normalize the hotkey that we were given, and convert it
+        # back into a format that IDA can understand. This way we can prevent
+        # users from giving us a sloppy hotkey combination that we won't be
+        # able to search for in our cache.
+        hotkey = cls.__normalize_key__(key)
+        keystring = cls.__of_key__(hotkey)
+
+        # The hotkey we normalized is now a tuple, so check to see if it's
+        # already within our cache. If it is, then we need to unmap it prior to
+        # re-creating the mapping.
+        if hotkey in cls.__cache__:
+            logging.warning(u"{:s}.map({!s}, {!r}) : Remapping the hotkey combination {!s} with the callable {!r}.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, internal.utils.string.repr(keystring), callable))
+            ctx, _ = cls.__cache__[hotkey]
+
+            ok = idaapi.del_hotkey(ctx)
+            if not ok:
+                raise internal.exceptions.DisassemblerError(u"{:s}.map({!s}, {!r}) : Unable to remove the hotkey combination {!s} from the list of current keyboard mappings.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, internal.utils.string.repr(keystring)))
+
+            # Pop the callable that was mapped out of the cache so that we can
+            # return it to the user.
+            _, res = cls.__cache__.pop(hotkey)
+
+        # If the user is mapping a new key, then there's no callable to return.
+        else:
+            res = None
+
+        # Verify that the user gave us a callable to use to avoid mapping a
+        # useless type to the specified keyboard combination.
+        if not builtins.callable(callable):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.map({!s}, {!r}) : Unable to map the non-callable value {!r} to the hotkey combination {!s}.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, callable, internal.utils.string.repr(keystring)))
+
+        # Define a closure that calls the user's callable as it seems that IDA's
+        # hotkey functionality doesn't deal too well when the same callable is
+        # mapped to different hotkeys.
+        def closure(*args, **kwargs):
+            return callable(*args, **kwargs)
+
+        # Now we can add the hotkey to IDA using the closure that we generated.
+        # XXX: I'm not sure if the key needs to be utf8 encoded or not
+        ctx = idaapi.add_hotkey(keystring, closure)
+        if not ctx:
+            raise internal.exceptions.DisassemblerError(u"{:s}.map({!s}, {!r}) : Unable to map the callable {!r} to the hotkey combination {!s}.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, callable, internal.utils.string.repr(keystring)))
+
+        # Last thing to do is to stash it in our cache with the user's callable
+        # in order to keep track of it for removal.
+        cls.__cache__[hotkey] = ctx, callable
+        return res
+
+    @classmethod
+    def unmap(cls, key):
+        '''Unmap the specified `key` from IDA and return the callable that it was assigned to.'''
+        frepr = lambda hotkey: internal.utils.string.repr(cls.__of_key__(hotkey))
+
+        # First check to see whether we were given a callable or a hotkey. If
+        # we were given a callable, then we need to look through our cache for
+        # the actual key that it was. Once found, then we normalize it like usual.
+        if callable(key):
+            try:
+                hotkey = cls.__normalize_key__(next(item for item, (_, fcallback) in cls.__cache__.items() if fcallback == key))
+
+            except StopIteration:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.unmap({:s}) : Unable to locate the callable {!r} in the current list of keyboard mappings.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), key))
+
+            else:
+                logging.warning(u"{:s}.unmap({:s}) : Discovered the hotkey {!s} being currently mapped to the callable {!r}.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey), key))
+
+        # We need to normalize the hotkey we were given, and convert it back
+        # into IDA's format. This way we can locate it in our cache, and prevent
+        # sloppy user input from interfering.
+        else:
+            hotkey = cls.__normalize_key__(key)
+
+        # Check to see if the hotkey is cached and warn the user if it isn't.
+        if hotkey not in cls.__cache__:
+            logging.warning(u"{:s}.unmap({:s}) : Refusing to unmap the hotkey {!s} as it is not currently mapped to anything.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey)))
+            return
+
+        # Grab the keymapping context from our cache, and then ask IDA to remove
+        # it for us. If we weren't successful, then raise an exception so the
+        # user knows what's up.
+        ctx, _ = cls.__cache__[hotkey]
+        ok = idaapi.del_hotkey(ctx)
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.unmap({:s}) : Unable to unmap the specified hotkey ({!s}) from the current list of keyboard mappings.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey)))
+
+        # Now we can pop off the callable that was mapped to the hotkey context
+        # in order to return it, and remove the hotkey from our cache.
+        _, res = cls.__cache__.pop(hotkey)
+        return res
+
+    add, rm = internal.utils.alias(map, 'keyboard'), internal.utils.alias(unmap, 'keyboard')
+
+    @classmethod
+    def input(cls):
+        '''Return the current keyboard input context.'''
+        raise internal.exceptions.MissingMethodError
+
+class mouse(object):
+    """
+    Base namespace for interacting with the mouse input.
+    """
+    @classmethod
+    def buttons(cls):
+        '''Return the current mouse buttons that are being clicked.'''
+        global application
+        q = application()
+        return q.mouseButtons()
+
+    @classmethod
+    def position(cls):
+        '''Return the current `(x, y)` position of the cursor.'''
+        raise internal.exceptions.MissingMethodError
+
+class clipboard(object):
+    """
+    This namespace is for interacting with the current clipboard state.
+    """
+    def __new__(cls):
+        '''Return the current clipboard.'''
+        global application
+        clp = application()
+        return clp.clipboard()
+
+    @classmethod
+    def get(cls):
+        '''Return the text that is residing within the current clipboard.'''
+        '''Apply the specified `text` to the current clipboard.'''
+        object = cls()
+        res = object.text()
+        return internal.utils.string.of(res)
+
+    @classmethod
+    def set(cls, text):
+        '''Apply the specified `text` to the current clipboard.'''
+        object = cls()
+        res, _ = internal.utils.string.of(object.text()), object.setText(internal.utils.string.to(text))
+        ok = internal.utils.string.of(object.text()) == text
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.set({!r}) : Unable to apply the specified text to the current clipboard.".format('.'.join([__name__, cls.__name__]), text))
+        return res
+
+class window(object):
+    """
+    This namespace is for interacting with a specific window.
+    """
+    def __new__(cls):
+        '''Return the currently active window.'''
+        # FIXME: should probably traverse the application windows to figure out the
+        #        exact one that was in use last since it's likely that the currently
+        #        active window is the Python input control which is not really useful.
+        return application.window()
+
+    @internal.utils.multicase(xy=internal.types.tuple)
+    @classmethod
+    def at(cls, xy):
+        '''Return the widget at the specified `(x, y)` coordinate within the `xy` tuple.'''
+        x, y = xy
+        return application.window(x, y)
+
+class windows(object):
+    """
+    This namespace is for interacting with any or all of the windows for the application.
+    """
+    def __new__(cls):
+        '''Return all of the top-level windows.'''
+        return application.windows()
+
+    @classmethod
+    def refresh(cls):
+        '''Refresh all of lists and choosers within the application.'''
+        global disassembly
+        ok = idaapi.refresh_lists() if idaapi.__version__ < 7.0 else idaapi.refresh_choosers()
+        return ok and disassembly.refresh()
+refresh = internal.utils.alias(windows.refresh, 'windows')
+
+## Interfacing with IDA's menu system.
+# FIXME: add some support for actually manipulating menus
+class menu(object):
+    """
+    This namespace is for registering items in IDA's menu system.
+    """
+    state = {}
+    @classmethod
+    def add(cls, path, name, callable, hotkey='', flags=0, args=()):
+        '''Register a `callable` as a menu item at the specified `path` with the provided `name`.'''
+
+        # check to see if our menu item is in our cache and remove it if so
+        if (path, name) in cls.state:
+            cls.rm(path, name)
+
+        # now we can add the menu item since everything is ok
+        # XXX: I'm not sure if the path needs to be utf8 encoded or not
+        res = internal.utils.string.to(name)
+        ctx = idaapi.add_menu_item(path, res, hotkey, flags, callable, args)
+        cls.state[path, name] = ctx
+    @classmethod
+    def rm(cls, path, name):
+        '''Remove the menu item at the specified `path` with the provided `name`.'''
+        res = cls.state[path, name]
+        idaapi.del_menu_item(res)
+        del cls.state[path, name]
+    @classmethod
+    def reset(cls):
+        '''Remove all currently registered menu items.'''
+        for path, name in cls.state.keys():
+            cls.rm(path, name)
+        return
+
+class widget(object):
+    """
+    This namespace is for interacting with any of the widgets
+    associated with the native user-interface.
+    """
+    @internal.utils.multicase()
+    def __new__(cls):
+        '''Return the widget that is currently being used.'''
+        return cls.of(current.widget())
+    @internal.utils.multicase(xy=internal.types.tuple)
+    def __new__(cls, xy):
+        '''Return the widget at the specified (`x`, `y`) coordinate within the `xy` tuple.'''
+        res = x, y = xy
+        return cls.at(res)
+    @internal.utils.multicase(title=internal.types.string)
+    def __new__(cls, title):
+        '''Return the widget that is using the specified `title`.'''
+        return cls.by(title)
+
+    @classmethod
+    def at(cls, xy):
+        '''Return the widget at the specified (`x`, `y`) coordinate within the `xy` tuple.'''
+        res = x, y = xy
+        global application
+        q = application()
+        return q.widgetAt(x, y)
+
+    @classmethod
+    def open(cls, widget, flags, **target):
+        '''Open the `widget` using the specified ``idaapi.WOPN_`` flags.'''
+        twidget = cls.form(widget) if cls.isinstance(widget) else widget
+        ok = idaapi.display_widget(twidget, flags)
+        # FIXME: rather than returning whether it succeeded or not, we should
+        #        return what the widget was attached to in order to locate it.
+        return ok
+    @classmethod
+    def close(cls, widget, flags):
+        '''Close the `widget` using the specified ``idaapi.WCLS_`` flags.'''
+        twidget = cls.form(widget) if cls.isinstance(widget) else widget
+        ok = idaapi.close_widget(twidget, flags)
+        # FIXME: rather than returning whether it succeeded or not, we should
+        #        return what the widget was attached to before we closed it.
+        return ok
+
+    @classmethod
+    def show(cls, widget):
+        '''Display the specified `widget` without putting it in focus.'''
+        twidget = cls.form(widget) if cls.isinstance(widget) else widget
+        res, ok = idaapi.get_current_widget(), idaapi.activate_widget(twidget, False)
+        return cls.of(res) if ok else None
+    @classmethod
+    def focus(cls, widget):
+        '''Activate the specified `widget` and put it in focus.'''
+        twidget = cls.form(widget) if cls.isinstance(widget) else widget
+        res, ok = idaapi.get_current_widget(), idaapi.activate_widget(twidget, True)
+        return cls.of(res) if ok else None
+
+    @classmethod
+    def type(cls, widget):
+        '''Return the ``idaapi.twidget_type_t`` for the given `widget`.'''
+        twidget = cls.form(widget) if cls.isinstance(widget) else widget
+        return idaapi.get_widget_type(twidget)
+    @classmethod
+    def title(cls, widget):
+        '''Return the window title for the given `widget`.'''
+        twidget = cls.form(widget) if cls.isinstance(widget) else widget
+        return idaapi.get_widget_title(twidget)
+
+    @internal.utils.multicase(title=internal.types.string)
+    @classmethod
+    @internal.utils.string.decorate_arguments('title')
+    def by(cls, title):
+        '''Return the widget associated with the given window `title`.'''
+        res = idaapi.find_widget(internal.utils.string.to(title))
+        if res is None:
+            raise internal.exceptions.WidgetNotFoundError(u"{:s}.by({!r}) : Unable to locate a widget with the specified title ({!r}).".format('.'.join([__name__, cls.__name__]), title, title))
+        return cls.of(res)
+
+    @internal.utils.multicase(title=internal.types.string)
+    @classmethod
+    @internal.utils.string.decorate_arguments('title')
+    def exists(cls, title):
+        '''Return whether a widget with the specified window `title` exists.'''
+        res = idaapi.find_widget(internal.utils.string.to(title))
+        return res is not None
+
+    @classmethod
+    def of(cls, form):
+        '''Return the user-interface widget for the IDA `form` that is provided.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            return form
+        raise internal.exceptions.MissingMethodError
+    @classmethod
+    def form(cls, widget):
+        '''Return the IDA form for the user-interface `widget` that is provided.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            return widget
+        raise internal.exceptions.MissingMethodError
+    @classmethod
+    def isinstance(cls, object):
+        '''Return whether the given `object` is of the correct type for the user-interface.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            return True
+        raise internal.exceptions.MissingMethodError
+
+    @classmethod
+    def window(cls, widget):
+        '''Return the top-level window that contains the specified `widget`.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.window({!s}) : Unable to query the window of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        return twidget.window()
+
+    @classmethod
+    def ancestors(cls, widget):
+        '''Return each of the parent widgets for the specified `widget` ascending to its top-level window.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.ancestors({!s}) : Unable to query the parents of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        result, iterable = [], twidget.parentWidget()
+        while iterable is not None:
+            result.append(iterable)
+            iterable = iterable.parentWidget()
+        return result
+
+    @classmethod
+    def parent(cls, widget):
+        '''Return the parent widget for the specified `widget`.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.parent({!s}) : Unable to query the parent of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        return twidget.parentWidget()
+
+    @classmethod
+    def __type_by_name__(cls, name):
+        '''Return the widget type with the specified `name` for the current user-interface.'''
+        raise internal.exceptions.MissingMethodError
+
+    @internal.utils.multicase(name=internal.types.string)
+    @classmethod
+    @internal.utils.string.decorate_arguments('name')
+    def child(cls, widget, name):
+        '''Return the first child widget from the specified `widget` that is instantiated with the specified `name`.'''
+        return cls.child(widget, cls.__type_by_name__(name))
+    @internal.utils.multicase()
+    @classmethod
+    def child(cls, widget, type):
+        '''Return the first child widget for the specified `widget` that is instantiated with the specified `type`.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.child({!s}, {!s}) : Unable to query the children of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget, type))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        result = twidget.findChild(type)
+        if result is None:
+            raise internal.exceptions.WidgetNotFoundError(u"{:s}.child({!s}, {!s}) : Unable to locate a widget that is instantiated with the specified type ({!s}).".format('.'.join([__name__, cls.__name__]), widget, type, type))
+        return result
+
+    @internal.utils.multicase(name=internal.types.string)
+    @classmethod
+    @internal.utils.string.decorate_arguments('name')
+    def children(cls, widget, name):
+        '''Return each child widget from the specified `widget` that are instantiated with the given `name`.'''
+        return cls.children(widget, cls.__type_by_name__(name))
+    @internal.utils.multicase()
+    @classmethod
+    def children(cls, widget, type):
+        '''Return each child widget from the specified `widget` that are instnatiated with the given `type`.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.children({!s}, {!s}) : Unable to query the children of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget, type))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        return twidget.findChildren(type)
+
+    @classmethod
+    def boundaries(cls, widget):
+        '''Return the boundaries of the specified `widget` relative to its parent as a 4-tuple containing the x-coodrdinate, y-coordinate, width, and height.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.bounds({!s}) : Unable to query the boundaries of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        area = twidget.geometry()
+        return area.x(), area.y(), area.width(), area.height()
+
+    @classmethod
+    def size(cls, widget):
+        '''Return the dimensions of the specified `widget` as a 2-tuple containing the width and height.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.size({!s}) : Unable to query the dimensions of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        res = twidget.size()
+        return res.width(), res.height()
+
+    @classmethod
+    def position(cls, widget):
+        '''Return the screen-position of the specified `widget` as a 2-tuple containing the x-coordinate and y-coordinate.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.position({!s}) : Unable to query the position of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        res = twidget.mapToGlobal(twidget.rect().topLeft())
+        return res.x(), res.y()
+
+    @classmethod
+    def visible(cls, widget):
+        '''Return whether the specified `widget` is currently visible.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.visible({!s}) : Unable to query the visibility of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        return twidget.isVisible()
+
+    @classmethod
+    def name(cls, widget):
+        '''Return the name of the specified `widget`.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.name({!s}) : Unable to query the name of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
+        twidget = widget if cls.isinstance(widget) else cls.of(widget)
+        return internal.utils.string.of(twidget.objectName())
+
+    class font(object):
+        def __new__(cls, object):
+            '''Return the font used when rendering the widget specified by `object`.'''
+            if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+                raise internal.exceptions.UnsupportedCapability(u"{:s}({!s}) : Unable to query the font for a widget when not using Qt.".format('.'.join([__name__, 'widget', cls.__name__]), object))
+            twidget = object if widget.isinstance(object) else widget.of(object)
+            return twidget.font()
+
+        @classmethod
+        def metrics(cls, object):
+            '''Return the metrics for the font used when rendering the widget specified by `object`.'''
+            if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+                raise internal.exceptions.UnsupportedCapability(u"{:s}.metrics({!s}) : Unable to query the font metrics for a widget when not using Qt.".format('.'.join([__name__, 'widget', cls.__name__]), object))
+            twidget = object if widget.isinstance(object) else widget.of(object)
+            return twidget.fontMetrics()
+
+        @classmethod
+        def character(cls, object):
+            '''Return the dimensions of a character from the font used when rendering the widget specified by `object`.'''
+            metrics = cls.metrics(object)
+            return metrics.averageCharWidth(), metrics.lineSpacing()
+
+### Signalling to the user that is using the user-interface.
+class message(object):
+    """
+    This namespace is for displaying a modal dialog box with the different
+    icons that are available from IDA's user interface. The functions within
+    will block IDA from being interacted with while their dialog is displayed.
+    """
+    def __new__(cls, message, **icon):
+        '''Display a modal information dialog box using the provided `message`.'''
+        if not idaapi.is_msg_inited():
+            raise internal.exceptions.DisassemblerError(u"{:s}({!r}{:s}) : Unable to display the requested modal dialog due to the user interface not yet being initialized.".format('.'.join([__name__, cls.__name__]), message, ", {:s}".format(internal.utils.string.kwargs(icon)) if icon else ''))
+
+        # because ida is fucking hil-ar-ious...
+        def why(F, *args):
+            name = '.'.join([F.__module__, F.__name__] if hasattr(F, '__module__') else [F.__name__])
+            raise internal.exceptions.DisassemblerError(u"{:s}({!r}{:s}) : Refusing to display the requested modal dialog with `{:s}` due it explicitly terminating the host application.".format('.'.join([__name__, cls.__name__]), message, ", {:s}".format(internal.utils.string.kwargs(icon)) if icon else '', name))
+
+        # these are all of the ones that seem to be available.
+        mapping = {
+            'information': idaapi.info, 'info': idaapi.info,
+            'warning': idaapi.warning, 'warn': idaapi.warning,
+            'error': functools.partial(why, idaapi.error), 'fatal': functools.partial(why, idaapi.error),
+            'nomem': functools.partial(why, idaapi.nomem), 'fuckyou': functools.partial(why, idaapi.nomem),
+        }
+        F = builtins.next((mapping[k] for k in icon if mapping.get(k, False)), idaapi.info)
+
+        # format it and give a warning if it's not the right type.
+        formatted = message if isinstance(message, internal.types.string) else "{!s}".format(message)
+        if not isinstance(message, internal.types.string):
+            logging.warning(u"{:s}({!r}{:s}) : Formatted the given message ({!r}) as a string ({!r}) prior to displaying it.".format('.'.join([__name__, cls.__name__]), message, ", {:s}".format(internal.utils.string.kwargs(icon)) if icon else '', message, formatted))
+
+        # set it off...
+        return F(internal.utils.string.to(formatted))
+
+    @classmethod
+    def information(cls, message):
+        '''Display a modal information dialog box using the provided `message`.'''
+        return cls(message, information=True)
+    info = internal.utils.alias(information, 'message')
+
+    @classmethod
+    def warning(cls, message):
+        '''Display a modal warning dialog box using the provided `message`.'''
+        return cls(message, warning=True)
+    warn = internal.utils.alias(warning, 'message')
+
+    @classmethod
+    def error(cls, message):
+        '''Display a modal error dialog box using the provided `message`.'''
+        return cls(message, error=True)
+
 class ask(object):
     """
     This namespace contains utilities for asking the user for some
@@ -283,6 +975,28 @@ class ask(object):
         result = idaapi.ask_text(length, internal.utils.string.to(dflt), internal.utils.string.to(message))
         return internal.utils.string.of(result)
 
+### Namespaces specific to the disassembler user-interface.
+class state(object):
+    """
+    This namespace is for fetching or interacting with the current
+    state of IDA's interface. These are things such as waiting for
+    IDA's analysis queue, or determining whether the function is
+    being viewed in graph view or not.
+    """
+    @classmethod
+    def graphview(cls):
+        '''Returns true if the current function is being viewed in graph view mode.'''
+        res = idaapi.get_inf_structure()
+        if idaapi.__version__ < 7.0:
+            return res.graph_view != 0
+        return res.is_graph_view()
+
+    @classmethod
+    def wait(cls):
+        '''Wait until IDA's autoanalysis queues are empty.'''
+        return idaapi.autoWait() if idaapi.__version__ < 7.0 else idaapi.auto_wait()
+wait = internal.utils.alias(state.wait, 'state')
+
 class current(object):
     """
     This namespace contains tools for fetching information about the
@@ -401,77 +1115,57 @@ class current(object):
         '''Return the current viewer that is being used.'''
         return idaapi.get_current_viewer()
 
-class state(object):
+class navigation(object):
     """
-    This namespace is for fetching or interacting with the current
-    state of IDA's interface. These are things such as waiting for
-    IDA's analysis queue, or determining whether the function is
-    being viewed in graph view or not.
+    This namespace is for updating the state of the colored navigation band.
     """
-    @classmethod
-    def graphview(cls):
-        '''Returns true if the current function is being viewed in graph view mode.'''
-        res = idaapi.get_inf_structure()
-        if idaapi.__version__ < 7.0:
-            return res.graph_view != 0
-        return res.is_graph_view()
+    if all(not hasattr(idaapi, name) for name in ['show_addr', 'showAddr']):
+        __set__ = staticmethod(lambda ea: None)
+    else:
+        __set__ = staticmethod(idaapi.showAddr if idaapi.__version__ < 7.0 else idaapi.show_addr)
+
+    if all(not hasattr(idaapi, name) for name in ['show_auto', 'showAuto']):
+        __auto__ = staticmethod(lambda ea, t: None)
+    else:
+        __auto__ = staticmethod(idaapi.showAuto if idaapi.__version__ < 7.0 else idaapi.show_auto)
 
     @classmethod
-    def wait(cls):
-        '''Wait until IDA's autoanalysis queues are empty.'''
-        return idaapi.autoWait() if idaapi.__version__ < 7.0 else idaapi.auto_wait()
-wait = internal.utils.alias(state.wait, 'state')
-
-class message(object):
-    """
-    This namespace is for displaying a modal dialog box with the different
-    icons that are available from IDA's user interface. The functions within
-    will block IDA from being interacted with while their dialog is displayed.
-    """
-    def __new__(cls, message, **icon):
-        '''Display a modal information dialog box using the provided `message`.'''
-        if not idaapi.is_msg_inited():
-            raise internal.exceptions.DisassemblerError(u"{:s}({!r}{:s}) : Unable to display the requested modal dialog due to the user interface not yet being initialized.".format('.'.join([__name__, cls.__name__]), message, ", {:s}".format(internal.utils.string.kwargs(icon)) if icon else ''))
-
-        # because ida is fucking hil-ar-ious...
-        def why(F, *args):
-            name = '.'.join([F.__module__, F.__name__] if hasattr(F, '__module__') else [F.__name__])
-            raise internal.exceptions.DisassemblerError(u"{:s}({!r}{:s}) : Refusing to display the requested modal dialog with `{:s}` due it explicitly terminating the host application.".format('.'.join([__name__, cls.__name__]), message, ", {:s}".format(internal.utils.string.kwargs(icon)) if icon else '', name))
-
-        # these are all of the ones that seem to be available.
-        mapping = {
-            'information': idaapi.info, 'info': idaapi.info,
-            'warning': idaapi.warning, 'warn': idaapi.warning,
-            'error': functools.partial(why, idaapi.error), 'fatal': functools.partial(why, idaapi.error),
-            'nomem': functools.partial(why, idaapi.nomem), 'fuckyou': functools.partial(why, idaapi.nomem),
-        }
-        F = builtins.next((mapping[k] for k in icon if mapping.get(k, False)), idaapi.info)
-
-        # format it and give a warning if it's not the right type.
-        formatted = message if isinstance(message, internal.types.string) else "{!s}".format(message)
-        if not isinstance(message, internal.types.string):
-            logging.warning(u"{:s}({!r}{:s}) : Formatted the given message ({!r}) as a string ({!r}) prior to displaying it.".format('.'.join([__name__, cls.__name__]), message, ", {:s}".format(internal.utils.string.kwargs(icon)) if icon else '', message, formatted))
-
-        # set it off...
-        return F(internal.utils.string.to(formatted))
+    def set(cls, ea):
+        '''Set the auto-analysis address on the navigation bar to `ea`.'''
+        result, _ = ea, cls.__set__(ea)
+        return result
 
     @classmethod
-    def information(cls, message):
-        '''Display a modal information dialog box using the provided `message`.'''
-        return cls(message, information=True)
-    info = internal.utils.alias(information, 'message')
+    def auto(cls, ea, **type):
+        """Set the auto-analysis address and type on the navigation bar to `ea`.
+
+        If `type` is specified, then update using the specified auto-analysis type.
+        """
+        result, _ = ea, cls.__auto__(ea, type.get('type', idaapi.AU_NONE))
+        return result
 
     @classmethod
-    def warning(cls, message):
-        '''Display a modal warning dialog box using the provided `message`.'''
-        return cls(message, warning=True)
-    warn = internal.utils.alias(warning, 'message')
-
+    def unknown(cls, ea): return cls.auto(ea, type=idaapi.AU_UNK)
     @classmethod
-    def error(cls, message):
-        '''Display a modal error dialog box using the provided `message`.'''
-        return cls(message, error=True)
+    def code(cls, ea): return cls.auto(ea, type=idaapi.AU_CODE)
+    @classmethod
+    def weak(cls, ea): return cls.auto(ea, type=idaapi.AU_WEAK)
+    @classmethod
+    def procedure(cls, ea): return cls.auto(ea, type=idaapi.AU_PROC)
+    @classmethod
+    def tail(cls, ea): return cls.auto(ea, type=idaapi.AU_TAIL)
+    @classmethod
+    def stackpointer(cls, ea): return cls.auto(ea, type=idaapi.AU_TRSP)
+    @classmethod
+    def analyze(cls, ea): return cls.auto(ea, type=idaapi.AU_USED)
+    @classmethod
+    def type(cls, ea): return cls.auto(ea, type=idaapi.AU_TYPE)
+    @classmethod
+    def signature(cls, ea): return cls.auto(ea, type=idaapi.AU_LIBF)
+    @classmethod
+    def final(cls, ea): return cls.auto(ea, type=idaapi.AU_FINAL)
 
+## Interaction with all of the available disassembler views/windows.
 class appwindow(object):
     """
     Base namespace used for interacting with the windows provided by IDA.
@@ -1071,699 +1765,6 @@ class output(appwindow):
         '''Return the widget for the command-line belonging to the specified Output `window`.'''
         return widget.child(window, 'QLineEdit')
 
-class timer(object):
-    """
-    This namespace is for registering a python callable to a timer in IDA.
-    """
-    clock = {}
-    @classmethod
-    def register(cls, id, interval, callable):
-        '''Register the specified `callable` with the requested `id` to be called at every `interval`.'''
-        if id in cls.clock:
-            idaapi.unregister_timer(cls.clock[id])
-
-        # XXX: need to create a closure that can terminate when signalled
-        cls.clock[id] = res = idaapi.register_timer(interval, callable)
-        return res
-    @classmethod
-    def unregister(cls, id):
-        '''Unregister the specified `id`.'''
-        raise internal.exceptions.UnsupportedCapability(u"{:s}.unregister({!s}) : A lock or a signal is needed here in order to unregister this timer safely.".format('.'.join([__name__, cls.__name__]), id))
-        idaapi.unregister_timer(cls.clock[id])
-        del(cls.clock[id])
-    @classmethod
-    def reset(cls):
-        '''Remove all the registered timers.'''
-        for id, clk in cls.clock.items():
-            idaapi.unregister_timer(clk)
-            del(cls.clock[id])
-        return
-
-### updating the state of the colored navigation band
-class navigation(object):
-    """
-    This namespace is for updating the state of the colored navigation band.
-    """
-    if all(not hasattr(idaapi, name) for name in ['show_addr', 'showAddr']):
-        __set__ = staticmethod(lambda ea: None)
-    else:
-        __set__ = staticmethod(idaapi.showAddr if idaapi.__version__ < 7.0 else idaapi.show_addr)
-
-    if all(not hasattr(idaapi, name) for name in ['show_auto', 'showAuto']):
-        __auto__ = staticmethod(lambda ea, t: None)
-    else:
-        __auto__ = staticmethod(idaapi.showAuto if idaapi.__version__ < 7.0 else idaapi.show_auto)
-
-    @classmethod
-    def set(cls, ea):
-        '''Set the auto-analysis address on the navigation bar to `ea`.'''
-        result, _ = ea, cls.__set__(ea)
-        return result
-
-    @classmethod
-    def auto(cls, ea, **type):
-        """Set the auto-analysis address and type on the navigation bar to `ea`.
-
-        If `type` is specified, then update using the specified auto-analysis type.
-        """
-        result, _ = ea, cls.__auto__(ea, type.get('type', idaapi.AU_NONE))
-        return result
-
-    @classmethod
-    def unknown(cls, ea): return cls.auto(ea, type=idaapi.AU_UNK)
-    @classmethod
-    def code(cls, ea): return cls.auto(ea, type=idaapi.AU_CODE)
-    @classmethod
-    def weak(cls, ea): return cls.auto(ea, type=idaapi.AU_WEAK)
-    @classmethod
-    def procedure(cls, ea): return cls.auto(ea, type=idaapi.AU_PROC)
-    @classmethod
-    def tail(cls, ea): return cls.auto(ea, type=idaapi.AU_TAIL)
-    @classmethod
-    def stackpointer(cls, ea): return cls.auto(ea, type=idaapi.AU_TRSP)
-    @classmethod
-    def analyze(cls, ea): return cls.auto(ea, type=idaapi.AU_USED)
-    @classmethod
-    def type(cls, ea): return cls.auto(ea, type=idaapi.AU_TYPE)
-    @classmethod
-    def signature(cls, ea): return cls.auto(ea, type=idaapi.AU_LIBF)
-    @classmethod
-    def final(cls, ea): return cls.auto(ea, type=idaapi.AU_FINAL)
-
-### interfacing with IDA's menu system
-# FIXME: add some support for actually manipulating menus
-class menu(object):
-    """
-    This namespace is for registering items in IDA's menu system.
-    """
-    state = {}
-    @classmethod
-    def add(cls, path, name, callable, hotkey='', flags=0, args=()):
-        '''Register a `callable` as a menu item at the specified `path` with the provided `name`.'''
-
-        # check to see if our menu item is in our cache and remove it if so
-        if (path, name) in cls.state:
-            cls.rm(path, name)
-
-        # now we can add the menu item since everything is ok
-        # XXX: I'm not sure if the path needs to be utf8 encoded or not
-        res = internal.utils.string.to(name)
-        ctx = idaapi.add_menu_item(path, res, hotkey, flags, callable, args)
-        cls.state[path, name] = ctx
-    @classmethod
-    def rm(cls, path, name):
-        '''Remove the menu item at the specified `path` with the provided `name`.'''
-        res = cls.state[path, name]
-        idaapi.del_menu_item(res)
-        del cls.state[path, name]
-    @classmethod
-    def reset(cls):
-        '''Remove all currently registered menu items.'''
-        for path, name in cls.state.keys():
-            cls.rm(path, name)
-        return
-
-### Qt wrappers and namespaces
-class window(object):
-    """
-    This namespace is for interacting with a specific window.
-    """
-    def __new__(cls):
-        '''Return the currently active window.'''
-        # FIXME: should probably traverse the application windows to figure out the
-        #        exact one that was in use last since it's likely that the currently
-        #        active window is the Python input control which is not really useful.
-        return application.window()
-
-    @internal.utils.multicase(xy=internal.types.tuple)
-    @classmethod
-    def at(cls, xy):
-        '''Return the widget at the specified `(x, y)` coordinate within the `xy` tuple.'''
-        x, y = xy
-        return application.window(x, y)
-
-class windows(object):
-    """
-    This namespace is for interacting with any or all of the windows for the application.
-    """
-    def __new__(cls):
-        '''Return all of the top-level windows.'''
-        return application.windows()
-
-    @classmethod
-    def refresh(cls):
-        '''Refresh all of lists and choosers within the application.'''
-        global disassembly
-        ok = idaapi.refresh_lists() if idaapi.__version__ < 7.0 else idaapi.refresh_choosers()
-        return ok and disassembly.refresh()
-refresh = internal.utils.alias(windows.refresh, 'windows')
-
-class widget(object):
-    """
-    This namespace is for interacting with any of the widgets
-    associated with the native user-interface.
-    """
-    @internal.utils.multicase()
-    def __new__(cls):
-        '''Return the widget that is currently being used.'''
-        return cls.of(current.widget())
-    @internal.utils.multicase(xy=internal.types.tuple)
-    def __new__(cls, xy):
-        '''Return the widget at the specified (`x`, `y`) coordinate within the `xy` tuple.'''
-        res = x, y = xy
-        return cls.at(res)
-    @internal.utils.multicase(title=internal.types.string)
-    def __new__(cls, title):
-        '''Return the widget that is using the specified `title`.'''
-        return cls.by(title)
-
-    @classmethod
-    def at(cls, xy):
-        '''Return the widget at the specified (`x`, `y`) coordinate within the `xy` tuple.'''
-        res = x, y = xy
-        global application
-        q = application()
-        return q.widgetAt(x, y)
-
-    @classmethod
-    def open(cls, widget, flags, **target):
-        '''Open the `widget` using the specified ``idaapi.WOPN_`` flags.'''
-        twidget = cls.form(widget) if cls.isinstance(widget) else widget
-        ok = idaapi.display_widget(twidget, flags)
-        # FIXME: rather than returning whether it succeeded or not, we should
-        #        return what the widget was attached to in order to locate it.
-        return ok
-    @classmethod
-    def close(cls, widget, flags):
-        '''Close the `widget` using the specified ``idaapi.WCLS_`` flags.'''
-        twidget = cls.form(widget) if cls.isinstance(widget) else widget
-        ok = idaapi.close_widget(twidget, flags)
-        # FIXME: rather than returning whether it succeeded or not, we should
-        #        return what the widget was attached to before we closed it.
-        return ok
-
-    @classmethod
-    def show(cls, widget):
-        '''Display the specified `widget` without putting it in focus.'''
-        twidget = cls.form(widget) if cls.isinstance(widget) else widget
-        res, ok = idaapi.get_current_widget(), idaapi.activate_widget(twidget, False)
-        return cls.of(res) if ok else None
-    @classmethod
-    def focus(cls, widget):
-        '''Activate the specified `widget` and put it in focus.'''
-        twidget = cls.form(widget) if cls.isinstance(widget) else widget
-        res, ok = idaapi.get_current_widget(), idaapi.activate_widget(twidget, True)
-        return cls.of(res) if ok else None
-
-    @classmethod
-    def type(cls, widget):
-        '''Return the ``idaapi.twidget_type_t`` for the given `widget`.'''
-        twidget = cls.form(widget) if cls.isinstance(widget) else widget
-        return idaapi.get_widget_type(twidget)
-    @classmethod
-    def title(cls, widget):
-        '''Return the window title for the given `widget`.'''
-        twidget = cls.form(widget) if cls.isinstance(widget) else widget
-        return idaapi.get_widget_title(twidget)
-
-    @internal.utils.multicase(title=internal.types.string)
-    @classmethod
-    @internal.utils.string.decorate_arguments('title')
-    def by(cls, title):
-        '''Return the widget associated with the given window `title`.'''
-        res = idaapi.find_widget(internal.utils.string.to(title))
-        if res is None:
-            raise internal.exceptions.WidgetNotFoundError(u"{:s}.by({!r}) : Unable to locate a widget with the specified title ({!r}).".format('.'.join([__name__, cls.__name__]), title, title))
-        return cls.of(res)
-
-    @internal.utils.multicase(title=internal.types.string)
-    @classmethod
-    @internal.utils.string.decorate_arguments('title')
-    def exists(cls, title):
-        '''Return whether a widget with the specified window `title` exists.'''
-        res = idaapi.find_widget(internal.utils.string.to(title))
-        return res is not None
-
-    @classmethod
-    def of(cls, form):
-        '''Return the user-interface widget for the IDA `form` that is provided.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            return form
-        raise internal.exceptions.MissingMethodError
-    @classmethod
-    def form(cls, widget):
-        '''Return the IDA form for the user-interface `widget` that is provided.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            return widget
-        raise internal.exceptions.MissingMethodError
-    @classmethod
-    def isinstance(cls, object):
-        '''Return whether the given `object` is of the correct type for the user-interface.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            return True
-        raise internal.exceptions.MissingMethodError
-
-    @classmethod
-    def window(cls, widget):
-        '''Return the top-level window that contains the specified `widget`.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.window({!s}) : Unable to query the window of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
-        twidget = widget if cls.isinstance(widget) else cls.of(widget)
-        return twidget.window()
-
-    @classmethod
-    def ancestors(cls, widget):
-        '''Return each of the parent widgets for the specified `widget` ascending to its top-level window.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.ancestors({!s}) : Unable to query the parents of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
-        twidget = widget if cls.isinstance(widget) else cls.of(widget)
-        result, iterable = [], twidget.parentWidget()
-        while iterable is not None:
-            result.append(iterable)
-            iterable = iterable.parentWidget()
-        return result
-
-    @classmethod
-    def parent(cls, widget):
-        '''Return the parent widget for the specified `widget`.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.parent({!s}) : Unable to query the parent of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
-        twidget = widget if cls.isinstance(widget) else cls.of(widget)
-        return twidget.parentWidget()
-
-    @classmethod
-    def __type_by_name__(cls, name):
-        '''Return the widget type with the specified `name` for the current user-interface.'''
-        raise internal.exceptions.MissingMethodError
-
-    @internal.utils.multicase(name=internal.types.string)
-    @classmethod
-    @internal.utils.string.decorate_arguments('name')
-    def child(cls, widget, name):
-        '''Return the first child widget from the specified `widget` that is instantiated with the specified `name`.'''
-        return cls.child(widget, cls.__type_by_name__(name))
-    @internal.utils.multicase()
-    @classmethod
-    def child(cls, widget, type):
-        '''Return the first child widget for the specified `widget` that is instantiated with the specified `type`.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.child({!s}, {!s}) : Unable to query the children of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget, type))
-        twidget = widget if cls.isinstance(widget) else cls.of(widget)
-        result = twidget.findChild(type)
-        if result is None:
-            raise internal.exceptions.WidgetNotFoundError(u"{:s}.child({!s}, {!s}) : Unable to locate a widget that is instantiated with the specified type ({!s}).".format('.'.join([__name__, cls.__name__]), widget, type, type))
-        return result
-
-    @internal.utils.multicase(name=internal.types.string)
-    @classmethod
-    @internal.utils.string.decorate_arguments('name')
-    def children(cls, widget, name):
-        '''Return each child widget from the specified `widget` that are instantiated with the given `name`.'''
-        return cls.children(widget, cls.__type_by_name__(name))
-    @internal.utils.multicase()
-    @classmethod
-    def children(cls, widget, type):
-        '''Return each child widget from the specified `widget` that are instnatiated with the given `type`.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.children({!s}, {!s}) : Unable to query the children of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget, type))
-        twidget = widget if cls.isinstance(widget) else cls.of(widget)
-        return twidget.findChildren(type)
-
-    @classmethod
-    def boundaries(cls, widget):
-        '''Return the boundaries of the specified `widget` relative to its parent as a 4-tuple containing the x-coodrdinate, y-coordinate, width, and height.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.bounds({!s}) : Unable to query the boundaries of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
-        twidget = widget if cls.isinstance(widget) else cls.of(widget)
-        area = twidget.geometry()
-        return area.x(), area.y(), area.width(), area.height()
-
-    @classmethod
-    def size(cls, widget):
-        '''Return the dimensions of the specified `widget` as a 2-tuple containing the width and height.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.size({!s}) : Unable to query the dimensions of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
-        twidget = widget if cls.isinstance(widget) else cls.of(widget)
-        res = twidget.size()
-        return res.width(), res.height()
-
-    @classmethod
-    def position(cls, widget):
-        '''Return the screen-position of the specified `widget` as a 2-tuple containing the x-coordinate and y-coordinate.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.position({!s}) : Unable to query the position of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
-        twidget = widget if cls.isinstance(widget) else cls.of(widget)
-        res = twidget.mapToGlobal(twidget.rect().topLeft())
-        return res.x(), res.y()
-
-    @classmethod
-    def visible(cls, widget):
-        '''Return whether the specified `widget` is currently visible.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.visible({!s}) : Unable to query the visibility of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
-        twidget = widget if cls.isinstance(widget) else cls.of(widget)
-        return twidget.isVisible()
-
-    @classmethod
-    def name(cls, widget):
-        '''Return the name of the specified `widget`.'''
-        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.name({!s}) : Unable to query the name of a widget when not using Qt.".format('.'.join([__name__, cls.__name__]), widget))
-        twidget = widget if cls.isinstance(widget) else cls.of(widget)
-        return internal.utils.string.of(twidget.objectName())
-
-    class font(object):
-        def __new__(cls, object):
-            '''Return the font used when rendering the widget specified by `object`.'''
-            if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-                raise internal.exceptions.UnsupportedCapability(u"{:s}({!s}) : Unable to query the font for a widget when not using Qt.".format('.'.join([__name__, 'widget', cls.__name__]), object))
-            twidget = object if widget.isinstance(object) else widget.of(object)
-            return twidget.font()
-
-        @classmethod
-        def metrics(cls, object):
-            '''Return the metrics for the font used when rendering the widget specified by `object`.'''
-            if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
-                raise internal.exceptions.UnsupportedCapability(u"{:s}.metrics({!s}) : Unable to query the font metrics for a widget when not using Qt.".format('.'.join([__name__, 'widget', cls.__name__]), object))
-            twidget = object if widget.isinstance(object) else widget.of(object)
-            return twidget.fontMetrics()
-
-        @classmethod
-        def character(cls, object):
-            '''Return the dimensions of a character from the font used when rendering the widget specified by `object`.'''
-            metrics = cls.metrics(object)
-            return metrics.averageCharWidth(), metrics.lineSpacing()
-
-class clipboard(object):
-    """
-    This namespace is for interacting with the current clipboard state.
-    """
-    def __new__(cls):
-        '''Return the current clipboard.'''
-        global application
-        clp = application()
-        return clp.clipboard()
-
-    @classmethod
-    def get(cls):
-        '''Return the text that is residing within the current clipboard.'''
-        '''Apply the specified `text` to the current clipboard.'''
-        object = cls()
-        res = object.text()
-        return internal.utils.string.of(res)
-
-    @classmethod
-    def set(cls, text):
-        '''Apply the specified `text` to the current clipboard.'''
-        object = cls()
-        res, _ = internal.utils.string.of(object.text()), object.setText(internal.utils.string.to(text))
-        ok = internal.utils.string.of(object.text()) == text
-        if not ok:
-            raise internal.exceptions.DisassemblerError(u"{:s}.set({!r}) : Unable to apply the specified text to the current clipboard.".format('.'.join([__name__, cls.__name__]), text))
-        return res
-
-class mouse(object):
-    """
-    Base namespace for interacting with the mouse input.
-    """
-    @classmethod
-    def buttons(cls):
-        '''Return the current mouse buttons that are being clicked.'''
-        global application
-        q = application()
-        return q.mouseButtons()
-
-    @classmethod
-    def position(cls):
-        '''Return the current `(x, y)` position of the cursor.'''
-        raise internal.exceptions.MissingMethodError
-
-class keyboard(object):
-    """
-    Base namespace for interacting with the keyboard input.
-    """
-    @classmethod
-    def modifiers(cls):
-        '''Return the current keyboard modifiers that are being used.'''
-        global application
-        q = application()
-        return q.keyboardModifiers()
-
-    @classmethod
-    def __of_key__(cls, key):
-        '''Convert the normalized hotkey tuple in `key` into a format that IDA can comprehend.'''
-        Separators = {'-', '+'}
-        Modifiers = {'ctrl', 'shift', 'alt'}
-
-        # Validate the type of our parameter
-        if not isinstance(key, internal.types.tuple):
-            raise internal.exceptions.InvalidParameterError(u"{:s}.of_key({!r}) : A key combination of an invalid type was provided as a parameter.".format('.'.join([__name__, cls.__name__]), key))
-
-        # Find a separator that we can use, and use it to join our tuple into a
-        # string with each element capitalized. That way it looks good for the user.
-        separator = next(item for item in Separators)
-        modifiers, hotkey = key
-
-        components = [item.capitalize() for item in modifiers] + [hotkey.capitalize()]
-        return separator.join(components)
-
-    @classmethod
-    def __normalize_key__(cls, hotkey):
-        '''Normalize the string `key` to a tuple that can be used to lookup keymappings.'''
-        Separators = {'-', '+', '_'}
-        Modifiers = {'ctrl', 'shift', 'alt'}
-
-        # First check to see if we were given a tuple or list. If so, then we might
-        # have been given a valid hotkey. However, we still need to validate this.
-        # So, to do that we'll concatenate each component together back into a string
-        # and then recurse so we can validate using the same logic.
-        if isinstance(hotkey, internal.types.unordered):
-            try:
-                # If we were mistakenly given a set, then we need to reformat it.
-                if isinstance(hotkey, internal.types.set):
-                    raise ValueError
-
-                modifiers, key = hotkey
-
-                # If modifiers is not of the correct type, then still need to reformat.
-                if not isinstance(modifiers, internal.types.unorered):
-                    raise ValueError
-
-            # If the tuple we received was of an invalid format, then extract the
-            # modifiers that we can from it, and try again.
-            except ValueError:
-                modifiers = tuple(item for item in hotkey if item.lower() in Modifiers)
-                key = ''.join(item for item in hotkey if item.lower() not in Modifiers)
-
-            # Grab a separator, and join all our components together with it.
-            separator = next(item for item in Separators)
-            components = [item for item in modifiers] + [key]
-            return cls.__normalize_key__(separator.join(components))
-
-        # Next we need to normalize the separator used throughout the string by
-        # simply converting any characters we might consider a separator into
-        # a null-byte so we can split on it.
-        normalized = functools.reduce(lambda agg, item: agg.replace(item, '\0'), Separators, hotkey)
-
-        # Now we can split the normalized string so we can convert it into a
-        # set. We will then iterate through this set collecting all of our known
-        # key modifiers. Anything left must be a single key, so we can then
-        # validate the hotkey we were given.
-        components = { item.lower() for item in normalized.split('\0') }
-
-        modifiers = { item for item in components if item in Modifiers }
-        key = components ^ modifiers
-
-        # Now we need to verify that we were given just one key. If we were
-        # given any more, then this isn't a valid hotkey combination and we need
-        # to bitch about it.
-        if len(key) != 1:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.normalize_key({!s}) : An invalid hotkey combination ({!s}) was provided as a parameter.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(hotkey), internal.utils.string.repr(hotkey)))
-
-        res = next(item for item in key)
-        if len(res) != 1:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.normalize_key({!s}) : The hotkey combination {!s} contains the wrong number of keys ({:d}).".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(hotkey), internal.utils.string.repr(res), len(res)))
-
-        # That was it. Now to do the actual normalization, we need to sort our
-        # modifiers into a tuple, and return the single hotkey that we extracted.
-        res, = key
-        return tuple(sorted(modifiers)), res
-
-    # Create a cache to store the hotkey context, and the callable that was mapped to it
-    __cache__ = {}
-
-    @classmethod
-    def list(cls):
-        '''Display the current list of keyboard combinations that are mapped along with the callable each one is attached to.'''
-        maxkey, maxtype, maxinfo = 0, 0, 0
-
-        results = []
-        for mapping, (capsule, closure) in cls.__cache__.items():
-            key = cls.__of_key__(mapping)
-
-            # Check if we were passed a class so we can figure out how to
-            # extract the signature.
-            cons = ['__init__', '__new__']
-            if inspect.isclass(closure):
-                available = (item for item in cons if hasattr(closure, item))
-                attribute = next((item for item in available if inspect.ismethod(getattr(closure, item))), None)
-                callable = getattr(closure, attribute) if attribute else None
-                information = '.'.join([closure.__name__, internal.utils.multicase.prototype(callable)]) if attribute else "{:s}(...)".format(closure.__name__)
-            else:
-                information = internal.utils.multicase.prototype(closure)
-
-            # Figure out the type of the callable that is mapped.
-            if inspect.isclass(closure):
-                ftype = 'class'
-            elif inspect.ismethod(closure):
-                ftype = 'method'
-            elif inspect.isbuiltin(closure):
-                ftype = 'builtin'
-            elif inspect.isfunction(closure):
-                ftype = 'anonymous' if closure.__name__ in {'<lambda>'} else 'function'
-            else:
-                ftype = 'callable'
-
-            # Figure out if there's any class-information associated with the closure
-            if inspect.ismethod(closure):
-                klass = closure.im_self.__class__ if closure.im_self else closure.im_class
-                clsinfo = klass.__name__ if getattr(klass, '__module__', '__main__') in {'__main__'} else '.'.join([klass.__module__, klass.__name__])
-            elif inspect.isclass(closure) or isinstance(closure, internal.types.object):
-                clsinfo = '' if getattr(closure, '__module__', '__main__') in {'__main__'} else closure.__module__
-            else:
-                clsinfo = None if getattr(closure, '__module__', '__main__') in {'__main__'} else closure.__module__
-
-            # Now we can figure out the documentation for the closure that was stored.
-            documentation = closure.__doc__ or ''
-            if documentation:
-                filtered = [item.strip() for item in documentation.split('\n') if item.strip()]
-                header = next((item for item in filtered), '')
-                comment = "{:s}...".format(header) if header and len(filtered) > 1 else header
-            else:
-                comment = ''
-
-            # Calculate our maximum column widths inline
-            maxkey = max(maxkey, len(key))
-            maxinfo = max(maxinfo, len('.'.join([clsinfo, information]) if clsinfo else information))
-            maxtype = max(maxtype, len(ftype))
-
-            # Append each column to our results
-            results.append((key, ftype, clsinfo, information, comment))
-
-        # If we didn't aggregate any results, then raise an exception as there's nothing to do.
-        if not results:
-            raise internal.exceptions.SearchResultsError(u"{:s}.list() : Found 0 key combinations mapped.".format('.'.join([__name__, cls.__name__])))
-
-        # Now we can output what was mapped to the user.
-        six.print_(u"Found the following{:s} key combination{:s}:".format(" {:d}".format(len(results)) if len(results) > 1 else '', '' if len(results) == 1 else 's'))
-        for key, ftype, clsinfo, info, comment in results:
-            six.print_(u"Key: {:>{:d}s} -> {:<{:d}s}{:s}".format(key, maxkey, "{:s}:{:s}".format(ftype, '.'.join([clsinfo, info]) if clsinfo else info), maxtype + 1 + maxinfo, " // {:s}".format(comment) if comment else ''))
-        return
-
-    @classmethod
-    def map(cls, key, callable):
-        """Map the specified `key` combination to a python `callable` in IDA.
-
-        If the provided `key` is being re-mapped due to the mapping already existing, then return the previous callable that it was assigned to.
-        """
-
-        # First we'll normalize the hotkey that we were given, and convert it
-        # back into a format that IDA can understand. This way we can prevent
-        # users from giving us a sloppy hotkey combination that we won't be
-        # able to search for in our cache.
-        hotkey = cls.__normalize_key__(key)
-        keystring = cls.__of_key__(hotkey)
-
-        # The hotkey we normalized is now a tuple, so check to see if it's
-        # already within our cache. If it is, then we need to unmap it prior to
-        # re-creating the mapping.
-        if hotkey in cls.__cache__:
-            logging.warning(u"{:s}.map({!s}, {!r}) : Remapping the hotkey combination {!s} with the callable {!r}.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, internal.utils.string.repr(keystring), callable))
-            ctx, _ = cls.__cache__[hotkey]
-
-            ok = idaapi.del_hotkey(ctx)
-            if not ok:
-                raise internal.exceptions.DisassemblerError(u"{:s}.map({!s}, {!r}) : Unable to remove the hotkey combination {!s} from the list of current keyboard mappings.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, internal.utils.string.repr(keystring)))
-
-            # Pop the callable that was mapped out of the cache so that we can
-            # return it to the user.
-            _, res = cls.__cache__.pop(hotkey)
-
-        # If the user is mapping a new key, then there's no callable to return.
-        else:
-            res = None
-
-        # Verify that the user gave us a callable to use to avoid mapping a
-        # useless type to the specified keyboard combination.
-        if not builtins.callable(callable):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.map({!s}, {!r}) : Unable to map the non-callable value {!r} to the hotkey combination {!s}.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, callable, internal.utils.string.repr(keystring)))
-
-        # Define a closure that calls the user's callable as it seems that IDA's
-        # hotkey functionality doesn't deal too well when the same callable is
-        # mapped to different hotkeys.
-        def closure(*args, **kwargs):
-            return callable(*args, **kwargs)
-
-        # Now we can add the hotkey to IDA using the closure that we generated.
-        # XXX: I'm not sure if the key needs to be utf8 encoded or not
-        ctx = idaapi.add_hotkey(keystring, closure)
-        if not ctx:
-            raise internal.exceptions.DisassemblerError(u"{:s}.map({!s}, {!r}) : Unable to map the callable {!r} to the hotkey combination {!s}.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, callable, internal.utils.string.repr(keystring)))
-
-        # Last thing to do is to stash it in our cache with the user's callable
-        # in order to keep track of it for removal.
-        cls.__cache__[hotkey] = ctx, callable
-        return res
-
-    @classmethod
-    def unmap(cls, key):
-        '''Unmap the specified `key` from IDA and return the callable that it was assigned to.'''
-        frepr = lambda hotkey: internal.utils.string.repr(cls.__of_key__(hotkey))
-
-        # First check to see whether we were given a callable or a hotkey. If
-        # we were given a callable, then we need to look through our cache for
-        # the actual key that it was. Once found, then we normalize it like usual.
-        if callable(key):
-            try:
-                hotkey = cls.__normalize_key__(next(item for item, (_, fcallback) in cls.__cache__.items() if fcallback == key))
-
-            except StopIteration:
-                raise internal.exceptions.InvalidParameterError(u"{:s}.unmap({:s}) : Unable to locate the callable {!r} in the current list of keyboard mappings.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), key))
-
-            else:
-                logging.warning(u"{:s}.unmap({:s}) : Discovered the hotkey {!s} being currently mapped to the callable {!r}.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey), key))
-
-        # We need to normalize the hotkey we were given, and convert it back
-        # into IDA's format. This way we can locate it in our cache, and prevent
-        # sloppy user input from interfering.
-        else:
-            hotkey = cls.__normalize_key__(key)
-
-        # Check to see if the hotkey is cached and warn the user if it isn't.
-        if hotkey not in cls.__cache__:
-            logging.warning(u"{:s}.unmap({:s}) : Refusing to unmap the hotkey {!s} as it is not currently mapped to anything.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey)))
-            return
-
-        # Grab the keymapping context from our cache, and then ask IDA to remove
-        # it for us. If we weren't successful, then raise an exception so the
-        # user knows what's up.
-        ctx, _ = cls.__cache__[hotkey]
-        ok = idaapi.del_hotkey(ctx)
-        if not ok:
-            raise internal.exceptions.DisassemblerError(u"{:s}.unmap({:s}) : Unable to unmap the specified hotkey ({!s}) from the current list of keyboard mappings.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey)))
-
-        # Now we can pop off the callable that was mapped to the hotkey context
-        # in order to return it, and remove the hotkey from our cache.
-        _, res = cls.__cache__.pop(hotkey)
-        return res
-
-    add, rm = internal.utils.alias(map, 'keyboard'), internal.utils.alias(unmap, 'keyboard')
-
-    @classmethod
-    def input(cls):
-        '''Return the current keyboard input context.'''
-        raise internal.exceptions.MissingMethodError
-
 ### PyQt5-specific functions and namespaces
 ## these can overwrite any of the classes defined above
 try:
@@ -1974,7 +1975,7 @@ except StopIteration:
     pass
 
 except ImportError:
-    logging.info(u"{:s}:Unable to locate `PyQt5.Qt` module.".format(__name__))
+    logging.info(u"{:s}: Skipping `PyQt5` components due to being unable to locate the `PyQt5.Qt` module.".format(__name__))
 
 ### PySide-specific functions and namespaces
 try:
@@ -2080,7 +2081,7 @@ except StopIteration:
     pass
 
 except ImportError:
-    logging.info(u"{:s}:Unable to locate `PySide` module.".format(__name__))
+    logging.info(u"{:s}: Skipping `PySide` components due to being unable to locate the `PySide` module.".format(__name__))
 
 ### wrapper that uses a priorityhook around IDA's hooking capabilities.
 class hook(object):
