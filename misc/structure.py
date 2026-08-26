@@ -1739,6 +1739,10 @@ class member(object):
         if not idaapi.set_member_type(sptr, mptr.soff, unsigned.value(), opinfo, nbytes):
             raise E.DisassemblerError(u"{:s}.set_type({:#x}, {!s}{:s}) : Unable to assign the provided type ({!s}) to the {:s} member \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, type, ", {:#x}".format(*map(int, offset)) if offset else '', type, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(utils.string.of(fullname), '"'), mptr.id))
 
+        # Now we can completely remove the type from the member.
+        elif not cls.remove_typeinfo(mptr):
+            raise E.DisassemblerError(u"{:s}.set_type({:#x}, {!s}{:s}) : Unable to remove the type information ({!r}) from the specified {:s} member \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, type, ", {:#x}".format(*map(int, offset)) if offset else '', type, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(utils.string.of(fullname), '"'), mptr.id))
+
         # XXX: On older versions of the disassembler, the structure might not have been "saved" and
         #      required us to race the member out of the database and re-verify.. To be fair, it
         #      only happened when modifying in bulk. However, we're now avoiding that entirely.
