@@ -1092,7 +1092,7 @@ class widget(object):
         '''Return the widget associated with the given window `title`.'''
         res = idaapi.find_widget(internal.utils.string.to(title))
         if res is None:
-            raise internal.exceptions.ItemNotFoundError(u"{:s}.by({!r}) : Unable to locate a widget with the specified title ({!r}).".format('.'.join([__name__, cls.__name__]), title, title))
+            raise internal.exceptions.WidgetNotFoundError(u"{:s}.by({!r}) : Unable to locate a widget with the specified title ({!r}).".format('.'.join([__name__, cls.__name__]), title, title))
         return cls.of(res)
 
     @internal.utils.multicase(title=internal.types.string)
@@ -1105,19 +1105,19 @@ class widget(object):
 
     @classmethod
     def of(cls, form):
-        '''Return the UI widget for the IDA `form` that is provided.'''
+        '''Return the user-interface widget for the IDA `form` that is provided.'''
         if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
             return form
         raise internal.exceptions.MissingMethodError
     @classmethod
     def form(cls, widget):
-        '''Return the IDA form for the UI `widget` that is provided.'''
+        '''Return the IDA form for the user-interface `widget` that is provided.'''
         if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
             return widget
         raise internal.exceptions.MissingMethodError
     @classmethod
     def isinstance(cls, object):
-        '''Return whether the given `object` is of the correct type for the UI.'''
+        '''Return whether the given `object` is of the correct type for the user-interface.'''
         if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
             return True
         raise internal.exceptions.MissingMethodError
@@ -1152,7 +1152,7 @@ class widget(object):
 
     @classmethod
     def __type_by_name__(cls, name):
-        '''Return the widget type with the specified `name` for the current UI.'''
+        '''Return the widget type with the specified `name` for the current user-interface.'''
         raise internal.exceptions.MissingMethodError
 
     @internal.utils.multicase(name=internal.types.string)
@@ -1170,7 +1170,7 @@ class widget(object):
         twidget = widget if cls.isinstance(widget) else cls.of(widget)
         result = twidget.findChild(type)
         if result is None:
-            raise internal.exceptions.ItemNotFoundError(u"{:s}.child({!s}, {!s}) : Unable to locate a widget that is instantiated with the specified type ({!s}).".format('.'.join([__name__, cls.__name__]), widget, type, type))
+            raise internal.exceptions.WidgetNotFoundError(u"{:s}.child({!s}, {!s}) : Unable to locate a widget that is instantiated with the specified type ({!s}).".format('.'.join([__name__, cls.__name__]), widget, type, type))
         return result
 
     @internal.utils.multicase(name=internal.types.string)
@@ -1688,7 +1688,7 @@ try:
                 return ns.QtWidgetToTWidget(widget)
             elif widget in cls.__cache__:
                 return cls.__cache__[widget]
-            raise internal.exceptions.UnsupportedVersion(u"{:s}.of({!s}) : Unable to return the plugin form from a PyQT widget due to it being unsupported by the current version of IDA.".format('.'.join([__name__, cls.__name__]), widget))
+            raise internal.exceptions.UnsupportedVersion(u"{:s}.form({!s}) : Unable to return the plugin form from a PyQT widget due to it being unsupported by the current version of the disassembler.".format('.'.join([__name__, cls.__name__]), widget))
         @classmethod
         def isinstance(cls, widget):
             '''Return whether the given `object` is a PyQt widget.'''
@@ -1701,7 +1701,7 @@ try:
             iterable = (getattr(module, name) for module in modules if hasattr(module, name))
             result = next(iterable, None)
             if result is None:
-                raise internal.exceptions.ItemNotFoundError(u"{:s}.__type_by_name__({!r}) : Unable to resolve a widget type for the specified name ({!r}).".format('.'.join([__name__, cls.__name__]), name, name))
+                raise internal.exceptions.WidgetNotFoundError(u"{:s}.__type_by_name__({!r}) : Unable to resolve a widget type for the specified name ({!r}).".format('.'.join([__name__, cls.__name__]), name, name))
             return result
 
 except StopIteration:
@@ -1793,7 +1793,7 @@ try:
             '''Return the IDA form for the PySide `widget` that is provided.'''
             if widget in cls.__cache__:
                 return cls.__cache__[widget]
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.of({!s}) : Unable to return the plugin form from a PySide widget due to it being unsupported by the current version of IDA.".format('.'.join([__name__, cls.__name__]), widget))
+            raise internal.exceptions.UnsupportedVersion(u"{:s}.form({!s}) : Unable to return the plugin form from a PySide widget due to it being unsupported by the current version of IDA.".format('.'.join([__name__, cls.__name__]), widget))
 
         @classmethod
         def isinstance(cls, object):
@@ -1807,7 +1807,7 @@ try:
             iterable = (getattr(module, name) for module in modules if hasattr(module, name))
             result = next(iterable, None)
             if result is None:
-                raise internal.exceptions.ItemNotFoundError(u"{:s}.__type_by_name__({!r}) : Unable to resolve a widget type for the specified name ({!r}).".format('.'.join([__name__, cls.__name__]), name, name))
+                raise internal.exceptions.WidgetNotFoundError(u"{:s}.__type_by_name__({!r}) : Unable to resolve a widget type for the specified name ({!r}).".format('.'.join([__name__, cls.__name__]), name, name))
             return result
 
 except StopIteration:
