@@ -1242,6 +1242,28 @@ class widget(object):
         twidget = widget if cls.isinstance(widget) else cls.of(widget)
         return internal.utils.string.of(twidget.objectName())
 
+    class font(object):
+        def __new__(cls, object):
+            '''Return the font used when rendering the widget specified by `object`.'''
+            if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+                raise internal.exceptions.UnsupportedCapability(u"{:s}({!s}) : Unable to query the font for a widget when not using Qt.".format('.'.join([__name__, 'widget', cls.__name__]), object))
+            twidget = object if widget.isinstance(object) else widget.of(object)
+            return twidget.font()
+
+        @classmethod
+        def metrics(cls, object):
+            '''Return the metrics for the font used when rendering the widget specified by `object`.'''
+            if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+                raise internal.exceptions.UnsupportedCapability(u"{:s}.metrics({!s}) : Unable to query the font metrics for a widget when not using Qt.".format('.'.join([__name__, 'widget', cls.__name__]), object))
+            twidget = object if widget.isinstance(object) else widget.of(object)
+            return twidget.fontMetrics()
+
+        @classmethod
+        def character(cls, object):
+            '''Return the dimensions of a character from the font used when rendering the widget specified by `object`.'''
+            metrics = cls.metrics(object)
+            return metrics.averageCharWidth(), metrics.lineSpacing()
+
 class clipboard(object):
     """
     This namespace is for interacting with the current clipboard state.
