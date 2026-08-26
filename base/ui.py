@@ -446,6 +446,112 @@ class window(object):
         x, y = xy
         return application.window(x, y)
 
+    @internal.utils.multicase()
+    @classmethod
+    def title(cls, window):
+        '''Return the title of the specified `window`.'''
+        return internal.utils.string.of(cls().windowTitle())
+    @internal.utils.multicase(text=internal.types.string)
+    @classmethod
+    @internal.utils.string.decorate_arguments('text')
+    def title(cls, window, text):
+        '''Modify the title of the specified `window` to `text`.'''
+        string = internal.utils.string.to(text)
+        res, ok = window.windowTitle(), window.setWindowTitle(string)
+        return internal.utils.string.of(res)
+
+    @classmethod
+    def state(cls, window):
+        '''Return the state of the specified `window` as a string.'''
+        if window.isMinimized():
+            return 'minimized'
+        elif window.isMaximized():
+            return 'maximized'
+        elif window.isFullScreen():
+            return 'fullscreen'
+        return 'normal'
+
+    @classmethod
+    def maximize(cls, window):
+        '''Maximum the specified `window`.'''
+        return window.showMaximized()
+
+    @classmethod
+    def minimize(cls, window):
+        '''Minimize the specified `window`.'''
+        return window.showMinimized()
+
+    @classmethod
+    def restore(cls, window):
+        '''Restore the specified `window` to its previous state.'''
+        return window.showNormal()
+
+    @classmethod
+    def fullscreen(cls, window):
+        '''Fullscreen the specified `window`.'''
+        return window.showFullScreen()
+
+    @classmethod
+    def activate(cls, window):
+        '''Activate the specified `window` bringing it into focus.'''
+        window.raise_()
+        return window.activateWindow()
+
+    @classmethod
+    def close(cls, window):
+        '''Close the specified `window`.'''
+        return window.close()
+
+    @classmethod
+    def screen(cls, window):
+        '''Return information about the monitor showing the specified `window` as a 5-tuple containing the name, x-coordinate, y-coordinate, width, and height.'''
+        screen = window.screen()
+        geometry = screen.geometry()
+        return internal.utils.string.of(screen.name()), geometry.x(), geometry.y(), geometry.width(), geometry.height()
+
+    @classmethod
+    def frame(cls, window):
+        '''Return the geometry of the frame for the specified `window` as a 4-tuple containing the x-coordinate, y-coordinate, width, and height.'''
+        frame = window.frameGeometry()
+        return frame.x(), frame.y(), frame.width(), frame.height()
+
+    @classmethod
+    def size(cls, window):
+        '''Return the size of the specified `window`.'''
+        return widget.size(window)
+
+    @classmethod
+    def position(cls, window):
+        '''Return the screen-position of the specified `window` as a 2-tuple containing the x-coordinate and y-coordinate.'''
+        return widget.position(window)
+
+    @classmethod
+    def boundaries(cls, window):
+        '''Return the boundaries of the specified `window` as a 4-tuple containing the x-coodrdinate, y-coordinate, width, and height.'''
+        return widget.boundaries(window)
+
+    @classmethod
+    def visible(cls, window):
+        '''Return whether the specified `window` is currently visible.'''
+        return widget.visible(window)
+
+    @classmethod
+    def name(cls, window):
+        '''Return the name of the specified `window`.'''
+        return widget.name(window)
+
+    @classmethod
+    def move(cls, window, x, y):
+        '''Move the given `window` to the x-coordinate and y-coordinate specified by `x` and `y`.'''
+        x, y = xy
+        return window.move(x, y)
+
+    @classmethod
+    def resize(cls, window, width, height):
+        '''Resize the given `window` to the specified `width` and `height`.'''
+        w, h = wh
+        return window.resize(w, h)
+
 class windows(object):
     """
     This namespace is for interacting with any or all of the windows for the application.
