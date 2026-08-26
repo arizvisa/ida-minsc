@@ -1300,6 +1300,18 @@ class appwindow(object):
             return object.deleteLater()
         return idaapi.close_tform(object, *args) if idaapi.__version__ < 7.0 else idaapi.close_widget(object, *args)
 
+    @classmethod
+    def isinstance(cls, object):
+        '''Return whether the specified `object` is a widget that is supported by this namespace.'''
+        expected = getattr(cls, '__type__', None)
+        if expected is None:
+            raise internal.exceptions.MissingMethodError
+        try:
+            result = widget.type(object)
+        except TypeError:
+            return False
+        return result == expected
+
 class breakpoints(appwindow):
     """
     This namespace is for interacting with the Breakpoints window.
