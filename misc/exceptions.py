@@ -241,6 +241,11 @@ class LocalTypeNotFoundError(ItemNotFoundError):
     Unable to locate the specified type in the local types library.
     """
 
+class WidgetNotFoundError(ItemNotFoundError):
+    """
+    Unable to locate the specified widget from the user-interface.
+    """
+
 class ReadOrWriteError(UnicodeException, E.IOError, E.ValueError):
     """
     Unable to read or write the specified number of bytes .
