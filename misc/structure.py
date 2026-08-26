@@ -6768,7 +6768,7 @@ class members(object):
             # If our mptr is not a size, then this is a pythonic type that we need to resolve.
             elif not isinstance(mptr, types.integer):
                 flag, typeid, nbytes = interface.typemap.resolve(mptr)
-                opinfo, tinfo, comments = idaapi.opinfo_t(), idaapi.tinfo_t(), []
+                opinfo, tinfo, comments = idaapi.opinfo_t(), None, []
                 opinfo.tid = typeid
 
             # If it's an integer, then this is just a size and nothing else.
@@ -7041,9 +7041,19 @@ class members(object):
             # XXX: we should catch any exceptions raised here so that we don't
             #      interrupt the application of type information and other
             #      metadata to any missed members.
-            if opinfo is not None and tinfo and tinfo.get_size() != idaapi.BADSIZE:
+            if tinfo and tinfo.get_size() != idaapi.BADSIZE:
                 setflags = getattr(idaapi, 'SET_MEMTI_USERTI', 0)
-                member.set_typeinfo(mptr, tinfo, flags=setflags)
+                res = member.set_typeinfo(mptr, tinfo, flags=setflags)
+
+            # If there wasn't any type information packed, then just remove it
+            # so that the disassembler doesn't try to compiler-type it.
+            elif not tinfo:
+                res = member.remove_typeinfo(mptr)
+
+            # If we hit this condition, then we were given a type but it has a
+            # busted size and is completely invalid. So, let's complain bout it.
+            else:
+                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Refusing to update the type information for member ({:s}) at {:s} of {:s} ({:#x}) with a type ({!s}) containing a bad size ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, mptr.id, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id, "{!s}".format(tinfo), tinfo.get_size()))
 
             # Apply any comments that we might've needed to copy.
             for repeatable, string in enumerate(comments):
@@ -7052,16 +7062,17 @@ class members(object):
                 continue
             continue
 
-        # XXX: The following logic updates any references that were made by the actions
-        #      of this method. This is done by tracking the original references, stepping,
-        #      the auto-queue, and then identifying which members gained which references.
-        #      This allows us to whine to the user if a reference was lost, but really
-        #      it's just so we can output everything that the action changed.
+        # XXX: The following logic updates any references that were made by the
+        #      actions of this method. This is done by tracking the original
+        #      references, stepping the auto-queue, and then distinguishing the
+        #      members that gained or lost references. This allows us to whine
+        #      to the user if a reference was lost, enabling us to output
+        #      anything and everything that this action actually changed.
 
-        # XXX: There's probably a huge performance cost to doing this, but personally I
-        #      can't come up with a legitimate reason for wanting to script mass-assignments
-        #      to structures/unions. Thus the reason for outputting these references is so
-        #      you can verify that the assignment did exactly what you intended it to do.
+        # XXX: There's probably a huge performance cost to doing this, but I
+        #      think  that it's important for us to output any references and
+        #      such that were modified, so that way you can verify that an
+        #      assignment did exactly what you intended it to do.
 
         # Flatten all of the references so that we can step the auto queue for them.
         iterable = (([id] * len(refs), refs) for offset, (id, refs) in references.items())
