@@ -8140,6 +8140,57 @@ class contiguous(object):
         delta = cls.size(items[1 - index:]) if index > 1 else 0
         return offset + delta
 
+    @classmethod
+    def address(cls, start, stop):
+        '''Yield the address and item for each item from the address `start` until `stop.'''
+        left, right = sorted([start, stop])
+
+        # assign our variables for tracking the gap.
+        gap, extra = left, 0
+        for ea in address.items(*map(int, [start, stop])):
+            head = address.head(ea)
+            end = head + (address.size(head) or 1)
+
+            # figure out how much of the item is within our range.
+            frag_start, frag_stop = max(head, left), min(end, right)
+            if frag_stop <= frag_start:
+                continue
+
+            # get all the information we need from the address.
+            flags, info = address.flags(head), idaapi.opinfo_t()
+            ok = idaapi.get_opinfo(head, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, head, idaapi.OPND_ALL, flags)
+
+            # if the address is defined as data, then figure out its type.
+            if flags & idaapi.MS_CLS == idaapi.FF_DATA and left <= head and end <= right:
+                if address.has_typeinfo(head):
+                    ti, aname = address.typeinfo(head), name.get(head)
+                    typename = name.typename(aname) if aname else ''
+                    res = idaapi.print_tinfo('', 0, 0, 0, ti, internal.utils.string.to(typename), '') or None
+                else:
+                    res = typemap.dissolve(flags, info.tid if ok else idaapi.BADADDR, end - head, offset=head)
+                item = res
+
+            # otherwise, this is a gap which is represented by `None`.
+            else:
+                item = None
+
+            # if it was a gap, then aggregate it and adjust our gap positioning.
+            if item is None:
+                gap = min(gap, frag_start) if extra else frag_start
+                extra += frag_stop - frag_start
+            elif not extra:
+                yield head, item
+            else:
+                yield gap, extra
+                extra = 0
+                yield head, item
+            continue
+
+        # if there's still some space left, then yield what's remaining.
+        if extra:
+            yield gap, extra
+        return
+
 class tinfo(object):
     """
     This namespace provides miscellaneous utilities for interacting
