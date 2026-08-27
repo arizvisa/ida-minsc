@@ -10378,7 +10378,7 @@ class tinfo(object):
     @classmethod
     def pointer(cls, info, size=0, attributes=[], **fields):
         '''Reify the type information specified as `info` to a pointer type of the specified `size` with the given `attributes`.'''
-        pi = idaapi.ptr_type_data_t()
+        pi, utils = idaapi.ptr_type_data_t(), internal.utils
 
         # If any type-specific attributes were specified, then pull them out of
         # the attributes and assign them to variables that we will use later to
