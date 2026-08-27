@@ -5738,7 +5738,7 @@ class address(object):
     def items(cls, start, stop):
         '''Iterate through all of the items from the address `start` until right before the address `stop`.'''
         left, right = cls.within(*sorted(map(int, [start, stop])))
-        ea, step, Fwhile = (left, idaapi.next_not_tail, functools.partial(operator.gt, right)) if start <= stop else (right, idaapi.prev_not_tail, functools.partial(operator.le, left))
+        ea, step, Fwhile = (left, idaapi.next_not_tail, functools.partial(operator.gt, right)) if start <= stop else (idaapi.prev_not_tail(right), idaapi.prev_not_tail, functools.partial(operator.le, idaapi.get_item_head(left)))
         iterable = itertools.takewhile(Fwhile, cls.iterate(ea, step))
         return itertools.chain([ea], iterable)
 
