@@ -1318,6 +1318,7 @@ class breakpoints(appwindow):
     """
     __open__ = staticmethod(idaapi.open_bpts_window)
     __open_defaults__ = (idaapi.BADADDR, 0)
+    __type__ = idaapi.BWN_BPTS
 
 class calls(appwindow):
     """
@@ -1325,6 +1326,7 @@ class calls(appwindow):
     """
     __open__ = staticmethod(idaapi.open_calls_window)
     __open_defaults__ = (idaapi.BADADDR, 0)
+    __type__ = idaapi.BWN_CALLS
 
 class disassembly(appwindow):
     """
@@ -1332,6 +1334,7 @@ class disassembly(appwindow):
     """
     __open__ = staticmethod(idaapi.open_disasm_window)
     __open_defaults__ = ('Disassembly', )
+    __type__ = getattr(idaapi, 'BWN_DISASM', getattr(idaapi, 'BWN_DISASMS', None))
 
     @classmethod
     def refresh(cls):
@@ -1345,6 +1348,7 @@ class dump(appwindow):
     """
     __open__ = staticmethod(idaapi.open_hexdump_window)
     __open_defaults__ = (idaapi.BADADDR, 0)
+    __type__ = getattr(idaapi, 'BWN_HEXVIEW', getattr(idaapi, 'BWN_DUMP', getattr(idaapi, 'BWN_DUMPS', None)))
 hexdump = dump
 
 class enumerations(appwindow):
@@ -1356,8 +1360,10 @@ class enumerations(appwindow):
     """
     if hasattr(idaapi, 'open_enums_window'):
         __open__ = staticmethod(idaapi.open_enums_window)
+        __type__ = idaapi.BWN_ENUMS
     else:
         __open__ = staticmethod(idaapi.open_loctypes_window)
+        __type__ = getattr(idaapi, 'BWN_TILIST', getattr(idaapi, 'BWN_LOCTYPS', None))
     __open_defaults__ = (idaapi.BADADDR, 0)
 
 class exports(appwindow):
@@ -1366,6 +1372,7 @@ class exports(appwindow):
     """
     __open__ = staticmethod(idaapi.open_exports_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_EXPORTS
 
 class frame(appwindow):
     """
@@ -1373,6 +1380,7 @@ class frame(appwindow):
     """
     __open__ = staticmethod(idaapi.open_frame_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_FRAME
 
 class functions(appwindow):
     """
@@ -1380,6 +1388,7 @@ class functions(appwindow):
     """
     __open__ = staticmethod(idaapi.open_funcs_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_FUNCS
 
 class imports(appwindow):
     """
@@ -1387,6 +1396,7 @@ class imports(appwindow):
     """
     __open__ = staticmethod(idaapi.open_imports_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_IMPORTS
 
 class libraries(appwindow):
     """
@@ -1394,6 +1404,7 @@ class libraries(appwindow):
     """
     __open__ = staticmethod(idaapi.open_tils_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_TILS
 tils = typelibraries = libraries
 
 class modules(appwindow):
@@ -1402,6 +1413,7 @@ class modules(appwindow):
     """
     __open__ = staticmethod(idaapi.open_modules_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_MODULES
 
 class names(appwindow):
     """
@@ -1409,6 +1421,7 @@ class names(appwindow):
     """
     __open__ = staticmethod(idaapi.open_names_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_NAMES
 
     @classmethod
     def refresh(cls):
@@ -1455,6 +1468,7 @@ class notepad(appwindow):
     """
     __open__ = staticmethod(idaapi.open_notepad_window)
     __open_defaults__ = ()
+    __type__ = idaapi.BWN_NOTEPAD
 
     @classmethod
     def open(cls, *args):
@@ -1544,6 +1558,7 @@ class problems(appwindow):
     """
     __open__ = staticmethod(idaapi.open_problems_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_PROBS
 
 class references(appwindow):
     """
@@ -1551,6 +1566,7 @@ class references(appwindow):
     """
     __open__ = staticmethod(idaapi.open_xrefs_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_XREFS
 xrefs = references
 
 class segments(appwindow):
@@ -1559,6 +1575,7 @@ class segments(appwindow):
     """
     __open__ = staticmethod(idaapi.open_segments_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_SEGS
 
 class segmentregisters(appwindow):
     """
@@ -1566,6 +1583,7 @@ class segmentregisters(appwindow):
     """
     __open__ = staticmethod(idaapi.open_segments_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_SEGREGS
 segregs = segmentregisters
 
 class selectors(appwindow):
@@ -1574,6 +1592,7 @@ class selectors(appwindow):
     """
     __open__ = staticmethod(idaapi.open_selectors_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_SELS
 
 class signatures(appwindow):
     """
@@ -1581,6 +1600,7 @@ class signatures(appwindow):
     """
     __open__ = staticmethod(idaapi.open_signatures_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_SIGNS
 
 class stack(appwindow):
     """
@@ -1588,6 +1608,7 @@ class stack(appwindow):
     """
     __open__ = staticmethod(idaapi.open_stack_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = getattr(idaapi, 'BWN_CALL_STACK', getattr(idaapi, 'BWN_STACK', None))
 callstack = stack
 
 class strings(appwindow):
@@ -1596,6 +1617,7 @@ class strings(appwindow):
     """
     __open__ = staticmethod(idaapi.open_strings_window)
     __open_defaults__ = (idaapi.BADADDR, idaapi.BADADDR, idaapi.BADADDR)
+    __type__ = idaapi.BWN_STRINGS
 
     @classmethod
     def __on_openidb__(cls, code, is_old_database):
@@ -1667,8 +1689,10 @@ class structures(appwindow):
     """
     if hasattr(idaapi, 'open_structs_window'):
         __open__ = staticmethod(idaapi.open_structs_window)
+        __type__ = idaapi.BWN_STRUCTS
     else:
         __open__ = staticmethod(idaapi.open_loctypes_window)
+        __type__ = getattr(idaapi, 'BWN_TILIST', getattr(idaapi, 'BWN_LOCTYPS', None))
     __open_defaults__ = (idaapi.BADADDR, 0)
 
 class threads(appwindow):
@@ -1677,6 +1701,7 @@ class threads(appwindow):
     """
     __open__ = staticmethod(idaapi.open_threads_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_THREADS
 
 class tracing(appwindow):
     """
@@ -1684,6 +1709,7 @@ class tracing(appwindow):
     """
     __open__ = staticmethod(idaapi.open_trace_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = idaapi.BWN_TRACE
 trace = tracing
 
 class types(appwindow):
@@ -1692,6 +1718,7 @@ class types(appwindow):
     """
     __open__ = staticmethod(idaapi.open_loctypes_window)
     __open_defaults__ = (idaapi.BADADDR, )
+    __type__ = getattr(idaapi, 'BWN_TILIST', getattr(idaapi, 'BWN_LOCTYPS', None))
 
 class output(appwindow):
     """
@@ -1707,6 +1734,7 @@ class output(appwindow):
     """
     __title__ = 'Output'
     __action__ = 'OutputWindow'
+    __type__ = getattr(idaapi, 'BWN_OUTPUT', None)
 
     @classmethod
     def __open__(cls, *args):
