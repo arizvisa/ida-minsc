@@ -5065,6 +5065,13 @@ class address(object):
     def set(cls, ea, items):
         '''Apply the specified list of `items` contiguously to the given address `ea`.'''
         return interface.address.setlayout(ea, items, +1)
+    @utils.multicase(bounds=(interface.bounds_t, interface.location_t), items=internal.types.list)
+    @classmethod
+    def set(cls, bounds, items):
+        '''Apply the specified list of `items` contiguously to the given address `ea`.'''
+        size, (start, stop) = interface.contiguous.size(items), bounds if isinstance(bounds, interface.bounds_t) else bounds.bounds
+        res = items if size == bounds.size else interface.contiguous.resize(0, bounds.size, items)
+        return interface.address.setlayout(start, res, +1)
 
 a = addr = address  # XXX: ns alias
 
