@@ -5708,7 +5708,7 @@ class address(object):
 
             # If anything failed, then we need to log it and return failure.
             if not ok:
-                description = "restore the original type {!s} to".format(interface.tinfo.quoted(oldinfo)) if oldinfo else 'remove the current type from'
+                description = "restore the original type {!s} to".format(tinfo.quoted(oldinfo)) if oldinfo else 'remove the current type from'
                 logging.error(u"{:s}.apply_typeinfo({:#x}, {!r}{:s}) : Error trying to {:s} the specified address ({:#x}) during failure while deleting {:d} byte{:s}.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), ", {:#x}".format(*flags) if flags else '', description, ea, nbytes, '' if nbytes == 1 else 's'))
             return False
 
