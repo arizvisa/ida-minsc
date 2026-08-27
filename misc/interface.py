@@ -8380,6 +8380,68 @@ class contiguous(object):
             yield gap, extra
         return
 
+    @classmethod
+    def resize(cls, start, stop, items):
+        '''Return the specified `items` enlarged or truncated from the offset `start` to `stop`.'''
+        range_t = idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t
+        size, [start, stop] = cls.size(items), map(int, [start, stop])
+        left_pad, right_pad = max(0, min(stop, 0) - start), max(0, stop - max(start, size))
+        low, high = max(start, 0), min(stop, size)
+
+        # go through each item figuring out whether we can clip or adjust it.
+        result, extra, point = [], left_pad, 0
+        for item in items:
+            start, stop = point, point + cls.size([item])
+            point = stop
+
+            # use the lowest and highest offsets to figure out much the item
+            # overlaps. if there isn't anything after truncating, then skip it.
+            clip_left, clip_right = max(start, low), min(stop, high)
+            if clip_right <= clip_left:
+                continue
+
+            # figure out the distances between the start/stop offsets and the
+            # offsets that were clipped.
+            distleft, distright = clip_left - start, stop - clip_right
+            keep = clip_right - clip_left
+
+            # figure out if we have a gap so we can just add it if so.
+            type, _ = (None, 0) if isinstance(item, internal.types.integer) else item[:2] if isinstance(item, (internal.types.tuple, internal.types.list)) else (item, 0)
+            if type == None:
+                extra += keep
+
+            # if we got a range or something similar, then we can truncate it.
+            elif isinstance(item, (bounds_t, location_t, range_t)):
+                if (clip_left, clip_right) == (start, stop):
+                    clipped = item
+                elif isinstance(item, (bounds_t, location_t)):
+                    left, right = item if isinstance(item, bounds_t) else item.bounds
+                    clipped = bounds_t(left + distleft, right - distright)
+                else:
+                    left, right = range.unpack(item)
+                    clipped = bounds_t(left + distleft, right - distright).range()
+
+                # now we check if there's any extra space that needs to be
+                # attached before adding our truncated range to the results.
+                extra and result.append(extra)
+                _, extra = result.append(clipped), 0
+
+            # if the item is atomic, then we also got to attach any extra space
+            # before appending our item to the results.
+            elif (clip_left, clip_right) == (start, stop):
+                extra and result.append(extra)
+                _, extra = result.append(item), 0
+
+            # add the size of the item we kept to our current total.
+            else:
+                extra += keep
+            continue
+
+        # if there was any padding, then we can append it to the results here.
+        extra += right_pad
+        extra and result.append(extra)
+        return result
+
 class tinfo(object):
     """
     This namespace provides miscellaneous utilities for interacting
