@@ -347,11 +347,24 @@ class architecture_t(object):
     def by_partial(self, name, offset, size):
         '''Return a `register_t` or `partialregister_t` for the register with the given `name` starting at `offset` up to the maximum `size`.'''
         register = self.by(name)
-        return interface.partialregister_t(register, offset, size)
+        return self.by_partial(register, offset, size)
     @utils.multicase(register=interface.register_t, offset=types.integer, size=types.integer)
     def by_partial(self, register, offset, size):
         '''Return a `register_t` or `partialregister_t` for the given `register` starting at `offset` up to the maximum `size`.'''
-        return interface.partialregister_t(register, offset, size)
+        ptype = register.__ptype__
+        def recurse(register, left, right):
+            left, position = max(0,  left), register.__position__
+            if right > register.bits and register.__parent__:
+                return recurse(register.__parent__, left + position, right + position)
+            for (cposition, ctype), child in register.__children__.items():
+                if ctype == ptype and cposition <= left and right <= cposition + child.bits:
+                    return recurse(child, left - cposition, right - cposition)
+                continue
+            if (left, right) == (0, register.bits):
+                return register
+            return interface.partialregister_t(register, left, min(register.bits - left, right - left))
+        left, right, eight = offset, offset + size, functools.partial(operator.mul, 8)
+        return recurse(register, *map(eight, [left, right]))
 
     @utils.multicase(name=types.string)
     def by(self, name):
