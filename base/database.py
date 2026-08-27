@@ -5016,6 +5016,56 @@ class address(object):
         return idaapi.get_fileregion_ea(offset)
     byfileoffset = utils.alias(by_fileoffset, 'address')
 
+    @utils.multicase()
+    @classmethod
+    def get(cls):
+        '''Return a contiguous list of data items from the current address or selection.'''
+        address, selection = ui.current.address(), ui.current.selection()
+        if operator.eq(*selection):
+            ea, size = interface.address.head(address), interface.address.size(address)
+            return interface.address.getlayout(ea, ea + size)
+        return interface.address.getlayout(*selection)
+    @utils.multicase(start=internal.types.integer, stop=internal.types.integer)
+    @classmethod
+    def get(cls, start, stop):
+        '''Return a contiguous list of data items from the address `start` to `stop`.'''
+        return interface.address.getlayout(start, stop)
+    @utils.multicase(bounds=(interface.bounds_t, interface.location_t))
+    @classmethod
+    def get(cls, bounds):
+        '''Return a contiguous list of data items from the specified `bounds`'''
+        res = bounds if isinstance(bounds, interface.bounds_t) else bounds.bounds # bounds and bounds...
+        start, stop = bounds
+        return interface.address.getlayout(start, stop)
+    @utils.multicase(range=(idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, idaapi.BasicBlock))
+    @classmethod
+    def get(cls, range):
+        '''Return a contiguous list of data items from the specified `range`.'''
+        start, stop = interface.range.unpack(range)
+        return interface.address.getlayout(start, stop)
+    @utils.multicase(structure=internal.structure.structure_t)
+    @classmethod
+    def get(cls, structure):
+        '''Return a contiguous list of data items at the location of the specified `structure`.'''
+        sptr = structure.ptr
+        if isinstance(sptr, idaapi.tinfo_t):
+            ea, size = structure.offset, interface.tinfo.size(sptr)
+        else:
+            ea, size = structure.offset, idaapi.get_struc_size(sptr)
+        return interface.address.getlayout(ea, ea + size)
+
+    @utils.multicase(items=internal.types.list)
+    @classmethod
+    def set(cls, items):
+        '''Apply the specified list of `items` contiguously to the current address.'''
+        ea = ui.current.address()
+        return interface.address.setlayout(ea, items, +1)
+    @utils.multicase(ea=internal.types.integer, items=internal.types.list)
+    @classmethod
+    def set(cls, ea, items):
+        '''Apply the specified list of `items` contiguously to the given address `ea`.'''
+        return interface.address.setlayout(ea, items, +1)
+
 a = addr = address  # XXX: ns alias
 
 # address translations
