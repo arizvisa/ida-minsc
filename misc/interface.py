@@ -5854,6 +5854,11 @@ class address(object):
             raise internal.exceptions.RegisterNotFoundError(u"{:s}.scan_register({:#x}, {:#x}, {:s}, {!s}, {:d}{:s}) : Unable to find address{:s} matching the requested register{:s} within the range {:#x}..{:#x}. Stopped at last matching address ({:#x}).".format('.'.join([__name__, cls.__name__]), start, stop, "[{:s}]".format(register_description), utils.pycompat.fullname(predicate) if callable(predicate) else predicate, count, ", {:s}".format(utils.string.kwargs(modifiers)) if modifiers else '', " #{:d}".format(count) if count else '', '' if len(registers) == 1 else 's', start, stop, result[-1] if result else start))
         return result[-1] if result else start
 
+    @classmethod
+    def getlayout(cls, start, stop):
+        '''Return a list containing the contiguous items from the address `start` to `stop`.'''
+        return [item for _, item in contiguous.address(start, stop)]
+
 class range(object):
     """
     This namespace provides tools that assist with interacting with IDA 6.x's
