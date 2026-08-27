@@ -8074,6 +8074,9 @@ class set(object):
         return get(ea)
     info = typeinfo = utils.alias(type, 'set')
 
+    # add an alias for applying a slice of types to the database.
+    slice = utils.alias(address.set, 'set')
+
     @utils.multicase()
     @classmethod
     def unknown(cls):
@@ -9164,6 +9167,9 @@ class get(object):
         if ea == idaapi.BADADDR:
             raise E.AddressNotFoundError(u"{:s}({!r}) : Unable to find the address for the specified symbol \"{:s}\".".format('.'.join([__name__, cls.__name__]), res if suffix else string, utils.string.escape(string, '"')))
         return cls(ea, interface.address.size(ea))
+
+    # add an alias for getting a slice of types from the database.
+    slice = utils.alias(address.get, 'get')
 
     @utils.multicase()
     @classmethod
