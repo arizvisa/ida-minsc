@@ -5859,6 +5859,183 @@ class address(object):
         '''Return a list containing the contiguous items from the address `start` to `stop`.'''
         return [item for _, item in contiguous.address(start, stop)]
 
+    @classmethod
+    def setlayout(cls, ea, items, direction):
+        '''Apply the specified `items` to the memory contiguously starting at address `ea`.'''
+        FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+        create_data = idaapi.do_data_ex if idaapi.__version__ < 7.0 else idaapi.create_data
+        create_struct = getattr(idaapi, 'doStruct', None) if idaapi.__version__ < 7.0 else idaapi.create_struct
+        create_string = idaapi.make_ascii_string if idaapi.__version__ < 7.0 else idaapi.create_strlit
+        create_align = getattr(idaapi, 'doAlign', None) if idaapi.__version__ < 7.0 else idaapi.create_align
+        retrieve_member_info = lambda info, mptr: idaapi.retrieve_member_info(mptr, info) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info
+
+        # figure out which direction we're applying the layout in.
+        if direction:
+            step = -1 if direction < 0 else +1
+        else:
+            return []
+
+        # grab our parameters for the reservation and then we can adjust the
+        # address and layout so that we start from the right place.
+        address, flags, size = int(ea), idaapi.FF_DATA | idaapi.FF_BYTE, contiguous.size(items)
+        ea, layout = (address - size, items[::step]) if step < 0 else (address, items[::step])
+        items_description = "{!r}".format(items) if len("{!r}".format(items)) < 0x40 else "[...{:d} byte{:s}...]".format(size, '' if size == 1 else 's')
+
+        # first we will fetch the layout at the specified address, and then we
+        # reserve the memory. we use bytes, because we're going to fuck it up.
+        results, til, preserved = [], tinfo.library(), cls.getlayout(*[ea, ea + size][::step])
+        with cls.reserve(ea, flags, size) as ok:
+            if not ok:
+                raise internal.exceptions.DisassemblerError(u"{:s}.setlayout({:#x}, {!s}) : Unable to reserve {:d} byte{:s} at address {:#x} for type ({:#x}).".format('.'.join([__name__, cls.__name__]), address, items_description, size, '' if size == 1 else 's', flags))
+
+            # iterate through each item in the layout and handle it. if we were
+            # given an integer, then this is just a gap we can skip.
+            for item in layout:
+                if isinstance(item, internal.types.integer):
+                    ok, nbytes = True, max(0, item)
+
+                # if we were given a location, then we will try to find an
+                # integer type that it fits, falling back to a byte array.
+                elif isinstance(item, location_t):
+                    res = typemap.size((int, item.size))
+                    ok, (flags, tid, nbytes) = False, typemap.resolve((int, item.size)) if res else (idaapi.FF_BYTE, idaapi.BADNODE, item.size)
+
+                # if we were given a range of some sort, then we will create a
+                # byte array for its space.
+                elif isinstance(item, (bounds_t, idaapi.func_t, idaapi.segment_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t)):
+                    left, right = item if isinstance(item, bounds_t) else range.unpack(item)
+
+                # if we got a type, then figure out if we need to parse it.
+                elif isinstance(item, (internal.types.string, idaapi.tinfo_t)):
+                    parsed = item if isinstance(item, idaapi.tinfo_t) else (tinfo.parse(til, item, idaapi.PT_SIL|idaapi.PT_VAR|idaapi.PT_NDC) or tinfo.parse(til, item, idaapi.PT_SIL))
+
+                    # use whatever we parsed to get the name and type.
+                    if not parsed:
+                        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.setlayout({:#x}, {!s}) : Unable to parse the string \"{:s}\" into a type to apply to address {:#x}.".format('.'.join([__name__, cls.__name__]), address, items_description, internal.utils.string.escape(item, '"'), ea))
+                    elif isinstance(parsed, idaapi.tinfo_t):
+                        aname, ti = '', parsed
+                    else:
+                        aname, ti = parsed
+
+                    # try to apply the type to the current address.
+                    if not cls.apply_typeinfo(ea, ti):
+                        raise internal.exceptions.DisassemblerError(u"{:s}.setlayout({:#x}, {!s}) : Unable to apply the type {!s} to the address {:#x}.".format('.'.join([__name__, cls.__name__]), address, items_description, tinfo.quoted(parsed), ea))
+
+                    # if it's named, then we need to ensure that it isn't being
+                    # used. otherwise, we keep suffixing the offset until not.
+                    iterable, newname = itertools.count(1), (aname, cls.offset(ea)) if name.exists(aname) else ()
+                    while newname and name.exists(*newname):
+                        index = next(iterable)
+                        newname = tuple(itertools.chain(newname[:1], [index], newname[-1:]))
+                    name.set(ea, tuplename(*newname)) if newname else name.set(ea, aname)
+
+                    # we succeeded applying the type, so we're good to go.
+                    ok, nbytes = True, tinfo.size(ti)
+
+                # if we got a structure, then we will use it as a type and apply
+                # it to the current address.
+                elif isinstance(item, (internal.structure.structuretypes, internal.structure.members_t)):
+                    sptr = item.owner.ptr if isinstance(item, internal.structure.members_t) else getattr(item, 'ptr', item)
+                    sid = tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
+                    if isinstance(sptr, idaapi.tinfo_t):
+                        if not cls.apply_typeinfo(ea, sptr):
+                            raise internal.exceptions.DisassemblerError(u"{:s}.setlayout({:#x}, {!s}) : Unable to apply the specified structure ({:#x}) to the address {:#x}.".format('.'.join([__name__, cls.__name__]), address, items_description, sid, ea))
+                        nbytes = tinfo.size(sptr)
+                    elif create_struct:
+                        res = idaapi.get_struc_size(sptr)
+                        if not create_struct(ea, res, sid):
+                            raise internal.exceptions.DisassemblerError(u"{:s}.setlayout({:#x}, {!s}) : Unable to apply the specified structure ({:#x}) to the address {:#x}.".format('.'.join([__name__, cls.__name__]), address, items_description, sid, ea))
+                        nbytes = res
+                    else:
+                        res = idaapi.get_struc_size(sptr)
+                        if not create_data(ea, idaapi.FF_DATA | FF_STRUCT, res, sid):
+                            raise internal.exceptions.DisassemblerError(u"{:s}.setlayout({:#x}, {!s}) : Unable to apply the specified structure ({:#x}) to the address {:#x}.".format('.'.join([__name__, cls.__name__]), address, items_description, sid, ea))
+                        nbytes = res
+                    ok = True
+
+                # if we got a member, then we will lift its type and apply it.
+                elif isinstance(item, internal.structure.membertypes):
+                    mptr, mid = getattr(item, 'ptr', item), item.id
+                    if not isinstance(mptr, internal.structure.membertypes):
+                        mowner, _, mindex, udm = internal.structure.v9members.by(mid)
+                        ns, mtype = internal.structure.v9member, tinfo.copy(udm.type)
+                    else:
+                        ns, mtype = internal.structure.member, None
+                        mowner, mindex, mptr = internal.structure.members.by(mid)
+
+                    opinfo = idaapi.opinfo_t()
+                    if isinstance(mtype, idaapi.tinfo_t) and not cls.apply_typeinfo(ea, mtype):
+                        raise internal.exceptions.DisassemblerError(u"{:s}.setlayout({:#x}, {!s}) : Unable to apply the type {!s} from the specified member ({:#x}) to the address {:#x}.".format('.'.join([__name__, cls.__name__]), address, items_description, tinfo.quoted(mtype), mid, ea))
+                    elif isinstance(mtype, idaapi.tinfo_t):
+                        ok = True
+                    elif not retrieve_member_info(opinfo, mptr):
+                        raise internal.exceptions.DisassemblerError(u"{:s}.setlayout({:#x}, {!s}) : Unable to retrieve information from the specified member ({:#x}) to apply to the address {:#x}.".format('.'.join([__name__, cls.__name__]), address, items_description, mid, ea))
+                    else:
+                        flags, tid = idaapi.as_uint32(mptr.flag), opinfo.tid
+                        ok, nbytes = False, idaapi.get_member_size(mptr)
+                    ok = ok
+
+                # if we got a register, or partial, then we will use its type.
+                elif isinstance(item, (register_t, partialregister_t)):
+                    ok, (flags, tid, nbytes) = False, typemap.resolve(item.type)
+
+                # otherwise, this is a pythonic type that we need to resolve.
+                else:
+                    ok, (flags, tid, nbytes) = False, typemap.resolve(item)
+
+                # if we didn't apply the type, then we were given a triple
+                # containing the flags, tid, and size and we will need to apply
+                # this to the address ourselves. first, we figure out the api.
+                if not ok and nbytes > 0:
+                    dtype = flags & typemap.FF_MASKSIZE
+
+                    # now that we have the dtype, we can choose the correct api
+                    # to apply the item to the current address.
+                    if dtype == idaapi.FF_ALIGN:
+                        ok = create_align(ea, nbytes, 0) if create_align else idaapi.create_data(ea, idaapi.FF_DATA | flags, nbytes, idaapi.BADADDR)
+                    elif dtype == FF_STRUCT:
+                        ok = create_struct(ea, nbytes, tid) if create_struct else idaapi.create_data(ea, idaapi.FF_DATA | flags, nbytes, tid)
+                    elif dtype == FF_STRLIT:
+                        ok = create_string(ea, nbytes, tid)
+                    else:
+                        ok = idaapi.create_data(ea, idaapi.FF_DATA | flags, nbytes, tid)
+                        if not ok:
+                            raise internal.exceptions.DisassemblerError(u"{:s}.setlayout({:#x}, {!s}) : Unable to define {:d} byte{:s} of the address {:#x} with the given data ({:#x}){!s}.".format('.'.join([__name__, cls.__name__]), address, items_description, nbytes, '' if nbytes == 1 else 's', ea, idaapi.FF_DATA | flags, '' if tid == idaapi.BADNODE else " and type ({:#x})".format(tid)))
+                        cls.update_refinfo(ea, flags)
+
+                        # XXX: if it's a pythonic type, then use a layout type.
+                        #      this code is commented out because applying the
+                        #      type information will always result in the
+                        #      disassembler displaying it next to the item.
+                        #      so we avoid clogging up the item with completely
+                        #      unnecessary information since the purpose of
+                        #      layout types is really just a placeholder for
+                        #      getting the size right anyways.
+
+                        #element, _ = item if isinstance(item, (internal.types.list, internal.types.tuple)) else (item, 0)
+                        #ti = None if element is None else typemap.resolvetype(item)
+                        #if element is None or not cls.apply_typeinfo(ea, ti, idaapi.TINFO_GUESSED):
+                        #    logging.warning(u"{:s}.setlayout({:#x}, {!s}) : Unable to apply the type {!s} to the address {:#x}.".format('.'.join([__name__, cls.__name__]), address, items_description, tinfo.quoted(ti), ea))
+                        #ok = ok
+
+                    # if we couldn't create the data, then throw an exception.
+                    if not ok:
+                        descriptions = {FF_ALIGN: 'specified alignment', FF_STRUCT: "given structure ({:#x})".format(tid), FF_STRLIT: "given string ({:#x})".format(tid)}
+                        raise internal.exceptions.DisassemblerError(u"{:s}.setlayout({:#x}, {!s}) : Unable to define {:d} byte{:s} of the address {:#x} with the {!s}.".format('.'.join([__name__, cls.__name__]), address, items_description, nbytes, '' if nbytes == 1 else 's', ea, descriptions.get(dtype, "given data ({:#x}){!s}".format(flags, '' if tid == idaapi.BADNODE else " and type ({:#x})".format(tid)))))
+                    nbytes = nbytes
+
+                # if we hit this condition, then the item we tried to write had
+                # no size. so just go ahead and log a warning for the user.
+                elif not ok:
+                    logging.warning(u"{:s}.setlayout({:#x}, {!s}) : Skipping the specified item ({!r}) at address {:#x} due to having a size of {:d} byte{:s}.".format('.'.join([__name__, cls.__name__]), address, items_description, item, ea, nbytes, '' if nbytes == 1 else 's'))
+
+                # update our results with the item we just processed.
+                results.append((ea, item))
+                ea = ea + max(0, nbytes)
+            applied = results[::step]
+        return preserved
+
 class range(object):
     """
     This namespace provides tools that assist with interacting with IDA 6.x's
