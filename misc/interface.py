@@ -8090,6 +8090,7 @@ class contiguous(object):
     @classmethod
     def layout(cls, offset, items, direction):
         '''Yield the offset and item for each of the given `items` when laid out contiguously in the specified `direction` from `offset`.'''
+        range_t = idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t
         size = {integer_t : internal.utils.fidentity for integer_t in internal.types.integer}
 
         # Start by building the lookup table that will map an individual item to its size.
@@ -8106,7 +8107,7 @@ class contiguous(object):
             size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('typeinfo'), tinfo.size)
             size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('typeinfo'), tinfo.size)
 
-        size[idaapi.func_t] = size[idaapi.segment_t] = size[idaapi.range_t] = range.size
+        size[idaapi.func_t] = size[idaapi.segment_t] = size[range_t] = range.size
         size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
         size[idaapi.tinfo_t] = tinfo.size
 
