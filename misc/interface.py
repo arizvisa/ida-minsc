@@ -5593,7 +5593,7 @@ class address(object):
 
             # Now we can remove the type, and then check if there is still a
             # type applied to determine whether we succeeded or not.
-            ok = False if del_tinfo(ea) or get_tinfo(idaapi.tinfo_t(), ea) else True
+            ok = False if [del_tinfo(ea), get_tinfo(idaapi.tinfo_t(), ea)][-1] else True
 
             # If already moved the type, but we need to make sure that we don't
             # tamper with anything that was already created by the loader.
@@ -5601,8 +5601,14 @@ class address(object):
                 return True
 
             # If we successfully removed the type, then we should be okay to
-            # delete the items. If that fails, then we can easily restore the
-            # old type back to the same address before returning failure.
+            # delete the items as long as the bytes aren't already deleted. So,
+            # to avoid `del_items` failures, we check if it was already deleted.
+            elif ok and cls.flags(ea, idaapi.MS_CLS) == idaapi.FF_UNK:
+                return True
+
+            # Otherwise, there's some data at the address that we will try to
+            # delete. If it fails, or we couldn't remove the type earlier, then
+            # we need to restore the type back to the address.
             elif ok and idaapi.del_items(ea, idaapi.DELIT_DELNAMES, nbytes):
                 return True
 
