@@ -7321,7 +7321,7 @@ class strpath(object):
                 # Now we should have the type and its member so we can finally
                 # calculate the current delta from whatever it is we got.
                 delta = sum([delta, 0 if any([ti.is_union(), udm is None]) else udm.offset, offset])
-                Fcollect((tid, tinfo.member_identifier(ti, mindex), offset))
+                Fcollect((tid, tinfo.member_identifier(ti, mindex) if udm else None, offset))
                 udm = None if udm is None or tinfo.identifier(udm.type) == idaapi.BADADDR else udm
 
             # This is super simple as we only need to check if our sptr is a union. We
