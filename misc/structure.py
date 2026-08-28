@@ -3645,7 +3645,7 @@ class v9members(object):
 
         # If we didn't return anything at all, then use the nearest member.
         if not count:
-            choice = cls.nearest(sptr, offset)
+            choice = cls.nearest(type, offset)
             mowner, mindex, mptr = choice
             index, remainder = v9member.at(mptr, offset)
             melement = v9member.element(mptr)
