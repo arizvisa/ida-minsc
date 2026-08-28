@@ -1106,15 +1106,15 @@ def op_structure(ea, opnum, structure, path):
 @utils.multicase(ea=types.integer, opnum=types.integer, sptr=idaapi.struc_t, path=types.ordered)
 def op_structure(ea, opnum, sptr, path):
     '''Apply the structure identified by `sptr` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
-    ea = interface.address.inside(ea)
+    ea, sid = interface.address.inside(ea), interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
     if interface.address.flags(ea, idaapi.MS_CLS) != idaapi.FF_CODE:
-        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The requested address ({:#x}) is not defined as a code type.".format(__name__, ea, opnum, sptr.id, path, ea))
+        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The requested address ({:#x}) is not defined as a code type.".format(__name__, ea, opnum, sid, path, ea))
 
     # Convert the path to a list, and then validate it before we use it.
     path, accepted = [item for item in path], (internal.structure.membertypes, types.string, types.integer)
     if any(not isinstance(item, accepted) for item in path if not hasattr(item, '__int__')):
         index, item = next((index, item) for index, item in enumerate(path) if not isinstance(item, accepted))
-        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The path member at index {:d} has a type ({!s}) that is not supported.".format(__name__, ea, opnum, sptr.id, path, index, item.__class__))
+        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The path member at index {:d} has a type ({!s}) that is not supported.".format(__name__, ea, opnum, sid, path, index, item.__class__))
 
     # Grab information about our instruction and operand so that we can decode
     # it to get the structure offset to use.
@@ -1123,7 +1123,7 @@ def op_structure(ea, opnum, sptr, path):
     # If the operand type is not a valid type, then raise an exception so that
     # we don't accidentally apply a structure to an invalid operand type.
     if op.type not in {idaapi.o_mem, idaapi.o_phrase, idaapi.o_displ, idaapi.o_imm}:
-        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : Unable to apply structure path to the operand ({:d}) for the instruction at {:#x} due to its type ({:d}).".format(__name__, ea, opnum, sptr.id, path, opnum, insn.ea, op.type))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : Unable to apply structure path to the operand ({:d}) for the instruction at {:#x} due to its type ({:d}).".format(__name__, ea, opnum, sid, path, opnum, insn.ea, op.type))
 
     # Now we need to decode our operand and stash it so that we can later
     # use it to calculate the delta between it and the actual member offset
@@ -1135,18 +1135,21 @@ def op_structure(ea, opnum, sptr, path):
     elif any(hasattr(res, attribute) for attribute in ['offset', 'Offset', 'address']):
         value = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
     else:
-        raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}).".format(__name__, ea, opnum, sptr.id, path, value.__class__, opnum, insn.ea))
+        raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}).".format(__name__, ea, opnum, sid, path, value.__class__, opnum, insn.ea))
 
     # First we use the path the user gave us to figure out the suggested path. This
     # should give us the suggestion and its expected delta that we can use for warnings.
-    st = structure.by_identifier(sptr.id)
-    userdelta, userpath = interface.strpath.suggest(sptr, path)
+    st = structure.by_identifier(sid)
+    userdelta, userpath = interface.strpath.suggest(st.ptr, path)
 
     # Precalculate a description of the path to make our error messages look good.
     path_description = []
     for sptr, mptr, offset in userpath:
-        sname = utils.string.of(idaapi.get_struc_name(sptr.id))
-        mname = utils.string.of(idaapi.get_member_name(mptr.id)) if mptr else ''
+        sname = internal.structure.naming.get(sptr)
+        if isinstance(sptr, idaapi.tinfo_t):
+            mname = internal.structure.v9member.get_name(sptr, mptr) if mptr else ''
+        else:
+            mname = internal.structure.member.get_name(sptr, mptr) if mptr else ''
         fullname = '.'.join([sname, mname] if mname else [sname])
         path_description.append("{:s}{:+#x}".format(fullname, offset) if offset or mname else fullname)
 
