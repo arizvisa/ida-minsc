@@ -1103,7 +1103,7 @@ def op_structure(ea, opnum, path):
 def op_structure(ea, opnum, structure, path):
     '''Apply the specified `structure` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
     return op_structure(ea, opnum, structure.ptr, path)
-@utils.multicase(ea=types.integer, opnum=types.integer, sptr=idaapi.struc_t, path=types.ordered)
+@utils.multicase(ea=types.integer, opnum=types.integer, sptr=(idaapi.tinfo_t, getattr(idaapi, 'struc_t', idaapi.tinfo_t)), path=types.ordered)
 def op_structure(ea, opnum, sptr, path):
     '''Apply the structure identified by `sptr` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
     ea, sid = interface.address.inside(ea), interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
@@ -1462,7 +1462,7 @@ def op_structurepath(ea, opnum, path):
 def op_structurepath(ea, opnum, structure, path):
     '''Apply the specified `structure` along with the members in `path` directly to the operand `opnum` of the instruction at address `ea`.'''
     return op_structurepath(ea, opnum, structure.ptr, path)
-@utils.multicase(ea=types.integer, opnum=types.integer, sptr=idaapi.struc_t, path=types.ordered)
+@utils.multicase(ea=types.integer, opnum=types.integer, sptr=(idaapi.tinfo_t, getattr(idaapi, 'struc_t', idaapi.tinfo_t)), path=types.ordered)
 def op_structurepath(ea, opnum, sptr, path):
     '''Apply the structure identified by `sptr` along with the members in `path` directly to the operand `opnum` of the instruction at address `ea`.'''
     ea, sid = interface.address.inside(ea), interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
