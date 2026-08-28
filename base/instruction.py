@@ -1487,6 +1487,7 @@ def op_structurepath(ea, opnum, sptr, path):
     # Similar to op_structure, we first need to figure out the path that the user
     # has suggested to us to apply to the operand and we calculate our goal.
     st = structure.by_identifier(sid)
+    scale = 8 if isinstance(st.ptr, idaapi.tinfo_t) else 1
     usergoal, userpath = interface.strpath.suggest(st.ptr, path)
 
     # Precalculate a description of the path to make our logging events look good.
@@ -1570,7 +1571,7 @@ def op_structurepath(ea, opnum, sptr, path):
 
     finally:
         resolver.close()
-        realdelta = builtins.next(calculator)
+        realdelta, _ = divmod(builtins.next(calculator), scale)
         calculator.close()
 
     # If there was no path that we were able to calculate, then the user gave us
@@ -1594,7 +1595,7 @@ def op_structurepath(ea, opnum, sptr, path):
 
     # We now calc the diff between our expected and the user's delta. We've already warned
     # them about it, so this ensures those missing members still get included in the operand.
-    base = usergoal - goaldelta
+    base, _ = divmod(usergoal - goaldelta, scale)
 
     # Now we need a delta to use. If we avoid adjusting the realdelta using the operand, then the
     # user's path would appear relative to the operand. But since we now support integer-likes, we
