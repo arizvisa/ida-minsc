@@ -1226,25 +1226,31 @@ def op_structurepath(ea, opnum):
         mptr, actval = res
 
         # Then we'll grab its frame along with everything related to the member.
-        frame = idaapi.get_frame(interface.range.start(fn))
-        mowner, mindex, mptr = internal.structure.members.by_identifier(frame, mptr)
+        frame = interface.function.frame(fn).ptr
+        scale, nsmembers = (8, internal.structure.v9members) if isinstance(frame, idaapi.tinfo_t) else (1, internal.structure.members)
+        mowner, mindex, mptr = nsmembers.by_identifier(frame, mptr)
         framebase = interface.function.frame_offset(fn)
 
         # Traverse through each member for the actual value, and collect the full path.
         path, is_array, realoffset, moffset = [], False, 0, 0
-        for realoffset, packed in internal.structure.members.at(mowner, actval):
+        for realoffset, packed in nsmembers.at(mowner, actval):
             mowner, mindex, mptr = packed
+            sid = interface.tinfo.identifier(mowner) if isinstance(mowner, idaapi.tinfo_t) else mowner.id
+            nsmember = internal.structure.v9member if isinstance(mowner, idaapi.tinfo_t) else internal.structure.member
+            moffset = mptr.offset if isinstance(mowner, idaapi.tinfo_t) else mptr.soff
 
             # Now we create a new structure at the real offset and grab the member by its index.
-            member = internal.structure.new(mowner.id, framebase + realoffset).members[mindex]
+            realmemberoffset, _ = divmod(realoffset, scale)
+            member = internal.structure.new(sid, framebase + realmemberoffset).members[mindex]
             path.append(member)
 
             # Check if any of the members are an array, because we promote to a list if so.
-            msize, melement = internal.structure.member.size(mptr), internal.structure.member.element(mptr)
-            is_array, moffset = is_array if is_array else melement < msize, 0 if mptr.flag & idaapi.MF_UNIMEM else mptr.soff
+            msize, melement = nsmember.size(mptr), nsmember.element(mptr)
+            is_array, moffset = is_array if is_array else melement < msize, 0 if internal.structure.union(mowner) else moffset
 
         # Calculate the delta based on the member location and the last member from the path.
-        delta = actval - (realoffset + moffset)
+        shifted, _ = divmod(realoffset + moffset, scale)
+        delta = actval - shifted
 
         # We didn't need to adjust the path due to the frame already being a structure. We still
         # have to determine whether the path contains an array, though. Also, since each member
@@ -1275,26 +1281,32 @@ def op_structurepath(ea, opnum):
             raise E.MissingTypeOrAttribute(u"{:s}.op_structurepath({:#x}, {:d}) : Operand {:d} is not referencing an address ({:#x}) containing the necessary information for a structure.".format(__name__, ea, opnum, opnum, address))
         elif not idaapi.get_struc(info.tid):
             raise E.StructureNotFoundError(u"{:s}.op_structurepath({:#x}, {:d}) : Operand {:d} is referencing an identifier ({:#x}) that is not a structure.".format(__name__, ea, opnum, opnum, info.tid))
-        sptr = idaapi.get_struc(info.tid)
+        sptr = internal.structure.by_identifier(info.tid)
+        scale, nsmembers = (8, internal.structure.v9members) if isinstance(sptr, idaapi.tinfo_t) else (1, internal.structure.members)
 
         # Now we'll use everything we gathered to determine the path using the real
         # offset into the structure. Each member of the path should be translated
         # to the correct address representing the index that was actually selected.
         path, is_array, moffset = [], False, 0
-        for realoffset, packed in internal.structure.members.at(sptr, bytes):
+        for realoffset, packed in nsmembers.at(sptr, bytes):
             mowner, mindex, mptr = packed
+            sid = interface.tinfo.identifier(mowner) if isinstance(mowner, idaapi.tinfo_t) else mowner.id
+            nsmember = internal.structure.v9member if isinstance(mowner, idaapi.tinfo_t) else internal.structure.member
+            moffset = mptr.offset if isinstance(mowner, idaapi.tinfo_t) else mptr.soff
 
             # We're using the real offset so that each structure starts at the correct
             # address. This way each path member has a real address that can be used.
-            member = internal.structure.new(mowner.id, address + base + realoffset).members[mindex]
+            realmemberoffset, _ = divmod(realoffset, scale)
+            member = internal.structure.new(sid, address + base + realmemberoffset).members[mindex]
             path.append(member)
 
             # Check if any of the members are an array, because we promote to a list if so.
-            msize, melement = internal.structure.member.size(mptr), internal.structure.member.element(mptr)
-            is_array, moffset = is_array if is_array else melement < msize, 0 if mptr.flag & idaapi.MF_UNIMEM else mptr.soff
+            msize, melement = nsmember.size(mptr), nsmember.element(mptr)
+            is_array, moffset = is_array if is_array else melement < msize, 0 if internal.structure.union(mowner) else moffset
 
         # Calculate the delta using the adjustment we made for the array and the last element.
-        delta = offset - (base + moffset)
+        memberoffset, _ = divmod(moffset, scale)
+        delta = offset - (base + memberoffset)
 
         # Now we need to figure out whether to return an array or a regular path. This is a
         # structure path, so the indices should already be resolved and represented by the
@@ -1316,8 +1328,9 @@ def op_structurepath(ea, opnum):
     delta, tids = interface.node.get_stroff_path(insn.ea, opnum)
     logging.debug(u"{:s}.op_structurepath({:#x}, {:d}) : Processing {:d} members ({:s}) from path that was returned from `{:s}`.".format(__name__, ea, opnum, len(tids), ', '.join("{:#x}".format(mid) for mid in tids), "{!s}({:#x}, {:d})".format('.'.join(getattr(interface.node.get_stroff_path, attribute) for attribute in ['__module__', '__name__']), insn.ea, opnum)))
 
-    sid, target = tids[0], value + delta
-    sptr = idaapi.get_struc(sid)
+    sid, sptr = tids[0], internal.structure.by_identifier(tids[0])
+    scale, sptr = (8, None) if isinstance(sptr, idaapi.tinfo_t) else (1, sptr)
+    target = scale * (value + delta)
 
     # Before we do anything, we need to figure out exactly what the leftover
     # bytes are after properly resolving our path for the operand and delta.
@@ -1325,13 +1338,13 @@ def op_structurepath(ea, opnum):
     # resolve each individual member and store it in our path.
     path, members = [], interface.strpath.of_tids(target, tids)
     calculator = interface.strpath.calculate(0)
-    resolver = interface.strpath.resolve(path.append, sptr, target)
+    resolver = interface.strpath.resolve(path.append, sptr or sid, target)
 
     position = builtins.next(calculator)
     try:
         sptr, candidates, carry = builtins.next(resolver)
         for owner, mptr, offset in members:
-            assert owner.id == sptr.id
+            assert getattr(owner, 'id', owner) == getattr(sptr, 'id', sptr)
             sptr, candidates, carry = resolver.send((mptr, carry))
             position = calculator.send((owner, mptr, offset))
 
@@ -1341,31 +1354,34 @@ def op_structurepath(ea, opnum):
     # If we're done resolving, then save our position for calculating the path members.
     except StopIteration:
         position = builtins.next(calculator)
-        base = value - carry - position
+        base = value * scale - carry - position
 
     # If we failed to resolve the path, then our operand does not reference the structure
     # and we can't trust the resolved path at all whatsoever. First check to see if it's
     # a sizeof(), and then recalculate the entire path explicitly trusting the tid array.
     except E.MemberNotFoundError as e:
-        size = idaapi.get_struc_size(sid)
+        sptr = internal.structure.by_identifier(sid)
+        size = interface.tinfo.size(sptr) if isinstance(sptr, idaapi.tinfo_t) else idaapi.get_struc_size(sid)
 
         # If we failed to resolve the path, our position and delta are 0, and the value
         # is the same as our structure size, then this is definitely a sizeof(structure)
         # and we return the structure with its size as a special-case.
-        if 0 == position == delta and target == size:
-            return structure.by_identifier(sptr.id), size
+        if 0 == position == delta and target == size * scale:
+            return internal.structure.new(sid, 0), size
 
         # Otherwise we're oob of the structure and will need to guide to the field
         # displayed by the disassembler. Then we can do our maths with the new position.
         calculator = interface.strpath.calculate(0); builtins.next(calculator)
         [calculator.send((sptr, mptr, offset)) for (sptr, mptr, offset) in members]
-        position, path = interface.strpath.guide(builtins.next(calculator) % size, idaapi.get_struc(sid), members)
+        _, goal = divmod(builtins.next(calculator), size * scale)
+        position, path = interface.strpath.guide(goal, internal.structure.by_identifier(sid), members)
 
-        # We need two calcuations, the first one which is the target offset,
+        # We need two calculations, the first one which is the target offset,
         # and relative to our guided position, and the base offset which'll be
         # used to calculate the position of each member in the returend path.
         carry = target - position
-        base =  value - delta - position
+        difference = value - delta
+        base = scale * difference - position
 
     finally:
         resolver.close(), calculator.close()
@@ -1377,9 +1393,10 @@ def op_structurepath(ea, opnum):
     calculator = interface.strpath.calculate(base)
     result, position = [], builtins.next(calculator)
     for sptr, mptr, offset in path:
-        st = structure.by_identifier(sptr.id, offset=position)
-        item = st.members.by_identifier(mptr.id) if mptr else st
-        result.append(item)
+        st = internal.structure.new(getattr(sptr, 'id', sptr), position // scale)
+        nsmembers = internal.structure.v9members if isinstance(st.ptr, idaapi.tinfo_t) else internal.structure.members
+        mowner, mindex, _ = nsmembers.by_identifier(st.ptr, getattr(mptr, 'id', mptr)) if mptr else (None, -1, None)
+        result.append(st if mindex < 0 else st.members[mindex])
         position = calculator.send((sptr, mptr, offset))
 
     # Just like the op_structure implementation, we need to figure out if
