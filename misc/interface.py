@@ -7121,7 +7121,7 @@ class strpath(object):
 
             # Otherwise, we use the choice to get its member by identifier. To
             # do this we need to get the type owning the choice we were given.
-            elif v9 and not ctype.get_type_by_tid(cid):
+            elif v9 and choice not in {None, idaapi.BADADDR} and not ctype.get_type_by_tid(cid):
                 raise internal.exceptions.StructureNotFoundError(formatlog(u"Unable to find the type for the specified identifier {:#x}".format(cid)))
 
             # If we are processing local types, and the choice is a structure
