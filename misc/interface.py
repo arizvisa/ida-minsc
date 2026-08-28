@@ -7538,13 +7538,14 @@ class strpath(object):
         iterable = ((sptr, mptr) for sptr, mptr, _ in path)
         item = builtins.next(iterable)
         sptr, _ = item
-        identifiers = [sptr.id if hasattr(sptr, 'id') else sptr]
+        sid = tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else getattr(sptr, 'id', sptr)
+        identifiers = [sid]
         iterable = itertools.chain([item], iterable)
 
         # Now we can process all of the members in our iterator that contain
         # a user-made decision (represented by being part of a union) and
         # then just combine them into a single list of our items to return.
-        iterable = ((idaapi.tinfo_t(), sptr, getattr(sptr, 'id', sptr), mptr) for sptr, mptr in iterable)
+        iterable = ((idaapi.tinfo_t(), sptr, tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else getattr(sptr, 'id', sptr), mptr) for sptr, mptr in iterable)
         iterable = ((ti if ti.get_type_by_tid(sid) else None, sptr, sid, getattr(mptr, 'id', mptr)) for ti, sptr, sid, mptr in iterable)
 
         members = []
