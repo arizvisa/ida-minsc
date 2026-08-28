@@ -861,27 +861,33 @@ def op_structure(ea, opnum):
         mptr, actval = res
 
         # First we grab our frame, and then find the starting member by its id.
-        frame = idaapi.get_frame(interface.range.start(fn))
-        mowner, mindex, mptr = internal.structure.members.by_identifier(frame, mptr)
+        frame = interface.function.frame(fn).ptr
+        scale, nsmembers = (8, internal.structure.v9members) if isinstance(frame, idaapi.tinfo_t) else (1, internal.structure.members)
+        mowner, mindex, mptr = nsmembers.by_identifier(frame, mptr)
         framebase = interface.function.frame_offset(fn)
 
         # Iterate through all of the members searching for the actual operand value.
         path, is_array, total = [], False, 0
-        for realoffset, packed in internal.structure.members.at(mowner, actval):
+        for realoffset, packed in nsmembers.at(mowner, actval):
             mowner, mindex, mptr = packed
+            sid = interface.tinfo.identifier(mowner) if isinstance(mowner, idaapi.tinfo_t) else mowner.id
+            nsmember = internal.structure.v9member if isinstance(mowner, idaapi.tinfo_t) else internal.structure.member
+            moffset = mptr.offset if isinstance(mowner, idaapi.tinfo_t) else mptr.soff
 
             # We use the total so that offsets from the path match what's displayed by the disassembler.
             # Essentially, the sum of the delta and the last path member should match the operand.
-            member = internal.structure.new(mowner.id, framebase + total).members[mindex]
+            totaloffset, _ = divmod(total, scale)
+            member = internal.structure.new(sid, framebase + totaloffset).members[mindex]
             path.append(member)
 
             # Check if any of the members are an array, because we promote to a list if so.
-            msize, melement = internal.structure.member.size(mptr), internal.structure.member.element(mptr)
-            is_array, total = is_array if is_array else melement < msize, total + (0 if mptr.flag & idaapi.MF_UNIMEM else mptr.soff)
+            msize, melement = nsmember.size(mptr), nsmember.element(mptr)
+            is_array, total = is_array if is_array else melement < msize, total + (0 if internal.structure.union(mowner) else moffset)
 
         # Calculate the delta using the difference of the delta
         # from the path and the actual value of the operand.
-        delta = actval - total
+        shifted, _ = divmod(total, scale)
+        delta = actval - shifted
 
         # If our result is an array, then we need to return a list and include the offset.
         if is_array:
@@ -914,29 +920,36 @@ def op_structure(ea, opnum):
             raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} is not referencing an address ({:#x}) containing the necessary information for a structure.".format(__name__, ea, opnum, opnum, address))
         elif not idaapi.get_struc(info.tid):
             raise E.StructureNotFoundError(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} is referencing an identifier ({:#x}) that is not a structure.".format(__name__, ea, opnum, opnum, info.tid))
-        sptr = idaapi.get_struc(info.tid)
+        sptr = internal.structure.by_identifier(info.tid)
+        scale, nsmembers = (8, internal.structure.v9members) if isinstance(sptr, idaapi.tinfo_t) else (1, internal.structure.members)
 
         # FIXME: check if the operand contains any member xrefs, because
         #        if it doesn't then we don't actually need a path.
 
         # Iterate through the structure members looking for actual member offset.
         total, path, is_array = 0, [], interface.address.size(address) // element > 1
-        for _, packed in internal.structure.members.at(sptr, bytes):
+        for _, packed in nsmembers.at(sptr, bytes):
             mowner, mindex, mptr = packed
+            sid = interface.tinfo.identifier(mowner) if isinstance(mowner, idaapi.tinfo_t) else mowner.id
+            nsmember = internal.structure.v9member if isinstance(mowner, idaapi.tinfo_t) else internal.structure.member
+            moffset = mptr.offset if isinstance(mowner, idaapi.tinfo_t) else mptr.soff
 
             # Here, we use the total so that the offsets for the entire path correlate to what
             # the disassembler displays. This works, except for when the disassembler is wrong.
             member = internal.structure.new(mowner.id, address + total).members[mindex]
+            realtotal, _ = divmod(total, scale)
+            member = internal.structure.new(sid, address + realtotal).members[mindex]
             path.append(member)
 
             # Check if any of the members are an array, because we promote to a list if so.
-            msize, melement = internal.structure.member.size(mptr), internal.structure.member.element(mptr)
-            is_array, total = is_array if is_array else melement < msize, total + (0 if mptr.flag & idaapi.MF_UNIMEM else mptr.soff)
+            msize, melement = nsmember.size(mptr), nsmember.element(mptr)
+            is_array, total = is_array if is_array else melement < msize, total + (0 if internal.structure.union(mowner) else moffset)
 
         # Calculate the delta based on the length of the path. The sum of the offset for the
         # very last member with the delta should result in the operand address. It's also
         # worth noting that the disassembler doesn't always display the correct member.
-        delta = value - (address + total)
+        shifted, _ = divmod(total, scale)
+        delta = value - (address + shifted)
 
         # If we encountered an element that's an array, then we
         # return the path as a list with the delta attached to it.
@@ -961,29 +974,30 @@ def op_structure(ea, opnum):
 
     delta, tids = interface.node.get_stroff_path(insn.ea, opnum)
     logging.debug(u"{:s}.op_structure({:#x}, {:d}) : Processing {:d} members ({:s}) from path that was returned from `{:s}`.".format(__name__, ea, opnum, len(tids), ', '.join("{:#x}".format(mid) for mid in tids), "{!s}({:#x}, {:d})".format('.'.join(getattr(interface.node.get_stroff_path, attribute) for attribute in ['__module__', '__name__']), insn.ea, opnum)))
+    sid, sptr = tids[0], internal.structure.by_identifier(tids[0])
+    nsmembers = internal.structure.v9members if isinstance(sptr, idaapi.tinfo_t) else internal.structure.members
 
     # If we're a single tid, and the sum of the offset and the delta is
     # the same as the size, then the operand is using sizeof and we can leave.
+    size = interface.tinfo.size(sptr) if isinstance(sptr, idaapi.tinfo_t) else idaapi.get_struc_size(sid)
     if len(tids) == 1 and sum([value, delta]) == structure.size(tids[0]):
-        return structure.by_identifier(tids[0])
+        return internal.structure.new(sid, 0)
 
     # Next we'll gather the data references for the operand and key them
     # by their sptr id. This is because I can't figure out any other way
     # to get _exactly_ what's being displayed.
     displayed = {}
     for mid in filter(interface.node.identifier, interface.xref.of_data(insn.ea)):
-
-        # Simple enough. If it's not a member identifier, then skip it.
-        item = idaapi.get_member_by_id(mid)
-        if item is None:
+        if not nsmembers.has_identifier(sptr, mid):
             continue
+        mowner, mindex, mptr = nsmembers.by_identifier(sptr, mid)
+        oid = interface.tinfo.identifier(mowner) if isinstance(mowner, idaapi.tinfo_t) else mowner.id
 
         # Okay, we should now have the member and its owner. We'll only be
         # looking them up by the sptr identifier, so that's all we want.
-        mptr, _, sptr = item
-        if operator.contains(displayed, sptr.id):
-            logging.debug(u"{:s}.op_structure({:#x}, {:d}) : Found more than one reference for a member ({:#x}) belonging to the same structure ({:#x}).".format(__name__, ea, opnum, mptr.id, sptr.id))
-        displayed[sptr.id] = mptr
+        if operator.contains(displayed, oid):
+            logging.debug(u"{:s}.op_structure({:#x}, {:d}) : Found more than one reference for a member ({:#x}) belonging to the same structure ({:#x}).".format(__name__, ea, opnum, mid, oid))
+        displayed[oid] = mid
 
     # Now we can grab our path from the tids that we extracted from the
     # operand. For the sake of debugging, we'll just log the full path.
@@ -995,22 +1009,23 @@ def op_structure(ea, opnum):
     calculator = interface.strpath.calculate(0)
     result, position, leftover = [], builtins.next(calculator), 0
     for sptr, mptr, offset in path:
-        owner = internal.structure.new(sptr.id, position)
+        owner = internal.structure.new(getattr(sptr, 'id', sptr), position)
+        sid, mid = (getattr(ptr, 'id', ptr) for ptr in [sptr, mptr])
 
         # Start out by finding the exact structure that was resolved,
         # and then use it to find the exact member being referenced.
-        if mptr:
-            mindex = internal.structure.members.index(sptr, mptr)
-            moffset = 0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff
-            member, offset = internal.structure.member_t(owner, mindex), mptr.soff
+        if mid not in {None, idaapi.BADADDR}:
+            mowner, mindex, mptr = nsmembers.by_identifier(owner.ptr, mid)
+            moffset = 0 if internal.structure.union(mowner) else mptr.offset // 8 if isinstance(mowner, idaapi.tinfo_t) else mptr.soff
+            member, offset = internal.structure.member_t(owner, mindex), moffset
 
         # If there wasn't a member, then there's at least a member
         # that's being displayed. So, we can figure out which one is
         # being displayed by the operand (via dref) and use that one.
-        elif operator.contains(displayed, sptr.id):
-            mptr, mindex = displayed[sptr.id], internal.structure.members.index(sptr, displayed[sptr.id])
-            moffset = 0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff
-            member, offset = internal.structure.member_t(owner, mindex), offset
+        elif displayed.get(sid) not in {None, idaapi.BADADDR}:
+            mowner, mindex, mptr = nsmembers.by_identifier(owner.ptr, displayed[sid])
+            moffset = 0 if internal.structure.union(mowner) else mptr.offset // 8 if isinstance(mowner, idaapi.tinfo_t) else mptr.soff
+            member, offset = internal.structure.member_t(owner, mindex), moffset
 
         # If it's not referenced at all, then we're in a very weird
         # situation and it absolutely has got to be the structure size.
