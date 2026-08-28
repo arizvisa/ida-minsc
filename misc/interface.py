@@ -7411,7 +7411,7 @@ class strpath(object):
         sid = builtins.next(iterable, idaapi.BADADDR)
         if hasattr(sid, 'id'):
             v9 = False
-        elif all(hasattr(idaapi, name) for name in ['visit_stroff_fields', 'visit_stroff_udms']):
+        elif hasattr(idaapi, 'get_struc'):
             v9 = isinstance(sid, idaapi.tinfo_t) or idaapi.get_struc(sid) is None
         else:
             v9 = hasattr(idaapi, 'visit_stroff_udms')
@@ -7471,6 +7471,24 @@ class strpath(object):
         leftover, visitordelta = disp.value(), builtins.next(calculator)
         calculator.close()
 
+        # Check if we received a truncated union from visit_offset_fields.
+        union = False
+        if not v9:
+            decisions = {}
+            for tid in filter(idaapi.get_member_by_id, tids):
+                mowner, mindex, mptr = internal.structure.members.by_identifier(None, tid)
+                if internal.structure.union(mowner):
+                    decisions[mowner.id] = mptr
+                continue
+
+            # Update our suggestion with the structure path we were given.
+            suggestion = []
+            for msptr, mmptr, moffset in visitorpath:
+                if mmptr is None and getattr(msptr, 'id', msptr) in decisions:
+                    mmptr, union = decisions[getattr(msptr, 'id', msptr)], True
+                suggestion.append((msptr, mmptr, moffset))
+            visitorpath = suggestion
+
         # FIXME: should probably check that the requested offset and delta are
         # accurate or something.
 
@@ -7481,9 +7499,9 @@ class strpath(object):
         # Now we can rely on cls.resolve to figure out where our decisions actually belong. We can
         # target the offset the user gave us because IDA did all of the work for the path, and we
         # only need to figure out which fields the offset is applied to.
-        result = []
+        result, remaining = [], 0 if union else 8 * leftover if v9 else leftover
         calculator = cls.calculate(0, result.append)
-        resolver = cls.resolve(calculator.send, sptr or sid, offset - leftover)
+        resolver = cls.resolve(calculator.send, sptr or sid, offset - remaining)
         flailer = cls.flail(visitorpath)
 
         resultdelta, _ = (builtins.next(item) for item in [calculator, flailer])
@@ -7494,8 +7512,8 @@ class strpath(object):
         try:
             while True:
                 owner, choice, zero = flailer.send((sptr, candidates, carry))
-                cid = choice if isinstance(choice, internal.types.integer) else choice.id
-                if choice and cid not in {getattr(item, 'id', item) for item in candidates}:
+                cid = choice if isinstance(choice, (internal.types.integer, internal.types.none)) else choice.id
+                if choice and not v9 and cid not in {getattr(item, 'id', item) for item in candidates}:
                     logging.info(u"{:s}.of_tids({:#x}, {:s}) : Ignoring the recommended choice ({:#x}) for index {:d} at offset ({:+#x}) as it was not in the list of candidates ([{:s}]).".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), cid, len(result), builtins.next(calculator), ', '.join("{:#x}".format(getattr(item, 'id', item)) for item in candidates)))
                     break
 
