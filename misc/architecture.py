@@ -786,7 +786,7 @@ else:
 
             # do some trickery to figure out what our largest contiguous register size is.
             midx = ida_hexrays.reg2mreg(0)
-            bits = 32 if ida_hexrays.mreg2reg(midx, 8) < 0 else 64
+            bits, bytes = (32, 4) if ida_hexrays.mreg2reg(midx, 8) < 0 else (64, 8)
             # FIXME: is it safe to assume that the reg at index 0 is always sizable?
 
             # some tools for dealing with a tree of registers on intel. i'm probably shooting
@@ -828,28 +828,8 @@ else:
             # first we do the non-architecture registers like temporary and kregs. neither
             # of these should need to be stored as a tree since they're only temporary and
             # should only be used as an intermediary before storing to a concrete register.
-            powers = range(1 + math.trunc(math.log2(bits // 8)))
+            powers = range(1 + math.trunc(math.log2(bytes)))
             pow2 = utils.fcompose(functools.partial(pow, 2), math.trunc)
-
-            # grab the temporary registers and iterate through all of them to add each one.
-            mlist = idaapi.get_temp_regs()
-            assert mlist.mem.count() == 0
-
-            for midx in mlist.reg:
-                for width in map(pow2, powers):
-                    name = ida_hexrays.get_mreg_name(midx, width)
-                    mreg = self.new(name, 8 * width, idaname=midx, ptype=int)
-                    setitem(name, mreg)
-                continue
-
-            # now we just need to do a few kernel registers so that the user can access
-            # them if they actually need to.
-            for midx in map(functools.partial(operator.add, count), range(0x10)):
-                for width in map(pow2, powers):
-                    name = ida_hexrays.get_mreg_name(midx, width)
-                    mreg = self.new(name, 8 * width, idaname=midx, ptype=int)
-                    setitem(name, mreg)
-                continue
 
             # now we need to build our index of all the mregs. we need to do the condition
             # codes (1-8) first, because they're required to exist. these can overlap with
@@ -871,8 +851,8 @@ else:
 
             # now we'll scan the entire mregspace for all other variable-byte registers
             # that "we" know about, but hexrays doesn't. (heh)
-            iterable = ((ida_hexrays.get_mreg_name(midx, 1), midx) for midx in range(count))
-            iterable = ((name, midx) for name, midx in iterable if ida_hexrays.get_mreg_name(midx, bits // 8).lower() == name.lower())
+            iterable = ((ida_hexrays.get_mreg_name(midx, 1), midx) for midx in range(count) if midx < 400)
+            iterable = ((name, midx) for name, midx in iterable if ida_hexrays.get_mreg_name(midx, bytes).lower() == name.lower())
             iterable = ((owner.by_name(name), midx) for name, midx in iterable if owner.has(name))
             mregindex.update({reg : midx for reg, midx in iterable if idaapi.reg2mreg(reg.id) < 0})
 
@@ -889,6 +869,31 @@ else:
                     logging.debug(u"skipping register {:d} during collection : {!r}".format(idx, reg))
                 else:
                     mregindex[reg] = midx
+                continue
+
+            # go through the microregisters, and gather only the full ones.
+            # build an index for all of the fullly named registers.
+            fullindex = {}
+            for midx in range(count):
+                for width in map(pow2, powers):
+                    name = ida_hexrays.get_mreg_name(midx, width)
+                    fullindex.setdefault((name.lower(), width), midx) if name and '^' not in name else fullindex
+                continue
+
+            # now we can use the full index to update our mregindex,
+            for name, reg in architecture.register.__state__.items():
+                if reg in mregindex:
+                    continue
+                elif not isinstance(reg.bits, types.integer):
+                    continue
+                elif reg.bits < 8:
+                    continue
+
+                # if the register is in the index, then copy it into mregindex.
+                key = reg.name.lower(), reg.size
+                if key in fullindex:
+                    mregindex[reg] = fullindex[key]
+                    logging.debug(u"updated the index for register \"{:s}\" ({!r}) using the matching uregister ({:d})".format(utils.string.escape(name, '"'), reg, midx))
                 continue
 
             # now we need all of the roots for each mreg in mregindex
@@ -932,9 +937,113 @@ else:
                 continue
 
             # that should be literally all of the registers we inherited from our owner,
-            # so the only thing left to really do is to attach them to our register state.
+            # so we will need to attach them to our register state.
             assert len({ureg.name for _, ureg in results.items()}) == len(results)
             [ setitem(ureg.name, ureg) for _, ureg in results.items() ]
+
+            # this closure will take a decompiler register name and split off
+            # the offset from it so that we can determine its base register.
+            def Fsplit_carated_register(name):
+                base, carat, offset = name.rpartition('^')
+                return (base, int(offset)) if carat else (name, 0)
+
+            # this closure is responsible for adding a region of registers using
+            # the full name to determine the base so that we can attach all of
+            # its available sub-registers to it.
+            def Fadd_region(indices):
+                views = {}
+                for midx in indices:
+                    name = ida_hexrays.get_mreg_name(midx, bytes)
+                    if name and owner.has(name):
+                        continue
+                    for width in map(pow2, powers):
+                        name = ida_hexrays.get_mreg_name(midx, width)
+                        if not name:
+                            continue
+
+                        # check if we have the register already.
+                        ridx, rbits = views[name] if name in views else (-1, 0)
+                        if ridx < 0 or width > rbits:
+                            views[name] = midx, width
+                        continue
+                    continue
+
+                # grab all the base registers that we collected, and build a
+                # table for looking them up so that we can add them properly.
+                parsed = {name : Fsplit_carated_register(name) for name in views}
+                roots = {base : name for name, (base, offset) in parsed.items() if offset == 0}
+
+                # now we need the interval or range for each of the registers so
+                # that we can figure out which are related and how to add them.
+                parents, queue = {}, []
+                iterable = ((name, views[name]) for name, (base, offset) in parsed.items() if offset == 0)
+                ranges = [(name, ridx, ridx + rbits) for name, (ridx, rbits) in iterable]
+                sortkey = lambda name, left, right: (left, left - right, name)
+                ordered = sorted(ranges, key=lambda packed: sortkey(*packed))
+                for name, left, right in ordered:
+                    _, sleft, sright = queue[-1] if queue else ('', 0, 0)
+                    while queue and not (sleft <= left and right <= sright):
+                        _, sleft, sright = queue.pop()
+
+                    # iterate through all all the ranges in our queue, and grab
+                    # the parent register from them if they match.
+                    res = None
+                    for sname, sleft, sright in queue[::-1]:
+                        if sleft <= left and right <= sright and (sleft, sright) != (left, right):
+                            res = sname
+                            break
+                        continue
+
+                    # now we update our parents, and queue the current register.
+                    parents[name] = res
+                    queue.append((name, left, right))
+
+                # go back through the ranges for the base registers and create
+                # them so that we can actually reference them later.
+                node = {}
+                for name, left, right in ordered:
+                    midx, width = views[name]
+                    if parents.get(name) is None:
+                        node[name] = self.new(name, 8 * width, idaname=midx, ptype=int)
+                    else:
+                        node[name] = self.child(node[parents[name]], name, 0, 8 * width, idaname=midx, ptype=int)
+                    setitem(name, node[name])
+
+                # iterate through all of the registers we parsed, so that we can
+                # actually add them to our current register state.
+                for name, (base, offset) in parsed.items():
+                    if offset == 0:
+                        continue
+                    midx, width = views[name]
+                    if base in roots:
+                        parent = node[roots[base]]
+                    elif owner.has(base) and owner.by_name(base) in results:
+                        parent = results[owner.by_name(base)]
+                    else:
+                        parent = None
+
+                    # if we found a parent for the current register, then we can
+                    # create the register as a child. otherwise, the register
+                    # stands alone and we need to just create it as a new one.
+                    if parent:
+                        mreg = self.child(parent, name, 8 * offset, 8 * width, idaname=midx, ptype=int)
+                    else:
+                        mreg = self.new(name, 8 * width, idaname=midx, ptype=int)
+
+                    # finally we can just add the new register to our stae.
+                    node[name] = mreg
+                    setitem(name, mreg)
+                return
+
+            # finally we can go ahead and add all of the temporary registers.
+            mlist = idaapi.get_temp_regs()
+            assert mlist.mem.count() == 0
+            Fadd_region(mlist.reg)
+
+            # and then we can add a few kernel registers so that the user can
+            # access them in case they actually need to.
+            iterable = map(functools.partial(operator.add, count), range(0x10))
+            Fadd_region([midx for midx in iterable])
 
         @utils.multicase(string=types.string)
         def by(self, string):
