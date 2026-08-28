@@ -1140,6 +1140,7 @@ def op_structure(ea, opnum, sptr, path):
     # First we use the path the user gave us to figure out the suggested path. This
     # should give us the suggestion and its expected delta that we can use for warnings.
     st = structure.by_identifier(sid)
+    scale = 8 if isinstance(st.ptr, idaapi.tinfo_t) else 1
     userdelta, userpath = interface.strpath.suggest(st.ptr, path)
 
     # Precalculate a description of the path to make our error messages look good.
@@ -1157,7 +1158,7 @@ def op_structure(ea, opnum, sptr, path):
 
     # If the suggested path has only 1 element, no members, and the sum of the delta
     # and the value matches the structure size, then this is simply the structure size.
-    if len(userpath) == 1 and all(mptr is None for _, mptr, _ in userpath) and userdelta + value == st.size:
+    if len(userpath) == 1 and all(mptr is None for _, mptr, _ in userpath) and userdelta + value * scale == st.size * scale:
         realdelta, realpath = 0, userpath
         display_members = False
 
@@ -1166,7 +1167,7 @@ def op_structure(ea, opnum, sptr, path):
     # the path that the user stopped at with the path that we'll actually apply.
     else:
         realdelta, realpath = interface.strpath.guide(value, st.ptr, userpath)
-        display_members = not(userdelta + value) and any(mptr for _, mptr, _ in userpath)
+        display_members = not(userdelta + value * scale) and any(mptr for _, mptr, _ in userpath)
 
     logging.info(u"{:s}.op_structure({:#x}, {:d}, {:#x}, [{:s}]) : The determined (real) path was {:s} with a delta of {:+#x} for the given value ({:#x}).".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), interface.strpath.fullname(realpath), realdelta, value))
 
