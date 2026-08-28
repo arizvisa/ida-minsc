@@ -7645,13 +7645,9 @@ class strpath(object):
         iterable = ((ti if ti.get_type_by_tid(sid) else None, sptr, sid, getattr(mptr, 'id', mptr)) for ti, sptr, sid, mptr in iterable)
 
         members = []
-        for ti, sptr, mid in iterable:
-            if hasattr(sptr, 'props') and internal.structure.union(sptr):
+        for ti, sptr, sid, mid in iterable:
+            if internal.structure.union(sid):
                 members.append(mid)
-            elif ti and ti.is_union():
-                members.append(mid)
-            else:
-                pass
             continue
         return identifiers + members
 
