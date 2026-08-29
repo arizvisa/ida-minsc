@@ -5512,6 +5512,21 @@ class members(object):
         return cls.by_identifier(sptr, mptr.id)
 
     @classmethod
+    def by(cls, *args, **caller):
+        '''Internal function that gets information about a member given an id or a type and an index.'''
+        if len(args) == 1 and isinstance(args[0], membertypes):
+            return cls.by_identifier(None, args[0].id)
+        elif len(args) == 1 and isinstance(args[0], types.integer) and has_member(args[0]):
+            return cls.by_identifier(None, args[0])
+        elif len(args) == 2 and isinstance(args[0], (structuretypes, types.integer)) and isinstance(args[1], membertypes):
+            return cls.by_identifier(args[0], args[1].id)
+        elif len(args) == 2 and isinstance(args[0], (structuretypes, types.integer)) and isinstance(args[1], types.string):
+            return cls.by_name(args[0], args[1])
+        elif len(args) == 2 and isinstance(args[0], (structuretypes, types.integer)) and isinstance(args[1], types.integer):
+            return cls.by_identifier(args[0], args[1]) if has_member(args[1]) else cls.by_index(args[0], args[1])
+        raise E.MemberNotFoundError(u"{:s}.by({:s}{:s}) : Unable to locate the specified member using an unsupported combination of parameters ({:s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, args)), ''.join(", {!s}={!r}".format(key, value) for key, value in caller.items()), ', '.join(utils.pycompat.fullname(item.__class__) for item in args)))
+
+    @classmethod
     def nearest(cls, sptr, offset):
         '''Return the member from the structure identified by `sptr` that is at or before the given `offset`.'''
         available = [packed for packed in cls.iterate(sptr)]
