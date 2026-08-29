@@ -6876,31 +6876,40 @@ class strpath(object):
                     raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fullname({!s}, sep={!r}) : Unable to find the type with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), path, sep, sid))
 
                 # next we need to figure out the member information.
-                utd = idaapi.udt_type_data_t()
+                mowner, utd = idaapi.tinfo_t(), idaapi.udt_type_data_t()
                 if not ti:
-                    mindex = -1
+                    mowner, mindex = ti, -1
                 elif not ti.get_udt_details(utd):
                     raise internal.exceptions.DisassemblerError(u"{:s}.fullname({!s}, sep={!r}) : Unable to get the details for the type {:s}.".format('.'.join([__name__, cls.__name__]), path, sep, tinfo.quoted(ti)))
                 elif node.identifier(mid):
-                    mindex = ti.get_udm_by_tid(udm_t(), mid)
+                    mowner = mowner if mowner.get_type_by_tid(mid) else ti
+                    mindex = tinfo.copy(ti).get_udm_by_tid(udm_t(), mid)
                 else:
-                    mindex = mid
+                    mowner, mindex = ti, mid
                 udm = utd[mindex] if 0 <= mindex < utd.size() else None
 
                 # then we can build the description for each path entry.
                 if ti and udm is not None:
-                    sname = internal.utils.string.of(ti.get_type_name())
-                    mname, msize, mtype = internal.utils.string.of(udm.name), udm.size, tinfo.copy(udm.type)
+                    sname, oname = (internal.structure.naming.get(ptr) for ptr in [ti, mowner])
+                    mname, msize, mtype = internal.structure.v9member.get_name(ti, mindex), udm.size, tinfo.copy(udm.type)
                     melement, _ = tinfo.array(mtype) if mtype.is_array() else (None, 0)
                     elementsize = 8 * melement.get_size() if melement else 1
                     fullname = '.'.join([sname, mname])
                     arrayQ, hindex = mtype.is_array(), (msize - 1) // elementsize
                     index, item = divmod(offset, elementsize) if arrayQ else (0, offset)
                     index, offset = (index, item) if index * elementsize < msize or msize == 0 else (hindex, item + (offset - hindex * elementsize))
-                    item = "{:s}{:s}{:s}".format(fullname if not result else mname, "[{:d}]".format(index) if arrayQ else '', "({:+#x})".format(offset) if offset else "{:+#x}".format(offset) if udm is None else '')
+
+                    sindex = "[{:d}]".format(index) if arrayQ else ''
+                    soffset = "({:+#x})".format(offset) if offset else "{:+#x}".format(offset) if udm is None else ''
+                    if tinfo.same(ti, mowner):
+                        items = [mname if result else fullname, sindex, soffset]
+                    else:
+                        items = ["{{ERR!{:s}|{:s}}}{:s}".format(sname, oname, mname), sindex, soffset]
+                    item = ''.join(items)
 
                 elif ti:
-                    item = ''.join([internal.utils.string.of(ti.get_type_name()), "({:+#x})".format(offset) if offset else ''])
+                    sname = internal.structure.naming.get(ti)
+                    item = ''.join([sname, "({:+#x})".format(offset) if offset else ''])
 
                 else:
                     item = "{{ERR!{:+#x}}}".format(offset)
@@ -6911,15 +6920,27 @@ class strpath(object):
             # otherwise, we can just figure it out using the older api which
             # uses `idaapi.struc_t` and `idaapi.member_t`.
             elif mptr:
-                _, fullname, owner = idaapi.get_member_by_id(mptr.id)
-                name, msize, size = idaapi.get_member_name(mptr.id), get_data_elsize(mptr.id, mptr.flag), idaapi.get_member_size(mptr)
-                sname, oname = (idaapi.get_struc_name(ptr.id) for ptr in [sptr, owner])
-                arrayQ, hindex = msize != size, (size - 1) // msize
+                nsmembers = internal.structure.members
+                mowner, mindex, mptr = nsmembers.by_identifier(sptr, mptr) if nsmembers.has_identifier(sptr, mptr.id) else nsmembers.by_identifier(None, mptr)
+                fullname = internal.structure.member.fullname(mptr)
+                msize, size = get_data_elsize(mptr.id, mptr.flag), idaapi.get_member_size(mptr)
+                sname, oname = (internal.structure.naming.get(ptr) for ptr in [sptr, mowner])
+                arrayQ, hindex, mname = msize != size, (size - 1) // msize, internal.structure.member.get_name(mptr)
                 index, item = divmod(offset, msize) if arrayQ else (0, offset)
                 index, offset = (index, item) if index * msize < size or mptr.soff == mptr.eoff else (hindex, item + (offset - hindex * msize))
-                item = "{:s}{:s}{:s}".format(fullname if not result else name if owner.id == sptr.id else "{{ERR!{:s}|{:s}}}{:s}".format(sname, oname, name), "[{:d}]".format(index) if arrayQ else '', "({:+#x})".format(offset) if offset else '' if mptr else "{:+#x}".format(offset))
+
+                sindex = "[{:d}]".format(index) if arrayQ else ''
+                soffset = "({:+#x})".format(offset) if offset else '' if mptr else "{:+#x}".format(offset)
+                if mowner.id == sptr.id:
+                    items = [mname if result else fullname, sindex, soffset]
+                else:
+                    items = ["{{ERR!{:s}|{:s}}}{:s}".format(sname, oname, mname), sindex, soffset]
+                item = ''.join(items)
+
             elif sptr:
-                item = ''.join([idaapi.get_struc_name(sptr.id), "({:+#x})".format(offset) if offset else ''])
+                sname = internal.structure.naming.get(sptr)
+                item = ''.join([sname, "({:+#x})".format(offset) if offset else ''])
+
             else:
                 item = "{{ERR!{:+#x}}}".format(offset)
             result.append(item)
