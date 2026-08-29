@@ -1288,7 +1288,10 @@ def op_structurepath(ea, opnum):
         # Then we'll grab its frame along with everything related to the member.
         frame = interface.function.frame(fn).ptr
         scale, nsmembers = (8, internal.structure.v9members) if isinstance(frame, idaapi.tinfo_t) else (1, internal.structure.members)
-        mowner, mindex, mptr = nsmembers.by_identifier(frame, mptr)
+        if isinstance(frame, idaapi.tinfo_t):
+            mowner, _, mindex, mptr = nsmembers.by_identifier(frame, mptr)
+        else:
+            mowner, mindex, mptr = nsmembers.by_identifier(frame, mptr)
         framebase = interface.function.frame_offset(fn)
 
         # Traverse through each member for the actual value, and collect the full path.
@@ -1454,8 +1457,11 @@ def op_structurepath(ea, opnum):
     result, position = [], builtins.next(calculator)
     for sptr, mptr, offset in path:
         st = internal.structure.new(getattr(sptr, 'id', sptr), position // scale)
-        nsmembers = internal.structure.v9members if isinstance(st.ptr, idaapi.tinfo_t) else internal.structure.members
-        mowner, mindex, _ = nsmembers.by_identifier(st.ptr, getattr(mptr, 'id', mptr)) if mptr else (None, -1, None)
+        mid, nsmembers = getattr(mptr, 'id', mptr), internal.structure.v9members if isinstance(st.ptr, idaapi.tinfo_t) else internal.structure.members
+        if isinstance(frame, idaapi.tinfo_t):
+            mowner, _, mindex, _ = nsmembers.by_identifier(st.ptr, mid) if mptr else (None, None, -1, None)
+        else:
+            mowner, mindex, mptr = nsmembers.by_identifier(st.ptr, mid) if mptr else (None, -1, None)
         result.append(st if mindex < 0 else st.members[mindex])
         position = calculator.send((sptr, mptr, offset))
 
@@ -1543,9 +1549,7 @@ def op_structurepath(ea, opnum, structure, path):
 @utils.multicase(ea=types.integer, opnum=types.integer, sptr=(idaapi.tinfo_t, getattr(idaapi, 'struc_t', idaapi.tinfo_t)), path=types.ordered)
 def op_structurepath(ea, opnum, sptr, path):
     '''Apply the structure identified by `sptr` along with the members in `path` directly to the operand `opnum` of the instruction at address `ea`.'''
-    ea, sid = interface.address.inside(ea), interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
-    if interface.address.flags(ea, idaapi.MS_CLS) != idaapi.FF_CODE:
-        raise E.InvalidTypeOrValueError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!r}) : The requested address ({:#x}) is not defined as a code type.".format(__name__, ea, opnum, sid, path, ea))
+    sid = interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else sptr.id
 
     # Convert the path to a list, and then validate it before we use it.
     path, accepted = [item for item in path], (internal.structure.membertypes, types.string, types.integer)
@@ -1553,31 +1557,65 @@ def op_structurepath(ea, opnum, sptr, path):
         index, item = next((index, item) for index, item in enumerate(path) if not isinstance(item, accepted))
         raise E.InvalidParameterError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!r}) : The path member at index {:d} has a type ({!s}) that is not supported.".format(__name__, ea, opnum, sid, path, index, item.__class__))
 
+    # Precalculate a description of the path to make our error messages look good.
+    path_description, mowner = [], sptr
+    nsmember = internal.structure.v9member if isinstance(sptr, idaapi.tinfo_t) else internal.structure.member
+    nsmembers = internal.structure.v9members if isinstance(sptr, idaapi.tinfo_t) else internal.structure.members
+    for item in path:
+        if isinstance(item, tuple):
+            res = interface.strpath.fullname([item])
+        elif internal.structure.has(item):
+            mowner = res = internal.structure.naming.get(item)
+        elif isinstance(item, internal.structure.membertypes):
+            if isinstance(mowner, idaapi.tinfo_t):
+                mowner, _, mindex, mptr = nsmembers.by(mowner, item.id)
+            else:
+                mowner, mindex, mptr = nsmembers.by(mowner, item.id)
+            res = nsmember.get_name(mowner, mindex) if isinstance(sptr, idaapi.tinfo_t) else nsmember.get_name(mptr)
+            mtype = mptr.type if isinstance(sptr, idaapi.tinfo_t) and mptr.type.is_udt() else None if isinstance(mowner, idaapi.tinfo_t) else idaapi.get_sptr(mptr)
+            mowner = mowner if mtype is None else mtype
+        elif isinstance(item, types.integer) and internal.structure.has_member(item):
+            if isinstance(mowner, idaapi.tinfo_t):
+                mowner, _, mindex, mptr = nsmembers.by(mowner, item)
+            else:
+                mowner, mindex, mptr = nsmembers.by(mowner, item)
+            res = nsmember.get_name(mowner, mindex) if isinstance(sptr, idaapi.tinfo_t) else nsmember.get_name(mptr)
+            mtype = mptr.type if isinstance(sptr, idaapi.tinfo_t) and mptr.type.is_udt() else None if isinstance(mowner, idaapi.tinfo_t) else idaapi.get_sptr(mptr)
+            mowner = mowner if mtype is None else mtype
+        elif isinstance(item, (types.integer, types.string)):
+            if isinstance(mowner, idaapi.tinfo_t):
+                mowner, _, mindex, mptr = nsmembers.by(mowner, item)
+            else:
+                mowner, mindex, mptr = nsmembers.by(mowner, item)
+            res = nsmember.get_name(mowner, mindex) if isinstance(sptr, idaapi.tinfo_t) else nsmember.get_name(mptr)
+            mtype = mptr.type if isinstance(sptr, idaapi.tinfo_t) and mptr.type.is_udt() else None if isinstance(mowner, idaapi.tinfo_t) else idaapi.get_sptr(mptr)
+            mowner = mowner if mtype is None else mtype
+        else:
+            res = "{{ERR!{!s}}}".format("{:#x}".format(item) if isinstance(item, types.integer) else "{!r}".format(item))
+        path_description.append(res)
+
+    # Verify that our address is actually pointing to an instruction.
+    ea = interface.address.inside(ea)
+    if interface.address.flags(ea, idaapi.MS_CLS) != idaapi.FF_CODE:
+        raise E.InvalidTypeOrValueError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!s}) : The requested address ({:#x}) is not defined as a code type.".format(__name__, ea, opnum, sid, "[{!s}]".format(', '.join(path_description)), ea))
+
     # Grab information about our instruction and operand so that we can decode
     # it to get the structure offset to use.
-    insn, op = at(ea), operand(ea, opnum)
+    insn, operands = interface.instruction.at(ea), interface.instruction.operands(ea)
+    if not (0 <= opnum < len(operands)):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!s}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, sid, "[{:s}]".format(', '.join(path_description)), opnum, len(operands(ea)), ea))
+    op = operands[opnum]
 
     # If the operand type is not a valid type, then raise an exception so that
     # we don't accidentally apply a structure to an invalid operand type.
     if op.type not in {idaapi.o_mem, idaapi.o_phrase, idaapi.o_displ, idaapi.o_imm}:
-        raise E.MissingTypeOrAttribute(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!r}) : Unable to apply structure path to the operand ({:d}) for the instruction at {:#x} due to its type ({:d}).".format(__name__, ea, opnum, sid, path, opnum, insn.ea, op.type))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!s}) : Unable to apply structure path to the operand ({:d}) for the instruction at {:#x} due to its type ({:d}).".format(__name__, ea, opnum, sid, "[{:s}]".format(', '.join(path_description)), opnum, insn.ea, op.type))
 
     # Similar to op_structure, we first need to figure out the path that the user
     # has suggested to us to apply to the operand and we calculate our goal.
     st = structure.by_identifier(sid)
     scale = 8 if isinstance(st.ptr, idaapi.tinfo_t) else 1
     usergoal, userpath = interface.strpath.suggest(st.ptr, path)
-
-    # Precalculate a description of the path to make our logging events look good.
-    path_description = []
-    for sptr, mptr, offset in userpath:
-        sname = internal.structure.naming.get(sptr)
-        if isinstance(sptr, idaapi.tinfo_t):
-            mname = internal.structure.v9member.get_name(sptr, mptr) if mptr else ''
-        else:
-            mname = internal.structure.member.get_name(sptr, mptr) if mptr else ''
-        fullname = '.'.join([sname, mname] if mname else [sname])
-        path_description.append("{:s}{:+#x}".format(fullname, offset) if offset or mname else fullname)
 
     # We're looking for the "exact" path which should always be within the bounds
     # of the structure so we'll simply flail around for its value.
@@ -1618,7 +1656,7 @@ def op_structurepath(ea, opnum, sptr, path):
         Flogging = logging.debug if usergoal < goaldelta else logging.warning
         Fdescription = "incomplete ({:#x} < {:#x})".format if usergoal < goaldelta else "incorrect ({:#x} > {:#x})".format
         action = 'of members were added' if usergoal < goaldelta else 'of the last members were temporarily removed'
-        Flogging(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, [{:s}]) : The suggested path was {:s} and {:+#x} bytes {:s} before calculating the real path.".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), Fdescription(usergoal, goaldelta), goaldelta - usergoal, action))
+        Flogging(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!s}) : The suggested path was {:s} and {:+#x} bytes {:s} before calculating the real path.".format(__name__, ea, opnum, sid, "[{:s}]".format(', '.join(path_description)), Fdescription(usergoal, goaldelta), goaldelta - usergoal, action))
 
     # Finally we can really flail for the exact member the user wanted using the
     # delta that we're using as our goal and then choose the defaults for the rest.
@@ -1662,7 +1700,7 @@ def op_structurepath(ea, opnum, sptr, path):
     # If we hit this case, then the logic described in the previous comment is
     # completely busted and I have no idea what this is supposed to be doing.
     elif not realpath:
-        raise E.InvalidParameterError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, [{:s}]) : Unable to apply the path to the operand ({:d}) of the specified address ({:#x}) as the given path does not point to a specific member.".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), opnum, insn.ea))
+        raise E.InvalidParameterError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!s}) : Unable to apply the path to the operand ({:d}) of the specified address ({:#x}) as the given path does not point to a specific member.".format(__name__, ea, opnum, sid, "[{:s}]".format(', '.join(path_description)), opnum, insn.ea))
 
     # Very last thing to do is to figure out the operands for op_stroff. We first need
     # to convert the path to a tid_array, and then we'll need to know the delta to use.
@@ -1692,7 +1730,7 @@ def op_structurepath(ea, opnum, sptr, path):
     # Only thing that's left to do is apply the tids that we collected along with
     # the delta that we calculated from the user's path to the desired operand.
     if not idaapi.op_stroff(insn.ea if idaapi.__version__ < 7.0 else insn, opnum, tid.cast(), length, base + delta):
-        raise E.DisassemblerError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, [{:s}]) : Unable to apply the resolved structure path ({:s}) and delta ({:+#x}) to the operand ({:d}) at the specified address ({:#x}).".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), ', '.join(map("{:#x}".format, items)), base + delta, opnum, insn.ea))
+        raise E.DisassemblerError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!s}) : Unable to apply the resolved structure path ({:s}) and delta ({:+#x}) to the operand ({:d}) at the specified address ({:#x}).".format(__name__, ea, opnum, st.ptr.id, "[{:s}]".format(', '.join(path_description)), ', '.join(map("{:#x}".format, items)), base + delta, opnum, insn.ea))
     interface.node.aflags(ea, idaapi.AFL_ZSTROFF, idaapi.AFL_ZSTROFF if display_members else 0)
 
     # And then we can call into our other case to return what we just applied.
