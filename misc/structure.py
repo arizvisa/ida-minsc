@@ -2283,7 +2283,7 @@ class v9members(object):
             # Now we can try and figure out the type using the member id.
             if not tinfo.get_type_by_tid(mid):
                 raise E.MemberNotFoundError(u"{:s} : Unable to find the member with the specified identifier ({:#x}).".format(caller_format, mid))
-            elif not (tinfo.is_struct() or union(tinfo)):
+            elif not tinfo.is_udt():
                 raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, interface.tinfo.identifier(tinfo)))
             elif not tinfo.get_udt_details(utd):
                 raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, interface.tinfo.identifier(tinfo)))
@@ -2296,6 +2296,41 @@ class v9members(object):
                 raise E.MemberNotFoundError(u"{:s} : Unable to find the member with the given identifier ({:#x}) in the specified type ({:#x}).".format(caller_format, mid, interface.tinfo.identifier(tinfo)))
             return tinfo, utd, mindex, udm
 
+        # Try using a type and a member identifier.
+        elif len(args) == 2 and isinstance(args[-1], types.integer) and interface.node.identifier(args[-1]):
+            [type, mid] = args
+            tinfo = interface.tinfo.copy(type)
+            formatted_args = ', '.join([interface.tinfo.quoted(tinfo), "{:#x}".format(mid)])
+            caller_format = prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
+            if not tinfo.is_udt():
+                raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, interface.tinfo.identifier(tinfo)))
+            elif not tinfo.get_udt_details(utd):
+                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, interface.tinfo.identifier(tinfo)))
+            else:
+                count = utd.size()
+            mindex = tinfo.get_udm_by_tid(udm, mid)
+            if not (0 <= mindex < count):
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member with the given identifier ({:#x}) in the specified type ({:#x}).".format(caller_format, mid, interface.tinfo.identifier(tinfo)))
+            return tinfo, utd, mindex, udm
+
+        # Try using a type and a member name.
+        elif len(args) == 2 and isinstance(args[-1], types.string):
+            [type, membername] = args
+            tinfo = interface.tinfo.copy(type)
+            formatted_args = ', '.join([interface.tinfo.quoted(tinfo), "{!r}".format(membername)])
+            caller_format = prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
+            if not tinfo.is_udt():
+                raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, interface.tinfo.identifier(tinfo)))
+            elif not tinfo.get_udt_details(utd):
+                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, interface.tinfo.identifier(tinfo)))
+            else:
+                count = utd.size()
+            udm.name = utils.string.to(membername)
+            mindex = tinfo.find_udm(udm, idaapi.STRMEM_NAME)
+            if not (0 <= mindex < count):
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member with the given name ({!r}) in the specified type ({:#x}).".format(caller_format, membername, interface.tinfo.identifier(tinfo)))
+            return tinfo, utd, mindex, udm
+
         # Try using a type and its udm index.
         elif len(args) == 2 and isinstance(args[-1], types.integer):
             [type, mindex] = args
@@ -2304,7 +2339,7 @@ class v9members(object):
             caller_format = prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
 
             # Verify that the type is valid and get its details.
-            if not (tinfo.is_struct() or union(tinfo)):
+            if not tinfo.is_udt():
                 raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, interface.tinfo.identifier(tinfo)))
             elif not tinfo.get_udt_details(utd):
                 raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, interface.tinfo.identifier(tinfo)))
@@ -2330,7 +2365,7 @@ class v9members(object):
             tinfo = interface.tinfo.copy(tinfo)
 
             # Verify the type we were given and use it to get its details.
-            if not (tinfo.is_struct() or union(tinfo)):
+            if not tinfo.is_udt():
                 raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, interface.tinfo.identifier(tinfo)))
             elif not tinfo.get_udt_details(utd):
                 raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, interface.tinfo.identifier(tinfo)))
