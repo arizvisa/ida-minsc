@@ -2420,7 +2420,7 @@ class v9members(object):
         return {point: gaps[index] for point, index in segments.items()}, sorted(points)
 
     @classmethod
-    def intervals(cls, type, critique=lambda mowner, mutd, mindex, udm: True):
+    def intervals(cls, type, critique=lambda mowner, mindex, udm: True):
         '''Return a dictionary and list of points for the boundaries of each element from the specified `type` selected by the callable `critique`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
@@ -2442,12 +2442,12 @@ class v9members(object):
                     raise E.MemberNotFoundError(u"{:s}.intervals({!s}, {!s}) : Unable to find the member at the index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), utils.pycompat.fullname(critique), index, sid))
                 continue
 
-            iterable = ((tinfo, utd, index, udm) for index, udm in enumerate(udms))
+            iterable = ((tinfo, index, udm) for index, udm in enumerate(udms))
             result = next((packed for packed in iterable if critique(*packed)), ())
             if not result:
                 raise E.MemberNotFoundError(u"{:s}.intervals({!s}, {!s}) : Unable to find a member with the provided callable ({!s}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), utils.pycompat.fullname(critique), index, utils.pycompat.fullname(critique)))
 
-            tinfo, utd, index, udm = result
+            tinfo, index, udm = result
             return {0: index, udm.size: index}, [0, udm.size]
 
         # Otherwise, we iterate through all of the critiqued members and gather
@@ -2461,7 +2461,7 @@ class v9members(object):
                 raise E.MemberNotFoundError(u"{:s}.intervals({!s}, {!s}) : Unable to find the member at the index {:d} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), utils.pycompat.fullname(critique), index, sid))
 
             # Now we critique the current member to see if we should add it.
-            packed = tinfo, utd, index, udm
+            packed = tinfo, index, udm
             if not(critique(*packed)):
                 continue
 
@@ -2807,7 +2807,7 @@ class v9members(object):
         # are available to determine the index for inserting the new member.
         # FIXME: if the specified location is not contiguous to the structure or
         #        its members, then we'll need to manually add a gap for it.
-        members, points = cls.intervals(ti, critique=lambda mowner, _, mindex, udm: not(udm.is_gap()))
+        members, points = cls.intervals(ti, critique=lambda mowner, mindex, udm: not(udm.is_gap()))
 
         # now we can search the intervals to figure out where we need to insert
         # the member in order to get it at the desired offset.
@@ -3635,7 +3635,7 @@ class v9members(object):
                 melement = v9member.element(mid)
                 res = index * melement
 
-                mowner, _, mindex, udm = cls.by(mid)
+                mowner, mindex, udm = cls.by(mid)
                 mtype = interface.tinfo.copy(udm.type)
 
             # If we're in a union and we have more than one member, then stop
@@ -3655,7 +3655,7 @@ class v9members(object):
                 melement = v9member.element(mptr)
                 res = index * melement
 
-                mowner, _, mindex, udm = cls.by(mid)
+                mowner, mindex, udm = cls.by(mid)
                 mtype = interface.tinfo.copy(udm.type)
 
             # Now we have a member to yield and can adjust our offset.
@@ -3727,7 +3727,7 @@ class v9members(object):
 
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
         iterable = (next(v9members.at_offset(ti, 8 * moffset)) for moffset in iterable if v9members.has_offset(ti, 8 * moffset))
-        specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, _, mindex, _ in iterable}
+        specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, mindex, _ in iterable}
 
         # We now need to collect the members matching the specified slice so
         # that we can stash them for returning later.
@@ -3771,7 +3771,7 @@ class v9members(object):
         # elements in reverse without the index changing.
         indices = sorted(builtins.range(*slice.indices(utd.size())))
         iterable = utils.itermap(functools.partial(cls.by, ti), indices[::-1])
-        iterable = ((mindex, v9member.packed(base + udm.offset, mowner, mindex)) for mowner, _, mindex, udm in iterable)
+        iterable = ((mindex, v9member.packed(base + udm.offset, mowner, mindex)) for mowner, mindex, udm in iterable)
         iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
         listable = [(mid, mname, mindex, mbitoffset, mbits) for mindex, mid, mname, mtype, (mbitoffset, mbits), mtypeinfo, mcomment in iterable if mid not in specials]
 
@@ -3920,7 +3920,7 @@ class v9members(object):
 
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
         iterable = (next(v9members.at_offset(ti, 8 * moffset)) for moffset in iterable if v9members.has_offset(ti, 8 * moffset))
-        specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, _, mindex, _ in iterable}
+        specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, mindex, _ in iterable}
 
         # We now need to collect the members matching the specified slice so
         # that we can stash them for returning later.
@@ -3957,14 +3957,14 @@ class v9members(object):
             if is_union and mleft:
                 soff = 0
             elif mleft:
-                _, _, _, udm = mleft
+                _, _, udm = mleft
                 soff = udm.offset
             else:
                 soff = 8 * size
 
             mright = cls.by(ti, rindex) if rindex < utd.size() else ()
             if mright:
-                _, _, _, udm = mright
+                _, _, udm = mright
                 eoff = udm.offset + udm.size
             else:
                 eoff = 8 * size
@@ -3973,7 +3973,7 @@ class v9members(object):
             # having to do any calculations for members that will be shifted.
             indices = builtins.range(*slice(lindex, rindex + 1).indices(utd.size()))
             iterable = utils.itermap(functools.partial(cls.by, ti), indices[::-1])
-            iterable = ((mindex, v9member.packed(base + udm.offset, mowner, mindex)) for mowner, _, mindex, udm in iterable)
+            iterable = ((mindex, v9member.packed(base + udm.offset, mowner, mindex)) for mowner, mindex, udm in iterable)
             iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
             listable = [(mid, mname, mindex, mbitoffset, mbits) for mindex, mid, mname, mtype, (mbitoffset, mbits), mtypeinfo, mcomment in iterable if mid not in specials]
 
@@ -4146,7 +4146,7 @@ class v9members(object):
         # Now we can go through and gather the identifiers for each member.
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
         iterable = (next(v9members.at_offset(ti, 8 * moffset)) for moffset in iterable if v9members.has_offset(ti, 8 * moffset))
-        specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, _, mindex, _ in iterable}
+        specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, mindex, _ in iterable}
 
         # Before clearing things, we stash them and gather the references for
         # each member so that we can update things and return the result later.
@@ -4179,7 +4179,7 @@ class v9members(object):
         # will be cleared, and reverse them so that the indices won't change.
         indices = sorted(builtins.range(*slice.indices(utd.size())))
         iterable = utils.itermap(functools.partial(cls.by, ti), indices[::-1])
-        iterable = ((mindex, v9member.packed(base + udm.offset, mowner, mindex)) for mowner, _, mindex, udm in iterable)
+        iterable = ((mindex, v9member.packed(base + udm.offset, mowner, mindex)) for mowner, mindex, udm in iterable)
         iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
         listable = [(mid, mname, mindex, mbitoffset, mbits) for mindex, mid, mname, mtype, (mbitoffset, mbits), mtypeinfo, mcomment in iterable if mid not in specials]
 
@@ -4300,7 +4300,7 @@ class v9members(object):
 
         iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
         iterable = (next(v9members.at_offset(ti, 8 * moffset)) for moffset in iterable if v9members.has_offset(ti, 8 * moffset))
-        specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, _, mindex, _ in iterable}
+        specials = {interface.tinfo.member_identifier(mowner, mindex) for mowner, mindex, _ in iterable}
 
         # Select the members from the type that are within the specified
         # boundaries and gather their references.
@@ -4326,7 +4326,7 @@ class v9members(object):
         # they are keyed by address instead of by the member id.
         references = {}
         for mid, addresses in member_references.items():
-            _, _, _, udm = cls.by(mid)
+            _, _, udm = cls.by(mid)
             references[udm.offset] = [item for item in interface.xref.to(mid)]
         member_references.clear()
 
@@ -4345,21 +4345,21 @@ class v9members(object):
             if is_union and mleft:
                 soff = 0
             elif mleft:
-                _, _, _, udm = mleft
+                _, _, udm = mleft
                 soff = udm.offset
             else:
                 soff = 8 * size
 
             mright = cls.by(ti, rindex) if rindex < utd.size() else ()
             if mright:
-                _, _, _, udm = mright
+                _, _, udm = mright
                 eoff = udm.offset + udm.size
             else:
                 eoff = 8 * size
 
             indices = builtins.range(*slice(lindex, rindex + 1).indices(utd.size()))
             iterable = utils.itermap(functools.partial(cls.by, ti), indices[::-1])
-            iterable = ((mindex, v9member.packed(base + udm.offset, ti, mindex)) for mowner, _, mindex, udm in iterable)
+            iterable = ((mindex, v9member.packed(base + udm.offset, ti, mindex)) for mowner, mindex, udm in iterable)
             iterable = (tuple(itertools.chain([mindex], packed)) for mindex, packed in iterable)
             listable = [(mid, mname, mindex, mbitoffset, mbits) for mindex, mid, mname, mtype, (mbitoffset, mbits), mtypeinfo, mcomment in iterable if mid not in specials]
 
@@ -4721,7 +4721,7 @@ class v9members(object):
         olditems = {}
         for mbitoffset, mid in selected:
             if union(ti) and interface.node.identifier(mid):
-                _, _, mindex, _ = cls.by(mid)
+                _, mindex, _ = cls.by(mid)
                 olditems[mindex] = v9member.packed(0, mid)
             elif interface.node.identifier(mid):
                 olditems[mbitoffset] = v9member.packed(base + mbitoffset, mid)
@@ -4777,7 +4777,7 @@ class v9members(object):
             # If it's one of our custom classes, then extract the type from it.
             elif isinstance(item, member_t):
                 mtype, mid = item.typeinfo, item.id
-                _, _, _, udm = cls.by(mid)
+                _, _, udm = cls.by(mid)
                 regcmt = udm.is_regcmt()
                 mcomments = not(regcmt), v9member.get_comment(mid)
 
@@ -4874,7 +4874,7 @@ class v9members(object):
                 candidates.setdefault(mname, []).append(offset)
 
             elif isinstance(item, member_t):
-                mowner, _, mindex, udm = cls.by(item.id)
+                mowner, mindex, udm = cls.by(item.id)
                 mname = '' if hasattr(udm, 'is_special_member') and udm.is_special_member() else newnames[offset]
                 originalname = mname or member.default_name(sid, None, offset)
                 original[offset] = newnames[offset] = originalname
@@ -4957,7 +4957,7 @@ class v9members(object):
         if union(ti):
             res, identifiers = 0, {mid for mindex, mid in selected if mindex in olditems}
             for mid in filter(v9member.has, identifiers):
-                mowner, _, mindex, udm = cls.by(mid)
+                mowner, mindex, udm = cls.by(mid)
 
                 # Unpack the member using the identifier, and smoke-check it.
                 ok = ti.del_udm(mindex) if interface.tinfo.identifier(mowner) == sid else idaapi.TERR_BAD_ARG
@@ -5008,7 +5008,7 @@ class v9members(object):
         # what we expected. The `olditems` dict uses the bitoffset as its key.
         if union(ti) and deleted != len(olditems):
             iterable = (cls.by(mid) for mindex, mid in selected if mindex in olditems if v9member.has(mid))
-            errors = {mindex : (mowner, mutd, mindex, udm) for mowner, mutd, mindex, udm in iterable}
+            errors = {mindex : (mowner, mindex, udm) for mowner, mindex, udm in iterable}
             for index in sorted(errors):
                 packed = errors[index]
                 logging.critical(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to remove the selected {:s} from {:s} of {:s} for replacement.".format('.'.join([__name__, cls.__name__]), sid, slice_description, layout_description, offset_description, "member ({:#x})".format(mid) if interface.node.identifier(mid) else "gap of size {:#x}".format(mid), "index {:d}".format(index), type_description))
@@ -5054,7 +5054,7 @@ class v9members(object):
         mindex = v9members.index_after(ti, left)
         if delta > 0 and 0 <= mindex:
             iterable = (cls.by(ti, index) for index in range(mindex, count))
-            olditems.update({udm.offset : v9member.packed(base + udm.offset, mowner, index) for mowner, _, index, udm in iterable})
+            olditems.update({udm.offset : v9member.packed(base + udm.offset, mowner, index) for mowner, index, udm in iterable})
 
         # Hopefully that is everything and we should only need to add the new
         # members to the structure from "newitems"
@@ -5123,7 +5123,7 @@ class v9members(object):
         # its metadata such as comments, type information, name, etc.
         for mkey, item, packed, mid in results:
             tinfo, msize, tid, mcomments, mrepr = packed
-            mowner, mutd, mindex, udm = cls.by(mid)
+            mowner, mindex, udm = cls.by(mid)
             mcommenttype, mcomment = mcomments
 
             mbitoffset = mkey
