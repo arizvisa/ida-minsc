@@ -613,116 +613,77 @@ else:
         @utils.multicase(index=types.integer, size=types.integer)
         def by_partial(self, index, offset, size):
             '''Return a `register_t` or `partialregister_t` for the register at the specified `index` up to the maximum `size`.'''
-            dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
-            midx, maximum, dtype = index, size, dtype_by_size(size)
+            midx = index + max(0, offset)
 
-            # define a closure that yields all of the available promotions for a register.
-            def mreg_promotions(midx):
-                if not self.has(midx):
-                    return
-                mreg = self.by_index(midx)
-                while mreg.__parent__ and mreg.realname is not None:
-                    yield mreg
-                    mreg = mreg.__parent__
-                if mreg.realname:
-                    yield mreg
-                return
+            # Start by grabbing our maximum register width and the positions of
+            # all of the microregisters that we initialized this class with.
+            width, positions = self.__positions__
 
-            # return the size for each mreg within the architecture. these sizes are the
-            # candidates that we'll be trying to match with. specifically, we only return
-            # sizes for the correct mreg index.
-            def mreg_candidates(midx):
-                def verify(midx, promotions):
-                    name = None
-                    for mreg in promotions:
-                        res = ida_hexrays.get_mreg_name(midx, mreg.size)
-                        if res != name and '^' not in res:
-                            name = res
-                            yield mreg.size
-                        continue
-                    return
-                iterable = verify(midx, mreg_promotions(midx))
-                return [size for size in iterable]
-
-            # scan backwards until we get to a real register
-            def mreg_scan(midx):
-                Fpredicate = lambda string: '^' in string
-                shift = next(-idx for idx in itertools.count() if not Fpredicate(ida_hexrays.get_mreg_name(-idx + midx, 1)))
-                return midx + shift
-
-            # now we can begin the actual logic. we shortcut things here by checking if
-            # we got an exact match. if so, then we're good to go and can just return it.
-            candidates = [size for size in mreg_candidates(midx)]
-            if any(size == maximum for size in candidates):
-                try:
-                    result = self.by_indextype(midx, dtype)
-                except (internal.exceptions.RegisterNotFoundError, KeyError):
-                    result = interface.partialregister_t(self.by_index(midx), 0, 8 * maximum)
-                return result
-
-            # otherwise, we need to seek backwards from our index to find the "real" register
-            # that the index is part of and that we're able to actually promote.
-            mregindex, res = mreg_scan(midx), midx
-            while any('^' in ida_hexrays.get_mreg_name(mregindex, mreg.size) for mreg in mreg_promotions(mregindex)):
-                if res == mregindex:
-                    mregindex, res = mreg_scan(res - 1), mregindex
-                else:
-                    mregindex, res = mreg_scan(res), mregindex
+            # Then we fast-path by trying to find an exact match from whatever
+            # it was that the user requested. If we found it, we're good to go.
+            for realsize, key in positions.get(midx, []):
+                if realsize == size:
+                    return self.by_indextype(*key)
                 continue
 
-            # now that we have the super register (mregindex), we can calculate
-            # the offset into it. we then check it against the parameter offset
-            # just in case they differ. despite this, we trust our calculation
-            # since microregisters should always have a zero offset anyways, and
-            # the register number is the truth about what the decompiler sees.
-            expected = midx - mregindex
-            if offset >= 0 and offset != 8 * expected:
-                logging.warning("{:s}.by_partial({:d}, {:d}, {:d}) : Expected the chosen offset for the register to be {:+d} due to the location of register {:s} ({:d}) relative to its larger register {:s} ({:d}).".format('.'.join([__name__, self.__class__.__name__]), index, offset, size, 8 * expected, ida_hexrays.get_mreg_name(midx, size), midx, ida_hexrays.get_mreg_name(mregindex, pow(2, math.ceil(math.log2(size)))), mregindex))
-            offset = expected
+            # Otherwise we will need to scan backwards using the positions to
+            # find the narrowest whole register that completely contains the
+            # register interval. If nothing fits, then we take the one that is
+            # farthest from the `midx` as a fallback to slice it as a partial.
+            narrowest = fallback = ()
+            for ridx in range(midx, max(-1, midx - width), -1):
+                for rsize, key in positions.get(ridx, []):
+                    if ridx + rsize <= midx:
+                        continue
+                    space = ridx + rsize - midx
 
-            # next we will need to use it to figure out what's the largest
-            # possible size that we would be able to promote to.
-            candidates = [size for size in mreg_candidates(mregindex)]
-            selected = [size for size in candidates if size <= maximum]
-            if len(selected):
-                goal = offset + maximum
-                index = bisect.bisect_left(selected, goal)
-                size = selected[min(index, len(selected) - 1)]
+                    # First figure out the fallback register that we will slice
+                    # a partial from in case we can't find a sub-register. We
+                    # reach as far as we can into the register from the index.
+                    fallback = csize, cidx, _ = fallback if fallback else (space, ridx, key)
+                    if space > csize:
+                        fallback = space, ridx, key
+                    elif space == csize and ridx > cidx:
+                        fallback = space, ridx, key
 
-                try:
-                    result = self.by_indexsize(mregindex, size)
-                    assert result.size == size
+                    # Now we need to figure out the most narrow register. If
+                    # there isn't enough space, then skip to the next one.
+                    if space < size:
+                        continue
 
-                # FIXME: we found a register, but couldn't find a size. the only time this happens
-                #        is because our register size from the architecture does not match hexrays
-                #        mreg size. so, we deal with this by treating as a partialregister_t.
-                except (internal.exceptions.RegisterNotFoundError, KeyError):
-                    result = self.by_index(mregindex)
-                    return result
+                    # If we don't have the narrowest register yet, then grab it
+                    # immediately since at this point we're sure that it fits.
+                    elif not narrowest:
+                        narrowest = rsize, ridx, key
+                        continue
 
-            # if we couldn't find any candidates to promote to, then there wasn't even a register
-            # that matched the desired size which makes this a partial register.
-            else:
-                result = self.by_index(mregindex)
-                assert maximum < result.size
+                    # Now we try to find the most narrow register for our space.
+                    csize, cidx, _ = narrowest
+                    if rsize < csize:
+                        narrowest = rsize, ridx, key
+                    elif rsize == csize and ridx > cidx:
+                        narrowest = rsize, ridx, key
+                    continue
 
-            # collect all of our available promotions looking for a register size that is larger
-            # than our offset that could fit it.
-            promotions = [mreg.size for mreg in mreg_promotions(mregindex) if offset < mreg.size and mreg.realname == mregindex and mreg.size <= max(candidates)]
-            if promotions and result.size < offset + maximum:
-                index = bisect.bisect_left(promotions, offset + maximum)
-                size = promotions[index] if index < len(promotions) else promotions[-1]
-                try:
-                    result = self.promote(result, 8 * size)
+            # If we couldn't find a matching register, then abort everything.
+            if not narrowest and not fallback:
+                raise internal.exceptions.RegisterNotFoundError(u"{:s}.by_partial({:d}, {:d}, {:d}) : Unable to identify a base register containing the specified microregister ({:d}).".format('.'.join([__name__, self.__class__.__name__]), index, offset, size, midx))
 
-                # if we couldn't promote the register to the desired size, then use whatever
-                # register index it was that we actually received.
-                except internal.exceptions.RegisterNotFoundError:
-                    return result
+            # Determine the register that we will use to slice a partial out of.
+            rsize, ridx, (base, dtype) = narrowest or fallback
+            choice = self.by_indextype(base, dtype)
+            position = midx - ridx
+            if position >= choice.size:
+                raise internal.exceptions.RegisterNotFoundError(u"{:s}.by_partial({:d}, {:d}, {:d}) : The specified offset ({:d}) is not within the size ({:d}) of the containing register {!s} ({:d}).".format('.'.join([__name__, self.__class__.__name__]), midx, offset, size, position, choice.size, choice, ridx))
 
-            # finally we use the offset to calcuate the real size of the result and then return it.
-            realsize = min(result.size - offset, offset + maximum)
-            return interface.partialregister_t(result, 8 * offset, 8 * realsize) if any([offset, realsize < result.size]) else result
+            # Figure out the remaining size from the distance between the index
+            # and the chosen register size. If the position starts at 0, and its
+            # size covers the register, then it's a whole register.  Otherwise,
+            # it's a partial register for the determined offset.
+            rsize = min(size, choice.size - position)
+            if position == 0 and rsize == choice.size:
+                return choice
+            return interface.partialregister_t(choice, 8 * position, 8 * rsize)
 
         @utils.multicase(name=types.string)
         def has(self, name):
