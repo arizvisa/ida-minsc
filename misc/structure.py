@@ -855,13 +855,13 @@ class v9member(object):
     @classmethod
     def index(cls, *args):
         '''Return the index of the specified member.'''
-        _, _, mindex, _ = v9members.by(*args, caller=[__name__, cls.__name__, 'by'])
+        _, mindex, _ = v9members.by(*args, caller=[__name__, cls.__name__, 'by'])
         return mindex
 
     @classmethod
     def has_name(cls, *args, **name):
         '''Return whether the `name` of the specified member is user-defined.'''
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'has_name'])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'has_name'])
         mid, mname = interface.tinfo.member_identifier(tinfo, mindex), utils.string.of(udm.name)
 
         # If we were given an explicit name, then use that one.
@@ -921,20 +921,20 @@ class v9member(object):
     @classmethod
     def get_name(cls, *args):
         '''Return the name of the specified member as a string.'''
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_name'])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_name'])
         return utils.string.of(udm.name)
 
     @classmethod
     def fullname(cls, *args):
         '''Return the full name of the specified member as a string.'''
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'fullname'])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'fullname'])
         tname, mname = naming.get(tinfo), udm.name
         return '.'.join(map(utils.string.of, [tname, mname]))
 
     @classmethod
     def set_name(cls, *args):
         '''Set the name of the specified member to a string and return the original name.'''
-        tinfo, utd, mindex, udm = v9members.by(*args[:-1], caller=[__name__, cls.__name__, 'set_name'], args="{!r}".format(*args[-1:]))
+        tinfo, mindex, udm = v9members.by(*args[:-1], caller=[__name__, cls.__name__, 'set_name'], args="{!r}".format(*args[-1:]))
         tname, mname = naming.get(tinfo), udm.name
         fullname = '.'.join(map(utils.string.of, [tname, mname]))
 
@@ -971,7 +971,7 @@ class v9member(object):
     @classmethod
     def remove_name(cls, *args):
         '''Reset the name for the specified member specified by `mid` and return the original name.'''
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'remove_name'])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'remove_name'])
         mid, tname, mname = interface.tinfo.member_identifier(tinfo, mindex), naming.get(tinfo), udm.name
         fullname = '.'.join(map(utils.string.of, [tname, mname]))
         default = cls.default_name(mid, udm.offset)
@@ -1019,12 +1019,12 @@ class v9member(object):
         # need to calculate the member offset ourselves. In case we were given
         # an offset, then cull it out since the member index was specified.
         elif (len(args) == 1 and isinstance(args[0], types.integer) and interface.node.identifier(args[0])) or (len(args) == 2 and isinstance(args[0], idaapi.tinfo_t)):
-            tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'default_name'])
+            tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'default_name'])
             mid, tname, mname = interface.tinfo.member_identifier(tinfo, mindex), naming.get(tinfo), utils.string.of(udm.name)
             offset, _ = divmod(udm.offset, 8) if udm else mindex if union(tinfo) else (tinfo.get_size(), 0)
 
         elif (len(args) == 2 and isinstance(args[0], types.integer) and interface.node.identifier(args[0])) or (len(args) == 3 and isinstance(args[0], idaapi.tinfo_t)):
-            tinfo, utd, mindex, udm = v9members.by(*args[:-1], caller=[__name__, cls.__name__, 'default_name'], args=["{:#x}".format(*args[-1:])])
+            tinfo, mindex, udm = v9members.by(*args[:-1], caller=[__name__, cls.__name__, 'default_name'], args=["{:#x}".format(*args[-1:])])
             mid, tname, mname = interface.tinfo.member_identifier(tinfo, mindex), naming.get(tinfo), utils.string.of(udm.name)
             [offset] = args[-1:]
 
@@ -1090,7 +1090,7 @@ class v9member(object):
 
         # Figure out the member and extract its type so that we can convert it
         # to a pythonic type using the `interface.typemap` namespace.
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_type'], args="{:#x}".format(offset))
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_type'], args="{:#x}".format(offset))
         mbitoffset, mtype = udm.offset, interface.tinfo.copy(udm.type)
         moffset = mbitoffset if offset is None else offset
         return interface.typemap.dissolvetype(mtype, offset=moffset)
@@ -1107,7 +1107,7 @@ class v9member(object):
             raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
 
         # Get the information about the member prior to modifying its type.
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_type'], args="{:#x}".format(offset))
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_type'], args="{:#x}".format(offset))
         moffset, mtype = udm.offset, interface.tinfo.copy(udm.type)
 
         # Convert the pythonic type that we received into a regular type that we
@@ -1120,7 +1120,7 @@ class v9member(object):
     @classmethod
     def has_typeinfo(cls, *args):
         '''Return whether there is type information applied to the specified member.'''
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'has_typeinfo'])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'has_typeinfo'])
 
         # XXX: in later versions of the disassembler, all members will have the
         #      type information unless the member is a gap. so, we only return
@@ -1132,7 +1132,7 @@ class v9member(object):
     @classmethod
     def get_typeinfo(cls, *args):
         '''Return the type information of the specified member.'''
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_typeinfo'])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_typeinfo'])
         ti = interface.tinfo.copy(udm.type)
         return ti
 
@@ -1147,7 +1147,7 @@ class v9member(object):
         # Extract the parameters and the type that we're going to apply.
         [info], args = args[-1:], args[:-1]
         ti = info if isinstance(info, idaapi.tinfo_t) else interface.tinfo.parse(None, info, idaapi.PT_SIL)
-        mowner, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'set_typeinfo'])
+        mowner, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'set_typeinfo'])
         caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'set_typeinfo'], args=["{!r}".format("{!s}".format(ti)), "flags={:#x}".format(flags)])
 
         # Now we can just use the parent type to change the member's type.
@@ -1161,7 +1161,7 @@ class v9member(object):
     @classmethod
     def remove_typeinfo(cls, *args):
         '''Remove the type information from the specified type member.'''
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'remove_typeinfo'])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'remove_typeinfo'])
         caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'remove_typeinfo'])
 
         # Now that we have the member, we need to extract its type and reduce it
@@ -1192,7 +1192,7 @@ class v9member(object):
 
         # Now we can grab the specified member and figure out what type of
         # comment it is so that we can return the correct string.
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_comment'], args=[] if repeatable is None else ["{!s}".format(repeatable)])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'get_comment'], args=[] if repeatable is None else ["{!s}".format(repeatable)])
         if repeatable is None:
             return utils.string.of(udm.cmt)
         elif repeatable and not udm.is_regcmt():
@@ -1213,7 +1213,7 @@ class v9member(object):
             raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
 
         caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'set_comment'], args=["{!r}".format(string), "{!s}".format(True if repeatable else False)])
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'set_comment'], args=["{!r}".format(string), "{!s}".format(True if repeatable else False)])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'set_comment'], args=["{!r}".format(string), "{!s}".format(True if repeatable else False)])
 
         res, terr = utils.string.of(udm.cmt), tinfo.set_udm_cmt(mindex, utils.string.to(string), not repeatable)
         if terr != idaapi.TERR_OK:
@@ -1231,7 +1231,7 @@ class v9member(object):
 
         args, [offset] = args[:-1], args[-1:]
 
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'contains'], args=["{:#x}".format(offset)])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'contains'], args=["{:#x}".format(offset)])
         if union(tinfo):
             return 0 <= offset < udm.size
         elif tinfo.is_varstruct() and udm.size == 0:
@@ -1241,7 +1241,7 @@ class v9member(object):
     @classmethod
     def element(cls, *args):
         '''Return the size for a single element belonging to the specified member.'''
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'element'])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'element'])
         if udm.type.is_array():
             type, length = interface.tinfo.array(udm.type)
             return 8 * interface.tinfo.size(type)
@@ -1250,7 +1250,7 @@ class v9member(object):
     @classmethod
     def size(cls, *args):
         '''Return the size of the type for the specified member.'''
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'size'])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'size'])
         return udm.size
 
     @classmethod
@@ -1261,7 +1261,7 @@ class v9member(object):
             raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
 
         args, [offset] = args[:-1], args[-1:]
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'at'], args=["{:#x}".format(offset)])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'at'], args=["{:#x}".format(offset)])
         moffset = 0 if union(tinfo) else udm.offset
 
         if udm.type.is_array():
@@ -1274,7 +1274,7 @@ class v9member(object):
     @classmethod
     def packed(cls, offset, *args):
         '''Pack the information about the specified member with its structure at the specified `offset` into a tuple in case it is to be removed.'''
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'packed'])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'packed'])
         mid = interface.tinfo.member_identifier(tinfo, mindex)
         name = utils.string.of(udm.name)
         mtype = interface.tinfo.copy(udm.type)
@@ -1288,7 +1288,7 @@ class v9member(object):
     @classmethod
     def has_references(cls, *args):
         '''Return whether the specified member is referenced by an address within the database.'''
-        tinfo, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'has_references'])
+        tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'has_references'])
         mid = interface.tinfo.member_identifier(tinfo, mindex)
         iterable = (ea for ea, iscode, xtype in interface.xref.to(mid, idaapi.XREF_ALL))
         return next((True for ea in iterable if not interface.node.identifier(ea)), False)
@@ -1300,7 +1300,7 @@ class v9member(object):
         FF_STKVAR = idaapi.stkvar_flag() if hasattr(idaapi, 'stkvar_flag') else idaapi.stkvarflag()
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
-        owner, utd, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'references'])
+        owner, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'references'])
         oid, mid = interface.tinfo.identifier(owner), interface.tinfo.member_identifier(owner, mindex)
         fn, is_union, is_frame = owner.get_frame_func() if hasattr(owner, 'get_frame_func') else idaapi.BADADDR, union(owner), frame(owner)
 
@@ -1327,16 +1327,11 @@ class v9member(object):
                 if isinstance(item, interface.ref_t):
                     continue
 
-                # if we didn't get a 4-element tuple, then this is a frame but
-                # in an old version of the disassembler that is still using the
-                # old structure api. we basically skip it because it's a frame.
-                if len(item) != 4:
-                    continue
-
-                # otherwise, it has 4-elements and it represents a type member.
-                mowner, mudt, mindex, mudm = item
+                # go ahead and grab the type member and number of elements.
+                mowner, mindex, mudm = item
                 if frame(mowner):
                     continue
+                count = v9members.count(mowner)
 
                 # now we need to grab the identifiable information for each type.
                 mownerid = interface.tinfo.identifier(mowner)
@@ -1348,11 +1343,11 @@ class v9member(object):
 
                 # if it's a union, then we update our working queue.
                 if union(mowner):
-                    candidates = [(interface.tinfo.member_identifier(mowner, index), (mowner, utd, index, utd[index])) for index in range(mudt.size())]
+                    candidates = [(interface.tinfo.member_identifier(mowner, index), (mowner, index, None)) for index in range(count)]
                     table.update((mcandidateid, mcandidate) for mcandidateid, mcandidate in candidates if mcandidateid != idaapi.BADADDR)
                     children.update(mcandidateid for mcandidateid, mcandidate in candidates if cls.contains(mcandidateid, mrealoffset))
 
-                    iterable = ((cmember.type, (cowner, cudt, cindex, cmember)) for _, (cowner, cudt, cindex, cmember) in candidates)
+                    iterable = ((cmember.type, (cowner, cindex, cmember)) for _, (cowner, cindex, cmember) in candidates)
                     candidates = [(interface.tinfo.identifier(ctype), ctype) for ctype, packed in iterable if interface.tinfo.identifier(ctype) != idaapi.BADADDR]
                     table.update((ctid, type) for ctid, packed in candidates)
                     work.update(ctid for ctid, _ in candidates)
@@ -1369,7 +1364,7 @@ class v9member(object):
 
         # okay, now we can convert this set into a set of structures and members to look for
         iterable = (v9members.by(cid) for cid in children)
-        candidates = {id for id in itertools.chain(*([interface.tinfo.identifier(mowner), interface.tinfo.member_identifier(mowner, mindex)] for mowner, mudt, mindex, mudm in iterable))}
+        candidates = {id for id in itertools.chain(*([interface.tinfo.identifier(mowner), interface.tinfo.member_identifier(mowner, mindex)] for mowner, mindex, mudm in iterable))}
 
         # now figure out which operand has the structure member applied to it
         results = []
