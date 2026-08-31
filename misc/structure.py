@@ -740,10 +740,10 @@ class xref(object):
             # information needed to select the specified type member. However,
             # if the tuple length is less than 4, then frames are still using
             # the old structure api. So, we pass these through to the last case.
-            elif v9 and len(reference_or_member) == 4:
-                tinfo, utd, mindex, udm = reference_or_member
+            elif v9:
+                tinfo, mindex, udm = reference_or_member
                 owner = structure_t(tinfo, offset=offset) if offset else structure_t(tinfo)
-                yield owner if 0 <= mindex < utd.size() else owner.members[mindex]
+                yield owner.members[mindex] if v9members.has_index(tinfo, mindex) else owner
 
             # Otherwise it is a tuple for a structure alias or a member, and we
             # need to use it to yield a structure_t or member_t with the index.
