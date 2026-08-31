@@ -8267,7 +8267,7 @@ class member_t(object):
             return self.ptr.props
 
         # Otherwise, use the owner and index to get the member information.
-        tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'properties'])
+        tinfo, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'properties'])
 
         # Then we'll use what we have to simulate the member properties.
         MF_OK = 1 if tinfo.is_correct() else 0              # is the member ok? (always yes)
@@ -8287,7 +8287,7 @@ class member_t(object):
         '''Return the size of the member.'''
         cls, mowner, mindex = self.__class__, self.parent, self.index
         if isinstance(mowner.ptr, idaapi.tinfo_t):
-            tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
+            tinfo, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
             mbitlocation = interface.location_t(udm.offset, udm.size)
             mbytelocation = _, msize = mbitlocation / 8
             return msize
@@ -8297,7 +8297,7 @@ class member_t(object):
         '''Return the real offset of the member.'''
         cls, mowner, mindex = self.__class__, self.parent, self.index
         if isinstance(mowner.ptr, idaapi.tinfo_t):
-            tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
+            tinfo, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
             mbitlocation = interface.location_t(udm.offset, udm.size)
             mbytelocation = moffset, _ = mbitlocation / 8
             return 0 if union(mowner.ptr) else moffset
@@ -8372,7 +8372,7 @@ class member_t(object):
         # get all of the member information. Then we can extract its dimensions,
         # and calculate the `bounds_t` to return.
         if isinstance(mowner.ptr, idaapi.tinfo_t):
-            tinfo, utd, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
+            tinfo, mindex, udm = v9members.by(mowner.ptr, mindex, caller=[__name__, cls.__name__, 'realoffset'])
             mbitoffset, mbits = 0 if union(tinfo) else udm.offset, udm.size
             moffset, moffsetex = divmod(mbitoffset, 8)
             msize, msizeex = divmod(mbits, 8)
