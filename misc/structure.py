@@ -9036,7 +9036,7 @@ class members_t(object):
             # Filter out any members that are not aligned along a multiple.
             filtered = [midx for midx, (index, moffset) in iterable if not moffset]
             for midx in filtered:
-                tinfo, utd, mindex, udm = v9members.by(owner.ptr, midx, caller=[__name__, cls.__name__, 'has'])
+                tinfo, mindex, udm = v9members.by(owner.ptr, midx, caller=[__name__, cls.__name__, 'has'])
                 mtype, mbitoffset, mbits = interface.tinfo.copy(udm.type), udm.offset, udm.size
 
                 # Get the type of the element from the array member type.
@@ -9124,7 +9124,7 @@ class members_t(object):
             # the element size (if it's an array) and the member size.
             cls = self.__class__
             for midx in filtered:
-                tinfo, utd, mindex, udm = v9members.by(owner.ptr, midx, caller=[__name__, cls.__name__, 'has'])
+                tinfo, mindex, udm = v9members.by(owner.ptr, midx, caller=[__name__, cls.__name__, 'has'])
                 mtype, mbitoffset, mbits = interface.tinfo.copy(udm.type), udm.offset, udm.size
                 metype, _ = interface.tinfo.array(mtype) if mtype.is_array() else (mtype, 1)
                 mbitlocation = interface.location_t(mbitoffset, mbits)
@@ -9398,10 +9398,7 @@ class members_t(object):
 
         # Iterate through all of the members and find the index that matches.
         try:
-            if isinstance(owner.ptr, idaapi.tinfo_t):
-                packed = v9members.by_identifier(owner.ptr, identifier)
-            else:
-                packed = members.by_identifier(owner.ptr, identifier)
+            packed = v9members.by_identifier(owner.ptr, identifier) if isinstance(owner.ptr, idaapi.tinfo_t) else members.by_identifier(owner.ptr, identifier)
             _, mindex, _ = packed
 
         # If anything raised an exception, then try and get the full name of the
@@ -9507,7 +9504,7 @@ class members_t(object):
             # Now we've filtered all the overlapping members and grabbed their
             # indices. So, we can now explore each one for its type.
             for midx in filtered:
-                tinfo, utd, mindex, udm = v9members.by(owner.ptr, midx, caller=[__name__, cls.__name__, 'index'])
+                tinfo, mindex, udm = v9members.by(owner.ptr, midx, caller=[__name__, cls.__name__, 'index'])
                 mtype, mbitoffset, mbits = interface.tinfo.copy(udm.type), udm.offset, udm.size
 
                 # Get the type of the element from the array member type.
@@ -9752,7 +9749,7 @@ class members_t(object):
             # then go back through them and verify everything about it.
             filtered = [midx for midx, (index, moffset) in iterable if not moffset]
             for midx in filtered:
-                tinfo, utd, mindex, udm = v9members.by(owner.ptr, midx, caller=[__name__, cls.__name__, 'has'])
+                tinfo, mindex, udm = v9members.by(owner.ptr, midx, caller=[__name__, cls.__name__, 'has'])
                 mtype, mbitoffset, mbits, mid = interface.tinfo.copy(udm.type), udm.offset, udm.size, interface.tinfo.member_identifier(tinfo, mindex)
 
                 # Now we take the member type and reduce it to just its element
