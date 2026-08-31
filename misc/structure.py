@@ -3164,7 +3164,7 @@ class v9members(object):
             ti, mindex, udm = available[index]
             pivot = 0 if union(udm.type) else udm.offset
             available = available[:index] if offset < pivot else available[index:]
-        return available[0] if available else ()
+        return available[0] if available else None
 
     @classmethod
     def at_offset(cls, type, offset):
