@@ -1045,6 +1045,48 @@ else:
             iterable = map(functools.partial(operator.add, count), range(0x10))
             Fadd_region([midx for midx in iterable])
 
+            # The very last thing we need to do is to build an index for each of
+            # the registers added. This is for mapping the register index to the
+            # sizes that are available so that we can backwards-scan to a whole
+            # register from a sub-register with each lookup being O(1) time.
+            positions = {}
+
+            # First we need to filter out any of the registers that are not even
+            # associated with a microregister as dictated by the decompiler, or
+            # a default root register since we only care for the sized ones.
+            for midx, dtype in filter(utils.finstance(tuple), self.__cache__):
+                if isinstance(midx, types.string):
+                    continue
+
+                # Next, we normalize the name and check if we actually have it
+                # within our registers. If not, then continue to the next one.
+                name = self.__cache__[midx, dtype].lower()
+                if name in self.__register__ or hasattr(self.__register__, name):
+                    res = name
+                elif name in self.__cache__:
+                    res = self.__cache__[name]
+                else:
+                    continue
+
+                # Now we can get the register dimensions, and stash them with
+                # the correct key that is associated with each register size.
+                register = getattr(self.__register__, res)
+                integers = ridx, rsize = register.realname, register.size
+                if all(isinstance(integer, types.integer) for integer in integers) and rsize > 0:
+                    positions.setdefault(ridx, {}).setdefault(rsize, (midx, dtype))
+                continue
+
+            # Now that we've got the dimensions, sort the sizes for each so that
+            # we can query them later. To assist with backwards-scanning for a
+            # candidate register, we grab the maximum width from all the sizes.
+            positions = {ridx : sorted(sizes.items()) for ridx, sizes in positions.items()}
+            iterable = itertools.chain(*(sizes for _, sizes in positions.items()))
+            sizes = {rsize for rsize, _ in iterable}
+            width = max(sizes) if sizes else 0
+
+            # We got it done.... so, attach it to the instance.
+            self.__positions__ = width, positions
+
         @utils.multicase(string=types.string)
         def by(self, string):
             '''Return the (complete) microregister identified by the name specified in `string`.'''
