@@ -2023,9 +2023,9 @@ def op_references(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_references(ea, opnum):
     '''Return the `(address, opnum, type)` of each location that references the target of operand `opnum` for the instruction at `ea`.'''
-    insn, ops = at(ea), operands(ea)
+    insn, ops = interface.instruction.at(ea), interface.instruction.operands(ea)
     if not(opnum < len(ops)):
-        raise E.InvalidTypeOrValueError(u"{:s}.op_references({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
+        raise E.InvalidTypeOrValueError(u"{:s}.op_references({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(interface.instruction.operands(ea)), ea))
 
     # Start out by doing sanity check so that we can determine whether
     # the operand is referencing a local or a global. We grab both the
@@ -2128,11 +2128,27 @@ def op_references(ea, opnum):
 
         # Hopefully that was it, now we should be able to figure out our path.
         iterable = itertools.chain([(items[0], items[1] if len(items) > 1 else None, 0)], [(None, item, 0) for item in items[2:]])
-        _, items = interface.strpath.guide(offset, idaapi.get_struc(items[0]), [item for item in iterable])
+        owner = internal.structure.by_identifier(items[0])
+        scale = 8 if isinstance(owner, idaapi.tinfo_t) else 1
+        _, items = interface.strpath.guide(offset * scale, owner, [item for item in iterable])
 
         # If we actually got some items, then we can assign it to members.
         if items:
-            members = [(sptr, mptr) for sptr, mptr, offset in items]
+            collected = []
+            for sptr, mptr, _ in items:
+                mowner = internal.structure.by_identifier(sptr) if isinstance(sptr, types.integer) else sptr
+                if mptr is None:
+                    mid = idaapi.BADADDR
+                elif isinstance(mptr, types.integer) and mptr in {idaapi.BADADDR, -1}:
+                    mid = idaapi.BADADDR
+                elif hasattr(mptr, 'id'):
+                    mid = mptr.id
+                elif interface.node.identifier(mptr):
+                    mid = mptr
+                else:
+                    mid = interface.tinfo.member_identifier(mowner, mptr)
+                collected.append((mowner, mid))
+            members = collected
 
         # If we couldn't figure out the path, then we'll just fall back
         # to the op_structure implementation. This should give us the
@@ -2151,22 +2167,26 @@ def op_references(ea, opnum):
 
             # So, now we should have a list of structure.member_t and all
             # we need to do is grab their idaapi.struc_t and idaapi.member_t.
-            members = [(item.parent.ptr, item.ptr) for item in items]
+            members = [(item.parent.ptr, item.id) for item in items]
 
         # Now we need to iterate through all of the members and collect their
         # xref'd targets. These will all get filtered later, so we shouldn't
         # have to worry about it too much.
         refs = {item for item in []}
-        for sptr, mptr in members:
+        for sptr, mid in members:
+            if mid in {None, -1, idaapi.BADADDR}:
+                continue
+            ns = internal.structure.v9member if isinstance(sptr, idaapi.tinfo_t) else internal.structure.member
 
             # Now we check to see if it has any xrefs that point directly to
             # the id of the member. If not, then there's nothing to do here.
             # First we need to check the first xref of the member. If there
             # isn't anything, then we continue onto the next one.
-            items = [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(mptr.id, idaapi.XREF_ALL)]
+            items = [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(mid, idaapi.XREF_ALL)]
             if not items:
-                fullname = idaapi.get_member_fullname(mptr.id)
-                logging.info(u"{:s}.op_references({:#x}, {:d}) : No references were found for structure member \"{:s}\".".format(__name__, ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
+                sid = interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else getattr(sptr, 'id', sptr)
+                fullname = ns.fullname(mid)
+                logging.info(u"{:s}.op_references({:#x}, {:d}) : No references were found for member \"{:s}\" ({:#x}) from the referenced structure ({:#x}).".format(__name__, ea, opnum, utils.string.escape(utils.string.of(fullname), '"'), mid, sid))
                 continue
 
             # Update our set with all of the references that we found for the
@@ -2178,7 +2198,8 @@ def op_references(ea, opnum):
         # every xref. We're going to use the structure in our path along with
         # all of its members as a required constraint when filtering them.
         sptr, _ = members[0]
-        required = {mptr.id for _, mptr in members}
+        required = {mid for _, mid in members if mid not in {idaapi.BADADDR, None}}
+        sid = interface.tinfo.identifier(sptr) if isinstance(sptr, idaapi.tinfo_t) else getattr(sptr, 'id', sptr)
 
         # Now we can iterate through all our references and gather any operands
         # as potential candidates that we'll filter later.
@@ -2199,62 +2220,124 @@ def op_references(ea, opnum):
                     op = operand(ea, refopnum)
                     offset = idaapi.as_signed(op.value if op.type in {idaapi.o_imm} else op.addr, 8 * op_size(ea, refopnum))
                     iterable = itertools.chain([(identifiers[0], identifiers[1] if len(identifiers) > 1 else None, 0)], [(None, id, 0) for id in identifiers[2:]])
-                    _, items = interface.strpath.guide(offset + delta, idaapi.get_struc(identifiers[0]), [item for item in iterable])
+
+                    # Use the identifier to grab a structure and get all the
+                    # items for the operand.
+                    owner = internal.structure.by_identifier(identifiers[0])
+                    scale = 8 if isinstance(owner, idaapi.tinfo_t) else 1
+                    goal = offset + delta
+                    _, items = interface.strpath.guide(scale * goal, owner, [item for item in iterable])
+
+                    # Now we need to normalize the owners since they are mixed.
+                    res = []
+                    for sptr, _, _ in items:
+                        if isinstance(sptr, idaapi.tinfo_t):
+                            res.append(interface.tinfo.identifier(sptr))
+                        elif isinstance(sptr, types.integer):
+                            res.append(sptr)
+                        else:
+                            res.append(sptr.id)
+                        continue
+                    owners = {id for id in res}
 
                     # If this path does not even include our structure inside it,
                     # then we can just exclude it from our list of candidates.
-                    if sptr.id not in {sptr.id for sptr, _, _ in items}:
+                    if sid not in owners:
                         continue
 
                     # Now we have the items, we need to grab their identifiers
                     # and then we can later test for them.
-                    ids = [sptr.id for sptr, _, _ in items[:1]] + [mptr.id for _, mptr, _ in items[:]]
+                    ids = []
+                    for index, (sptr, mptr, _) in enumerate(items):
+                        if isinstance(sptr, idaapi.tinfo_t):
+                            id = interface.tinfo.identifier(sptr)
+                        elif isinstance(sptr, types.integer):
+                            id = sptr
+                        else:
+                            id = sptr.id
+
+                        # If it's the owner of the reference item, then save it.
+                        if index == 0:
+                            ids.append(id)
+
+                        # Now that we have an owner, grab the member identifier.
+                        if mptr is None:
+                            continue
+                        elif isinstance(mptr, types.integer) and mptr in {idaapi.BADADDR, -1}:
+                            continue
+                        elif hasattr(mptr, 'id'):
+                            mid = mptr.id
+                        elif interface.node.identifier(mptr):
+                            mid = mptr
+                        else:
+                            mid = interface.tinfo.member_identifier(sptr, mptr)
+                        ids.append(mid)
                     candidates.append((refopnum, {id for id in ids}))
                 continue
 
             # Next we need to check if there were any operands that actually
             # point to stack variables so we can figure out their path and
             # add them to our candidates list if necessary.
-            for refopnum, op in enumerate(operands(ea)):
+            func = interface.function.by_address(ea) if interface.function.has(ea) else None
+            for refopnum, op in enumerate(interface.instruction.operands(ea)):
                 if not idaapi.is_stkvar(interface.address.flags(ea), refopnum):
+                    continue
+                elif not func:
                     continue
 
                 # Use the instruction and the operand to figure out the
                 # member id of the frame that we need to descend into.
-                item = idaapi.get_stkvar(at(ea), op, op.value if op.type in {idaapi.o_imm} else op.addr)
+                item = idaapi.get_stkvar(interface.instruction.at(ea), op, op.value if op.type in {idaapi.o_imm} else op.addr)
                 if item is None:
                     logging.warning(u"{:s}.op_references({:#x}, {:d}) : Error trying to get frame variable for the referenced operand ({:d}) of the instruction at {:#x}.".format(__name__, insn.ea, opnum, refopnum, ea))
                     continue
                 mptr, actval = item
-                offset = actval - mptr.soff
 
-                # We have the mptr for the frame variable, so next we just need
-                # to get the sptr for it, and use it get its members_t. This way
-                # we can use the actual value to compose a path through it.
-                msptr = idaapi.get_sptr(mptr)
-                if msptr is None:
-                    logging.warning(u"{:s}.op_references({:#x}, {:d}) : The frame variable for the operand ({:d}) in the instruction at {:#x} is not a structure.".format(__name__, insn.ea, opnum, refopnum, ea))
+                # Use the function so that we can grab the owner of the member,
+                # the member's index, and then the member.
+                owner = interface.function.frame(func).ptr
+                if isinstance(mptr, types.integer):
+                    mowner, mindex, mptr = internal.structure.v9members.by_index(owner, mptr)
+                else:
+                    mowner, mindex, mptr = internal.structure.members.by_identifier(owner, mptr.id)
+
+                # Now we can use the owner to get the scale, and the information
+                # from the member itself. Grab the type first, because if we
+                # can't descend then we can skip over this reference entirely.
+                if isinstance(mowner, idaapi.tinfo_t) and mptr.type.is_udt():
+                    mtype, moffset = interface.tinfo.copy(mptr.type), mptr.offset
+                elif isinstance(mowner, idaapi.tinfo_t):
+                    continue
+                elif idaapi.get_sptr(mptr):
+                    mtype, moffset = idaapi.get_sptr(mptr), mptr.soff
+                else:
                     continue
 
-                # Carve a path through the members that overlap with the offset.
-                path, moffset, realoffset = [], 0, 0
-                for realoffset, packed in internal.structure.members.at(mowner, offset):
-                    mowner, mindex, mptr = packed
-                    path.append((mowner, mptr))
-                    moffset = 0 if mptr.flsg & idaapi.MF_UNIMEM else mptr.soff
+                # Now that we have the type to descend into, go ahead and
+                # calculating the offset so that it is for the correct backing.
+                scale = 8 if isinstance(mowner, idaapi.tinfo_t) else 1
+                scaledoffset = scale * actval - moffset
 
-                delta = offset - (realoffset + moffset)
+                # Carve a path through the members that overlap with the offset.
+                ids, nsmembers = [], internal.structure.v9members if isinstance(sptr, idaapi.tinfo_t) else internal.structure.members
+                for realoffset, packed in nsmembers.at(mtype, scaledoffset):
+                    mowner, mindex, mptr = packed
+                    if isinstance(mowner, idaapi.tinfo_t):
+                        ids.append(interface.tinfo.identifier(mowner))
+                        ids.append(interface.tinfo.member_identifier(mowner, mindex))
+                    else:
+                        ids.extend((getattr(ptr, 'id', ptr)) for ptr in [mowner, mptr])
+                    continue
 
                 # Now that we have all the members in the path, we go through and
                 # collect all of their identifiers as a filter for the candidates.
-                ids = [msptr.id] + [mptr.id for mowner, mptr in path]
                 candidates.append((refopnum, {id for id in ids}))
 
             # If we didn't find any candidates, then that means this is a global
             # so we need to figure out which operand it is. We'll iterate through
             # all of them for this xref and filter it in one shot.
             if not candidates:
-                for refopnum, op in enumerate(operands(ea)):
+                for refopnum, op in enumerate(interface.instruction.operands(ea)):
                     if op.type not in {idaapi.o_mem}:
                         continue
 
@@ -2273,7 +2356,7 @@ def op_references(ea, opnum):
 
                     # Now we can grab all of the operand's ids and check them
                     # against our required ids before adding them to our results.
-                    ids = {item.ptr.id for item in items}
+                    ids = {item.id for item in items}
                     if ids & required == required:
                         result.append(interface.opref_t(ea, int(refopnum), accesses[refopnum]))
                     continue
