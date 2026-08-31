@@ -13468,7 +13468,7 @@ class xref(object):
                 mindex = xowner.get_udm_by_tid(udm, mid)
                 if mindex < 0:
                     raise internal.exceptions.MemberNotFoundError(u"{:s}.typeinfo({:#x}) : Unable to locate the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), tid, mid))
-                packed = xowner, utd, mindex, udm
+                packed = xowner, mindex, udm
 
                 # Next we check if the type being references belongs to a frame.
                 ea = xowner.get_frame_func() if hasattr(xowner, 'get_frame_func') else idaapi.BADADDR
