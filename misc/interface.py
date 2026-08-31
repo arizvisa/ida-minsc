@@ -5964,11 +5964,11 @@ class address(object):
                 elif isinstance(item, internal.structure.membertypes):
                     mptr, mid = getattr(item, 'ptr', item), item.id
                     if not isinstance(mptr, internal.structure.membertypes):
-                        mowner, _, mindex, udm = internal.structure.v9members.by(mid)
+                        mowner, mindex, udm = internal.structure.v9members.by(mid)
                         ns, mtype = internal.structure.v9member, tinfo.copy(udm.type)
                     else:
-                        ns, mtype = internal.structure.member, None
                         mowner, mindex, mptr = internal.structure.members.by(mid)
+                        ns, mtype = internal.structure.member, None
 
                     opinfo = idaapi.opinfo_t()
                     if isinstance(mtype, idaapi.tinfo_t) and not cls.apply_typeinfo(ea, mtype):
