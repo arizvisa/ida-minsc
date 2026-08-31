@@ -5259,9 +5259,12 @@ class members(object):
         return
 
     @classmethod
-    def index(cls, sptr, mptr):
-        '''Return the index of the member `mptr` in the structure identified by `sptr`.'''
+    def index(cls, sptr, offset):
+        '''Return the index of the member at the specified `offset` from the structure identified by `sptr`.'''
         sptr = idaapi.get_struc(sptr.id if isinstance(sptr, structuretypes) else sptr)
+        mptr = idaapi.get_member(sptr, offset) if isinstance(offset, types.integer) else offset
+        if not mptr:
+            raise E.MemberNotFoundError(u"{:s}.index({:#x}, {:#x}) : Unable to find a member at the specified byte offset ({:#x}) of the given structure ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, offset, sptr.id))
 
         # We assume that the member actually belongs to the specified structure to
         # avoid having to do a get_member_by_id every time this gets called. If the
