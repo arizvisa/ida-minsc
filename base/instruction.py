@@ -1270,7 +1270,7 @@ def op_structurepath(ea, opnum):
         frame = interface.function.frame(fn).ptr
         scale, nsmembers = (8, internal.structure.v9members) if isinstance(frame, idaapi.tinfo_t) else (1, internal.structure.members)
         if isinstance(frame, idaapi.tinfo_t):
-            mowner, _, mindex, mptr = nsmembers.by_identifier(frame, mptr)
+            mowner, mindex, mptr = nsmembers.by_identifier(frame, mptr)
         else:
             mowner, mindex, mptr = nsmembers.by_identifier(frame, mptr)
         framebase = interface.function.frame_offset(fn)
@@ -1323,7 +1323,7 @@ def op_structurepath(ea, opnum):
             raise E.MissingTypeOrAttribute(u"{:s}.op_structurepath({:#x}, {:d}) : Operand {:d} is not referencing an address ({:#x}) containing the required flags ({:#x}) for a structure.".format(__name__, ea, opnum, opnum, address, flags))
         elif not ok:
             raise E.MissingTypeOrAttribute(u"{:s}.op_structurepath({:#x}, {:d}) : Operand {:d} is not referencing an address ({:#x}) containing the necessary information for a structure.".format(__name__, ea, opnum, opnum, address))
-        elif not idaapi.get_struc(info.tid):
+        elif not internal.structure.has(info.tid):
             raise E.StructureNotFoundError(u"{:s}.op_structurepath({:#x}, {:d}) : Operand {:d} is referencing an identifier ({:#x}) that is not a structure.".format(__name__, ea, opnum, opnum, info.tid))
         sptr = internal.structure.by_identifier(info.tid)
         scale, nsmembers = (8, internal.structure.v9members) if isinstance(sptr, idaapi.tinfo_t) else (1, internal.structure.members)
@@ -1439,10 +1439,7 @@ def op_structurepath(ea, opnum):
     for sptr, mptr, offset in path:
         st = internal.structure.new(getattr(sptr, 'id', sptr), position // scale)
         mid, nsmembers = getattr(mptr, 'id', mptr), internal.structure.v9members if isinstance(st.ptr, idaapi.tinfo_t) else internal.structure.members
-        if isinstance(frame, idaapi.tinfo_t):
-            mowner, _, mindex, _ = nsmembers.by_identifier(st.ptr, mid) if mptr else (None, None, -1, None)
-        else:
-            mowner, mindex, mptr = nsmembers.by_identifier(st.ptr, mid) if mptr else (None, -1, None)
+        mowner, mindex, mptr = nsmembers.by_identifier(st.ptr, mid) if mptr else (None, -1, None)
         result.append(st if mindex < 0 else st.members[mindex])
         position = calculator.send((sptr, mptr, offset))
 
@@ -1548,26 +1545,17 @@ def op_structurepath(ea, opnum, sptr, path):
         elif internal.structure.has(item):
             mowner = res = internal.structure.naming.get(item)
         elif isinstance(item, internal.structure.membertypes):
-            if isinstance(mowner, idaapi.tinfo_t):
-                mowner, _, mindex, mptr = nsmembers.by(mowner, item.id)
-            else:
-                mowner, mindex, mptr = nsmembers.by(mowner, item.id)
+            mowner, mindex, mptr = nsmembers.by(mowner, item.id)
             res = nsmember.get_name(mowner, mindex) if isinstance(sptr, idaapi.tinfo_t) else nsmember.get_name(mptr)
             mtype = mptr.type if isinstance(sptr, idaapi.tinfo_t) and mptr.type.is_udt() else None if isinstance(mowner, idaapi.tinfo_t) else idaapi.get_sptr(mptr)
             mowner = mowner if mtype is None else mtype
         elif isinstance(item, types.integer) and internal.structure.has_member(item):
-            if isinstance(mowner, idaapi.tinfo_t):
-                mowner, _, mindex, mptr = nsmembers.by(mowner, item)
-            else:
-                mowner, mindex, mptr = nsmembers.by(mowner, item)
+            mowner, mindex, mptr = nsmembers.by(mowner, item)
             res = nsmember.get_name(mowner, mindex) if isinstance(sptr, idaapi.tinfo_t) else nsmember.get_name(mptr)
             mtype = mptr.type if isinstance(sptr, idaapi.tinfo_t) and mptr.type.is_udt() else None if isinstance(mowner, idaapi.tinfo_t) else idaapi.get_sptr(mptr)
             mowner = mowner if mtype is None else mtype
         elif isinstance(item, (types.integer, types.string)):
-            if isinstance(mowner, idaapi.tinfo_t):
-                mowner, _, mindex, mptr = nsmembers.by(mowner, item)
-            else:
-                mowner, mindex, mptr = nsmembers.by(mowner, item)
+            mowner, mindex, mptr = nsmembers.by(mowner, item)
             res = nsmember.get_name(mowner, mindex) if isinstance(sptr, idaapi.tinfo_t) else nsmember.get_name(mptr)
             mtype = mptr.type if isinstance(sptr, idaapi.tinfo_t) and mptr.type.is_udt() else None if isinstance(mowner, idaapi.tinfo_t) else idaapi.get_sptr(mptr)
             mowner = mowner if mtype is None else mtype
