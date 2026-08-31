@@ -8247,10 +8247,8 @@ class member_t(object):
     def ptr(self):
         '''Return the pointer of the ``idaapi.member_t``.'''
         mowner, mindex = self.__parent__, self.__index__
-        if isinstance(mowner.ptr, idaapi.tinfo_t):
-            mowner, mindex, mptr = v9members.by_index(mowner.ptr, mindex)
-        else:
-            mowner, mindex, mptr = members.by_index(mowner.ptr, mindex)
+        ns = v9members if isinstance(mowner.ptr, idaapi.tinfo_t) else members
+        mowner, mindex, mptr = ns.by_index(mowner.ptr, mindex)
         return mptr
     @property
     def id(self):
@@ -9278,12 +9276,11 @@ class members_t(object):
     def has(self, member):
         '''Return whether the specified `members` is owned by the current structure.'''
         ti, mowner = idaapi.tinfo_t(), self.owner
-        sid, mid = mowner.id, member.id
+        sid, mid, ns = mowner.id, member.id, v9members if isinstance(mowner.ptr, idaapi.tinfo_t) else members
+        sptr, mindex, mptr = ns.by_identifier(mowner.ptr, mid)
         if isinstance(mowner, idaapi.tinfo_t):
-            sptr, mindex, mptr = v9members.by_identifier(mowner.ptr, mid)
             expected, expected_member = interface.tinfo.identifier(sptr), sptr.get_udm_tid(mindex)
         else:
-            sptr, mindex, mptr = members.by_identifier(mowner.ptr, mid)
             expected, expected_member = sptr.id, mptr.id
         return all([sid == expected, mid == expected_member])
 
