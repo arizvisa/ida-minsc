@@ -2254,7 +2254,7 @@ class v9members(object):
 
         # Get the structure/union details if the type has them, and return the
         # size. Otherwise, raise an exception that we couldn't get them.
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.count({:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), sid))
         elif tinfo.get_udt_details(utd):
             return utd.size()
@@ -2429,7 +2429,7 @@ class v9members(object):
         '''Return a dictionary and list of points for the boundaries of each element from the specified `type` selected by the callable `critique`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.intervals({!s}, {!s}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), utils.pycompat.fullname(critique)))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.intervals({!s}, {!s}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), utils.pycompat.fullname(critique)))
@@ -2500,7 +2500,7 @@ class v9members(object):
 
         # Next we get the details for the type that we received or determined.
         utd = idaapi.udt_type_data_t()
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.iterate({!s}, {!r}) : The specified type ({:#x}) is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), slice, sid))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.iterate({!s}, {!r}) : Unable to get the details for the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), slice, sid))
@@ -2520,7 +2520,7 @@ class v9members(object):
     def index(cls, type, offset):
         '''Return the index of the member at the specified `offset` from the given structure or union `type`.'''
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.index({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), int(offset)))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.index({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), int(offset)))
@@ -2537,7 +2537,7 @@ class v9members(object):
         '''Return the index of a member at the given `offset` or after from the specified structure or union `type`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.index_after({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.index_after({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
@@ -2595,7 +2595,7 @@ class v9members(object):
         '''Return the index of a member at the given `offset` or before from the specified structure or union `type`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.index_before({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.index_before({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
@@ -2758,7 +2758,7 @@ class v9members(object):
         # if there isn't a `tinfo_t.add_udm` method, then we need to add the
         # member manually. before doing anything, we need the type details.
         utd = idaapi.udt_type_data_t()
-        if not (ti.is_struct() or union(ti)):
+        if not ti.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : The specified type ({:#x}) is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, sid))
         elif not ti.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.add({:#x}, {!s}, {!s}, {!s}{!s}) : Unable to get the details for the specified type ({:#x})".format('.'.join([__name__, cls.__name__]), sid, name_description, typeinfo_description, location, offset_description, sid))
@@ -2823,7 +2823,7 @@ class v9members(object):
     def contains(cls, type, offset):
         '''Return whether the given `offset` is within the boundaries of the specified structure or union `type`.'''
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.contains({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.contains({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
@@ -2840,7 +2840,7 @@ class v9members(object):
     def has_identifier(cls, type, identifier):
         '''Return whether the member with the specified `identifier` belongs to the given structure or union `type`.'''
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.by_identifier({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.by_identifier({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier))
@@ -2859,7 +2859,7 @@ class v9members(object):
         '''Return whether a member with the given `name` exists within the specified structure or union `type`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.has_name({!s}, {!r}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), name))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.has_name({!s}, {!r}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), name))
@@ -2877,7 +2877,7 @@ class v9members(object):
         '''Return whether a member exists at the specified `index` of the given structure or union `type`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.has_index({!s}, {:d}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), int(index)))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.has_index({!s}, {:d}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), int(index)))
@@ -2890,7 +2890,7 @@ class v9members(object):
         '''Return whether a member exists at the `offset` of the specified structure or union `type`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.has_offset({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.has_offset({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
@@ -2935,7 +2935,7 @@ class v9members(object):
         '''Return whether any members exist in the specified structure or union `type` from the offset `start` to `stop`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.has_bounds({!s}, {:#x}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.has_bounds({!s}, {:#x}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop))
@@ -3054,7 +3054,7 @@ class v9members(object):
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
         identifier = interface.tinfo.member_identifier(tinfo, cls.index(tinfo, identifier)) if isinstance(identifier, udm_t) else int(identifier)
 
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.by_identifier({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.by_identifier({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier))
@@ -3079,7 +3079,7 @@ class v9members(object):
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
 
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.by_index({!s}, {:d}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), index))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.by_index({!s}, {:d}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), index))
@@ -3099,7 +3099,7 @@ class v9members(object):
         '''Return the member with the given `name` belonging to the structure identified by `sptr`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.by_name({!s}, {!r}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), name))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.by_name({!s}, {!r}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), name))
@@ -3172,7 +3172,7 @@ class v9members(object):
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
 
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.at_offset({!s}, {:+#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.at_offset({!s}, {:+#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
@@ -3282,7 +3282,7 @@ class v9members(object):
             raise E.InvalidParameterError(u"{:s}.in_offset({!r}, {:+#x}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), type, offset, type.__class__))
 
         # Try and get the structure/union details if it actually is one.
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.in_offset({:#x}, {:+#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), sid, offset))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.in_offset({:#x}, {:+#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), sid, offset))
@@ -3322,7 +3322,7 @@ class v9members(object):
                 priority = -2 if msize == 8 * interface.tinfo.size(melement) and not inexactness else -1 if not inexactness else 0
 
             # If it's a structure, then set a value that can be scaled.
-            elif melement.is_struct() or union(melement):
+            elif melement.is_udt():
                 priority = -3 if msize == 8 * interface.tinfo.size(melement) and not inexactness else -2 if not inexactness else -1
 
             # Otherwise, this is unknown which we give the very last priority.
@@ -3333,9 +3333,9 @@ class v9members(object):
             # points directly to one of its members.
             udm = udm_t()
             udm.offset = realoffset
-            mchild = mtype.find_udm(udm, idaapi.STRMEM_OFFSET) if mtype.is_struct() or mtype.is_union() else -1
+            mchild = mtype.find_udm(udm, idaapi.STRMEM_OFFSET) if mtype.is_udt() else -1
 
-            if mtype.is_struct() or mtype.is_union():
+            if mtype.is_udt():
                 moffset = realoffset - (0 if union(mtype) else udm.offset)
                 index, inexactness = v9member.at(mtype, mchild, moffset)
                 priority *= 3 if 0 <= mchild and not moffset and not inexactness else 2 if 0 <= mchild and not inexactness else 1
@@ -3361,7 +3361,7 @@ class v9members(object):
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
 
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.at_bounds({!s}, {:+#x}, {:+#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.at_bounds({!s}, {:+#x}, {:+#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop))
@@ -3455,7 +3455,7 @@ class v9members(object):
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
 
-        if not (tinfo.is_struct() or union(tinfo)):
+        if not tinfo.is_udt():
             raise E.InvalidTypeOrValueError(u"{:s}.overlaps({!s}, {:+#x}, {:+#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop))
         elif not tinfo.get_udt_details(utd):
             raise E.DisassemblerError(u"{:s}.overlaps({!s}, {:+#x}, {:+#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop))
