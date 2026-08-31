@@ -2340,7 +2340,7 @@ class typeinfo_member(object):
     @classmethod
     def get(cls, *args):
         '''Return a dictionary containing the tags for the specified member.'''
-        tinfo, utd, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'get'])
+        tinfo, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'get'])
         mid, mfullname = interface.tinfo.member_identifier(tinfo, mindex), internal.structure.v9member.fullname(tinfo, mindex)
         repeatable = True
 
@@ -2397,7 +2397,7 @@ class typeinfo_member(object):
             caller_format = internal.structure.v9member.format_args(*args, caller=[__name__, cls.__name__, 'set'], args=["{!r}".format(item) for item in [key, value]])
             raise internal.exceptions.InvalidParameterError(u"{:s} : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format(caller_format, utils.string.escape(key, '"'), value))
 
-        tinfo, utd, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'get_type'], args=["{!r}".format(item) for item in [key, value]])
+        tinfo, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'get_type'], args=["{!r}".format(item) for item in [key, value]])
         mid, mfullname = interface.tinfo.member_identifier(tinfo, mindex), internal.structure.v9member.fullname(tinfo, mindex)
         repeatable = True
 
@@ -2455,7 +2455,7 @@ class typeinfo_member(object):
 
         # Using the arguments, we can now get the specified member. First thing
         # we do is check if the implicit tags are being explicitly modified.
-        tinfo, utd, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'remove'], args=["{!r}".format(key), "{!s}".format(none)])
+        tinfo, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'remove'], args=["{!r}".format(key), "{!s}".format(none)])
         mid, mfullname = interface.tinfo.member_identifier(tinfo, mindex), internal.structure.v9member.fullname(tinfo, mindex)
         repeatable = True
 
