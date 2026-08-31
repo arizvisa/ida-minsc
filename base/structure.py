@@ -1042,15 +1042,13 @@ class members(object):
         '''Return the members of the structure with the specified `name`.'''
         string = name if isinstance(name, types.tuple) else (name,)
         res = utils.string.to(interface.tuplename(*(string + suffix)))
-        id = idaapi.get_struc_id(res)
-        if id == idaapi.BADADDR:
-            raise E.StructureNotFoundError(u"{:s}.members({!r}) : Unable to locate a structure with the specified name.".format(__name__, utils.string.escape(res, '"')))
-        return internal.structure.new(id, 0).members
-    @utils.multicase(sptr=internal.structure.structuretypes)
-    def __new__(cls, sptr):
-        '''Return the members of the structure specified by `sptr`.'''
-        offset = sptr.baseoffset if isinstance(sptr, structure_t) else 0
-        return internal.structure.new(sptr.id, offset).members
+        sptr = internal.structure.by_name(res)
+        return internal.structure.new(sptr, 0).members
+    @utils.multicase(structure=internal.structure.structuretypes)
+    def __new__(cls, structure):
+        '''Return the members of the specified `structure`.'''
+        offset = structure.offset if isinstance(structure, structure_t) else 0
+        return internal.structure.new(structure.id, offset).members
 
     # XXX The following functions should actually be deprecated as there are
     #     now much better ways to get the contiguous layout of a structure.
