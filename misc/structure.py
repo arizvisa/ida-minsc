@@ -74,7 +74,7 @@ def has(id):
     elif isinstance(id, types.string) and hasattr(idaapi, 'get_struc_id'):
         return idaapi.get_struc_id(utils.string.to(id)) != idaapi.BADADDR
     elif isinstance(id, types.integer) and interface.node.identifier(id) and tinfo.get_type_by_tid(id):
-        return tinfo.is_struct() or tinfo.is_union()
+        return tinfo.is_udt()
     elif isinstance(id, types.string) and interface.tinfo.has_name(id):
         return interface.tinfo.for_name(id).is_udt()
     elif isinstance(id, structuretypes):
