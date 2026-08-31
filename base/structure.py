@@ -1104,26 +1104,31 @@ class members(object):
             offset += 0 if is_union else msize
         return
 
-    @utils.multicase(structure=(internal.structure.structuretypes, idaapi.tinfo_t, types.integer, types.string), offset=types.integer)
+    @utils.multicase(structure=internal.structure.structuretypes, offset=types.integer)
+    @classmethod
+    def fragment(cls, structure, offset, **base):
+        '''Yield each member of the given `structure` from the specified `offset` as a tuple containing its attributes.'''
+        return cls.fragment(structure, offset, structure.size, **base)
+    @utils.multicase(structure=(idaapi.tinfo_t, types.integer, types.string), offset=types.integer)
     @classmethod
     def fragment(cls, structure, offset, **base):
         '''Yield each member of the given `structure` from the specified `offset` as a tuple containing its attributes.'''
         st = by(structure)
-        return cls.fragment(st.ptr, offset, st.size, **base)
-    @utils.multicase(structure=(idaapi.tinfo_t, structure_t, types.integer, types.string), offset=types.integer, size=types.integer)
+        return cls.fragment(st, offset, st.size, **base)
+    @utils.multicase(structure=(idaapi.tinfo_t, types.integer, types.string), offset=types.integer, size=types.integer)
     @classmethod
     def fragment(cls, structure, offset, size, **base):
         '''Yield each member of the given `structure` from the specified `offset` up to `size` as a tuple containing its attributes.'''
         st = by(structure)
-        return cls.fragment(st.ptr, offset, size, **base)
-    @utils.multicase(sptr=idaapi.struc_t, offset=types.integer, size=types.integer)
+        return cls.fragment(st, offset, size, **base)
+    @utils.multicase(structure=internal.structure.structuretypes, offset=types.integer, size=types.integer)
     @classmethod
-    def fragment(cls, sptr, offset, size, **base):
+    def fragment(cls, structure, offset, size, **base):
         """Yield each member of the structure in `sptr` from the given `offset` up to `size` as a tuple containing its `(offset, size, tags)`.
 
         If the integer `base` is defined, then the offset of each member will be translated by the given value.
         """
-        iterable, unionQ = cls.layout(sptr.id, **base), type.union(sptr.id)
+        iterable, unionQ = cls.layout(structure, **base), internal.structure.union(structure)
 
         # seek
         for item in iterable:
