@@ -1327,7 +1327,7 @@ class v9member(object):
                 if isinstance(item, interface.ref_t):
                     continue
 
-                # go ahead and grab the type member and number of elements.
+                # first grab the type member. afterwards, grab the length.
                 mowner, mindex, mudm = item
                 if frame(mowner):
                     continue
