@@ -5963,11 +5963,11 @@ class address(object):
                 # if we got a member, then we will lift its type and apply it.
                 elif isinstance(item, internal.structure.membertypes):
                     mptr, mid = getattr(item, 'ptr', item), item.id
-                    if not isinstance(mptr, internal.structure.membertypes):
-                        mowner, mindex, udm = internal.structure.v9members.by(mid)
-                        ns, mtype = internal.structure.v9member, tinfo.copy(udm.type)
+
+                    mowner, mindex, mptr = internal.structure.members.by(mid) if isinstance(mptr, internal.structure.membertypes) else internal.structure.v9members.by(mid)
+                    if isinstance(mowner, idaapi.tinfo_t):
+                        ns, mtype = internal.structure.v9member, tinfo.copy(mptr.type)
                     else:
-                        mowner, mindex, mptr = internal.structure.members.by(mid)
                         ns, mtype = internal.structure.member, None
 
                     opinfo = idaapi.opinfo_t()
