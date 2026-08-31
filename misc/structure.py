@@ -841,7 +841,7 @@ class v9member(object):
         # doesn't exist.
         if not tinfo.get_type_by_tid(mid):
             return False
-        elif not (tinfo.is_struct() or union(tinfo)):
+        elif not tinfo.is_udt():
             return False
         elif not tinfo.get_udt_details(utd):
             return False
