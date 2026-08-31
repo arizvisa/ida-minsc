@@ -13130,7 +13130,7 @@ class xref(object):
         # identifier, or a `member_t` with an "id" property.
         if isinstance(frame.ptr, idaapi.tinfo_t):
             mid = mptr if isinstance(mptr, internal.types.integer) else getattr(mptr, 'id', mptr)
-            tinfo, utd, mindex, udm = internal.structure.v9members.by(*[mid] if node.identifier(mid) else [frame.ptr, mid])
+            tinfo, mindex, udm = internal.structure.v9members.by(*[mid] if node.identifier(mid) else [frame.ptr, mid])
 
             lbits, rbits = udm.offset, udm.offset + udm.size
             left, _ = divmod(rbits, 8)
@@ -13435,7 +13435,7 @@ class xref(object):
                     # id to the structure, so we yield it without the member.
                     if mpack is None and idaapi.get_struc(mid):
                         logging.info(u"{:s}.typeinfo({:#x}) : Skipping reference to the specified structure ({:#x}) from the aliased structure identified by {:#x}.".format('.'.join([__name__, cls.__name__]), tid, tid, mid))
-                        packed = idaapi.get_struc(mid), None
+                        packed = idaapi.get_struc(mid), -1, None
                         yield mpack, packed
                         continue
 
@@ -13453,7 +13453,7 @@ class xref(object):
                     # Now we need to figure out the structure and base that it
                     # will be created at. Then we yield the packed information.
                     sptr, soffset = idaapi.get_frame(func), function.frame_offset(func)
-                    packed = sptr, mptr
+                    packed = sptr, getattr(mptr, 'index', -1), mptr
                     yield soffset, packed
                     continue
 
