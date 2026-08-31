@@ -6616,7 +6616,7 @@ class strpath(object):
             # next we need to figure out the member information.
             utd = idaapi.udt_type_data_t()
             if not ti.get_udt_details(utd):
-                raise internal.exceptions.DisassemblerError(u"{:s}.v9contains({!s}, {!s}, {:d}) : Unable to get the details for the type {:s}.".format(format_description, "{:#x}".format(tinfo.identifier(ti)), "{:#x}".format(mid) if node.identifier(mid) else "{:d}".format(mid), offset, tinfo.quoted(ti)))
+                raise internal.exceptions.DisassemblerError(u"{:s} : Unable to get the details for the specified type {!s} ({:#x}).".format(format_description, tinfo.quoted(ti), "{:#x}".format(tinfo.identifier(ti))))
 
             # collect the candidate members for the structure type or union.
             members = [mindex for mindex in builtins.range(utd.size())]
@@ -6823,7 +6823,7 @@ class strpath(object):
                 # If we've already assigned the mptr and the item's parent is the same
                 # as our current sptr, then we issue a warning and re-assign it.
                 elif expected.id == sptr.id:
-                    logging.warning(u"{:s}.collect({:#x}, result={!s}) : Overwriting {:s} \"{:s}\" ({:#x}) of collected results with {:s} \"{:s}\" ({:#x}) due to it belonging to the current {:s} \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), struc.id, Fcollect, mptr.__class__.__name__, internal.utils.string.escape(internal.netnode.name.get(mptr.id), '"'), mptr.id, item.__class__.__name__, internal.utils.string.escape(internal.netnode.name.get(item.id), '"'), item.id, sptr.__class__.__name__, internal.utils.string.escape(internal.netnode.name.get(sptr.id), '"'), sptr.id))
+                    logging.warning(u"{:s} : Overwriting {:s} \"{:s}\" ({:#x}) of collected results with {:s} \"{:s}\" ({:#x}) due to it belonging to the current {:s} \"{:s}\" ({:#x}).".format(format_description, struc.id, Fcollect, internal.utils.pycompat.fullname(mptr.__class__), internal.utils.string.escape(internal.netnode.name.get(mptr.id), '"'), mptr.id, internal.utils.pycompat.fullname(item.__class__), internal.utils.string.escape(internal.netnode.name.get(item.id), '"'), item.id, internal.utils.pycompat.fullname(sptr.__class__), internal.utils.string.escape(internal.netnode.name.get(sptr.id), '"'), sptr.id))
                     mptr = item
 
                 # If we got here we need to append our state. However, mptr is None and so
@@ -6844,7 +6844,7 @@ class strpath(object):
             else:
                 Fcollect((sptr, mptr, offset))
                 description = [item.__class__.__module__, item.__class__.__name__] if hasattr(item.__class__, '__module__') else [item.__class__.__name__]
-                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.collect({:#x}, result={!s}) : Unable to continue collecting results due to the received item ({!r}) being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), struc.id, Fcollect, item, '.'.join(description)))
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s} : Unable to continue collecting results due to the received item ({!r}) being an unsupported type ({!s}).".format(format_description, struc.id, Fcollect, item, '.'.join(description)))
             continue
         return
 
