@@ -16038,10 +16038,11 @@ class name(object):
         elif isinstance(ea, idaapi.tinfo_t):
             ti, id = tinfo.copy(ea), tinfo.identifier(ea)
         elif isinstance(ea, internal.types.integer) and internal.structure.has_member(ea):
+            index = next(([ordinal[key]] for key in ['ordinal', 'offset', 'index', 'address'] if key in ordinal), [])
             if hasattr(idaapi, 'get_member_by_id') and idaapi.get_member_by_id(ea):
                 mowner, mindex, mptr = internal.structure.members.by_identifier(None, ea)
-                return internal.structure.member.default_name(mowner, mptr, *[ordinal['ordinal']] if 'ordinal' in ordinal else [])
-            return internal.structure.v9member.default_name(ea, *[ordinal['ordinal']] if 'ordinal' in ordinal else [])
+                return internal.structure.member.default_name(mowner, mptr, *index)
+            return internal.structure.v9member.default_name(ea, *index)
         elif isinstance(ea, internal.types.integer) and node.identifier(ea) and ti.get_type_by_tid(ea):
             ti, id = ti, ea
         elif isinstance(ea, (internal.structure.structure_t, internal.structure.membertypes)):
