@@ -3253,10 +3253,18 @@ def tag(func, key):
     res = internal.tags.function.get(func)
     if key in res:
         return res[key]
-    elif key not in {'__name__'}:
-        raise E.MissingFunctionTagError(u"{:s}.tag({:s}, {!r}) : Unable to read the specified tag (\"{:s}\") from the function.".format(__name__, ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), key, utils.string.escape(key, '"')))
-    ea, _ = (func, idaapi.BADADDR) if isinstance(func, types.integer) else interface.range.unpack(func)
-    return internal.tags.function.name(func) if interface.name.has(ea) else None
+    elif key in {'__name__'}:
+        ea, _ = (func, idaapi.BADADDR) if isinstance(func, types.integer) else interface.range.unpack(func)
+        return internal.tags.function.name(func) if interface.name.has(ea) else None
+    elif key in {'__typeinfo__'}:
+        ea, _ = (func, idaapi.BADADDR) if isinstance(func, types.integer) else interface.range.unpack(func)
+        realname = internal.tags.function.name(ea)
+        typeinfo = interface.function.typeinfo(ea)
+        lowered = interface.tinfo.lower_function_type(typeinfo) if typeinfo.is_func() or typeinfo.is_funcptr() else typeinfo
+        validname = interface.name.typename(realname)
+        res = idaapi.print_tinfo('', 0, 0, 0, lowered, utils.string.to(validname), '')
+        return utils.string.of(res) if interface.function.has_typeinfo(ea) else None
+    raise E.MissingFunctionTagError(u"{:s}.tag({:s}, {!r}) : Unable to read the specified tag (\"{:s}\") from the function.".format(__name__, ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), key, utils.string.escape(key, '"')))
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def tag(func):
     '''Returns all the tags defined for the function `func`.'''
