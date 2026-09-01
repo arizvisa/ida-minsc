@@ -1409,7 +1409,7 @@ class member(object):
         return 0 if mptr.id == sptr.get_member(0).id else 1
 
     @classmethod
-    def has_name(cls, mptr, *offset, **name):
+    def has_name(cls, mptr, *name, **offset):
         '''Return whether the `name` of the member specified by `mptr` is user-defined.'''
         mid = getattr(mptr, 'id', mptr)
         packed = idaapi.get_member_by_id(mid)
@@ -1417,21 +1417,22 @@ class member(object):
             raise E.MemberNotFoundError(u"{:s}.has_name({:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         mptr, fullname, sptr = packed
 
-        # if the user gave us an explicit name to test against the member, then
-        # we will go ahead and use it. otherwise, we can just grab it normally.
-        if 'name' in name:
-            res = name.pop('name')
-        else:
-            res = utils.string.of(idaapi.get_member_name(mptr.id)) or ''
+        # if we were given an explicit offset, then use it when we calculate the
+        # expected name. otherwise, we just use the member's actual offset.
+        [moffset] = [offset.pop('offset')] if 'offset' in offset else [mptr.soff]
+
+        # if the user gave us name components to test against the member, then
+        # pack them into a name. otherwise, we can just grab it normally.
+        res = interface.tuplename(*name) if name else (utils.string.of(idaapi.get_member_name(mptr.id)) or '')
         name = utils.string.of(res)
 
         # if the sptr is not a function frame, then this is easy and we
         # only have to check to see if the name matches "field_%X".
         if not frame(sptr):
             #return name.startswith('field_')               # XXX: this is how the disassembler does it..
-            field, offset = name.split('_', 1) if '_' in name else (name, '')
-            expected = "{:x}".format(mptr.soff)
-            return (field, offset.lower()) != ('field', expected)
+            field, suffix = name.split('_', 1) if '_' in name else (name, '')
+            expected = "{:x}".format(moffset)
+            return (field, suffix.lower()) != ('field', expected)
 
         # first we'll check that it's not one of the names we can check with the disassembler api.
         idaname = utils.string.to(name)
@@ -1447,9 +1448,9 @@ class member(object):
         # we're now free to figure out which the frame part that this member
         # belongs to. we render the expected offset and do a comparison.
         args, frsize = idaapi.frame_off_args(fn), fn.frsize
-        var, offset = name.split('_', 1) if '_' in name else (name, '')
-        prefix, expected = ('var', "{:x}".format(frsize - mptr.soff)) if mptr.soff < args else ('arg', "{:x}".format(mptr.soff - args))
-        return (var, offset.lower()) != (prefix, expected)
+        var, suffix = name.split('_', 1) if '_' in name else (name, '')
+        prefix, expected = ('var', "{:x}".format(frsize - moffset)) if moffset < args else ('arg', "{:x}".format(moffset - args))
+        return (var, suffix.lower()) != (prefix, expected)
 
     @classmethod
     def get_name(cls, mptr):
