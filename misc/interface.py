@@ -15897,17 +15897,126 @@ class name(object):
         return long_formatter(module, name) if all([module, name]) else ''
 
     @classmethod
-    def has(cls, ea):
-        '''Return if a name has been applied to the item at the address `ea`.'''
-        if not node.identifier(ea):
-            res = address.flags(ea, idaapi.FF_ANYNAME)
-            return res != idaapi.FF_NAME
-        elif internal.structure.has(ea):
-            sptr = internal.structure.by_identifier(ea)
-            return internal.structure.naming.has(sptr)
-        elif __import__('enumeration').has(ea):
-            return internal.structure.naming.has(sptr)
-        return False
+    def has(cls, ea, *name, **ordinal):
+        '''Return whether the `name` of the address specified by `ea` has a non-default name using the `ordinal` if provided.'''
+        ti, is_address = idaapi.tinfo_t(), isinstance(ea, (internal.types.integer, integerish)) and not node.identifier(ea)
+        if is_address and not name:
+            res = address.flags(int(ea), idaapi.FF_ANYNAME)
+            return res == idaapi.FF_NAME
+        elif is_address:
+            ti, id = None, int(ea)
+        elif isinstance(ea, idaapi.tinfo_t):
+            ti, id = tinfo.copy(ea), tinfo.identifier(ea)
+        elif isinstance(ea, internal.types.integer) and node.identifier(ea) and ti.get_type_by_tid(ea):
+            ti, id = ti, ea
+        elif isinstance(ea, internal.structure.structure_t):
+            ti, id = ea.ptr, ea.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(ea, idaapi.struc_t):
+            ti, id = ea, ea.id
+        elif hasattr(idaapi, 'get_struc') and isinstance(ea, internal.types.integer) and node.identifier(ea):
+            ti, id = idaapi.get_struc(ea), ea
+        elif isinstance(ea, internal.types.integer):
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.has({:#x}{!s}{!s}) : Unable to locate the type with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ", {:s}".format(', '.join(names)) if names else '', ", {!s}".format(internal.utils.string.kwargs(ordinal)) if ordinal else '', ea))
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.has({!s}{!s}{!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), ea, ", {:s}".format(', '.join(names)) if names else '', ", {!s}".format(internal.utils.string.kwargs(ordinal)) if ordinal else '', ea.__class__))
+
+        # first we need to figure out the candidate ordinals...
+        indices = []
+        if any(key in ordinal for key in ['ordinal', 'offset', 'index', 'address']):
+            indices+= [ordinal[key] for key in ['ordinal', 'offset', 'index', 'address'] if key in ordinal]
+        if internal.structure.frame(ti):
+            indices+= [range.start(function.by_frame(ti))]
+        if isinstance(ti, idaapi.tinfo_t):
+            indices+= [tinfo.ordinal(ti)]
+        if all(hasattr(idaapi, attribute) for attribute in ['get_enum_idx', 'get_struc_idx']):
+            indices+= [idaapi.get_struc_idx(id)] if idaapi.get_enum_idx(id) == idaapi.BADADDR else [idaapi.get_enum_idx(id)]
+        if ti is None:
+            indices+= [id]
+
+        # get the address class just in case we were given an address as an id.
+        res, flags = address.flags(id, idaapi.MS_CLS), address.flags(id)
+
+        # if we got a type, then set the formats to include all possible ones.
+        if ti:
+            formats = ['enum_{:d}', 'struc_{:d}', 'struct_{:d}', 'type_{:d}', 'typeref_{:d}']
+
+        # if we were given an address, and it's data then use the dtype.
+        elif res == idaapi.FF_DATA and not any([idaapi.is_off(flags, 0), idaapi.is_seg(flags, 0)]):
+            dtype, iterable = address.flags(id, typemap.FF_MASKSIZE), [
+                (idaapi.FF_BYTE, 'byte_{:X}'),
+                (idaapi.FF_WORD, 'word_{:X}'),
+                (idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD, 'dword_{:X}'),
+                (idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD, 'qword_{:X}'),
+                (idaapi.FF_TBYTE, 'tbyte_{:X}'),
+                (idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI, 'asc_{:X}'),
+                (idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU, 'stru_{:X}'),
+                (idaapi.FF_OWORD if hasattr(idaapi, 'FF_OWORD') else idaapi.FF_OWRD, 'xmmword_{:X}'),
+                (idaapi.FF_FLOAT, 'flt_{:X}'),
+                (idaapi.FF_DOUBLE, 'dbl_{:X}'),
+                (idaapi.FF_PACKREAL, 'packreal_{:X}'),
+                (idaapi.FF_ALIGN, 'algn_{:X}'),
+                (idaapi.FF_CUSTOM, 'custdata_{:X}'),
+                (idaapi.FF_YWORD if hasattr(idaapi, 'FF_YWORD') else idaapi.FF_YWRD, 'ymmword_{:X}'),
+                (idaapi.FF_ZWORD if hasattr(idaapi, 'FF_ZWORD') else idaapi.FF_ZWRD, 'zmmword_{:X}'),
+            ]
+            dtype_label = {idaapi.as_uint32(dtype) : label for dtype, label in iterable}
+
+            # use the data type to figure out the exact format.
+            formats = [dtype_label[dtype]] if dtype in dtype_label else []
+
+        # if we were given an address and we got here, then check the operand to
+        # see if it's an offset or a segment.
+        elif res == idaapi.FF_DATA:
+            if idaapi.is_off(flags, idaapi.OPND_ALL):
+                dataformats = ['off_{:X}']
+            elif idaapi.is_seg(flags, idaapi.OPND_ALL):
+                dataformats = ['seg_{:X}']
+            else:
+                dataformats = []
+            formats = dataformats
+
+        # if it's code, then check for the only 3 possible types.
+        elif res == idaapi.FF_CODE:
+            fn = function.by_address(id) if function.has(id) else None
+            if range.start(fn) == id:
+                codeformats = ['sub_{:X}']
+            elif instruction.is_return(id):
+                codeformats = ['locret_{:X}']
+            else:
+                codeformats = ['loc_{:X}']
+            formats = codeformats
+
+        # otherwise, it's unknown and we have only one format.
+        else:
+            formats = ['unk_{:X}']
+
+        # now we need to build the list of candidates herre.
+        if not internal.structure.frame(ti):
+            candidates = [string.format for string in formats]
+        else:
+            candidates = ["$ F{:X}".format]     # FIXME: is this right, how many zeroes do we pad?
+        iterable = itertools.chain(*(map(Fformat, indices) for Fformat in candidates))
+        candidates = {formatted for formatted in iterable}
+
+        # now we can get the actual name depending on the type, and ensure that
+        # it doesn't exist in our list of candidates.
+        if name:
+            res = tuplename(*name)
+        elif isinstance(ti, idaapi.tinfo_t):
+            res = internal.utils.string.of(idaapi.get_tid_name(id) or ti.get_type_name())
+        elif idaapi.get_enum_idx(id) == idaapi.BADADDR:
+            res = internal.utils.string.of(idaapi.get_struc_name(id))
+        else:
+            res = idaapi.get_enum_name(id)
+
+        # Check if the name is anonymous. The disassembler assumes that a type
+        # is anonymous if it begins with a '$', but we also verify the length
+        # since in v8.4 the disassembler uses an MD5 hash for anonymous types.
+        if res.startswith('$') and len(res[1:]) == 0x20:
+            return False
+
+        # Otherwise we can just check if the name is one of our candidates.
+        return not(res in candidates)
 
     @classmethod
     def exists(cls, name, *suffix):
