@@ -2291,14 +2291,19 @@ def tag(key, value):
 def tag(ea, key):
     '''Return the tag identified by `key` from the address `ea`.'''
     res = internal.tags.address.get(ea)
+    entrypoint = interface.range.start(interface.function.by_address(ea)) if interface.function.has(ea) else ~ea
     if key in res:
         return res[key]
-    elif key not in {'__name__'}:
-        raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}) : Unable to read tag (\"{:s}\") from address.".format(__name__, ea, key, utils.string.escape(key, '"')))
-    elif not interface.function.has(ea):
+    elif key in {'__name__'}:
         return internal.tags.address.name(ea, False) if interface.name.has(ea) else None
-    entrypoint = interface.range.start(interface.function.by_address(ea))
-    return internal.tags.address.name(ea, entrypoint == ea) if interface.name.has(ea) else None
+    elif key in {'__typeinfo__'}:
+        realname = internal.tags.address.name(ea, ea == entrypoint)
+        typeinfo = interface.address.typeinfo(ea)
+        lowered = interface.tinfo.lower_function_type(typeinfo) if typeinfo.is_func() or typeinfo.is_funcptr() else typeinfo
+        validname = interface.name.typename(realname)
+        res = idaapi.print_tinfo('', 0, 0, 0, lowered, utils.string.to(validname), '')
+        return utils.string.of(res) if interface.address.has_typeinfo(ea) else None
+    raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}) : Unable to read tag (\"{:s}\") from address.".format(__name__, ea, key, utils.string.escape(key, '"')))
 @utils.multicase(ea=internal.types.integer, key=internal.types.string)
 @utils.string.decorate_arguments('key', 'value')
 def tag(ea, key, value):
