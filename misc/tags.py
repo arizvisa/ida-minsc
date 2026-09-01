@@ -1452,10 +1452,10 @@ class address(object):
         # requiring us to use the repeatable function comment (state_runtime) or
         # the non-repeatable address comment (state_wrong).
         if func and rt:
-            rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, repeatable) if state_runtime else (False, state_wrong, not repeatable)
+            rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, repeatable)
 
         else:
-            rt, state, where = (False, state_correct, repeatable) if key in state_correct else (False, state_wrong, not repeatable) if key in state_wrong else (False, state_correct, repeatable) if state_correct else (False, state_wrong, not repeatable)
+            rt, state, where = (False, state_correct, repeatable) if key in state_correct else (False, state_wrong, not repeatable) if key in state_wrong else (False, state_correct, repeatable)
 
         # If the key was not in any of the encoded dictionaries, then we need to
         # update the reference count in the tag cache. If the address is a runtime
