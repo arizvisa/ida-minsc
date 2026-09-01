@@ -5318,7 +5318,7 @@ class localtypesmonitor_84(object):
     def is_field_general(cls, ordinal, mindex, name):
         '''Return true if the `name` for the member at `mindex` of the type in `ordinal` is a default field name that was chosen by the disassembler.'''
         state = __import__('hook').localtypesmonitor
-        return not internal.structure.v9member.has_name(state.get_type(ordinal), mindex, name=name)
+        return not internal.structure.v9member.has_name(state.get_type(ordinal), mindex, name)
 
     @classmethod
     def enable_tracking(cls, *atype):
