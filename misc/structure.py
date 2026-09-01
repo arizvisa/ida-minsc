@@ -1409,7 +1409,7 @@ class member(object):
         return 0 if mptr.id == sptr.get_member(0).id else 1
 
     @classmethod
-    def has_name(cls, mptr, **name):
+    def has_name(cls, mptr, *offset, **name):
         '''Return whether the `name` of the member specified by `mptr` is user-defined.'''
         mid = getattr(mptr, 'id', mptr)
         packed = idaapi.get_member_by_id(mid)
