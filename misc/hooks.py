@@ -3758,7 +3758,7 @@ class membernamingcommon(changingchanged):
         # disassembler api. Then we can use them to grab the default name for
         # the member. Only thing left to do is to return the comparison result.
         mowner, mindex, mptr = internal.structure.members.by_identifier(sid, mid)
-        return not internal.structure.member.has_name(mptr, name=name)
+        return not internal.structure.member.has_name(mptr, name)
 
     @classmethod
     def updater(cls):
