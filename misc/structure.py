@@ -7295,7 +7295,7 @@ class structure_t(object):
             return res[key]
         elif key not in {'__name__'}:
             raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the structure {:s}.".format('.'.join([__name__, cls.__name__]), sid, key, utils.string.escape(key, '"'), utils.string.repr(self.name)))
-        return naming.get(owner)
+        return naming.get(owner) if naming.has(owner) else None
     @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
