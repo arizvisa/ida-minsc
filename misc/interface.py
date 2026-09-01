@@ -15907,18 +15907,26 @@ class name(object):
             ti, id = None, int(ea)
         elif isinstance(ea, idaapi.tinfo_t):
             ti, id = tinfo.copy(ea), tinfo.identifier(ea)
+        elif isinstance(ea, internal.types.integer) and internal.structure.has_member(ea):
+            if hasattr(idaapi, 'get_member_by_id') and idaapi.get_member_by_id(ea):
+                mowner, mindex, mptr = internal.structure.members.by_identifier(None, ea)
+                return internal.structure.member.has_name(mptr, **{'name': tuplename(*name)} if name else {})
+            return internal.structure.v9member.has_name(ea, **{'name': tuplename(*name)} if name else {})
         elif isinstance(ea, internal.types.integer) and node.identifier(ea) and ti.get_type_by_tid(ea):
             ti, id = ti, ea
-        elif isinstance(ea, internal.structure.structure_t):
-            ti, id = ea.ptr, ea.id
+        elif isinstance(ea, (internal.structure.structure_t, internal.structure.membertypes)):
+            sptr, id = getattr(ea, 'ptr', ea), ea.id
+            if isinstance(sptr, internal.structure.membertypes):
+                return cls.has(id, *name, **ordinal)    # recurse with a member identifier.
+            ti = sptr
         elif hasattr(idaapi, 'struc_t') and isinstance(ea, idaapi.struc_t):
             ti, id = ea, ea.id
         elif hasattr(idaapi, 'get_struc') and isinstance(ea, internal.types.integer) and node.identifier(ea):
             ti, id = idaapi.get_struc(ea), ea
         elif isinstance(ea, internal.types.integer):
-            raise internal.exceptions.ItemNotFoundError(u"{:s}.has({:#x}{!s}{!s}) : Unable to locate the type with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ", {:s}".format(', '.join(names)) if names else '', ", {!s}".format(internal.utils.string.kwargs(ordinal)) if ordinal else '', ea))
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.has({:#x}{!s}{!s}) : Unable to locate the type with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ", {:s}".format(', '.join(name)) if name else '', ", {!s}".format(internal.utils.string.kwargs(ordinal)) if ordinal else '', ea))
         else:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.has({!s}{!s}{!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), ea, ", {:s}".format(', '.join(names)) if names else '', ", {!s}".format(internal.utils.string.kwargs(ordinal)) if ordinal else '', ea.__class__))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.has({!s}{!s}{!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), ea, ", {:s}".format(', '.join(name)) if name else '', ", {!s}".format(internal.utils.string.kwargs(ordinal)) if ordinal else '', ea.__class__))
 
         # first we need to figure out the candidate ordinals...
         indices = []
