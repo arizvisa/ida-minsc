@@ -1859,7 +1859,7 @@ class function(object):
         # we can simply use a repeatable comment because we're a function.
         state_correct = comment.decode(utils.string.of(idaapi.get_func_cmt(fn, True))), True
         state_wrong = comment.decode(utils.string.of(idaapi.get_func_cmt(fn, False))), False
-        state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct if state_correct[0] else state_wrong
+        state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
 
         # Grab the previous value from the correct dictionary, and update it with
         # the new value that was given to us.
