@@ -16019,6 +16019,111 @@ class name(object):
         return not(res in candidates)
 
     @classmethod
+    def default(cls, ea, **ordinal):
+        '''Return the default name of the address specified by `ea` using the given `ordinal` if provided.'''
+        ti = idaapi.tinfo_t()
+        is_address = isinstance(ea, (internal.types.integer, integerish)) and not node.identifier(ea)
+        if is_address:
+            ti, id = None, int(ea)
+        elif isinstance(ea, idaapi.tinfo_t):
+            ti, id = tinfo.copy(ea), tinfo.identifier(ea)
+        elif isinstance(ea, internal.types.integer) and node.identifier(ea) and ti.get_type_by_tid(ea):
+            ti, id = ti, ea
+        elif isinstance(ea, internal.structure.structure_t):
+            ti, id = ea.ptr, ea.id
+        elif hasattr(idaapi, 'struc_t') and isinstance(ea, idaapi.struc_t):
+            ti, id = ea, ea.id
+        elif hasattr(idaapi, 'get_struc') and isinstance(ea, internal.types.integer) and node.identifier(ea):
+            ti, id = idaapi.get_struc(ea), ea
+        elif isinstance(ea, internal.types.integer):
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.default({:#x}{!s}) : Unable to locate the type with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ", {!s}".format(internal.utils.string.kwargs(ordinal)) if ordinal else '', ea))
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.default({!s}{!s}) : Unable to locate the type using an unsupported parameter type ({!s}).".format('.'.join([__name__, cls.__name__]), ea, ", {!s}".format(internal.utils.string.kwargs(ordinal)) if ordinal else '', ea.__class__))
+
+        # if we were given an explicit ordinal, than use it as our index. if
+        # it's an address, then use the id as our index. otherwise we figure the
+        # rest of them out.
+        if any(key in ordinal for key in ['ordinal', 'offset', 'index', 'address']):
+            iterable = ( ordinal[key] for key in ['ordinal', 'offset', 'index', 'address'] if key in ordinal )
+            index = next(iterable)
+        elif is_address:
+            index = id
+        elif internal.structure.frame(ti):
+            index, _ = range.unpack(function.by_frame(ti))
+        elif isinstance(ti, idaapi.tinfo_t):
+            index = tinfo.ordinal(ti)
+        elif idaapi.get_enum_idx(id) == idaapi.BADADDR:
+            index = idaapi.get_struc_idx(id)
+        else:
+            index = idaapi.get_enum_idx(id)
+
+        # if it's an address, then just fall through. if it isn't, then we have
+        # a type that we can apply the index to and return immediately after.
+        if is_address:
+            pass
+        elif internal.structure.union(ti):
+            return "union_{:d}".format(index)
+        elif internal.structure.frame(ti):
+            return "$ F{:X}".format(index)
+        elif isinstance(ti, idaapi.tinfo_t) and ti.is_enum():
+            return "enum_{:d}".format(index)
+        elif isinstance(ti, idaapi.tinfo_t) and ti.is_struct():
+            return "struc_{:d}".format(index)
+        elif isinstance(ti, idaapi.tinfo_t):
+            return "type{:s}_{:d}".format('ref' if ti.is_typeref() else '', index)
+        elif idaapi.get_enum_idx(id) == idaapi.BADADDR:
+            return "struc_{:d}".format(index)
+        else:
+            return "enum_{:d}".format(index)
+
+        # get the class and flags for the specified address.
+        res, flags = address.flags(id, idaapi.MS_CLS), address.flags(id)
+
+        # if we got data and it's not an offset or a segment, then look up the
+        # correct nameing format using the dtype from the address.
+        if res == idaapi.FF_DATA and not any([idaapi.is_off(flags, 0), idaapi.is_seg(flags, 0)]):
+            dtype, iterable = address.flags(id, typemap.FF_MASKSIZE), [
+                (idaapi.FF_BYTE, 'byte_{:X}'),
+                (idaapi.FF_WORD, 'word_{:X}'),
+                (idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD, 'dword_{:X}'),
+                (idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD, 'qword_{:X}'),
+                (idaapi.FF_TBYTE, 'tbyte_{:X}'),
+                (idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI, 'asc_{:X}'),
+                (idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU, 'stru_{:X}'),
+                (idaapi.FF_OWORD if hasattr(idaapi, 'FF_OWORD') else idaapi.FF_OWRD, 'xmmword_{:X}'),
+                (idaapi.FF_FLOAT, 'flt_{:X}'),
+                (idaapi.FF_DOUBLE, 'dbl_{:X}'),
+                (idaapi.FF_PACKREAL, 'packreal_{:X}'),
+                (idaapi.FF_ALIGN, 'algn_{:X}'),
+                (idaapi.FF_CUSTOM, 'custdata_{:X}'),
+                (idaapi.FF_YWORD if hasattr(idaapi, 'FF_YWORD') else idaapi.FF_YWRD, 'ymmword_{:X}'),
+                (idaapi.FF_ZWORD if hasattr(idaapi, 'FF_ZWORD') else idaapi.FF_ZWRD, 'zmmword_{:X}'),
+            ]
+            dtype_label = {idaapi.as_uint32(dtype) : label for dtype, label in iterable}
+            formatter = dtype_label.get(dtype, 'unk_{:X}')
+
+        # if the class is data, then we must have an offset or a segment.
+        elif res == idaapi.FF_DATA:
+            if idaapi.is_off(flags, idaapi.OPND_ALL):
+                dataformatter = 'off_{:X}'
+            elif idaapi.is_seg(flags, idaapi.OPND_ALL):
+                dataformatter = 'seg_{:X}'
+            else:
+                dataformatter = 'unk_{:X}'
+            formatter = dataformatter
+
+        # if the class is code, then we only have 3 naming variations to check.
+        elif res == idaapi.FF_CODE:
+            if function.has(id) and range.start(function.by_address(id)) == id:
+                codeformatter = 'sub_{:X}'
+            elif instruction.is_return(id):
+                codeformatter = 'locret_{:X}'
+            else:
+                codeformatter = 'loc_{:X}'
+            formatter = codeformatter
+        return "unk_{:X}".format(index) if res in {idaapi.FF_UNK, idaapi.FF_TAIL} else formatter.format(index)
+
+    @classmethod
     def exists(cls, name, *suffix):
         '''Return if the given `name` already exists at an address within the database.'''
         fullname = tuplename(name, *suffix)
