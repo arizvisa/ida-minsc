@@ -15908,10 +15908,12 @@ class name(object):
         elif isinstance(ea, idaapi.tinfo_t):
             ti, id = tinfo.copy(ea), tinfo.identifier(ea)
         elif isinstance(ea, internal.types.integer) and internal.structure.has_member(ea):
+            iterable = (ordinal[key] for key in ['ordinal', 'offset', 'index', 'address'] if key in ordinal)
+            moffset = next(iterable, None)
             if hasattr(idaapi, 'get_member_by_id') and idaapi.get_member_by_id(ea):
                 mowner, mindex, mptr = internal.structure.members.by_identifier(None, ea)
-                return internal.structure.member.has_name(mptr, **{'name': tuplename(*name)} if name else {})
-            return internal.structure.v9member.has_name(ea, **{'name': tuplename(*name)} if name else {})
+                return internal.structure.member.has_name(mptr, *name, **{} if moffset is None else {'offset': moffset})
+            return internal.structure.v9member.has_name(ea, *name, **{} if moffset is None else {'offset': moffset})
         elif isinstance(ea, internal.types.integer) and node.identifier(ea) and ti.get_type_by_tid(ea):
             ti, id = ti, ea
         elif isinstance(ea, (internal.structure.structure_t, internal.structure.membertypes)):
