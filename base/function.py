@@ -3255,7 +3255,8 @@ def tag(func, key):
         return res[key]
     elif key not in {'__name__'}:
         raise E.MissingFunctionTagError(u"{:s}.tag({:s}, {!r}) : Unable to read the specified tag (\"{:s}\") from the function.".format(__name__, ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), key, utils.string.escape(key, '"')))
-    return internal.tags.function.name(func)
+    ea, _ = (func, idaapi.BADADDR) if isinstance(func, types.integer) else interface.range.unpack(func)
+    return internal.tags.function.name(func) if interface.name.has(ea) else None
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def tag(func):
     '''Returns all the tags defined for the function `func`.'''
