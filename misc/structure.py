@@ -763,17 +763,28 @@ class v9member(object):
         return mindex
 
     @classmethod
-    def has_name(cls, *args, **name):
+    def has_name(cls, *args, **offset):
         '''Return whether the `name` of the specified member is user-defined.'''
+        [type] = args[:1]
+        if len(args) > 1 and isinstance(type, idaapi.tinfo_t):
+            args, names = args[:2], args[2:]
+        elif isinstance(type, types.integer) and interface.node.identifier(type):
+            args, names = args[:1], args[1:]
+        elif isinstance(type, membertypes):
+            args, names = args[:1], args[1:]
+        else:
+            args, names = args, ()
+
+        # Now that we've sliced out our parameters, we can use them to get the
+        # member that the caller specified.
         tinfo, mindex, udm = v9members.by(*args, caller=[__name__, cls.__name__, 'has_name'])
         mid, mname = interface.tinfo.member_identifier(tinfo, mindex), utils.string.of(udm.name)
 
-        # If we were given an explicit name, then use that one.
-        if 'name' in name:
-            res = name.pop('name')
-        else:
-            res = mname or ''
-        name = res
+        # If we were given an explicit offset, then save it for when we
+        # calculate the name. We also pack the member name so we need it.
+        iterable = (offset[key] for key in ['offset'] if key in offset)
+        moffset = next(iterable, None)
+        name = interface.tuplename(*names) if names else (mname or '')
 
         # If the member is a gap (v9 api), then we act as if there's no name
         # applied. This is different from the disassembler, because in the v9
@@ -784,10 +795,10 @@ class v9member(object):
         # If the type is not a function frame, then we only need to check that
         # the name matches directly with "field_%X".
         if not frame(tinfo):
-            field, offset = name.split('_', 1) if '_' in name else (name, '')
-            bytes, _ = divmod(udm.offset, 8)
+            field, suffix = name.split('_', 1) if '_' in name else (name, '')
+            bytes, _ = divmod(udm.offset, 8) if moffset is None else (moffset, 0)
             expected = "{:x}".format(bytes)
-            return (field, offset.lower()) != ('field', expected)
+            return (field, suffix.lower()) != ('field', expected)
 
         # If we're using earlier than 8.5, then we can just use the older
         # `member` namespace to figure out whether a frame member is named.
@@ -797,7 +808,7 @@ class v9member(object):
             if not(packed):
                 raise E.MemberNotFoundError(u"{:s} : Unable to find the frame member with the specified identifier ({:#x}).".format(caller_format, mid))
             mptr, fullname, sptr = packed
-            return member.has_name(mptr)
+            return member.has_name(mptr, *names, **offset)
 
         # We can start out by checking that the member name is not one of the
         # names that we can check using the v9 api.
@@ -816,11 +827,11 @@ class v9member(object):
 
         # Otherwise, we will need to calculate the default name and compare it
         # ourselves using the member offset converted from bits to bytes.
-        moffset, _ = divmod(udm.offset, 8)
+        bytes, _ = divmod(udm.offset, 8) if moffset is None else (moffset, 0)
         args, frsize = idaapi.frame_off_args(fn), fn.frsize
-        var, offset = name.split('_', 1) if '_' in name else (name, '')
-        prefix, expected = ('var', "{:x}".format(frsize - moffset)) if moffset < args else ('arg', "{:x}".format(moffset - args))
-        return (var, offset.lower()) != (prefix, expected)
+        var, suffix = name.split('_', 1) if '_' in name else (name, '')
+        prefix, expected = ('var', "{:x}".format(frsize - bytes)) if bytes < args else ('arg', "{:x}".format(bytes - args))
+        return (var, suffix.lower()) != (prefix, expected)
 
     @classmethod
     def get_name(cls, *args):
