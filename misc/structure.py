@@ -952,7 +952,7 @@ class v9member(object):
 
         # Now we need to figure out where our member is. If it's within the
         # `func_t.frsize`, then we're a "var_" relative to `func_t.frsize`.
-        moff, _ = divmod(offset, 8)
+        moff = offset
         if moff < fn.frsize:
             fmt, moffset = fmtVar, fn.frsize - moff
 
