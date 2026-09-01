@@ -15897,6 +15897,19 @@ class name(object):
         return long_formatter(module, name) if all([module, name]) else ''
 
     @classmethod
+    def has(cls, ea):
+        '''Return if a name has been applied to the item at the address `ea`.'''
+        if not node.identifier(ea):
+            res = address.flags(ea, idaapi.FF_ANYNAME)
+            return res != idaapi.FF_NAME
+        elif internal.structure.has(ea):
+            sptr = internal.structure.by_identifier(ea)
+            return internal.structure.naming.has(sptr)
+        elif __import__('enumeration').has(ea):
+            return internal.structure.naming.has(sptr)
+        return False
+
+    @classmethod
     def exists(cls, name, *suffix):
         '''Return if the given `name` already exists at an address within the database.'''
         fullname = tuplename(name, *suffix)
