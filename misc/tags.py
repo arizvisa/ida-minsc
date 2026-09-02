@@ -1624,7 +1624,7 @@ class address(object):
         # address is a runtime-linked one or not. This way we can determine the
         # actual comment type that will be used.
         try:
-            func = interface.function.by(ea)
+            func = interface.function.by_address(ea)
             rt, _ = interface.addressOfRuntimeOrStatic(ea if func is None else func)
 
         # If the address wasn't within a function, then assign the necessary
@@ -1651,10 +1651,10 @@ class address(object):
         # the key that the user is trying to remove. The case where a runtime-linked
         # address is being referenced needs to be specially handled as IDA may
         # incorrectly declare some runtime-linked addresses as functions.
-        if rt:
+        if func and rt:
             rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, True)
         else:
-            state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
+            rt, state, where = (False, state_correct, repeatable) if key in state_correct else (False, state_wrong, not repeatable) if key in state_wrong else (False, state_correct, repeatable)
 
         # If the key is not in the expected dictionary, then raise an exception. If
         # it is, then we can modify the dictionary and remove it to return to the user.
