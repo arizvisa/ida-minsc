@@ -1418,26 +1418,17 @@ class address(object):
         # whether it's runtime-linked or not in order to distinguish whether a
         # repeatable or non-repeatable comment is used.
         try:
-            func = interface.function.by(ea)
+            func = interface.function.by_address(ea)
+            rt, _ = interface.addressOfRuntimeOrStatic(func or ea)
 
         # If the address was not within a function, then assign an empty value
         # as our function location.
         except LookupError:
-            func = None
-
-        # Now we figure out whether the address is runtime-linked or not. This
-        # will be used to determine the type of comment that will be used. If
-        # in a function and the address is runtime-linked, then the disassembler
-        # created a function with the comment stored as a repeatable comment.
-        address = ea if func is None else func
-        if interface.function.has(address):
-            rt, _ = interface.addressOfRuntimeOrStatic(address)
-        else:
-            rt, _ = False, ()
+            rt, func = False, None
 
         # If we're outside a function or pointing to a runtime-linked address, then
         # we use a repeatable comment. Anything else means a non-repeatable comment.
-        repeatable = False if func and interface.function.has(address) and not rt else True
+        repeatable = False if func and interface.function.has(ea) and not rt else True
 
         # Go ahead and decode the tags that are written to all 3 comment types. This
         # way we can search them for the correct one that the user is trying to modify.
