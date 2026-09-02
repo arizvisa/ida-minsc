@@ -1745,10 +1745,6 @@ class function(object):
         res = {}
         [ res.update(d) for d in ([d1, d2] if repeatable else [d2, d1]) ]
 
-        # Get the unmangled function name which we use to determine if the name
-        # exists. Then get the real name which we use for the tag values.
-        fname, realname = interface.function.name(ea), cls.name(ea)
-
         # Use the reference namespace to find the source of our tag information.
         if reference == reference_v0:
             available = {}
@@ -1756,6 +1752,10 @@ class function(object):
             available.setdefault('__typeinfo__', True) if interface.function.has_typeinfo(ea) else available
         else:
             available = reference.globals.get(ea)
+
+        # Get the unmangled function name which we use to determine if the name
+        # exists. Then get the real name which we use for the tag values.
+        fname, realname = interface.function.name(ea), cls.name(ea) if any(key in available for key in ['__name__', '__typeinfo__']) else ''
 
         # Add any of the implicit tags for the given function into our results.
         if fname and '__name__' in available:
