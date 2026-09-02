@@ -7,7 +7,7 @@ function and type declarations.
 TODO: Implement parsers for some of the C++ symbol manglers in order to
       query them for specific attributes or type information.
 """
-import functools, operator, itertools, logging, builtins, bisect, string as _string
+import functools, operator, itertools, logging, builtins, bisect, re, string as _string
 logging = logging.getLogger(__name__)
 
 import internal, idaapi
@@ -781,6 +781,20 @@ class nested(object):
             current, string = current + 1 + index, string[1 + index:]
             iterable = [string.find(character) for character in characters]
             index = min([index for index in iterable if 0 <= index] or [-1])
+        return
+
+    @classmethod
+    def indices(cls, string, characters, patterns={}):
+        '''Yield each index of the matching `characters` from the given `string`.'''
+        key, charset = frozenset(characters), {character for character in characters if character}
+        if key in patterns:
+            pattern = patterns[key]
+        elif charset:
+            pattern = patterns[key] = re.compile("[{:s}]".format(str().join(map(re.escape, charset))))
+        else:
+            return
+        for match in pattern.finditer(string):
+            yield match.start(), 1
         return
 
     @classmethod
