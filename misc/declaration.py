@@ -1118,6 +1118,20 @@ class token(nested):
         return
 
     @classmethod
+    def indices(cls, string, tokens, patterns={}):
+        '''Yield each index and corresponding length for the matching `tokens` from `string`.'''
+        key, ordered = frozenset(tokens), sorted({token for token in tokens if token}, key=len)
+        if key in patterns:
+            pattern = patterns[key]
+        elif ordered:
+            pattern = patterns[key] = re.compile('|'.join(map(re.escape, ordered)))
+        else:
+            return
+        for match in pattern.finditer(string):
+            yield match.start(), match.end() - match.start()
+        return
+
+    @classmethod
     def parse(cls, string, tokens):
         '''Return a list of ranges, a tree, and a list of tuples for the errors when parsing the given `tokens` out of `string`.'''
         groups = {length: [{token for token in group} for group in zip(*pairs)] for length, pairs in itertools.groupby(sorted(tokens, key=len), len)}
