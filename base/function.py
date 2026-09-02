@@ -3791,6 +3791,34 @@ class type(object):
 
     @utils.multicase()
     @classmethod
+    def export(cls):
+        '''Return a boolean describing whether the current function is exported.'''
+        return cls.export(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def export(cls, func):
+        '''Return a boolean describing whether the function `func` is exported.'''
+        fn, _ = interface.range.unpack(func) if isinstance(func, idaapi.func_t) else (func, idaapi.BADADDR)
+        iterable = utils.itermap(interface.entries.ordinal, interface.entries.at_address(fn))
+        return all(ea != fn for ea in iterable)
+    is_export = utils.alias(export, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def entrypoint(cls):
+        '''Return a boolean describing whether the current function is an entrypoint.'''
+        return cls.entrypoint(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def entrypoint(cls, func):
+        '''Return a boolean describing whether the function `func` is an entrypoint.'''
+        fn, _ = interface.range.unpack(func) if isinstance(func, idaapi.func_t) else (func, idaapi.BADADDR)
+        iterable = utils.itermap(interface.entries.ordinal, interface.entries.at_address(fn))
+        return any(ea == fn for ea in iterable)
+    is_entrypoint = utils.alias(entrypoint, 'type')
+
+    @utils.multicase()
+    @classmethod
     def has(cls):
         '''Return a boolean describing whether the current function has a prototype associated with it.'''
         return cls.has(ui.current.address())
