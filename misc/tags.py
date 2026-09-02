@@ -1319,7 +1319,7 @@ class address(object):
         # First thing we need to figure out is whether the name exists and if
         # it's actually special in that we need to demangle it for the real name.
         aname = interface.name.get(ea, idaapi.GN_LOCAL) if is_entrypoint else interface.name.get(ea)
-        realname = cls.name(ea, is_entrypoint)
+        realname = cls.name(ea, is_entrypoint) if any(key in available for key in ['__name__', '__typeinfo__']) else aname
 
         # Use the reference namespace to find the source of our tag information.
         if reference == reference_v0:
