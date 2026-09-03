@@ -1268,7 +1268,7 @@ class address(object):
     """
 
     @classmethod
-    def get(cls, ea):
+    def get(cls, ea, *keys):
         '''Return a dictionary containing the tags for the item at address `ea`.'''
         MNG_NODEFINIT, MNG_NOPTRTYP = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7)
 
@@ -1291,6 +1291,7 @@ class address(object):
         # sure that the "__name__" and "__typeinfo__" tags are not applied to a
         # contents address unless done explicitly.
         is_entrypoint = False if rt else entrypoint == ea
+        has_address_typed = not func or is_entrypoint
 
         # Read both repeatable and non-repeatable comments from the chosen
         # address so that we can decode both of them into dictionaries to
@@ -1312,35 +1313,39 @@ class address(object):
         # to the correct one. If the address was pointing to a runtime-linked
         # address and was a case that had a function comment, then we need to
         # give those tags absolute priority when building our dictionary.
-        res = {}
+        res, requested = {}, {key for key in keys}
         [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
         rt and res.update(d3)
+
+        # Use the reference namespace to find the source of our tag information.
+        if reference == reference_v0:
+            available = {key for key in res}
+            available.add('__name__') if interface.address.flags(ea, idaapi.FF_NAME) else available
+            available.add('__typeinfo__') if has_address_typed and interface.address.has_typeinfo(ea) else available
+            available.add('__color__') if interface.address.color(ea) != 0xffffffff else available
+            available.add('__extra_prefix__') if comment.extra.has_prefix(ea) else available
+            available.add('__extra_suffix__') if comment.extra.has_suffix(ea) else available
+        else:
+            available = reference.contents.get(ea) if func else reference.globals.get(ea)
+        selected = requested or available
 
         # First thing we need to figure out is whether the name exists and if
         # it's actually special in that we need to demangle it for the real name.
         aname = interface.name.get(ea, idaapi.GN_LOCAL) if is_entrypoint else interface.name.get(ea)
-        realname = cls.name(ea, is_entrypoint) if any(key in available for key in ['__name__', '__typeinfo__']) else aname
-
-        # Use the reference namespace to find the source of our tag information.
-        if reference == reference_v0:
-            available = {}
-            available.setdefault('__name__', True) if interface.address.flags(ea, idaapi.FF_NAME) else available
-            available.setdefault('__typeinfo__', True) if interface.address.has_typeinfo(ea) else available
-        else:
-            available = reference.contents.get(ea) if func else reference.globals.get(ea)
+        realname = cls.name(ea, is_entrypoint) if {'__name__', '__typeinfo__'} & selected else aname
 
         # Add any of the implicit tags for the specified address to our results.
-        if aname and '__name__' in available:
+        if aname and '__name__' in selected:
             res.setdefault('__name__', realname)
-        if comment.extra.has_prefix(ea):
+        if comment.extra.has_prefix(ea) and '__extra_prefix__' in selected:
             res.setdefault('__extra_prefix__', comment.extra.get_prefix(ea))
-        if comment.extra.has_suffix(ea):
+        if comment.extra.has_suffix(ea) and '__extra_suffix__' in selected:
             res.setdefault('__extra_suffix__', comment.extra.get_suffix(ea))
 
         # If there was some type information associated with the address, then
         # we need its name so that we can format it and add it as an implicit tag.
         try:
-            if not is_entrypoint and '__typeinfo__' in available:
+            if has_address_typed and '__typeinfo__' in selected and interface.address.has_typeinfo(ea):
                 typeinfo = interface.address.typeinfo(ea)
                 ti = interface.tinfo.lower_function_type(typeinfo) if typeinfo.is_func() or typeinfo.is_funcptr() else typeinfo
                 validname = interface.name.typename(realname)
@@ -1359,14 +1364,15 @@ class address(object):
 
             # if the demangled name is different from the actual name, then we need
             # to extract its result type and prepend it to the demangled name.
-            if demangled != aname:
+            if demangled != aname and '__typeinfo__' in selected:
                 res.setdefault('__typeinfo__', demangled)
 
         # Add the implicit color to the result dictionary if one was actually set.
         col, DEFCOLOR = interface.address.color(ea), 0xffffffff
-        if col != DEFCOLOR: res.setdefault('__color__', col)
-
-        return res
+        if col != DEFCOLOR and '__color__' in selected:
+            res.setdefault('__color__', col)
+        decoded = requested or set(res)
+        return {key : res[key] for key in decoded & set(res)}
 
     @classmethod
     def set(cls, ea, key, value):
