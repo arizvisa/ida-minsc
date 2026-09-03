@@ -2064,21 +2064,24 @@ class block(object):
     """
 
     @classmethod
-    def get(cls, bb):
+    def get(cls, bb, *keys):
         '''Returns all the tags defined for the ``idaapi.BasicBlock`` given in `bb`.'''
-        DEFCOLOR, ea = 0xffffffff, interface.range.start(bb)
+        DEFCOLOR, ea, requested = 0xffffffff, interface.range.start(bb), {key for key in keys}
 
         # first thing to do is to read the tags for the address. this
         # gives us "__extra_prefix__", "__extra_suffix__", and "__name__".
-        res = address.get(ea)
+        res = address.get(ea, *keys)
+        available = {key for key in res}
+        available.add('__color__') if interface.function.blockcolor(bb) not in {None, DEFCOLOR} else available
+        selected = requested or available
 
         # next, we're going to replace the one implicit tag that we
         # need to handle...and that's the "__color__" tag.
         col = interface.function.blockcolor(bb)
-        if col not in {None, DEFCOLOR}: res.setdefault('__color__', col)
-
-        # that was pretty much it, so we can just return our results.
-        return res
+        if col not in {None, DEFCOLOR} and '__color__' in selected:
+            res.setdefault('__color__', col)
+        decoded = requested or set(res)
+        return {key : res[key] for key in decoded & set(res)}
 
     @classmethod
     def set(cls, bb, key, value):
