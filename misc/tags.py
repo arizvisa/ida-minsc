@@ -3776,9 +3776,6 @@ class reference_v1(object):
             position, count = internal.tagindex.structure.decrement(sid, name) if internal.tagindex.tags.has(name) else (0, 0)
             return count
         @classmethod
-        def get(cls, sid):
-            return internal.tagindex.structure.get(sid)
-        @classmethod
         def count(cls, sid):
             return len(cls.get(sid))
         @classmethod
