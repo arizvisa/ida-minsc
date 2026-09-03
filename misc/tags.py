@@ -2347,6 +2347,13 @@ class typeinfo_member(object):
     @classmethod
     def get(cls, *args):
         '''Return a dictionary containing the tags for the specified member.'''
+        if len(args) > 0 and isinstance(args[0], internal.types.integer):
+            args, keys = args[:1], args[1:]
+        elif len(args) > 1:
+            args, keys = args[:2], args[2:]
+        else:
+            caller_format = internal.structure.v9member.format_unknown_args(*args, caller=[__name__, cls.__name__, 'get'])
+            raise internal.exceptions.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
         tinfo, mindex, udm = internal.structure.v9members.by(*args, caller=[__name__, cls.__name__, 'get'])
         mid, mfullname = interface.tinfo.member_identifier(tinfo, mindex), internal.structure.v9member.fullname(tinfo, mindex)
         repeatable = True
@@ -2372,20 +2379,23 @@ class typeinfo_member(object):
         idaname = utils.string.of(internal.structure.v9member.get_name(tinfo, mindex))
         mname = utils.string.of(idaname)
         mtype = interface.tinfo.copy(udm.type)
+        requested = {key for key in keys}
         available = reference.members.get(mid)
+        selected = requested or available
 
         # Check if the member has a name and is tagged before assigning it.
         aname = mname if internal.structure.v9member.has_name(tinfo, mindex) else ''
-        if aname and '__name__' in available:
+        if aname and '__name__' in selected:
             res.setdefault('__name__', aname)
 
         # If our hooks tagged this with "__typeinfo__" then we can add it.
-        if '__typeinfo__' in available:
+        if '__typeinfo__' in selected:
             realname = aname or ''
             validname = interface.name.member(realname) if realname else ''
             ti_s = idaapi.print_tinfo('', 0, 0, 0, mtype, utils.string.to(validname), '')
             res.setdefault('__typeinfo__', ti_s)
-        return res
+        decoded = requested or set(res)
+        return {key : res[key] for key in decoded & set(res)}
 
     @classmethod
     def set(cls, *args):
