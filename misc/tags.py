@@ -1052,7 +1052,8 @@ class select_v1(object):
         for ea, used in query_v1.globals(*args, **kwargs):
             is_function = interface.function.has(cls.navigation.set(ea))
             Ftag = function.get if is_function else address.get
-            tags, owners = Ftag(ea), {f for f in interface.function.owners(ea)} if is_function else {ea}
+            tags = Ftag(ea, *used) if selection else Ftag(ea)
+            owners = {f for f in interface.function.owners(ea)} if is_function else {ea}
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if not key.startswith('__')}
             if ea not in owners:
@@ -1086,7 +1087,8 @@ class select_v1(object):
         '''Query the contents of the function `func` and yield a tuple containing each address and all of the `required` tags with any `included` ones.'''
         selection = True if any([args, kwargs]) else False
         for ea, used in query_v1.function(func, *args, **kwargs):
-            tags = address.get(cls.navigation.analyze(ea))
+            ea = cls.navigation.analyze(ea)
+            tags = address.get(ea, *used) if selection else address.get(ea)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if not key.startswith('__')}
             if selection:
@@ -1101,7 +1103,7 @@ class select_v1(object):
         '''Query the structures in the database and yield a tuple containing each structure identifier and all of the `required` tags with any `included` ones.'''
         selection = True if any([args, kwargs]) else False
         for sid, used in query_v1.structures(*args, **kwargs):
-            tags = structure.get(sid)
+            tags = structure.get(sid, *used) if selection else structure.get(sid)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if not key.startswith('__')}
             if selection:
@@ -1158,7 +1160,8 @@ class select_v1(object):
         '''Query the members of the structure `sid` and yield a tuple containing each member identifier and all of the `required` tags with any `included` ones.'''
         selection = True if any([args, kwargs]) else False
         for mid, used in query_v1.structure(sid, *args, **kwargs):
-            tags = member.get(mid) if idaapi.__version__ < 8.5 else typeinfo_member.get(mid)
+            Fget = member.get if idaapi.__version__ < 8.5 else typeinfo_member.get
+            tags = Fget(mid, *used) if selection else Fget(mid)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if not key.startswith('__')}
             if selection:
@@ -1173,7 +1176,7 @@ class select_v1(object):
         '''Query the basic blocks of the func `func` and yield a tuple containing each block and all of the `required` tags with any `included` ones.'''
         selection, cache = True if any([args, kwargs]) else False, {}
         for bb, used in query_v1.blocks(func, *args, **kwargs):
-            tags = block.get(bb)
+            tags = block.get(bb, *used) if selection else block.get(bb)
             selected = {key : value for key, value in tags.items() if key in used}
             explicit = {key : value for key, value in tags.items() if not key.startswith('__')}
             if selection:
