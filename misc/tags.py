@@ -2531,7 +2531,7 @@ class structure(object):
     """
 
     @classmethod
-    def get(cls, sptr):
+    def get(cls, sptr, *keys):
         '''Return a dictionary containing the tags for the structure `sptr`.'''
         repeatable, sptr = True, idaapi.get_struc(int(sptr)) if isinstance(sptr, internal.types.integer) else sptr
 
@@ -2549,27 +2549,31 @@ class structure(object):
         [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
 
         # Now we need to add implicit tags which are related to the structure.
-        available = reference.structure.get(sptr.id)
         is_frame = internal.structure.frame(sptr)
+        requested = {key for key in keys}
+        available = reference.structure.get(sptr.id)
+        available.add('__ea__') if is_frame and interface.function.by_frame(sptr) else available
+        selected = requested or available
 
         # If we have the implicit name tagged, then add it to the dictionary.
         name = utils.string.of(idaapi.get_struc_name(sptr.id))
-        if name and '__name__' in available:
+        if name and '__name__' in selected:
             res.setdefault('__name__', name)
 
         if is_frame and interface.function.by_frame(sptr):
             ea = interface.range.start(interface.function.by_frame(sptr))
             ea != idaapi.BADADDR and res.setdefault('__ea__', ea)
             typename = name if name else "{:X}".format(ea)
-            res.setdefault('__typeinfo__', typename) if '__typeinfo__' in available else ()
+            res.setdefault('__typeinfo__', typename) if '__typeinfo__' in selected else ()
 
         # Now we need to add the tag for the implicit type if it was applied.
-        elif '__typeinfo__' in available:
+        elif '__typeinfo__' in selected:
             ti = interface.address.typeinfo(sptr.id)
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, '', '')
             res.setdefault('__typeinfo__', ti_s)
 
-        return res
+        decoded = requested or set(res)
+        return {key : res[key] for key in decoded & set(res)}
 
     @classmethod
     def set(cls, sptr, key, value):
@@ -2584,7 +2588,7 @@ class structure(object):
         # Before we apply the chosen tag to a comment, we need to check if the
         # user is updating an implicit tag and selecting the correct one.
         elif key == '__name__':
-            tags, res = cls.get(sptr), internal.structure.naming.set(sptr, value)
+            tags, res = cls.get(sptr, key), internal.structure.naming.set(sptr, value)
             return tags.pop(key, None)
 
         # If it's a frame, we can't modify any other implicit tags.
@@ -2592,7 +2596,7 @@ class structure(object):
             pass
 
         elif key == '__typeinfo__':
-            tags, available = cls.get(sptr), internal.tags.reference.structure.get(sptr.id)
+            tags, available = cls.get(sptr, key), internal.tags.reference.structure.get(sptr.id)
             res = internal.tags.reference.structure.increment(sptr.id, '__typeinfo__') if '__typeinfo__' not in available else ()
             return tags.pop(key, None)
 
@@ -2635,7 +2639,7 @@ class structure(object):
 
         # We need to first check if an implicit tag is being removed.
         elif key == '__name__':
-            tags, original = cls.get(sptr), internal.structure.naming.remove(sptr)
+            tags, original = cls.get(sptr, key), internal.structure.naming.remove(sptr)
             return tags.pop(key, None)
 
         # If it's a frame, then quit since we can't set any other implicit tags.
@@ -2643,7 +2647,7 @@ class structure(object):
             pass
 
         elif key == '__typeinfo__':
-            tags, available = cls.get(sptr), internal.tags.reference.structure.get(sptr.id)
+            tags, available = cls.get(sptr, key), internal.tags.reference.structure.get(sptr.id)
             res = internal.tags.reference.structure.decrement(sptr.id, '__typeinfo__') if '__typeinfo__' in available else ()
             return tags.pop(key, None)
 
