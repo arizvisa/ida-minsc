@@ -1711,7 +1711,7 @@ class function(object):
     """
 
     @classmethod
-    def get(cls, func):
+    def get(cls, func, *keys):
         '''Return a dictionary containing the tags for the function `func`.'''
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
 
@@ -1722,12 +1722,12 @@ class function(object):
         except internal.exceptions.FunctionNotFoundError:
             parameter = ("{:#x}" if isinstance(func, internal.types.integer) else "{!r}").format(func)
             logging.warning(u"{:s}.tag({:s}) : Attempted to read any tags from a non-function ({:s}). Falling back to using database tags.".format('function', parameter, parameter))
-            return address.get(func)
+            return address.get(func, *keys)
 
         # If we were given a runtime function, then the address actually uses a database tag.
         if rt:
             logging.warning(u"{:s}.tag({:#x}) : Attempted to read any tags from a runtime-linked address ({:#x}). Falling back to using database tags.".format('function', ea, ea))
-            return address.get(ea)
+            return address.get(ea, *keys)
 
         # Read both repeatable and non-repeatable comments from the address, and
         # decode the tags that are stored within to a dictionary.
@@ -1742,30 +1742,32 @@ class function(object):
             logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('function', ea, ', '.join(d1keys & d2keys), 'repeatable' if repeatable else 'non-repeatable'))
 
         # Then we can store them into a dictionary whilst preserving priority.
-        res = {}
+        res, requested = {}, {key for key in keys}
         [ res.update(d) for d in ([d1, d2] if repeatable else [d2, d1]) ]
 
         # Use the reference namespace to find the source of our tag information.
         if reference == reference_v0:
-            available = {}
-            available.setdefault('__name__', True) if interface.address.flags(interface.range.start(fn), idaapi.FF_NAME) else available
-            available.setdefault('__typeinfo__', True) if interface.function.has_typeinfo(ea) else available
+            available = {key for key in res}
+            available.add('__name__') if interface.address.flags(interface.range.start(fn), idaapi.FF_NAME) else available
+            available.add('__typeinfo__') if interface.function.has_typeinfo(ea) else available
+            available.add('__color__') if interface.function.color(fn) != 0xFFFFFFFF else available
         else:
             available = reference.globals.get(ea)
+        selected = requested or available
 
         # Get the unmangled function name which we use to determine if the name
         # exists. Then get the real name which we use for the tag values.
-        fname, realname = interface.function.name(ea), cls.name(ea) if any(key in available for key in ['__name__', '__typeinfo__']) else ''
+        fname, realname = interface.function.name(ea), cls.name(ea) if {'__name__', '__typeinfo__'} & selected else ''
 
         # Add any of the implicit tags for the given function into our results.
-        if fname and '__name__' in available:
+        if fname and '__name__' in selected:
             res.setdefault('__name__', realname)
 
         # For the function's type information within the implicit "__typeinfo__"
         # tag, we'll need to extract the prototype and the function's name. This
         # is so that we can use the name to emit a proper function prototype.
         try:
-            if '__typeinfo__' in available:
+            if '__typeinfo__' in selected:
                 typeinfo = interface.function.typeinfo(fn)
                 ti = interface.tinfo.lower_function_type(typeinfo) if typeinfo.is_func() or typeinfo.is_funcptr() else typeinfo
                 validname = interface.name.typename(realname)
@@ -1782,9 +1784,10 @@ class function(object):
 
         # Add the color to the result if one was actually set.
         fcolor, DEFCOLOR = interface.function.color(fn), 0xffffffff
-        if fcolor != DEFCOLOR:
+        if fcolor != DEFCOLOR and '__color__' in selected:
             res.setdefault('__color__', fcolor)
-        return res
+        decoded = requested or set(res)
+        return {key : res[key] for key in decoded & set(res)}
 
     @classmethod
     def set(cls, func, key, value):
