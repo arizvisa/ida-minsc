@@ -3037,42 +3037,47 @@ class hexvariable(object):
     @classmethod
     def get(cls, func, *args):
         '''Return a dictionary containing the tags for the decompiler variable specified by `locator`.'''
-        [arg] = args if args else [func]
+        [arg] = args[:1] if args else [func]
+
+        # if our function is a variable type of some sort, then we can use it
+        # as-is, since it includes everything we need to determine the function.
+        if isinstance(func, internal.hexrays.ida_hexrays_types.hexrays_var_types):
+            locator = internal.hexrays.variables.by(func)
+            defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
+            func, keys = defea, args
+
+        # otherwise the variable locator information is packed into a 3-tuple.
+        elif isinstance(func, tuple) and len(func) == 3:
+            defea, atype, alocinfo = func
+            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+            locator = internal.hexrays.variable.new_locator(defea, vdloc)
+            func, keys = defea, args
+
+        # this other tuple is similar but contains a function address inside it.
+        elif isinstance(func, tuple) and len(func) == 4:
+            fn, defea, atype, alocinfo = func
+            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
+            locator = internal.hexrays.variable.new_locator(defea, vdloc)
+            func, keys = fn, args
 
         # figure out if we were given a locator or a function with a locator.
         # then we can determine unpack the locator depending on the type.
-        if args and isinstance(args[0], internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
+        elif args and isinstance(args[0], internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
             locator = internal.hexrays.variables.by(func, args[0])
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
             func, keys = defea, args[1:]
 
-        elif args:
-            if isinstance(func, internal.hexrays.ida_hexrays_types.hexrays_func_types):
-                ea = internal.hexrays.function.address(func)
-                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), ea, arg))
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type.".format('.'.join([__name__, cls.__name__]), func, arg))
+        # otherwise mistakes were made and an exception needs to be raised.
+        elif isinstance(func, tuple):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.get({!r}{!s}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported length ({:d}).".format('.'.join([__name__, cls.__name__]), func, ", {!s}".format(', '.join(map("{!r}".format, args))) if args else '', func, len(func)))
 
-        elif isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_var_types):
-            locator = internal.hexrays.variables.by(arg)
-            defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
-            func = defea
+        elif isinstance(func, internal.hexrays.ida_hexrays_types.hexrays_func_types):
+            ea, keys = internal.hexrays.function.address(func), args[1:]
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {!s}{!s}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), ea, arg, ", {:s}".format(', '.join(map("{!r}".format, keys))) if keys else '', arg, arg.__class__))
 
-        # otherwise the locator information is packed into a tuple.
-        elif len(arg) == 3:
-            defea, atype, alocinfo = arg
-            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
-            locator = internal.hexrays.variable.new_locator(defea, vdloc)
-            func = defea
-
-        # this other tuple contains a function address inside it.
-        elif len(arg) == 4:
-            func, defea, atype, alocinfo = arg
-            vdloc = internal.hexrays.variable.copy_vdloc(atype, alocinfo)
-            locator = internal.hexrays.variable.new_locator(defea, vdloc)
-
-        # otherwise an exception needs to be raised.
         else:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.get({!r}, {!r}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported length ({:d}).".format('.'.join([__name__, cls.__name__]), func, arg, arg, len(arg)))
+            keys = args[1:]
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({!r}, {!r}{!s}) : Unable to determine the function and locator from the specified parameter ({!r}) due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), func, arg, ", {!s}".format(', '.join(map("{!r}".format, keys))) if keys else '', arg, arg.__class__))
 
         # now we can get the function from the parameters, and then use the
         # locator to grab the comment for the variable and decode it.
@@ -3084,26 +3089,31 @@ class hexvariable(object):
         # is basically handled by the `internal.hexrays.variable` namespace.
         name = internal.hexrays.variable.get_name(cfunc, locator)
         typeinfo = internal.hexrays.variable.get_type(cfunc, locator)
-        available = reference.hexvariable.get(locator, target=cfunc)
+
+        # use the function and locator to get the expected variable tags.
+        requested = {key for key in keys}
+        expected = reference.hexvariable.get(locator, target=cfunc)
 
         # if the name was tagged, then we can add it to our dictionary.
-        if '__name__' in available:
+        if '__name__' in expected:
             decoded.setdefault('__name__', name)
 
         # when determining whether the type has a tag, we need to distinguish
         # between a native compiler type and a user-specified one. the following
         # function attempts to do this, but it's likely completely incorrect.
-        if '__typeinfo__' in available:
+        if '__typeinfo__' in expected:
             validname = interface.name.member(name) # FIXME: types have different character requirements
             typeinfo_string = idaapi.print_tinfo('', 0, 0, 0, typeinfo, validname, '')
             decoded.setdefault('__typeinfo__', typeinfo_string)
 
-        # use the function and locator to get the expected variable tags and
-        # verify that they match before returning the resulting dictionary.
-        expected = reference.hexvariable.get(locator, target=cfunc)
+        # now we select the tags requested by the user. if whatever the expected
+        # are lmatches what is actually available, then return them all.
         available = {key for key in decoded} if reference == reference_v1 else {key for key in []}
+        selected = requested or available
+
+        # verify that the expected variable tags match what is available.
         if expected == available:
-            return decoded
+            return {key : decoded[key] for key in selected & set(decoded)}
 
         # FIXME: this is probably not the greatest place to do this, and as
         #        such we should probably figure out a way to identify when a
@@ -3114,7 +3124,7 @@ class hexvariable(object):
         # just added to the variable.
         [reference.hexvariable.decrement(locator, name, target=cfunc) for name in expected - available]
         [reference.hexvariable.increment(locator, name, target=cfunc) for name in available - expected]
-        return decoded
+        return {key : decoded[key] for key in selected & set(decoded)}
 
     @classmethod
     def set(cls, func, *args):
