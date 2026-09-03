@@ -2698,7 +2698,7 @@ class member(object):
     """
 
     @classmethod
-    def get(cls, mptr):
+    def get(cls, mptr, *keys):
         '''Return a dictionary containing the tags for the structure member `mptr`.'''
         repeatable, mid = True, mptr.id if isinstance(mptr, internal.structure.membertypes) else int(mptr)
         mptr, fullname, sptr = idaapi.get_member_by_id(mid)
@@ -2720,23 +2720,26 @@ class member(object):
         # the name is not a default, and the other is to include it in the rendered type.
         idaname = idaapi.get_member_name(mptr.id) or ''
         name = utils.string.of(idaname)
+        requested = {key for key in keys}
         available = reference.members.get(mptr.id)
+        selected = requested or available
 
         # If the name is defined and it's tagged, then go ahead and add it.
         aname = name if internal.structure.member.has_name(mptr) else ''
-        if aname and '__name__' in available:
+        if aname and '__name__' in selected:
             res.setdefault('__name__', aname)
 
         # If the typeinfo is tagged, and we can grab its type, then we can go
         # ahead and add it to our dictionary.
         ti = idaapi.tinfo_t()
         ok = idaapi.get_or_guess_member_tinfo2(mptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, mptr)
-        if ok and '__typeinfo__' in available:
+        if ok and '__typeinfo__' in selected:
             realname = name or internal.structure.member.default_name(sptr, mptr)
             validname = interface.name.member(realname) if realname else ''
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
             res.setdefault('__typeinfo__', ti_s)
-        return res
+        decoded = requested or set(res)
+        return {key : res[key] for key in decoded & set(res)}
 
     @classmethod
     def set(cls, mptr, key, value):
@@ -2750,11 +2753,11 @@ class member(object):
         # Before we do absolutely anything, we need to check if the user is updating
         # one of the implicit tags and act on them by assigning their new value.
         if key == '__name__':
-            tags, original = cls.get(mptr), internal.structure.member.set_name(mptr, value)
+            tags, original = cls.get(mptr, key), internal.structure.member.set_name(mptr, value)
             return tags.pop(key, None)
 
         elif key == '__typeinfo__':
-            tags, original = cls.get(mptr), internal.structure.member.set_typeinfo(mptr, value, flags=getattr(idaapi, 'SET_MEMTI_MAY_DESTROY', 1))
+            tags, original = cls.get(mptr, key), internal.structure.member.set_typeinfo(mptr, value, flags=getattr(idaapi, 'SET_MEMTI_MAY_DESTROY', 1))
             return tags.pop(key, None)
 
         # We need to grab both types of comments so that we can figure out
@@ -2789,11 +2792,11 @@ class member(object):
         # Check if the key is an implicit tag that we're being asked to
         # remove so that we can remove it from whatever it represents.
         if key == '__name__':
-            tags, original = cls.get(mptr), internal.structure.member.remove_name(mptr)
+            tags, original = cls.get(mptr, key), internal.structure.member.remove_name(mptr)
             return tags.pop(key, None)
 
         elif key == '__typeinfo__':
-            tags, original = cls.get(mptr), internal.structure.member.remove_typeinfo(mptr)
+            tags, original = cls.get(mptr, key), internal.structure.member.remove_typeinfo(mptr)
             return tags.pop(key, None)
 
         # Read both the comment types to figure out where the tag we want to remove is located at.
