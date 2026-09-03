@@ -3445,9 +3445,6 @@ class reference_v0(object):
         def decrement(cls, sid, name):
             return 0
         @classmethod
-        def get(cls, sid):
-            return {name for name in []}
-        @classmethod
         def count(cls, sid):
             return 0
         @classmethod
