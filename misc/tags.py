@@ -2846,16 +2846,16 @@ class hexfunction(object):
         '''Return a dictionary containing the tags for the decompiler item at `preciser`.'''
         treeloc = idaapi.treeloc_t()
 
-        # if we were given two parameters, then one of them is the function.
-        if args:
-            [preciser] = args
-            cfunc = internal.hexrays.function(func)
-
         # if we were given one parameter, then we need to figure out the cfunc
         # ourselves using the address given in the preciser.
-        else:
+        if isinstance(func, idaapi.treeloc_t) or isinstance(func, tuple):
             preciser = ea, itp = (func.ea, func.itp) if isinstance(func, idaapi.treeloc_t) else func
-            cfunc = internal.hexrays.function(ea)
+            cfunc, keys = internal.hexrays.function(ea), args
+
+        # if we were given two parameters, then one of them is the function.
+        else:
+            [preciser], keys = args[:1], args[1:]
+            cfunc = internal.hexrays.function(func)
 
         # now we can create the locator for the function's ctree.
         treeloc.ea, treeloc.itp = (lambda ea, itp: (ea, idaapi.as_signed(itp, 32)))(*preciser)
@@ -2888,9 +2888,12 @@ class hexfunction(object):
         # Check if the tagindex matches the tags that we decoded from the
         # comment for the location. If they do, then we have a result to return.
         expected = reference.hexfunction.get((treeloc.ea, treeloc.itp & 0xFFFFFFFF))
+        requested = {key for key in keys}
         available = {key for key in decoded} if reference == reference_v1 else {key for key in []}
+
+        selected = requested or available
         if expected == available:
-            return decoded
+            return {key : decoded[key] for key in selected & set(decoded)}
 
         # FIXME: this is probably not the greatest place to do this, and as
         #        such we should probably track down in hexrays to confirm
@@ -2902,7 +2905,7 @@ class hexfunction(object):
         # we increment the tag names that don't exist yet.
         [reference.hexfunction.decrement((treeloc.ea, treeloc.itp), name) for name in expected - available]
         [reference.hexfunction.increment((treeloc.ea, treeloc.itp), name) for name in available - expected]
-        return decoded
+        return {key : decoded[key] for key in selected & set(decoded)}
 
     @classmethod
     def set(cls, func, *args):
@@ -3038,10 +3041,10 @@ class hexvariable(object):
 
         # figure out if we were given a locator or a function with a locator.
         # then we can determine unpack the locator depending on the type.
-        if args and isinstance(arg, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
-            locator = internal.hexrays.variables.by(func, arg)
+        if args and isinstance(args[0], internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
+            locator = internal.hexrays.variables.by(func, args[0])
             defea, (atype, alocinfo) = locator.defea, interface.tinfo.location_raw(locator.location)
-            func = defea
+            func, keys = defea, args[1:]
 
         elif args:
             if isinstance(func, internal.hexrays.ida_hexrays_types.hexrays_func_types):
