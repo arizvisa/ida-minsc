@@ -2135,7 +2135,7 @@ class typeinfo(object):
     """
 
     @classmethod
-    def get(cls, type):
+    def get(cls, type, *keys):
         '''Return a dictionary containing the tags for the specified `type`.'''
         udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
 
@@ -2169,11 +2169,14 @@ class typeinfo(object):
             res.update(d)
 
         # Start by grabbing the tags that have been applied to the type.
+        requested = {key for key in keys}
         available = reference.structure.get(sid)
+        available.add('__ea__') if is_frame and interface.function.by_frame(ti) else available
+        selected = requested or available
 
         # If we have an implicit "__name__" tag, then we're good to add it.
         name = utils.string.of(internal.structure.naming.get(ti))
-        if name and '__name__' in available:
+        if name and '__name__' in selected:
             res.setdefault('__name__', name)
 
         # If the type is a frame, then we don't need to set a name or anything,
@@ -2182,17 +2185,18 @@ class typeinfo(object):
             ea = interface.range.start(interface.function.by_frame(ti))
             ea != idaapi.BADADDR and res.setdefault('__ea__', ea)
             typename = name if name else "{:X}".format(ea)
-            res.setdefault('__typeinfo__', typename) if '__typeinfo__' in available else ()
+            res.setdefault('__typeinfo__', typename) if '__typeinfo__' in selected else ()
 
         # Here we use the tagindex to determine whether a specific type id has
         # the implicit "__typeinfo__" tag applied to it. This is for tracking
         # types created by the user from types created by the disassembler.
-        elif '__typeinfo__' in available:
+        elif '__typeinfo__' in selected:
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, '', '')
             res.setdefault('__typeinfo__', ti_s)
 
         # Now we can return our dictionary of tags as the result.
-        return res
+        decoded = requested or set(res)
+        return {key : res[key] for key in decoded & set(res)}
 
     @classmethod
     def set(cls, type, key, value):
@@ -2219,7 +2223,7 @@ class typeinfo(object):
 
         # Before everything, we check if the implicit tags are being modified.
         elif key == '__name__':
-            tags, res = cls.get(sptr), internal.structure.naming.set(sptr, value)
+            tags, res = cls.get(ti, key), internal.structure.naming.set(type, value)
             return tags.pop(key, None)
 
         # If it's a frame, then we can't modify any other implicit tags.
@@ -2227,8 +2231,8 @@ class typeinfo(object):
             pass
 
         elif key == '__typeinfo__':
-            tags, available = cls.get(sptr), internal.tags.reference.structure.get(sptr.id)
-            res = internal.tags.reference.structure.increment(sptr.id, '__typeinfo__') if '__typeinfo__' not in available else ()
+            tags, available = cls.get(ti, key), internal.tags.reference.structure.get(sid)
+            res = internal.tags.reference.structure.increment(sid, '__typeinfo__') if '__typeinfo__' not in available else ()
             return tags.pop(key, None)
 
         # Then we start by reading both comments to figure out what's being requested.
@@ -2282,15 +2286,15 @@ class typeinfo(object):
             raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}, {!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__, 'remove']), sid, key, none, utils.string.escape(key, '"'), none))
 
         elif key == '__name__':
-            tags, original = cls.get(sptr), internal.structure.naming.remove(sptr)
+            tags, original = cls.get(ti, key), internal.structure.naming.remove(ti)
             return tags.pop(key, None)
 
         elif is_frame:
             pass
 
         elif key == '__typeinfo__':
-            tags, available = cls.get(sptr), internal.tags.reference.structure.get(sptr.id)
-            res = internal.tags.reference.structure.decrement(sptr.id, '__typeinfo__') if '__typeinfo__' in available else ()
+            tags, available = cls.get(ti, key), internal.tags.reference.structure.get(sid)
+            res = internal.tags.reference.structure.decrement(sid, '__typeinfo__') if '__typeinfo__' in available else ()
             return tags.pop(key, None)
 
         # Then we can get both comment types.
