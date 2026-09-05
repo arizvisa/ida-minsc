@@ -243,7 +243,7 @@ class extract(object):
     @classmethod
     def trimmed(cls, string, range, segments, whitespace=' '):
         '''Return a token for the given `string` with the characters in `whitespace` removed using both `range` and `segments`.'''
-        left, right = range if isinstance(range, tuple) else (0, len(string))
+        left, right = range if isinstance(range, tuple) and range else (0, len(string))
         original = string[left : right]
         start, stop = (len(original) - len(F(*whitespace)) for F in [original.lstrip, original.rstrip])
         if not(all(string[left : right] in whitespace for left, right in segments[:start])):
@@ -258,7 +258,7 @@ class extract(object):
     @classmethod
     def parameters(cls, tree, string, range=None, assertion={'()', '<>', '{}'}, delimiter={','}):
         '''Use the given `tree` to yield a token for each item within the given `range` of `string` that is separated by `delimiter` and wrapped by `assertion`.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         if assertion and not(string[start:][:+1] + string[:stop][-1:] in assertion):
             sortable = sorted(assertion)
             raise internal.exceptions.InvalidFormatError(u"{:s}.parameters({!r}, {!r}, {!s}, assertion={!r}, delimiter={!r}) : Error verifying parameters \"{:s}\" due to them not being surrounded by group{:s} {!s}.".format('.'.join([__name__, cls.__name__]), tree, string, "{:d}..{:d}".format(*range) if range else range, assertion, delimiter, utils.string.escape(string[start : stop], '"'), '' if len(sortable) == 1 else 's', ', '.join(itertools.chain(map("\"{:s}\"".format, sortable[:-1]), ["or \"{:s}\"".format(*sortable[-1:])])) if len(sortable) > 1 else "\"{:s\"".format(*sortable)))
@@ -294,7 +294,7 @@ class extract(object):
     @classmethod
     def braces(cls, string, range, segments, group={'()', '<>', '{}'}):
         '''Use the given `tree` to split a trailing `group` using the given `range` and `segments` from `string`.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         segments = segments[:]
 
         # extract the last component and select the range out of the string.
@@ -311,7 +311,7 @@ class extract(object):
     @classmethod
     def elements(cls, string, range, segments, pairs={'[]'}):
         '''Yield each segment from a `string` selected bv the provided `range` and `segments` that is aligned contiguously and cuddled by any of the specified `pairs`.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         iterable = ((1 + index, string[left : right]) for index, (left, right) in enumerate(segments[::-1]))
         filtered = (rindex for rindex, item in iterable if item[:+1] + item[-1:] in pairs)
 
@@ -332,7 +332,7 @@ class extract(object):
     @classmethod
     def prototype(cls, tree, string, range=None):
         '''Use the given `tree` with `range` on the prototype in `string` to return a tuple containing the result type with convention, name, segment for parameters, and list of segments for qualifiers.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         ignored, symbols = {'', ' '}, {' ', '*', '&'}
 
         # start by extracting away the qualifiers that we need to return and
@@ -377,7 +377,7 @@ class extract(object):
     @classmethod
     def declaration(cls, string, range, segments, qualifiers={'const', 'volatile', 'throw()', 'throw(void)', 'noexcept', '[clone]'}):
         '''Use the given `range` and `segments` with `string` to return a tuple containing the selection for the type and a list of segments for its qualifiers.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         ignored = {item for item in itertools.chain([''], (qualifier[qualifier.rindex('('):] for qualifier in qualifiers if qualifier[-1] in ')'))}
         symbols, requested = {'*', '&'}, {'*', '&'} | qualifiers
 
@@ -397,7 +397,7 @@ class extract(object):
     @classmethod
     def qualifiers(cls, string, range, segments, qualifiers={'const', 'volatile', 'throw()', 'throw(void)', 'noexcept', '[clone]'}):
         '''Return a tuple containing the selections for the declaration and qualifiers using the given `range` and `segments` with `string`.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         symbols, cuddled = {'', ' ', '*', '&'}, {item for item in itertools.chain((qualifier[qualifier.rindex('('):] for qualifier in qualifiers if qualifier[-1] in ')'))}
         cuddled_qualifiers = cuddled | qualifiers
 
@@ -450,7 +450,7 @@ class extract(object):
     @classmethod
     def declaration_and_name(cls, string, range, segments):
         '''Use the given `range` on the trimmed `string` with `segments` to return a selection of its declaration and segment for its name.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         ignored, symbols = {'', ' '}, {' ', '*', '&'}
 
         # scan for the name until we get to a symbol to pivot from.
@@ -477,7 +477,7 @@ class extract(object):
     @classmethod
     def keyword(cls, string, range, segments, delimiters={' '}, keywords={'class', 'struct', 'union', 'enum'}):
         '''Use the given `string` with `range` and `segments` to return a tuple with the requested `keywords` prior to `delimiters` and the resulting selection.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
 
         # scan for the very first delimiter and grab its index.
         iterable = (index for index, (left, right) in enumerate(segments) if string[left : right] in delimiters)
@@ -499,7 +499,7 @@ class extract(object):
     @classmethod
     def beginning(cls, string, range, segments, delimiters={' ', '*', '&'}):
         '''Use the given `string` with `range` and `segments` to return a tuple containing the selections before and after the first instance of any `delimiters`.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
 
         # scan forwards until we encounter one of the given delimiters.
         iterable = (index for index, (left, right) in enumerate(segments) if string[left : right] in delimiters)
@@ -518,7 +518,7 @@ class extract(object):
     @classmethod
     def ending(cls, string, range, segments, delimiters={' ', '*', '&'}):
         '''Use the given `string` with `range` and `segments` to return a tuple containing the selections before and after the last instance of any `delimiters`.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
 
         # scan backwards until we encounter one of the chosen delimiters.
         iterable = (1 + index for index, (left, right) in enumerate(segments[::-1]) if string[left : right] in delimiters)
@@ -537,7 +537,7 @@ class extract(object):
     @classmethod
     def name_and_template(cls, string, range, segments, delimiter={'::'}, template='<>'):
         '''Use the given `range` on the trimmed `string` with `segments` to yield each component of a name delimited by `delimiter` as a tuple composed of the range for the name and its template parameters.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         ignored, delimiters = {'', ' '}, {' ', '*', '&'}
 
         # first we need to figure out where the name begins
@@ -559,7 +559,7 @@ class extract(object):
     @classmethod
     def function_pointer(cls, string, range, segments):
         '''Use the given `range` on the trimmed `string` with `segments` to return a tuple containing the result type, and the segments of both the calling convention and parameters.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         ignored, symbols = {'', ' '}, {' ', '*', '&'}
 
         # first we need to find the parameters.
@@ -590,7 +590,7 @@ class extract(object):
     @classmethod
     def function_pointer_convention(cls, string, range, segments, assertion={'()'}, symbols={'*', '&'}, whitespace={' '}):
         '''Use the given `range` on both `string` and `segments` to return a tuple containing the calling convention, the segments of each symbol, and the tokens that compose the name.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         if assertion and not(string[start:][:+1] + string[:stop][-1:] in assertion):
             sortable = sorted(assertion)
             raise internal.exceptions.InvalidFormatError(u"{:s}.function_pointer_convention({!r}, {!s}, {!r}, assertion={!r}, symbols={!r}, whitespace={!r}) : Error verifying function pointer convention \"{:s}\" due to it not being surrounded by group{:s} {!s}.".format('.'.join([__name__, cls.__name__]), string, "{:d}..{:d}".format(*range) if range else range, segments, assertion, symbols, whitespace, utils.string.escape(string[start : stop], '"'), '' if len(sortable) == 1 else 's', ', '.join(itertools.chain(map("\"{:s}\"".format, sortable[:-1]), ["or \"{:s}\"".format(*sortable[-1:])])) if len(sortable) > 1 else "\"{:s\"".format(*sortable)))
@@ -632,7 +632,7 @@ class extract(object):
     @classmethod
     def names(cls, tree, string, range, parameters):
         '''Use the given `tree` and `range` to return the segments of all the names in `parameters` from the prototype specified by `string`.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         range_description = "{!r}".format(range)
 
         # define a recursive function that can be used to parse each of the
@@ -756,7 +756,6 @@ class extract(object):
                 invertedsub = normalize_results(string, sub)
                 inverted[key] = invertedrange, invertedsub
             return inverted
-
         return normalize_results(string, results)
 
     @classmethod
@@ -766,7 +765,7 @@ class extract(object):
         If a callable or list is specified in `exclude`, then use it to exclude
         a matching segment from the result.
         '''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         iterable = (getattr(re, attribute) for attribute in ['_pattern_type', 'Pattern'] if hasattr(re, attribute))
         Fexclude = exclude.search if isinstance(exclude, next(iterable, types.none)) else exclude if callable(exclude) else functools.partial(operator.contains, frozenset(exclude)) if isinstance(exclude, types.ordered) else None
         for left, right in segments[::-1]:
