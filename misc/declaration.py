@@ -759,6 +759,26 @@ class extract(object):
 
         return normalize_results(string, results)
 
+    @classmethod
+    def enclosure(cls, string, range, segments, group='()', exclude=functools.partial(operator.contains, [])):
+        '''Use the `range` on the trimmed `string` with `segments` to return the trailing range closing the pairs specifed by `group`.
+
+        If a callable or list is specified in `exclude`, then use it to exclude
+        a matching segment from the result.
+        '''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        iterable = (getattr(re, attribute) for attribute in ['_pattern_type', 'Pattern'] if hasattr(re, attribute))
+        Fexclude = exclude.search if isinstance(exclude, next(iterable, types.none)) else exclude if callable(exclude) else functools.partial(operator.contains, frozenset(exclude)) if isinstance(exclude, types.ordered) else None
+        for left, right in segments[::-1]:
+            if string[left : left + 1] + string[right - 1 : right] != group:
+                pass
+            elif Fexclude and Fexclude(string[start : left].rstrip()):
+                pass
+            else:
+                return left, right
+            continue
+        return start, start
+
 class nested(object):
     """
     This namespace contains basic utilities for processing a string
