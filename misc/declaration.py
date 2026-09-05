@@ -3845,3 +3845,651 @@ class parseable(object):
                 res.append("[{:d}] {!r} -> {!r}".format(index, string, transformed))
             continue
         return '\n'.join(itertools.chain([cls], res, ['']))
+
+class name(object):
+    """
+    This namespace is responsible for performing different string operations on
+    a mangled/demangled symbol name. This includes parsing of the name, or the
+    stripping of any extraneous prefixes or suffixes. There are also some tools
+    for returning the type of mangling (scheme) for the symbol, as the identity
+    of the operator, or the classifical of the symbol at a specified address.
+
+    When using the `name.demangle` function, its parameter specifies whether to
+    demangle the full declaration of the symbol or just its name. If an integer
+    or an iterable of integers is specified, these integers will be combined and
+    passed directly along to the disassembler API.
+
+    This namespace was mostly written by Claude with a few tweaks and renames
+    from me.
+    """
+
+    __flags_declaration = [
+        getattr(idaapi, 'MNG_ZPT_SPACE', 0x00400000),
+        getattr(idaapi, 'MNG_NOCLOSUR',  0x00008000),
+        getattr(idaapi, 'MNG_NOUNALG',   0x00010000),
+        getattr(idaapi, 'MNG_NOMANAGE',  0x00020000),
+        getattr(idaapi, 'MNG_NOPTRTYP', 0x00000007),
+    ]
+
+    __flags_name = [
+        getattr(idaapi, 'MNG_IGN_JMP',   0x04000000),
+        getattr(idaapi, 'MNG_NODEFINIT', 0x00000008),
+        getattr(idaapi, 'MNG_ZPT_SPACE', 0x00400000),
+        getattr(idaapi, 'MNG_SHORT_S',   0x00100000),
+        getattr(idaapi, 'MNG_SHORT_U',   0x00200000),
+    ]
+
+    # microsoft operator tables.
+    __operator_microsoft_single = {
+        '0': 'constructor',
+        '1': 'destructor',
+        '2': 'operator new',
+        '3': 'operator delete',
+        '4': 'operator=',
+        '5': 'operator>>',
+        '6': 'operator<<',
+        '7': 'operator!',
+        '8': 'operator==',
+        '9': 'operator!=',
+        'A': 'operator[]',
+        'B': 'operator<cast>',
+        'C': 'operator->',
+        'D': 'operator*',
+        'E': 'operator++',
+        'F': 'operator--',
+        'G': 'operator-',
+        'H': 'operator+',
+        'I': 'operator&',
+        'J': 'operator->*',
+        'K': 'operator/',
+        'L': 'operator%',
+        'M': 'operator<',
+        'N': 'operator<=',
+        'O': 'operator>',
+        'P': 'operator>=',
+        'Q': 'operator,',
+        'R': 'operator()',
+        'S': 'operator~',
+        'T': 'operator^',
+        'U': 'operator|',
+        'V': 'operator&&',
+        'W': 'operator||',
+        'X': 'operator*=',
+        'Y': 'operator+=',
+        'Z': 'operator-=',
+    }
+
+    __operator_microsoft_underscored = {
+        '0': 'operator/=',
+        '1': 'operator%=',
+        '2': 'operator>>=',
+        '3': 'operator<<=',
+        '4': 'operator&=',
+        '5': 'operator|=',
+        '6': 'operator^=',
+        '7': 'vftable',
+        '8': 'vbtable',
+        '9': 'vcall',
+        'A': 'typeof',
+        'B': 'local static guard',
+        'C': 'string',
+        'D': 'vbase destructor',
+        'E': 'vector deleting destructor',
+        'F': 'default constructor closure',
+        'G': 'scalar deleting destructor',
+        'H': 'vector constructor iterator',
+        'I': 'vector destructor iterator',
+        'J': 'vector vbase constructor iterator',
+        'K': 'virtual displacement map',
+        'L': 'eh vector constructor iterator',
+        'M': 'eh vector destructor iterator',
+        'N': 'eh vector vbase constructor iterator',
+        'O': 'copy constructor closure',
+        'P': 'udt returning',
+        'R': 'RTTI',
+        'S': 'local vftable',
+        'T': 'local vftable constructor closure',
+        'U': 'operator new[]',
+        'V': 'operator delete[]',
+        'X': 'placement delete closure',
+        'Y': 'placement delete[] closure',
+    }
+
+    __operator_microsoft_dunderscored = {
+        'A': 'managed vector constructor iterator',
+        'B': 'managed vector destructor iterator',
+        'C': 'eh vector copy constructor iterator',
+        'D': 'eh vector vbase copy constructor iterator',
+        'E': 'dynamic initializer for',
+        'F': 'dynamic atexit destructor for',
+        'G': 'vector copy constructor iterator',
+        'H': 'vector vbase copy constructor iterator',
+        'I': 'managed vector copy constructor iterator',
+        'J': 'local static thread guard',
+        'K': 'operator ""',
+        'L': 'co_await',
+    }
+
+    # Itanium operator tables.
+    __operator_itanium = {
+        'nw': 'operator new',
+        'na': 'operator new[]',
+        'dl': 'operator delete',
+        'da': 'operator delete[]',
+        'ps': 'operator+',
+        'ng': 'operator-',
+        'ad': 'operator&',
+        'de': 'operator*',
+        'co': 'operator~',
+        'pl': 'operator+',
+        'mi': 'operator-',
+        'ml': 'operator*',
+        'dv': 'operator/',
+        'rm': 'operator%',
+        'an': 'operator&',
+        'or': 'operator|',
+        'eo': 'operator^',
+        'aS': 'operator=',
+        'pL': 'operator+=',
+        'mI': 'operator-=',
+        'mL': 'operator*=',
+        'dV': 'operator/=',
+        'rM': 'operator%=',
+        'aN': 'operator&=',
+        'oR': 'operator|=',
+        'eO': 'operator^=',
+        'ls': 'operator<<',
+        'rs': 'operator>>',
+        'lS': 'operator<<=',
+        'rS': 'operator>>=',
+        'eq': 'operator==',
+        'ne': 'operator!=',
+        'lt': 'operator<',
+        'gt': 'operator>',
+        'le': 'operator<=',
+        'ge': 'operator>=',
+        'ss': 'operator<=>',
+        'nt': 'operator!',
+        'aa': 'operator&&',
+        'oo': 'operator||',
+        'pp': 'operator++',
+        'mm': 'operator--',
+        'cm': 'operator,',
+        'pm': 'operator->*',
+        'pt': 'operator->',
+        'cl': 'operator()',
+        'ix': 'operator[]',
+        'qu': 'operator?',
+        'cv': 'operator<cast>',
+        'li': 'operator""',
+        'aw': 'co_await',
+    }
+
+    # mangled kinds for data types.
+    __microsoft_data_kinds = {
+        'vftable',
+        'vbtable',
+        'local vftable',
+        'string',
+        'RTTI',
+        'udt returning',
+    }
+
+    __itanium_data_kinds = {
+        'V': (idaapi.FF_DATA, 'vtable'),
+        'T': (idaapi.FF_DATA, 'vtt'),
+        'I': (idaapi.FF_DATA, 'typeinfo'),
+        'S': (idaapi.FF_DATA, 'typeinfo-name'),
+        'C': (idaapi.FF_DATA, 'construction-vtable'),
+        'W': (idaapi.FF_CODE, 'tls-wrapper'),
+        'H': (idaapi.FF_CODE, 'tls-init'),
+        'h': (idaapi.FF_CODE, 'non-virtual-thunk'),
+        'v': (idaapi.FF_CODE, 'virtual-thunk'),
+    }
+
+    # prefixes to strip in order to get at the mangled name.
+    __prefixes = [
+        '__imp_load_',
+        '__imp_stub_',
+        '__imp__',
+        '__imp_',
+        '_imp_',
+        '__delayLoadHelper2@',
+        'j_'
+    ]
+
+    @classmethod
+    def demangle(cls, string, flags=False):
+        """Demangle the specified `string` using the given `flags`.
+
+        If the parameter `flags` is set to true, then it will return the full declaration.
+        If the parameter `flags` is set to false, then it will return the demangled name.
+        Otherwise, the `flags` will be reduced to an integer (if it isn't already) and used to demangle `string`.
+        """
+        undecorated = cls.stripped(string)
+        if not undecorated:
+            return None
+
+        # Figure out whether we're using one of the default flags.
+        if isinstance(flags, types.bool):
+            flag = functools.reduce(operator.or_, cls.__flags_declaration if flags else cls.__flags_name, 0)
+
+        # Or if we were given explicit flags that we need to use.
+        else:
+            flag = flags if isinstance(flags, types.integer) else functools.reduce(operator.or_, flags, 0)
+
+        # Now we can actually demangle the undecorated string.
+        Fdemangle_name = idaapi.demangle_name2 if hasattr(idaapi, 'demangle_name2') else idaapi.demangle_name
+        res = Fdemangle_name(utils.string.to(undecorated), flag)
+        return utils.string.of(res) or None
+
+    @classmethod
+    def stripped(cls, string):
+        '''Strip all prefixes and suffixes that are unrelated to the unmangled string.'''
+        string, changed = string or '', True
+        while changed:
+            changed = False
+            while string[:1] == '.':
+                string, changed = string[1:], True
+            for prefix in cls.__prefixes:
+                if string.startswith(prefix):
+                    string, changed = string[len(prefix):], True
+                    break
+                continue
+            continue
+
+        # strip the numeric suffix added by the disassembler to make it unique.
+        trimmed = string.rstrip('0123456789')
+        if trimmed == string:
+            return string
+        elif trimmed[-1:] == '_':
+            return trimmed[:-1]
+        return string
+
+    @classmethod
+    def scheme(cls, string):
+        '''Return the type of mangling for the specified `string`.'''
+        undecorated = cls.stripped(string)
+        if not undecorated:
+            return 'unknown'
+        elif undecorated[0] == '?':
+            return 'microsoft'
+        elif undecorated.startswith('_Z') or undecorated.startswith('__Z'):
+            return 'itanium'
+        elif undecorated.startswith('_R'):
+            return 'rust'
+        elif undecorated.startswith('_$s') or undecorated.startswith('$s') or undecorated.startswith('$S'):
+            return 'swift'
+        return 'unknown'
+
+    @classmethod
+    def operator(cls, string):
+        '''Decode the operator identity from the specified mangled `string`.'''
+        undecorated = cls.stripped(string)
+        if undecorated.startswith(('_Z', '__Z')):
+            return cls.__itanium_operator(undecorated)
+        if not undecorated.startswith('??'):
+            return 'plain', None
+        remaining = undecorated[2:]
+        if remaining.startswith('$?'):
+            body = remaining[2:]
+            if body.startswith('_'):
+                label = cls.__operator_microsoft_underscored.get(body[1 : 2])
+            else:
+                label = cls.__operator_microsoft_single.get(body[:1])
+            return cls.__operator_information('template-operator', label)
+        if remaining.startswith('$'):
+            return 'template-function', None
+        if remaining.startswith('__'):
+            label = cls.__operator_microsoft_dunderscored.get(remaining[2 : 3])
+            return cls.__operator_information('special', label)
+        if remaining.startswith('_'):
+            label = cls.__operator_microsoft_underscored.get(remaining[1 : 2])
+            return cls.__operator_information('special', label)
+        label = cls.__operator_microsoft_single.get(remaining[:1])
+        return cls.__operator_information('operator', label)
+
+    @classmethod
+    def __itanium_operator(cls, string):
+        '''Decode the operator identity from the itanium encoding in the specified mangled `string`.'''
+        default, body = (~idaapi.FF_DATA, 0), string[3:] if string.startswith('__Z') else string[2:]
+
+        if body.startswith('GV'):
+            return 'special', 'guard-variable'
+        elif body.startswith('GR'):
+            return 'special', 'reference-temporary'
+        elif body[:1] != 'T':
+            pass
+        elif cls.__itanium_data_kinds.get(body[1 : 2], default)[0] == idaapi.FF_DATA:
+            flag, kind = cls.__itanium_data_kinds[body[1]]
+            return 'special', kind
+
+        if body[:1] == 'T' and body[1 : 2] in {'h', 'v', 'c'}:
+            index, length = 2, len(body)
+            while index < length:
+                position = scan = index + 1 if body[index : index + 1] == 'n' else index
+                while scan < length and body[scan].isdigit():
+                    scan += 1
+                if scan > position and body[scan : scan + 1] == '_':
+                    index = scan + 1
+                else:
+                    break
+                continue
+            body = body[index:]
+
+        if body[:1] == 'Z':
+            body = cls.__skip_local_entity(body)
+
+        if body.startswith('N'):
+            nested = body[1:]
+            while nested[:1] in {'r', 'V', 'K', 'R', 'O'}:
+                nested = nested[1:]
+            body = nested
+
+        index, length = 0, len(body)
+        while index < length:
+            character = body[index]
+            if character == 'E':
+                break
+            elif character.isdigit():
+                index = cls.__skip_template_group(body, cls.__skip_source_name(body, index))
+                continue
+            elif character == 'S':
+                index = cls.__skip_template_group(body, cls.__skip_substitution(body, index))
+                continue
+            elif character == 'T':
+                index = cls.__skip_template_group(body, cls.__skip_template_parameter(body, index))
+                continue
+            elif character == 'I':
+                index = cls.__skip_template_group(body, index)
+                continue
+            elif character == 'U' and body[index + 1 : index + 2] == 'l':
+                index = cls.__skip_closure(body, index)
+                continue
+            elif character == 'C' and index + 1 < length and body[index + 1].isdigit():
+                return 'constructor', 'constructor'
+            elif character == 'C' and index + 1 < length and body[index + 1] == 'I':
+                return 'constructor', 'constructor'
+            elif character == 'D' and index + 1 < length and body[index + 1].isdigit():
+                return 'destructor', 'destructor'
+            elif body[index : index + 2] in cls.__operator_itanium:
+                key = body[index : index + 2]
+                operator = cls.__operator_itanium[key]
+                if operator == 'operator<cast>':
+                    return 'cast', None
+                return 'operator', operator
+            break
+        return 'plain', None
+
+    @classmethod
+    def __skip_source_name(cls, body, index):
+        '''Skip the template name in the specified `body` from the given `index`.'''
+        length, start = len(body), index
+        while index < length and body[index].isdigit():
+            index += 1
+        if index == start:
+            return start
+        index += int(body[start : index])
+        while index < length and body[index] == 'B':
+            next = index + 1
+            while next < length and body[next].isdigit():
+                next += 1
+            if next == index + 1:
+                break
+            index = next + int(body[index + 1 : next])
+        return index
+
+    __itanium_characters = frozenset('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+    __numeric_characters = frozenset('0123456789')
+    @classmethod
+    def __skip_template_parameter(cls, body, index):
+        '''Skip the template-parameter in the specified `body` from the given `index`.'''
+        length, index = len(body), index + 1
+        if body[index : index + 1] in {'s', 't', 'T', 'p', 'l'}:
+            index += 1
+        while index < length and body[index] in cls.__itanium_characters:
+            index += 1
+        if body[index : index + 1] == '_':
+            index += 1
+        return index
+
+    @classmethod
+    def __skip_substitution(cls, body, index):
+        '''Skip the substitution-token in the specified `body` from the given `index`.'''
+        character, length = body[index + 1 : index + 2], len(body)
+        if character == '_':
+            return index + 2
+        if character in cls.__itanium_characters:
+            index += 1
+            while index < length and body[index] in cls.__itanium_characters:
+                index += 1
+            return index + 1
+        return index + 2
+
+    @classmethod
+    def __skip_template_group(cls, body, index):
+        '''Skip the template argument group in the specified `body` from the given `index`.'''
+        length = len(body)
+        if index >= length or body[index] != 'I':
+            return index
+        index += 1
+        while index < length and body[index] != 'E':
+            skip = cls.__skip_argument(body, index)
+            index = index + 1 if skip <= index else skip
+        return index + 1 if index < length else index
+
+    @classmethod
+    def __skip_to_expression_sentinel(cls, body, index):
+        '''Skip to the expression sentinel in the specified `body` from the given `index`.'''
+        length = len(body)
+        while index < length and body[index] != 'E':
+            skip = cls.__skip_argument(body, index)
+            index = index + 1 if skip <= index else skip
+        return index + 1 if index < length else index
+
+    @classmethod
+    def __skip_nested(cls, body, index):
+        '''Skip the nested name in the specified `body` from the given `index`.'''
+        length, index = len(body), index + 1
+        while index < length and body[index] in {'r', 'V', 'K', 'R', 'O'}:
+            index += 1
+        while index < length and body[index] != 'E':
+            character = body[index]
+            if character.isdigit():
+                index = cls.__skip_template_group(body, cls.__skip_source_name(body, index))
+            elif character == 'S':
+                index = cls.__skip_template_group(body, cls.__skip_substitution(body, index))
+            elif character == 'T':
+                index = cls.__skip_template_group(body, cls.__skip_template_parameter(body, index))
+            elif character == 'I':
+                index = cls.__skip_template_group(body, index)
+            elif character == 'U' and body[index + 1 : index + 2] == 'l':
+                index = cls.__skip_closure(body, index)
+            elif character == 'C' and body[index + 1 : index + 2] and body[index + 1] in ({'I'} | cls.__numeric_characters):
+                index += 2
+            elif character == 'D' and body[index + 1 : index + 2] in cls.__numeric_characters:
+                index += 2
+            elif body[index : index + 2] in cls.__operator_itanium:
+                index += 2
+            else:
+                index += 1
+        return index + 1 if index < length else index
+
+    @classmethod
+    def __skip_closure(cls, body, index):
+        '''Skip the closure-type in the specified `body` from the given `index`.'''
+        length, index = len(body), cls.__skip_to_expression_sentinel(body, index + 2)
+        while index < length and body[index].isdigit():
+            index += 1
+        if body[index : index + 1] == '_':
+            index += 1
+        return index
+
+    @classmethod
+    def __skip_local_scope(cls, body, index):
+        '''Skip the local-scope entity in the specified `body` from the given `index`.'''
+        length, index = len(body), index + 1
+        character = body[index : index + 1]
+        if character == 'N':
+            index = cls.__skip_nested(body, index)
+        elif character.isdigit():
+            index = cls.__skip_template_group(body, cls.__skip_source_name(body, index))
+        elif character == 'S':
+            index = cls.__skip_template_group(body, cls.__skip_substitution(body, index))
+        elif character == 'L':
+            index = cls.__skip_argument(body, index)
+        while index < length and body[index] != 'E':
+            next = cls.__skip_argument(body, index)
+            index = index + 1 if next <= index else next
+        return index + 1 if index < length else index
+
+    @classmethod
+    def __skip_local_entity(cls, body):
+        '''Skip the local entity in the specified `body`.'''
+        while body[:1] == 'Z':
+            body = body[cls.__skip_local_scope(body, 0):]
+        return body
+
+    @classmethod
+    def __skip_local_name(cls, body, index):
+        '''Skip the local name in the specified `body` from the given `index`.'''
+        length, index = len(body), cls.__skip_local_scope(body, index)
+        if body[index : index + 1] == 's':
+            index = index + 1
+        else:
+            index = cls.__skip_argument(body, index)
+
+        if body[index : index + 1] != '_':
+            return index
+
+        index += 1
+        while index < length and body[index].isdigit():
+            index += 1
+        return index
+
+    @classmethod
+    def __skip_argument(cls, body, index):
+        '''Skip the template-argument in the specified `body` from the given `index`.'''
+        length, character = len(body), body[index : index + 1]
+        if character == '' or character == 'E':
+            return index
+        elif character in {'P', 'R', 'O', 'K', 'V', 'r', 'C', 'G'}:
+            return cls.__skip_argument(body, index + 1)
+        elif character.isdigit():
+            return cls.__skip_template_group(body, cls.__skip_source_name(body, index))
+        elif character == 'N':
+            return cls.__skip_nested(body, index)
+        elif character == 'S':
+            return cls.__skip_template_group(body, cls.__skip_substitution(body, index))
+        elif character == 'I':
+            return cls.__skip_template_group(body, index)
+        elif character == 'Z':
+            return cls.__skip_local_name(body, index)
+        elif character == 'U' and body[index + 1 : index + 2] == 'l':
+            return cls.__skip_closure(body, index)
+        elif character == 'T':
+            return cls.__skip_template_group(body, cls.__skip_template_parameter(body, index))
+        elif character == 'L':
+            index += 1
+            if body[index : index + 2] == '_Z' or body[index : index + 3] == '__Z':
+                index = cls.__skip_argument(body, index)
+            else:
+                index = cls.__skip_argument(body, index)
+            while index < length and body[index] != 'E':
+                index += 1
+            return index + 1 if index < length else index
+        elif character == 'X':
+            return cls.__skip_to_expression_sentinel(body, index + 1)
+        elif character == 'J':
+            return cls.__skip_to_expression_sentinel(body, index + 1)
+        elif character == 'F':
+            index += 1
+            if body[index : index + 1] == 'Y':
+                index += 1
+            return cls.__skip_to_expression_sentinel(body, index)
+        elif character == 'A':
+            index += 1
+            while index < length and body[index] != '_':
+                index += 1
+            return cls.__skip_argument(body, index + 1)
+        elif character == 'M':
+            return cls.__skip_argument(body, cls.__skip_argument(body, index + 1))
+        elif character == 'U':
+            return cls.__skip_argument(body, cls.__skip_source_name(body, index + 1))
+        elif character == 'D' and body[index + 1 : index + 2] == 'p':
+            return cls.__skip_argument(body, index + 2)
+        elif character == 'D' and body[index + 1 : index + 2] in 'tT':
+            return cls.__skip_to_expression_sentinel(body, index + 2)
+        elif character == 'D':
+            return index + 2
+        return index + 1
+
+    @classmethod
+    def __operator_information(cls, kind, label):
+        '''Distinguish the operator type from the specified `kind` and `label`.'''
+        if label == 'constructor':
+            return 'constructor', label
+        elif label == 'destructor':
+            return 'destructor', label
+        elif label == 'operator<cast>':
+            return 'cast', None
+        elif kind == 'template-operator':
+            return 'template-operator', label
+        elif label is None:
+            return 'special', label
+        elif label.startswith('operator'):
+            return 'operator', label
+        return 'special', label
+
+    @classmethod
+    def classify(cls, ea, string):
+        '''Classify the mangled `string` at the address specified by `ea` and return it as a tuple.'''
+        if not string:
+            return 'unknown', idaapi.FF_UNK, 'unknown'
+        undecorated = cls.stripped(string)
+        if not undecorated:
+            return 'unknown', idaapi.FF_UNK, 'unknown'
+        if undecorated and undecorated[0] == '?':
+            return cls.__classify_microsoft(string, undecorated)
+        if undecorated.startswith('_Z') or undecorated.startswith('__Z'):
+            return cls.__classify_itanium(string, undecorated)
+        if undecorated.startswith('_R'):
+            return 'rust', idaapi.FF_CODE, 'rust-symbol'
+        if undecorated.startswith('_$s') or undecorated.startswith('$s') or undecorated.startswith('$S'):
+            return 'swift', idaapi.FF_CODE, 'swift-symbol'
+        return 'unknown', idaapi.FF_UNK, 'unknown'
+
+    @classmethod
+    def __classify_microsoft(cls, original, string):
+        '''Classify the specified microsoft-mangled `string`.'''
+        if string.startswith('??'):
+            kind, operator = cls.operator(original)
+            if kind == 'template-function':
+                return 'microsoft', idaapi.FF_CODE, 'template-function'
+            elif kind == 'special' and operator in cls.__microsoft_data_kinds:
+                return 'microsoft', idaapi.FF_DATA, operator.replace(' ', '-') if operator else 'special'
+            elif kind == 'special':
+                return 'microsoft', idaapi.FF_CODE, operator.replace(' ', '-') if operator else 'special'
+            elif kind == 'cast':
+                return 'microsoft', idaapi.FF_CODE, 'cast'
+            elif kind == 'template-operator':
+                return 'microsoft', idaapi.FF_CODE, 'templated-operator'
+            return 'microsoft', idaapi.FF_CODE, kind
+        elif string.endswith('Z'):
+            return 'microsoft', idaapi.FF_CODE, 'function'
+        return 'microsoft', idaapi.FF_DATA, 'data'
+
+    @classmethod
+    def __classify_itanium(cls, original, string):
+        '''Classify the specified itanium-mangled `string`.'''
+        remaining = string[3:] if string.startswith('__Z') else string[2:]
+        if remaining.startswith('GV'):
+            return 'itanium', idaapi.FF_DATA, 'guard-variable'
+        elif remaining.startswith('GR'):
+            return 'itanium', idaapi.FF_DATA, 'reference-temporary'
+        elif remaining.startswith('GTt'):
+            return 'itanium', idaapi.FF_CODE, 'transaction-clone'
+        elif remaining.startswith('T') and len(remaining) > 1 and remaining[1] in cls.__itanium_data_kinds:
+            flag, kind = cls.__itanium_data_kinds[remaining[1]]
+            return 'itanium', flag, kind
+        return 'itanium', idaapi.FF_CODE, 'function'
