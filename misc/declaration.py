@@ -877,7 +877,7 @@ class nested(object):
     @classmethod
     def reversedselection(cls, string, range, segments):
         '''Return the specified `range` and `segments` translated for the reversed version of the given `string`.'''
-        (start, stop) = range if isinstance(range, tuple) else (0, len(string) if hasattr(string, '__len__') else string)
+        (start, stop) = range if isinstance(range, tuple) and range else (0, len(string) if hasattr(string, '__len__') else string)
         result, point = [], len(string)
         for left, right in segments:
             result.append((point - right, point - left))
@@ -1081,7 +1081,7 @@ class nested(object):
     @classmethod
     def split(cls, string, range, segments, tokens={}):
         '''Use the `range` and `segments` associated with `string` to yield each selection that is delimited by any of the given `tokens`.'''
-        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         if not(start <= stop):
             raise internal.exceptions.InvalidParameterError(u"{:s}.split({!r}, {!s}, {!s}, tokens={!r}) : An invalid range {!s} was specified as a parameter.".format('.'.join([__name__, cls.__name__]), string, "{:d}..{:d}".format(*range), "{!s}".format(segments or []), tokens, "{:d}..{:d}".format(*range)))
         result = []
