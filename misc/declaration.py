@@ -4758,6 +4758,31 @@ class mangled(object):
         'unsigned long long': 'uq',
     }
 
+    # Mapping of type codes back to their corresponding types.
+    _TYPECODE_UNSPELL = {
+        'v': 'void', 'b': 'bool',
+        'f': 'float', 'd': 'double', 'g': 'long double',
+
+        'cb': 'char',
+        'cw': 'wchar_t',
+        'ci': 'char32_t',
+
+        '_b': '__int8',
+        '_w': 'short',
+        '_i': 'int',
+        '_q': '__int64',
+
+        'sb': 'signed char',
+        'sw': 'signed short',
+        'si': 'signed int',
+        'sq': 'signed __int64',
+
+        'ub': 'unsigned char',
+        'uw': 'unsigned short',
+        'ui': 'unsigned int',
+        'uq': 'unsigned __int64',
+    }
+
     # create a regular expression for matching all of the available qualifiers.
     __typecode_qualifiers = [
         'const', 'volatile', '__ptr32', '__ptr64', '__restrict', '__unaligned',
@@ -4766,8 +4791,9 @@ class mangled(object):
     ]
     _TYPECODE_QUALIFIERS = re.compile(r"\b(?:{:s})\b".format('|'.join(__typecode_qualifiers)))
 
-    # strip all of the matching type codes from a mangled name.
+    # strip or decode the matching codes from a mangled name.
     _STRIP_TYPECODES = re.compile(r'^(\$O\$\d+_[0-9a-f]{8})\$.*\$o\$$', re.S)
+    _DECODE_TYPECODES = re.compile(r'\$O\$\d+_[0-9a-f]{8}\$(.*)\$o\$\Z', re.S)
 
     @classmethod
     def encode(cls, text):
@@ -5184,6 +5210,167 @@ class mangled(object):
         return ''.join(result)
 
     @classmethod
+    def __decode_marker(cls, codes, index):
+        '''Find the marker in the specified `codes` from the given index and then return them.'''
+        close = codes.find('$', index + 1)
+        if close < 0:
+            return '', len(codes)
+        return codes[index + 1 : close], close + 1
+
+    @classmethod
+    def __decode_qualifiers(cls, codes, index):
+        '''Decode the qualifiers from the specified type `codes` at the given index.'''
+        length = len(codes)
+        const = 1 if index < length and codes[index] == 'K' else 0
+        index = index + const
+        volatile = 1 if index < length and codes[index] == 'V' else 0
+        index = index + volatile
+
+        # count the number of pointers that were encoded.
+        pointer = 0
+        while index < length and codes[index] == 'P':
+            pointer, index = pointer + 1, index + 1
+
+        # now we need to figure out the reference type and then return
+        # everything that we've successfully decoded.
+        if codes[index : index + 2] == 'RR':
+            reference, index = '&&', index + 2
+        elif index < length and codes[index] == 'R':
+            reference, index = '&', index + 1
+        else:
+            reference = ''
+        return (const, volatile, pointer, reference), index
+
+    @classmethod
+    def __decode_parameter_type(cls, codes, index):
+        '''Decode the parameter type in `codes` from the given `index`.'''
+        return cls.__decode_general_type(codes, index, False)
+
+    @classmethod
+    def __decode_template_type(cls, codes, index):
+        '''Decode the template type in `codes` from the given `index`.'''
+        return cls.__decode_general_type(codes, index, True)
+
+    @classmethod
+    def __decode_general_type(cls, codes, index=0, template=False):
+        '''Decode the general type in `codes` from the given `index`.'''
+        length = len(codes)
+
+        # if we encountered an empty template slot, then this is an ellipsis.
+        if codes[index : index + 2] == '__':
+            return ('' if template else '...'), index + 2
+
+        # read the leading qualifiers before we figure out what the core type is.
+        (const, volatile, pointer, reference), index = cls.__decode_qualifiers(codes, index)
+        decoration = ['*' * pointer, reference]
+        prefix = ['const ' if const else '', 'volatile ' if volatile else '']
+        suffix = " {:s}".format(''.join(decoration)) if any(decoration) else ''
+
+        # if we couldn't find a marker, then it's just a regular scalar type.
+        if index >= length:
+            return None, index
+
+        # check if it's a regular type, and then go ahead and decode it.
+        elif codes[index] != '$':
+            width = 2 if codes[index] in {'_', 's', 'u', 'c'} else 1
+            if codes[index : index + width] in cls._TYPECODE_UNSPELL:
+                coded = codes[index : index + width]
+                spelled = cls._TYPECODE_UNSPELL[coded]
+                return ''.join(itertools.chain(prefix, spelled, [suffix])), index + width
+            return None, index + width
+
+        # otherwise, read the marker so that we can figure it out.
+        marker, index = cls.__decode_marker(codes, index)
+
+        # the "$n$" marker is arbitrary name that could include a potential
+        # template specifier that we'll need to check for. once we find the
+        # starting marker, we need to scan for the trailing marker.
+        if marker == 'n':
+            close = codes.find('$N$', index)
+            if close < 0:
+                return None, length
+
+            # now we can try and decode the name out of it.
+            name = cls.decode(codes[index : close])
+            index = close + len('$N$')
+
+            # if our next marker is "$tp", then this is a template specifier and
+            # we will need to decode our template arguments out of it.
+            if codes[index : index + 3] == '$tp':
+                marker, index = cls.__decode_marker(codes, index)
+                count = int(marker[2:]) if marker[2:].isdigit() else 0
+
+                # decode each of the template arguments.
+                arguments = []
+                for item in range(count):
+                    argument, index = cls.__decode_template_type(codes, index)
+                    if argument is None:
+                        return None, index
+                    arguments.append(argument)
+
+                # now we decode the marker and format it back into a template.
+                marker, index = cls.__decode_marker(codes, index)
+                name = "{:s}<{:s}>".format(name, ', '.join(arguments))
+            return ''.join(itertools.chain(prefix, [name, suffix])), index
+
+        # if we got the "$fn" marker, then this is just a function type with the
+        # number of parameters that we'll need to decode.
+        elif marker[:2] == 'fn':
+            count = int(marker[2:]) if marker[2:].isdigit() else 0
+
+            # a function type always has a result that comes first.
+            result, index = cls.__decode_parameter_type(codes, index)
+            if result is None:
+                return None, index
+
+            # then we can decode each of the parameters that follow it.
+            parameters = []
+            for item in range(count - 1):
+                parameter, index = cls.__decode_parameter_type(codes, index)
+                if parameter is None:
+                    return None, index
+                parameters.append(parameter)
+
+            # scan for the next marker within the specified codes.
+            marker, index = cls.__decode_marker(codes, index)
+
+            # glue the parameter types back together and return them.
+            declarator = ['*' * pointer, ' const' if const else '', reference]
+            wrapped = "({:s})".format(''.join(declarator)) if any(declarator) else ''
+            return "{:s} {:s}({:s})".format(result, wrapped, ', '.join(parameters)), index
+
+        # if we encounter the "$ar" marker, then we have a multidimensional
+        # array that we'll need to extract the dimensions from.
+        elif marker[:2] == 'ar':
+            dimensions = [marker[2:]]
+            while codes[index : index + 3] == '$ar':
+                marker, index = cls.__decode_marker(codes, index)
+                dimensions.append(marker[2:])
+
+            # decode the element type that follows the array dimensions.
+            element, index = cls.__decode_parameter_type(codes, index)
+            if element is None:
+                return None, index
+
+            # the qualifiers are for the declaration that is cuddling the array.
+            declarator = ['*' * pointer, reference]
+            wrapped = "({:s})".format(''.join(declarator)) if any(declarator) else ''
+            brackets = ''.join("[{:s}]".format(dimension) for dimension in dimensions)
+            return "{:s} {:s}{:s}".format(element, wrapped, brackets), index
+        return None, index
+
+    @classmethod
+    def __decode_parameters(cls, codes):
+        '''Decode the specified type `codes` into a list of parameter types.'''
+        result, index, length = [], 0, len(codes)
+        while index < length:
+            piece, index = cls.__decode_parameter_type(codes, index)
+            if piece is None:
+                return None
+            result.append(piece)
+        return result
+
+    @classmethod
     def __degrade_encoding(cls, encoded, discriminator, size):
         '''Collapse the `encoded` string and `discriminator` if larger than the specified `size`.'''
         format, tail = "H{:08x}".format, discriminator
@@ -5274,3 +5461,15 @@ class mangled(object):
         if size > 0 and len(result) > size:
             result = cls.__degrade_encoding(encoded, discriminator, size)
         return result
+
+    @classmethod
+    def unparsable(cls, identifier):
+        '''Transform the specified `identifier` back to a readable but completely unparsable string.'''
+        Fmarker = identifier.find('$O$')
+        encoded = identifier[:Fmarker] if Fmarker >= 0 else identifier
+        symbol = cls.decode(encoded)
+        match = cls._DECODE_TYPECODES.search(identifier)
+        parameters = cls.__decode_parameters(match.group(1)) if match else None
+        if parameters:
+            return "{:s}({:s})".format(symbol, ', '.join(parameters))
+        return symbol
