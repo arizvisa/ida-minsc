@@ -1930,6 +1930,31 @@ class block(object):
 
     @utils.multicase()
     @classmethod
+    def size(cls):
+        '''Return the number of bytes contained by the basic block at the current address.'''
+        left_right = cls()
+        return operator.sub(*sorted(left_right)[::-1])
+    @utils.multicase(ea=types.integer)
+    @classmethod
+    def size(cls, ea):
+        '''Return the number of bytes contained by the basic block at address `ea`.'''
+        left_right = cls(ea)
+        return operator.sub(*sorted(left_right)[::-1])
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def size(cls, bb):
+        '''Return the number of bytes contained by the basic block `bb`.'''
+        left_right = cls(bb)
+        return operator.sub(*sorted(left_right)[::-1])
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def size(cls, bounds):
+        '''Return the number of bytes contained by the basic block specified by `bounds`.'''
+        left_right = cls(bounds)
+        return operator.sub(*sorted(left_right)[::-1])
+
+    @utils.multicase()
+    @classmethod
     def address(cls):
         '''Return the top address for the basic block containing the current address.'''
         return cls.address(ui.current.address(), 0)
