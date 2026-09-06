@@ -604,13 +604,13 @@ class extract(object):
         iterable = (1 + index for index, (left, right) in enumerate(segments[::-1]) if string[left] + string[left : right][-1] == '()')
         parameters_index = next(iterable)
         if not(all(string[left : right] in ignored for left, right in segments[-parameters_index:][1:])):
-            raise internal.exceptions.InvalidFormatError(u"{:s}.function_pointer({!r}, {!s}, {!r}) : An error occurred while scanning the parameters due to the string containing non-whitespace characters at its end.".format('.'.join([__name__, cls.__name__]), string, "{:d}..{:d}".format(*range) if range else range))
+            raise internal.exceptions.InvalidFormatError(u"{:s}.function_pointer({!r}, {!s}, {!r}) : An error occurred while scanning the parameters due to the string containing non-whitespace characters at its end.".format('.'.join([__name__, cls.__name__]), string, "{:d}..{:d}".format(*range) if range else range, segments))
 
         # then we continue to find the convention, pointer, and name. if we couldn't
         # find another pair of parentheses, then this is a functor and has no convention.
         pointer_index = next(iterable, parameters_index)
         if not(all(string[left : right] in ignored for left, right in segments[-pointer_index : -parameters_index:][1:])):
-            raise internal.exceptions.InvalidFormatError(u"{:s}.function_pointer({!r}, {!s}, {!r}) : An error occurred while scanning the specified string for its pointer due to the string containing non-whitespace characters before the parameters.".format('.'.join([__name__, cls.__name__]), string, "{:d}..{:d}".format(*range) if range else range))
+            raise internal.exceptions.InvalidFormatError(u"{:s}.function_pointer({!r}, {!s}, {!r}) : An error occurred while scanning the specified string for its pointer due to the string containing non-whitespace characters before the parameters.".format('.'.join([__name__, cls.__name__]), string, "{:d}..{:d}".format(*range) if range else range, segments))
 
         # next we need to skip any whitespace to find the range of the result.
         result_segments, (stop, _) = segments[:-pointer_index], segments[-pointer_index]
