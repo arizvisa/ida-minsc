@@ -4691,25 +4691,83 @@ class mangled(object):
         'managed vector destructor iterator': 'managed::__vec_dtor',
     }
 
-    # A list of tokens to parse out components of an unmangled name.
+    # A list of tokens to parse out segments from an unmangled name.
     _TOKENS = ['()', '<>', '[]', '{}', "`'", ',', ['::']]
+    _TYPE_TOKENS = ['()', '<>', '[]', '{}', "`'", ' ', ',', '*', '&', ['::']]
 
     # Regular expressions and tables for fixing unparsable operators.
     _ITANIUM_SPECIAL = re.compile(r"^\s*`[^`']* for'(.*)$", re.DOTALL)
-    _OPERATOR_GLYPH = re.compile(r'\b(operator\s*)(<=>|<<=|>>=|->\*|<<|>>|<=|>=|->|<|>)')
+    _OPERATOR_GLYPH = re.compile(r"\b({:s})({:s})".format(r'operator\s*', '|'.join(['<=>', '<<=', '>>=', r'->\*', '<<', '>>', '<=', '>=', '->', '<', '>'])))
     _GLYPH_SWAP = {ord('<'): 0x01, ord('>'): 0x02}
 
     # Characters for a name that are actually parser-safe.
     _SAFE = frozenset(itertools.chain('_', 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '0123456789'))
 
     # Tokens that should be stripped since they don't add anything useful.
-    _ELABORATED = re.compile(r'(?<![A-Za-z0-9_$])(?:class|struct|enum|union) ')
+    _ELABORATED = re.compile(r"(?<![A-Za-z0-9_$])(?:{:s}) ".format('|'.join(['class', 'struct', 'enum', 'union'])))
 
     # Translation table for filtering out non-hexadecimal digits.
     _HEXDIGITS = bytearray(map(utils.fcondition(functools.partial(operator.contains, b'0123456789abcdefABCDEF'))(utils.fidentity, utils.fconstant(0)), range(0x100)))
 
     # Tokens that represent exception types in the unmangled symbol.
-    _EXCEPTION_SPECIFICATION = re.compile(r'(?:^|\s)(?:throw|noexcept)\Z')
+    _EXCEPTION_SPECIFICATION = re.compile(r"(?:^|\s)(?:{:s})\Z".format('|'.join(['throw', 'noexcept'])))
+
+    # Mapping of types to their corresponding codes.
+    _TYPECODE_SPELL = {
+        'void': 'v',
+        'size_t': 'uq',
+        'ptrdiff_t': '_q',
+        'uintptr_t': 'uq',
+        'intptr_t': '_q',
+
+        '__int8': '_b',
+        '__int16': '_w',
+        '__int32': '_i',
+        '__int64': '_q',
+
+        'signed __int8': 'sb',
+        'signed __int16': 'sw',
+        'signed __int32': 'si',
+        'signed __int64': 'sq',
+
+        'unsigned __int8': 'ub',
+        'unsigned __int16': 'uw',
+        'unsigned __int32': 'ui',
+        'unsigned __int64': 'uq',
+
+        'bool': 'b',
+        'char': 'cb', 'char8_t': 'cb', 'char16_t': 'cw', 'char32_t': 'ci',
+        'wchar_t': 'cw',
+
+        'short': '_w', 'short int': '_w',
+        'int': '_i', 'long': '_i', 'long int': '_i', 'long long': '_q',
+        'float': 'f', 'double': 'd', 'long double': 'g',
+
+        'signed': 'si',
+        'signed char': 'sb',
+        'signed short': 'sw',
+        'signed int': 'si',
+        'signed long': 'si',
+        'signed long long': 'sq',
+
+        'unsigned': 'ui',
+        'unsigned char': 'ub',
+        'unsigned short': 'uw',
+        'unsigned int': 'ui',
+        'unsigned long': 'ui',
+        'unsigned long long': 'uq',
+    }
+
+    # create a regular expression for matching all of the available qualifiers.
+    __typecode_qualifiers = [
+        'const', 'volatile', '__ptr32', '__ptr64', '__restrict', '__unaligned',
+        '__sptr', '__uptr', '__cdecl', '__stdcall', '__thiscall', '__fastcall',
+        '__vectorcall', '__clrcall',
+    ]
+    _TYPECODE_QUALIFIERS = re.compile(r"\b(?:{:s})\b".format('|'.join(__typecode_qualifiers)))
+
+    # strip all of the matching type codes from a mangled name.
+    _STRIP_TYPECODES = re.compile(r'^(\$O\$\d+_[0-9a-f]{8})\$.*\$o\$$', re.S)
 
     @classmethod
     def encode(cls, text):
@@ -4871,7 +4929,259 @@ class mangled(object):
         '''Return the encoded `parameter` for the specified `arity`.'''
         res = parameter.encode('utf-8', 'replace')
         checksum = zlib.crc32(res) & 0XFFFFFFFF
+        typecodes = cls.__encode_parameters(parameter)
+        if typecodes:
+            return '$O${:d}_{:08x}${:s}$o$'.format(arity, checksum, typecodes)
         return '$O${:d}_{:08x}$o$'.format(arity, checksum)
+
+    @classmethod
+    def __type_groups(cls, tree, string, range=(), groups='()'):
+        '''Return a list of the segments from the given `string` and parsed `tree` that are cuddled by the specified `groups`.'''
+        start, stop = range if isinstance(range, tuple) and range else (None, len(string))
+        result, groups = [], frozenset(groups) if isinstance(groups, types.unordered) else {groups}
+        for left, right in tree.get(start, []):
+            if string[left : left + 1] + string[right - 1 : right] in groups:
+                result.append((left, right))
+            continue
+        return sorted(result)
+
+    @classmethod
+    def __type_split(cls, tree, string, range=(), separators=','):
+        '''Use the given `tree` to split the segments from the given `range` of `string` with the specified `separators`.'''
+        start, stop = range if isinstance(range, tuple) and range else (None, len(string))
+        left, right = (0, stop) if start is None else (1 + start, stop - 1)
+        result, separators = [], frozenset(separators) if isinstance(separators, types.unordered) else {separators}
+        for (left, right), _ in token.split(string, (left, right), tree.get(start, []), separators):
+            result.append(string[left : right])
+        return result
+
+    @classmethod
+    def __encode_parameter_type(cls, text):
+        '''Encode the parameter type specified by `text` into its corresponding code.'''
+        return cls.__encode_general_type(text, False)
+
+    @classmethod
+    def __encode_template_type(cls, text):
+        '''Encode the template type specified by `text` into its corresponding code.'''
+        return cls.__encode_general_type(text, True)
+
+    @classmethod
+    def __encode_general_type(cls, text, template=False):
+        '''Encode the general type specified by `text` into its corresponding code.'''
+        Fsafe_characters = functools.partial(operator.contains, cls._SAFE | {':'})
+        normalized = ' '.join(text.split())
+
+        # first split out the worthless tokens using a regex.
+        normalized = ' '.join(cls._ELABORATED.sub('', normalized).split())
+        if not normalized:
+            return '__' if template else None
+        elif normalized == '...':
+            return '__'
+
+        # next we'll parse the normalized string and split out all the groups.
+        _, tree, _ = token.parse(normalized, cls._TYPE_TOKENS)
+        parentheses = cls.__type_groups(tree, normalized, groups='()')
+        arrays = cls.__type_groups(tree, normalized, groups='[]')
+        angles = cls.__type_groups(tree, normalized, groups='<>')
+
+        # if we found any arrays, then we need to extract their dimensions.
+        if arrays:
+            dimensions, (start, stop) = [], arrays[0]
+            for left, right in arrays:
+                inner = normalized[left + 1 : right - 1]
+                if not inner.isdigit():
+                    return None
+                dimensions.append(int(inner))
+
+            # first check for any declarations from the array.
+            declarators = [(left, right) for left, right in parentheses if right <= start]
+            if declarators:
+                left, right = declarators[-1]
+                declarator = normalized[left + 1 : right - 1]
+
+                # count the asterisks for the number of pointers, and figure out
+                # the reference type that we will use for encoding the array.
+                pointers = declarator.count('*')
+                if '&&' in declarator:
+                    reference = 'r'
+                elif '&' in declarator:
+                    reference = 'l'
+                else:
+                    reference = ''
+                point = left
+
+            # if there were no declarators, then start at the very beginning.
+            else:
+                point, reference, pointers = start, '', 0
+
+            # strip the normalized string and encode the element type.
+            stripped = normalized[:point].strip()
+            element = cls.__encode_parameter_type(stripped) if stripped else None
+            if element is None:
+                return None
+
+            # connect all of the code components into the final encoded array.
+            prefix = itertools.chain('P' * pointers, {'': '', 'l': 'R', 'r': 'RR'}[reference])
+            arraycodes = ("$ar{:d}$".format(dimension) for dimension in dimensions)
+            refcode = {'': '', 'l': 'R', 'r': 'RR'}[reference]
+            return ''.join(itertools.chain(['P' * pointers, refcode], arraycodes, [element]))
+
+        # if we found any parentheses, then we have a function of some sort.
+        if parentheses:
+            start, stop = parentheses[-1]
+
+            # get the declarator from the segment for tracking the parentheses.
+            range = left, right = parentheses[-2] if len(parentheses) >= 2 else (start, start)
+            declarator = '' if operator.eq(*range) else normalized[1 + left : right - 1]
+
+            # if there is any asterisks or ampersands in the declarator, then
+            # grab the numbers so that we can map them into actual codes.
+            if '*' in declarator or '&' in declarator:
+                reference = 'r' if '&&' in declarator else ('l' if '&' in declarator else '')
+                const = 1 if re.search(r'\bconst\b', declarator) else 0
+                pointer = declarator.count('*')
+                point = left
+
+            # otherwise, use some empty defaults for the parameters.
+            else:
+                reference = ''
+                const = 0
+                pointer = 0
+                point = start
+
+            # strip the normalized string and encode it as a parameter type.
+            stripped = normalized[:point].strip()
+            result = cls.__encode_parameter_type(normalized[:point]) if stripped else None
+            if result is None:
+                return None
+
+            # grab the string inside the parentheses, and then split each
+            # parameter so that we can access its individual pieces.
+            parameters, last = [], parentheses[-1]
+            pieces = cls.__type_split(tree, normalized, last, separators=',')
+
+            # if there is only one element and it's a void, then emit its code.
+            if len(pieces) == 1 and pieces[0] in {'', 'void'}:
+                refcode = {'': '', 'l': 'R', 'r': 'RR'}[reference]
+                prefix = itertools.chain('K' if const else '', ['P' * pointer, refcode])
+                fncodes = "$fn{:d}$".format(1)
+                return ''.join(itertools.chain(prefix, [fncodes], result, parameters, ['$nf$']))
+
+            # gather all of the parameters, encoding each one, and appending it.
+            parameters = []
+            for piece in pieces:
+                code = cls.__encode_parameter_type(piece)
+                if code is None:
+                    return None
+                parameters.append(code)
+
+            # now we can combine all the parameters into an encoded function.
+            refcode = {'': '', 'l': 'R', 'r': 'RR'}[reference]
+            prefix = itertools.chain('K' if const else '', 'P' * pointer, [refcode])
+            fncode = "$fn{:d}$".format(1 + len(parameters))
+            return ''.join(itertools.chain(prefix, [fncode], result, parameters, ['$nf$']))
+
+        # if we found any angles, then we have a template specifier to do.
+        if angles:
+            start, stop = angles[0]
+            name, parameters, post = normalized[:start], normalized[start + 1 : stop - 1], normalized[stop:]
+            if re.sub(r'[*&\s]', '', cls._TYPECODE_QUALIFIERS.sub('', post)):
+                return None
+
+            qualifiers = ' '.join([name, post])
+            const = 1 if re.search(r'\bconst\b', qualifiers) else 0
+            volatile = 1 if re.search(r'\bvolatile\b', qualifiers) else 0
+
+            # strip the whitespace from the text following our templates, and
+            # then use it to figure out what type of reference it is.. if any.
+            stripped = post.rstrip()
+            if stripped.endswith('&&'):
+                reference = 'r'
+            elif stripped.endswith('&'):
+                reference = 'l'
+            else:
+                reference = ''
+
+            # now we'll go ahead and count the pointers.
+            pointer = post.count('*')
+            name = ' '.join(cls._TYPECODE_QUALIFIERS.sub(' ', name).split())
+
+            # if there is no name or it has invalid characters, then abort.
+            if not name:
+                return None
+            elif not all(map(Fsafe_characters, name)):
+                return None
+
+            # gather all of the arguments, encoding each one, and appending it.
+            arguments, first = [], angles[0]
+            for argument in cls.__type_split(tree, normalized, first, separators=','):
+                code = cls.__encode_template_type(argument) if argument.strip() else '__'
+                if code is None:
+                    return None
+                arguments.append(code)
+
+            # now we can combine all the arguments into an encoded template.
+            refcode = {'': '', 'l': 'R', 'r': 'RR'}[reference]
+            prefix = itertools.chain('K' if const else '', 'V' if volatile else '', ['P' * pointer, refcode])
+            namecode = ['$n$', cls.encode(name), '$N$']
+            anglecode = "$tp{:d}$".format(len(arguments))
+            return ''.join(itertools.chain(prefix, namecode, [anglecode], arguments, ['$pt$']))
+
+        # otherwise, we got a scalar or a name and just need to extract it. we
+        # take the trailing decorations, and extract the individual segments.
+        declaration, decorations = extract.pointer(normalized, (), tree.get(None, []))
+        (start, stop), _ = declaration
+        decoration = [normalized[left : right] for left, right in decorations]
+
+        # now we can count the qualifiers, pointers, and references.
+        const = 1 if 'const' in decoration else 0
+        volatile = 1 if 'volatile' in decoration else 0
+        pointer = decoration.count('*')
+        ampersand = decoration.count('&')
+
+        # use the ampersand count to figure out what type of reference it is.
+        if ampersand >= 2:
+            reference = 'r'
+        elif ampersand == 1:
+            reference = 'l'
+        else:
+            reference = ''
+
+        # split the qualifiers and then join it back together with spaces.
+        scalar = normalized[start : stop]
+        base = ' '.join(cls._TYPECODE_QUALIFIERS.sub(' ', scalar).split())
+
+        # calculate the reference code and the scalar prefix.
+        refcode = {'': '', 'l': 'R', 'r': 'RR'}[reference]
+        prefix = itertools.chain('K' if const else '', 'V' if volatile else '', ['P' * pointer, refcode])
+
+        # if the type can map directly to a type code, then do it.
+        if base in cls._TYPECODE_SPELL:
+            return ''.join(itertools.chain(prefix, [cls._TYPECODE_SPELL[base]]))
+
+        # otherwise, if the name has valid characters then use the name markers.
+        elif base and all(map(Fsafe_characters, base)):
+            return ''.join(itertools.chain(prefix, ['$n$', cls.encode(base), '$N$']))
+        return None
+
+    @classmethod
+    def __encode_parameters(cls, parameter):
+        '''Encode the raw inner parameter text into typecodes, or '' if any parameter can't be encoded.'''
+        stripped = parameter.strip()
+        if not stripped:
+            return ''
+        elif stripped == 'void':
+            return ''
+
+        # split the parameter string into its ","-separated components, and then
+        # encode the type of each parameter into the correct type code.
+        result, (_, tree, _) = [], token.parse(parameter, cls._TYPE_TOKENS)
+        for piece in cls.__type_split(tree, parameter, separators=','):
+            code = cls.__encode_parameter_type(piece)
+            if code is None:
+                return ''
+            result.append(code)
+        return ''.join(result)
 
     @classmethod
     def __degrade_encoding(cls, encoded, discriminator, size):
@@ -4894,6 +5204,11 @@ class mangled(object):
             return text
 
         # if we're within the given size, then we can just return it.
+        if len(encoded) + len(tail) <= size:
+            return ''.join([encoded, tail])
+
+        # now we can go and strip out the typecodes to try and meet the size.
+        tail = cls._STRIP_TYPECODES.sub(r'\1$o$', tail)
         if len(encoded) + len(tail) <= size:
             return ''.join([encoded, tail])
 
