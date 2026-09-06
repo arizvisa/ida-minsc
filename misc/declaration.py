@@ -536,6 +536,43 @@ class extract(object):
         return beginning, result
 
     @classmethod
+    def pointer(cls, string, range, segments, pointers={'*', '&'}, qualifiers={'const', 'volatile'}):
+        '''Use the given `string` with `range` and `segments` to return a tuple with the list of pointer, reference, and cv-qualifier segments.'''
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
+        decorations, ignored = pointers | qualifiers, {'', ' '}
+
+        # get the gaps for the selection we were given, and create some
+        # closures for matching the different parts for extraction.
+        segments = [item for item in token.segments((start, stop), segments)]
+        Fdecoration = lambda left, right: string[left : right] in decorations
+        Ftransparent = lambda left, right: string[left : right] in decorations or string[left : right] in ignored
+
+        # scan forwards across the segments at the beginning.
+        leading, index = [], 0
+        while index < len(segments) and Ftransparent(*segments[index]):
+            leading.append(segments[index]) if Fdecoration(*segments[index]) else leading
+            index += 1
+
+        # scan backwards across the segments from the end.
+        trailing, rindex = [], len(segments)
+        while rindex > index and Ftransparent(*segments[rindex - 1]):
+            trailing.insert(0, segments[rindex - 1]) if Fdecoration(*segments[rindex - 1]) else trailing
+            rindex -= 1
+
+        # whatever is remaining between the scan is the type, so we only need
+        # pivot the selection around those remaining segments.
+        inner = segments[index : rindex]
+        if inner:
+            (left, _), (_, right) = inner[0], inner[-1]
+            declaration = (left, right), inner
+        else:
+            left, _ = segments[index] if index < len(segments) else (stop, stop)
+            declaration = (left, left), []
+
+        # now we can return the declaration and the selected segments.
+        return declaration, leading + trailing
+
+    @classmethod
     def name_and_template(cls, string, range, segments, delimiter={'::'}, template='<>'):
         '''Use the given `range` on the trimmed `string` with `segments` to yield each component of a name delimited by `delimiter` as a tuple composed of the range for the name and its template parameters.'''
         start, stop = range if isinstance(range, tuple) and range else (0, len(string))
