@@ -777,6 +777,7 @@ class chunks(object):
         return cls.remove(func, ea)
 
 iterate = utils.alias(chunks.iterate, 'chunks')
+size = utils.alias(chunks.size, 'chunks')
 contains = utils.alias(chunks.contains, 'chunks')
 register = utils.alias(chunks.register, 'chunks')
 point = stackpoint = utils.alias(chunks.point, 'chunks')
