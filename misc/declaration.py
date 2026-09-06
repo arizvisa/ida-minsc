@@ -7,7 +7,8 @@ function and type declarations.
 TODO: Implement parsers for some of the C++ symbol manglers in order to
       query them for specific attributes or type information.
 """
-import functools, operator, itertools, logging, builtins, bisect, re, string as _string
+import functools, operator, itertools, logging, builtins
+import bisect, re, zlib, string as _string
 logging = logging.getLogger(__name__)
 
 import internal, idaapi
@@ -4512,3 +4513,412 @@ class name(object):
             flag, kind = cls.__itanium_data_kinds[remaining[1]]
             return 'itanium', flag, kind
         return 'itanium', idaapi.FF_CODE, 'function'
+
+class mangled(object):
+    """
+    This namespace interacts with a mangled string in various ways. It's primary
+    purpose, however, is to support encoding and encoding an unmangled symbol so
+    that the semantics of the demangled name is preserved for the reader, but
+    still remains a valid and unique identifier. The issue that this is aiming
+    to solve is that when a symbol name is demangled, and its name is used to
+    define a type, that type will become unparsable because of the invalid
+    character in the demangled name.
+
+    Normally we would just strip the identifiers of invalid characters, but at
+    that point things such as the operator or things named with backticks will
+    have to be replaced somehow. So, one of the features of this namespace is
+    that we normalize the operator to use valid character for an identifier,
+    and then we perform the encoding. This results in a much cleaner appearance
+    since we can exclude any special information such as template parameters or
+    similar. We also avoid the issue of there being duplicate names since a
+    template specification actually changes the type entirely.
+
+    There are three main entrypoints to the functionality provided by this
+    namespace. They are the `mangled.encode` and `mangled.decode` pair of
+    functions, and then the `mangled.parsable` function. The `mangled.parsable`
+    function is responsible for taking a mangled symbol, determining its
+    mangling scheme, demangling just its name, and then demangling its full
+    declaration (cleaning up any qualifiers that were encountered). Once the
+    full declaration is found, then the operator is extracted from it so that
+    it may be normalized prior to being encoded.
+
+    Most of this class was written with the help of Claude.
+    """
+
+    # This is our operator table that is used for mapping unparsable operators
+    # into ones that take. We try to preserve the semantics for the user.
+    __operators__ = {
+        'constructor': 'constructor',
+        'destructor': 'destructor',
+
+        'string': 'string',
+        'typeof': 'typeof',
+        'vftable': 'vftable',
+        'vbtable': 'vbtable',
+        'vtable': 'vftable',
+        'vtt': 'vtt',
+        'vcall': 'vcall',
+        'co_await': 'co_await',
+
+        'RTTI': 'rtti',
+        'RTTI Type Descriptor': 'rtti_type_descriptor',
+        'RTTI Base Class Array': 'rtti_base_array',
+        'RTTI Class Hierarchy Descriptor': 'rtti_hierarchy',
+        'RTTI Complete Object Locator': 'rtti_locator',
+
+        'typeinfo': 'typeinfo',
+        'typeinfo-name': 'typeinfo_name',
+        'guard-variable': 'guard_variable',
+        'reference-temporary': 'reference_temporary',
+        'construction-vtable': 'construction_vtable',
+
+        'operator new': 'new',
+        'operator new[]': 'new_array',
+        'operator delete': 'delete',
+        'operator delete[]': 'delete_array',
+        'placement delete closure': 'placement_delete_closure',
+        'placement delete[] closure': 'placement_delete_array_closure',
+
+        'udt returning': 'udt_returning',
+        'virtual displacement map': 'vdispmap',
+        'copy constructor closure': 'copy_constructor_closure',
+        'default constructor closure': 'default_constructor_closure',
+        'dynamic atexit destructor for': 'dynamic_atexit_',
+        'dynamic initializer for': 'initializer_',
+        'scalar deleting destructor': 'scalar_deleting_destructor',
+        'vbase destructor': 'vbase_destructor',
+        'vector constructor iterator': '__vec_ctor_iter',
+        'vector copy constructor iterator': '__vec_copy',
+        'vector deleting destructor': '__vec_dtor',
+        'vector destructor iterator': '__vec_dtor_iter',
+        'vector vbase constructor iterator': '__vec_vbase_ctor_iter',
+        'vector vbase copy constructor iterator': '__vec_copy_vb',
+
+        'operator+': 'add',
+        'operator+=': 'add_assign',
+        'operator&&': 'and',
+        'operator=': 'assign',
+        'operator&': 'band',
+        'operator&=': 'band_assign',
+        'operator~': 'bnot',
+        'operator|': 'bor',
+        'operator|=': 'bor_assign',
+        'operator^': 'bxor',
+        'operator^=': 'bxor_assign',
+        'operator()': 'call',
+        'operator<cast>': 'cast',
+        'operator,': 'comma',
+        'operator--': 'decrement',
+        'operator/': 'divide',
+        'operator/=': 'divide_assign',
+        'operator==': 'equal',
+        'operator>': 'greater',
+        'operator>=': 'greaterequal',
+        'operator++': 'increment',
+        'operator<': 'less',
+        'operator<=': 'lessequal',
+        'operator ""': 'literal',
+        'operator""': 'literal',
+        'operator*': 'multiply',
+        'operator*=': 'multiply_assign',
+        'operator!': 'not',
+        'operator!=': 'notequal',
+        'operator||': 'or',
+        'operator->': 'pointer',
+        'operator->*': 'pointer_member',
+        'operator%': 'remainder',
+        'operator%=': 'remainer_assign',
+        'operator<<': 'shiftleft',
+        'operator<<=': 'shiftleft_assign',
+        'operator>>': 'shiftright',
+        'operator>>=': 'shiftright_assign',
+        'operator<=>': 'spaceship',
+        'operator[]': 'subscript',
+        'operator-': 'subtract',
+        'operator-=': 'subtract_assign',
+        'operator?': 'ternary',
+
+        'eh vector constructor iterator': 'eh::__vec_ctor_iter',
+        'eh vector copy constructor iterator': 'eh::__vec_copy',
+        'eh vector destructor iterator': 'eh::__vec_dtor_iter',
+        'eh vector vbase constructor iterator': 'eh::__vec_base_ctor_iter',
+        'eh vector vbase copy constructor iterator': 'eh::__vec_copy_vb',
+
+        'local static guard': 'local::static_guard',
+        'local static thread guard': 'local::static_thread_guard',
+        'local vftable': 'local::vftable',
+        'local vftable constructor closure': 'local::vftable_constructor_closure',
+
+        'managed vector constructor iterator': 'managed::__vec_ctor',
+        'managed vector copy constructor iterator': 'managed::__vec_copy',
+        'managed vector destructor iterator': 'managed::__vec_dtor',
+    }
+
+    # A list of tokens to parse out components of an unmangled name.
+    _TOKENS = ['()', '<>', '[]', '{}', "`'", ',', ['::']]
+
+    # Regular expressions and tables for fixing unparsable operators.
+    _ITANIUM_SPECIAL = re.compile(r"^\s*`[^`']* for'(.*)$", re.DOTALL)
+    _OPERATOR_GLYPH = re.compile(r'\b(operator\s*)(<=>|<<=|>>=|->\*|<<|>>|<=|>=|->|<|>)')
+    _GLYPH_SWAP = {ord('<'): 0x01, ord('>'): 0x02}
+
+    # Characters for a name that are actually parser-safe.
+    _SAFE = frozenset(itertools.chain('_', 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '0123456789'))
+
+    # Tokens that should be stripped since they don't add anything useful.
+    _ELABORATED = re.compile(r'(?<![A-Za-z0-9_$])(?:class|struct|enum|union) ')
+
+    # Translation table for filtering out non-hexadecimal digits.
+    _HEXDIGITS = bytearray(map(utils.fcondition(functools.partial(operator.contains, b'0123456789abcdefABCDEF'))(utils.fidentity, utils.fconstant(0)), range(0x100)))
+
+    # Tokens that represent exception types in the unmangled symbol.
+    _EXCEPTION_SPECIFICATION = re.compile(r'(?:^|\s)(?:throw|noexcept)\Z')
+
+    @classmethod
+    def encode(cls, text):
+        '''Encode the unmangled string from the specified `text` into a parsable identifier.'''
+        text = cls._ELABORATED.sub('', text)
+        result, index, length = [], 0, len(text)
+        tokens = {'<': '$tp$', '>': '$pt$', ',': '$C$', '$': '$S$'}
+        while index < length:
+            character = text[index]
+            if character in cls._SAFE:
+                input = output = character
+            elif text[index:index + 2] == '::':
+                input = output = '::'
+            elif character in tokens:
+                input, output = character, tokens[character]
+            else:
+                input, output = character, '$H{:02x}$'.format(ord(character) & 0xff)
+            index, _ = index + len(input), result.append(output)
+        return ''.join(result)
+
+    @classmethod
+    def decode(cls, identifier):
+        '''Decode the encoded string specified by `identifier` back to its unmangled name.'''
+        result, index, length = [], 0, len(identifier)
+        tokens = {'tp': '<', 'pt': '>', 'A': '<', 'a': '>', 'C': ',', 'S': '$'}
+        while index < length:
+            if identifier[index] != '$':
+                index, _ = index + 1, result.append(identifier[index])
+                continue
+            close = identifier.find('$', index + 1)
+            code = identifier[index + 1 : close]
+            if close <= index:
+                next, output = index + 1, '$'
+            elif code in tokens:
+                next, output = close + 1, tokens[code]
+            elif code[:1] == 'H' and len(code) == 3:
+                selected = code[1:]
+                if selected.translate(cls._HEXDIGITS) == selected:
+                    next_output = close + 1, chr(int(selected, 16))
+                else:
+                    next_output = index + 1, '$'
+                next, output = next_output
+            else:
+                next, output = index + 1, '$'
+            index, _ = next, result.append(output)
+        return ''.join(result)
+
+    @classmethod
+    def __split_namespace(cls, tree, string, range=()):
+        '''Split the given "::"-delimited string using the specified parse `tree`.'''
+        splitted = token.split(string, range, tree.get(None, []), {'::'})
+        iterable = itertools.chain(*(token.segments(range) for range, _ in splitted))
+        return [string[left : right] for left, right in iterable]
+
+    @classmethod
+    def __parameter_arity(cls, tree, string, range=()):
+        '''Use the specified `tree` to return the number of parameters from the given `range` of `string`.'''
+        left, right = range if isinstance(range, tuple) and range else (0, len(string))
+        inner = string[left + 1 : right - 1].strip()
+        if inner and inner != 'void':
+            pieces = extract.parameters(tree, string, range)
+            return sum(1 for (left, right), _ in pieces if string[left : right].strip())
+        return 0
+
+    @classmethod
+    def __operator_map(cls, operator, terminal):
+        '''Return the label for the specified `operator` or `terminal` if no operator was provided.'''
+        kind, identifier = operator
+        if kind in {'constructor', 'destructor'}:
+            return cls.__operators__[kind]
+        elif kind == 'cast':
+            stripped = terminal.strip()
+            if stripped.startswith('operator_cast'):
+                return cls.encode(stripped)
+            trimmed = stripped[len('operator'):].strip() if stripped.startswith('operator') else stripped
+            substituted = re.sub(r'(?:\s+(?:const|volatile)|\s*&&?|\s*__ptr\d+)+$', '', trimmed).strip()
+            result = "operator_cast_{:s}".format(cls.encode(substituted)) if substituted else 'operator_cast'
+        elif kind in {'operator', 'template-operator'}:
+            result = "operator_{:s}".format(identifier or cls.encode(terminal))
+        elif (kind, identifier) == ('special', 'rtti'):
+            return cls.__rtti_map(terminal)
+        elif kind in {'special'}:
+            base = identifier or cls.encode(terminal)
+            match = re.search(r'\{[^{}]*\}', terminal) or re.search(r"'[^']+'", terminal)
+            matched = terminal[1 + match.start() : match.end() - 1] if match else ''
+            result = "{:s}{:s}".format(base, cls.encode(matched))
+        else:
+            result = None
+        return result
+
+    @classmethod
+    def __rtti_map(cls, terminal):
+        '''Return the encoded identifier for the specified RTTI terminal.'''
+        match = re.search(r"`([^`']*)'", terminal)
+        prefix = terminal[:match.start()].strip() if match else ''
+        label = match.group(1) if match else terminal
+        offset = re.search(r'[Bb]ase [Cc]lass [Dd]escriptor at \(([^)]*)\)', label)
+        if offset:
+            res = 'rtti_base_descriptor_' + re.sub(r'[^0-9a-z]+', '_', offset.group(1)).strip('_')
+        else:
+            res = cls.__operators__.get(label, 'rtti')
+        return '::'.join([cls.encode(prefix), res]) if prefix else res
+
+    @classmethod
+    def __itanium_special_map(cls, label, name, mangled=''):
+        '''Return the encoded `label` for the itanium `mangled` symbol or the operator specified by `name`.'''
+        match = cls._ITANIUM_SPECIAL.match(name) if name else None
+        matched = match.group(1).strip() if match else None
+        if not matched:
+            packed = mangled or name or ''
+            checksum = zlib.crc32(packed.encode('utf-8', 'replace')) & 0XFFFFFFFF
+            return '{:s}_{:08x}'.format(label or 'special', checksum)
+
+        # if we matched a special, then parse it and split out the namespace.
+        _, tree, _ = token.parse(matched, cls._TOKENS)
+        names = cls.__split_namespace(tree, matched, ())
+        if not names:
+            return label or 'special'
+
+        # now we can reattach the label to the namespace we split up.
+        iterable = map(cls.encode, names)
+        return '::'.join(filter(None, itertools.chain(iterable, [label or 'special'])))
+
+    @classmethod
+    def __qualified_name(cls, name, operator, scheme, mangled=''):
+        '''Return the encoded qualified `name` and `operator` for the specified `scheme` targetting the given `mangled` symbol.'''
+        if not operator:
+            return cls.encode(name)
+
+        # figure out how to process the qualified name for the given operator.
+        kind, label = operator
+        if kind in ('plain', 'template-function'):
+            return cls.encode(name)
+
+        # if it's a special itanium operator, then we're in the wrong function.
+        elif (scheme, kind) == ('itanium', 'special'):
+            return cls.__itanium_special_map(label, name, mangled)
+
+        # otherwise, we go ahead and parse the name out.
+        _, tree, _ = token.parse(name, cls._TOKENS)
+        names = cls.__split_namespace(tree, name, ())
+        terminal = names[-1] if names else name
+
+        # then we map it into a label that can be parsed.
+        label = cls.__operator_map(operator, terminal)
+        if label is None:
+            return cls.encode(name)
+
+        # if there aren't any name components, then return just the label.
+        elif not names[:-1]:
+            return label
+
+        # select out the trailing name from our names, and sub it for the label.
+        iterable = map(cls.encode, names[:-1])
+        return '::'.join(itertools.chain(iterable, [label]))
+
+    @classmethod
+    def __discriminator(cls, parameter, arity):
+        '''Return the encoded `parameter` for the specified `arity`.'''
+        res = parameter.encode('utf-8', 'replace')
+        checksum = zlib.crc32(res) & 0XFFFFFFFF
+        return '$O${:d}_{:08x}$o$'.format(arity, checksum)
+
+    @classmethod
+    def __degrade_encoding(cls, encoded, discriminator, size):
+        '''Collapse the `encoded` string and `discriminator` if larger than the specified `size`.'''
+        format, tail = "H{:08x}".format, discriminator
+
+        # define a closure for encoding a matched template group.
+        def Fmatch(match):
+            '''Encode each matching template group into a CRC32.'''
+            matched = match.group(1).encode()
+            res = zlib.crc32(matched) & 0xFFFFFFFF
+            return '$V${:08x}$v$'.format(res)
+
+        # recursively collapse a template group by encoding it with `Fmatch`.
+        def Fcollapse(text):
+            '''Collapse each template group by recursively culling them.'''
+            pattern = re.compile(r'\$tp\d*\$((?:(?!\$tp\d*\$|\$pt\$).)*)\$pt\$')
+            while pattern.search(text):
+                text = pattern.sub(Fmatch, text)
+            return text
+
+        # if we're within the given size, then we can just return it.
+        if len(encoded) + len(tail) <= size:
+            return ''.join([encoded, tail])
+
+        # we're not within the size, so we need to collapse the encoding.
+        length, encoded = len(format(0)), Fcollapse(encoded)
+        room = size - len(tail)
+        if room >= len(encoded):
+            return encoded + tail
+        elif room >= length:
+            res = zlib.crc32(encoded.encode()) & 0xFFFFFFFF
+            suffix = encoded[length - room:]
+            return ''.join([format(res), suffix if room > length else '', tail])
+        elif room > 0:
+            suffix = encoded[-room:]
+            return suffix + tail
+        return tail
+
+    @classmethod
+    def parsable(cls, symbol, size=0):
+        '''Transform the given `symbol` to the required characters up to the maximum `size` for it to be parseable without complaints.'''
+        scheme = name.scheme(symbol) if symbol else None
+        is_mangled = scheme in {'microsoft', 'msvc', 'itanium'}
+        Funglyph = lambda match: ''.join([match.group(1), match.group(2).translate(cls._GLYPH_SWAP)])
+
+        # Unmangle the symbol to get its name, and figure out whether it's an
+        # operator and the kind of operator that it is.
+        unmangled_name = name.demangle(symbol, False) if is_mangled else None
+        decoded = name.operator(symbol) if is_mangled else ()
+        kind, label = decoded if decoded else ('', None)
+        operator_info = (kind, cls.__operators__.get(label)) if decoded else ()
+
+        # Now that we have the unmangled name and we know if the symbol is
+        # mangled, then we figure out the signature for the symbol and parse it.
+        res = name.demangle(symbol, True) if is_mangled else None
+        signature = res or symbol or ''
+        unglyphed = cls._OPERATOR_GLYPH.sub(Funglyph, signature) if signature else ''
+        _, tree, _ = token.parse(unglyphed, cls._TOKENS) if unglyphed else (None, {}, None)
+
+        # Extract the trailing parameters if we found any. We need to exclude
+        # any exception-like things that might get in the way.
+        range = left, right = extract.enclosure(unglyphed, (), tree.get(None, []), group='()', exclude=cls._EXCEPTION_SPECIFICATION) if unglyphed else (0, 0)
+        parameters = None if operator.eq(*range) else unglyphed[1 + left : right - 1]
+
+        # If we couldn't demangle a name, then we need to fall back to somethin.
+        if not unmangled_name:
+            unmangled_name = signature[:left].rstrip() if parameters else signature
+        if not unmangled_name:
+            unmangled_name = name.stripped(symbol) if is_mangled else (symbol or '')
+
+        # Now we can encode the fully-qualified name including the transformed
+        # operator, and falling back to the specified symbol if nothing else
+        encoded = cls.__qualified_name(unmangled_name, operator_info, scheme, symbol)
+
+        # If there was a parameter list, then encode a discriminator so that the
+        # number of parameters can be distinguished.
+        if parameters:
+            discriminator = cls.__discriminator(parameters, cls.__parameter_arity(tree, unglyphed, range))
+        else:
+            discriminator = ''
+
+        # Last thing is to verify that the encoded symbol fits within the size.
+        result = encoded + discriminator
+        if size > 0 and len(result) > size:
+            result = cls.__degrade_encoding(encoded, discriminator, size)
+        return result
