@@ -477,6 +477,19 @@ class chunks(object):
 
     @utils.multicase()
     @classmethod
+    def size(cls):
+        '''Return a list containing the bounds of each chunk for the current function.'''
+        return cls.size(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def size(cls, func):
+        '''Return a list containing the bounds of each chunk for the function `func`.'''
+        fn = interface.function.by(func)
+        iterable = map(interface.range.unpack, interface.function.chunks(fn))
+        return sum(operator.sub(*sorted(range)[::-1]) for range in iterable)
+
+    @utils.multicase()
+    @classmethod
     def iterate(cls):
         '''Iterate through all the instructions for each chunk in the current function.'''
         return cls.iterate(ui.current.function())
