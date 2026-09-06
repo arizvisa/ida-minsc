@@ -796,6 +796,17 @@ class chunk(object):
         return interface.range.bounds(area)
 
     @utils.multicase()
+    def size(cls):
+        '''Return the number of bytes contained by the function chunk at the current address.'''
+        return cls.size(ui.current.address())
+    @utils.multicase(ea=types.integer)
+    def size(cls, ea):
+        '''Return the number of bytes contained by the function chunk at the address `ea`.'''
+        area = interface.function.chunk(ea, ea)
+        left_right = interface.range.unpack(area)
+        return operator.sub(*sorted(left_right)[::-1])
+
+    @utils.multicase()
     @classmethod
     def owner(cls):
         '''Return the primary owner of the function chunk containing the current address.'''
