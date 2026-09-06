@@ -4082,6 +4082,11 @@ class name(object):
         'aw': 'co_await',
     }
 
+    # mangled kinds for code types.
+    __microsoft_code_kinds = {
+        'vcall',
+    }
+
     # mangled kinds for data types.
     __microsoft_data_kinds = {
         'vftable',
@@ -4499,6 +4504,34 @@ class name(object):
         return 'special', label
 
     @classmethod
+    def __skip_encoding_name(cls, body, index):
+        '''Skip the itanium-encoded name in the specified `body` from the given `index`.'''
+        character = body[index : index + 1]
+        if character == 'N':
+            return cls.__skip_nested(body, index)
+        elif character == 'Z':
+            return cls.__skip_local_name(body, index)
+        index += 2 if body[index : index + 2] == 'St' else 0
+        character = body[index : index + 1]
+        if character == 'S':
+            index = cls.__skip_substitution(body, index)
+        elif character == 'T':
+            index = cls.__skip_template_parameter(body, index)
+        elif character.isdigit():
+            index = cls.__skip_source_name(body, index)
+        elif character == 'C' and body[index + 1 : index + 2] and body[index + 1].isdigit():
+            index += 2
+        elif character == 'C' and body[index + 1 : index + 2] and body[index + 1] == 'I':
+            index += 2
+        elif character == 'D' and body[index + 1 : index + 2] in cls.__numeric_characters:
+            index += 2
+        elif body[index : index + 2] in cls.__operator_itanium:
+            index += 2
+        else:
+            return index
+        return cls.__skip_template_group(body, index)
+
+    @classmethod
     def classify(cls, ea, string):
         '''Classify the mangled `string` at the address specified by `ea` and return it as a tuple.'''
         if not string:
@@ -4521,10 +4554,16 @@ class name(object):
         '''Classify the specified microsoft-mangled `string`.'''
         if string.startswith('??'):
             kind, operator = cls.operator(original)
-            if kind == 'template-function':
-                return 'microsoft', idaapi.FF_CODE, 'template-function'
-            elif kind == 'special' and operator in cls.__microsoft_data_kinds:
+            if kind == 'special' and operator in cls.__microsoft_data_kinds:
                 return 'microsoft', idaapi.FF_DATA, operator.replace(' ', '-') if operator else 'special'
+            elif kind == 'special' and operator in cls.__microsoft_code_kinds:
+                return 'microsoft', idaapi.FF_CODE, operator.replace(' ', '-') if operator else 'special'
+            elif not string.endswith('Z') and kind == 'template-function':
+                return 'microsoft', idaapi.FF_DATA, 'template-variable'
+            elif not string.endswith('Z'):
+                return 'microsoft', idaapi.FF_DATA, operator.replace(' ', '-') if operator else 'data'
+            elif kind == 'template-function':
+                return 'microsoft', idaapi.FF_CODE, 'template-function'
             elif kind == 'special':
                 return 'microsoft', idaapi.FF_CODE, operator.replace(' ', '-') if operator else 'special'
             elif kind == 'cast':
@@ -4549,7 +4588,13 @@ class name(object):
         elif remaining.startswith('T') and len(remaining) > 1 and remaining[1] in cls.__itanium_data_kinds:
             flag, kind = cls.__itanium_data_kinds[remaining[1]]
             return 'itanium', flag, kind
-        return 'itanium', idaapi.FF_CODE, 'function'
+        elif remaining.startswith('T') and remaining[1 : 2] == 'c':
+            return 'itanium', idaapi.FF_CODE, 'covariant-thunk'
+        body = remaining[1:] if remaining[:1] == 'L' else remaining
+        index = cls.__skip_encoding_name(body, 0)
+        if body[index:].strip('E'):
+            return 'itanium', idaapi.FF_CODE, 'function'
+        return 'itanium', idaapi.FF_DATA, 'data'
 
 class mangled(object):
     """
