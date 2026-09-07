@@ -1668,10 +1668,10 @@ class member(object):
         get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
         if isinstance(mptr, internal.types.integer):
             ti, mid = idaapi.tinfo_t(), mptr
-            return True if get_tinfo(ti, mid) else False
+            return not interface.tinfo.primitive(ti) if get_tinfo(ti, mid) else False
         get_member_tinfo = (lambda ti, mptr: idaapi.get_member_tinfo2(mptr, ti)) if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
         ti = idaapi.tinfo_t()
-        return True if get_member_tinfo(ti, mptr) else False
+        return not interface.tinfo.primitive(ti) if get_member_tinfo(ti, mptr) else False
 
     @classmethod
     def get_typeinfo(cls, mptr):
