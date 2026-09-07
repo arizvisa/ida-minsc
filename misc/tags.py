@@ -758,7 +758,7 @@ class query_v1(object):
 
     @classmethod
     def function(cls, func, require=frozenset(), include=frozenset()):
-        '''Yield the contents address and tags from the contents of the function `func` containing all the tags in `require` and including any from `include`.'''
+        '''Yield the address and tags from the contents of the function `func` containing all the tags in `require` and including any from `include`.'''
         fn = interface.function.by(func)
         rmask, imask = (cls.mask(names) for names in [require, include])
         requested, selection = rmask | imask, require or include
