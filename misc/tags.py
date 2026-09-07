@@ -29,11 +29,11 @@ class query_v0(object):
     navigation = __import__('ui').navigation
 
     @classmethod
-    def globals(cls, required=[], included=[]):
-        '''Query the globals in the database and yield a tuple containing its address and all of the `required` tags with any `included` ones.'''
-        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+    def globals(cls, require=[], include=[]):
+        '''Yield the address and tags from the globals that contain all the tags in `require` and including any from `include`.'''
+        iterable = require if isinstance(require, (internal.types.unordered, internal.types.dictionary)) else {require}
         required = {key for key in iterable}
-        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        iterable = include if isinstance(include, (internal.types.unordered, internal.types.dictionary)) else {include}
         included = {key for key in iterable}
 
         # Nothing specific was queried, so just yield all tags that are available.
@@ -70,11 +70,11 @@ class query_v0(object):
         return
 
     @classmethod
-    def contents(cls, required=[], included=[]):
-        '''Query the contents of each function and yield a tuple containing its address and all of the `required` tags with any `included` ones.'''
-        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+    def contents(cls, require=[], include=[]):
+        '''Yield the function address and tags from the contents of each function containing all the tags in `require` and including any from `include`.'''
+        iterable = require if isinstance(require, (internal.types.unordered, internal.types.dictionary)) else {require}
         required = {key for key in iterable}
-        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        iterable = include if isinstance(include, (internal.types.unordered, internal.types.dictionary)) else {include}
         included = {key for key in iterable}
 
         # Nothing specific was queried, so just yield all tagnames that are available.
@@ -122,11 +122,11 @@ class query_v0(object):
         return
 
     @classmethod
-    def function(cls, func, required=[], included=[]):
-        '''Query the contents of the function `func` and yield a tuple containing each address and all of the `required` tags with any `included` ones.'''
-        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+    def function(cls, func, require=[], include=[]):
+        '''Yield the address and tags from the contents of the function `func` containing all the tags in `require` and including any from `include`.'''
+        iterable = require if isinstance(require, (internal.types.unordered, internal.types.dictionary)) else {require}
         required = {key for key in iterable}
-        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        iterable = include if isinstance(include, (internal.types.unordered, internal.types.dictionary)) else {include}
         included = {key for key in iterable}
 
         # First thing is to convert the argument to a proper function to query.
@@ -158,11 +158,11 @@ class query_v0(object):
         return
 
     @classmethod
-    def structures(cls, required=[], included=[]):
-        '''Query the structures in the database and yield a tuple containing each and all of the `required` tags with any `included` ones.'''
-        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+    def structures(cls, require=[], include=[]):
+        '''Yield the structure id and tags from each structure containing all the tags in `require` and including any from `include`.'''
+        iterable = require if isinstance(require, (internal.types.unordered, internal.types.dictionary)) else {require}
         required = {key for key in iterable}
-        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        iterable = include if isinstance(include, (internal.types.unordered, internal.types.dictionary)) else {include}
         included = {key for key in iterable}
 
         # first we need to figure out which structure api we can use.
@@ -203,11 +203,11 @@ class query_v0(object):
         return
 
     @classmethod
-    def structure(cls, sid, required=[], included=[]):
-        '''Query the structures in the database and yield a tuple containing each and all of the `required` tags with any `included` ones.'''
-        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+    def structure(cls, sid, require=[], include=[]):
+        '''Yield the member id and tags for each member belonging to the structure `sid` which contain all the tags in `require` and include any from `include`.'''
+        iterable = require if isinstance(require, (internal.types.unordered, internal.types.dictionary)) else {require}
         required = {key for key in iterable}
-        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        iterable = include if isinstance(include, (internal.types.unordered, internal.types.dictionary)) else {include}
         included = {key for key in iterable}
 
         # First we need to figure out which structure api we can use.
@@ -248,11 +248,11 @@ class query_v0(object):
         return
 
     @classmethod
-    def owners(cls, required=[], included=[]):
-        '''Query the members in the database and yield a tuple containing the owning structure and all of the `required` tags with any `included` ones.'''
-        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+    def owners(cls, require=[], include=[]):
+        '''Yield the owning structure id and tags for each structure with members that use all the tags in `require` and include any from `include`.'''
+        iterable = require if isinstance(require, (internal.types.unordered, internal.types.dictionary)) else {require}
         required = {key for key in iterable}
-        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        iterable = include if isinstance(include, (internal.types.unordered, internal.types.dictionary)) else {include}
         included = {key for key in iterable}
 
         # If we weren't given anything to query with, then we need to yield
@@ -294,11 +294,11 @@ class query_v0(object):
         return
 
     @classmethod
-    def frames(cls, required=[], included=[]):
-        '''Query the frames in the database and yield a tuple containing the owning function and all of the `required` tags with any `included` ones.'''
-        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+    def frames(cls, require=[], include=[]):
+        '''Yield the owning function address and tags for each frame with members that use all the tags in `require` and include any from `include`.'''
+        iterable = require if isinstance(require, (internal.types.unordered, internal.types.dictionary)) else {require}
         required = {key for key in iterable}
-        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        iterable = include if isinstance(include, (internal.types.unordered, internal.types.dictionary)) else {include}
         included = {key for key in iterable}
 
         # If we weren't given anything to query with, then we need to yield
@@ -356,11 +356,11 @@ class query_v0(object):
         return
 
     @classmethod
-    def members(cls, required=[], included=[]):
-        '''Query the members in the database and yield a tuple containing the member and all of the `required` tags with any `included` ones.'''
-        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+    def members(cls, require=[], include=[]):
+        '''Yield the member id and tags for each member in the database using all the tags in `require` and including any from `include`.'''
+        iterable = require if isinstance(require, (internal.types.unordered, internal.types.dictionary)) else {require}
         required = {key for key in iterable}
-        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        iterable = include if isinstance(include, (internal.types.unordered, internal.types.dictionary)) else {include}
         included = {key for key in iterable}
 
         # If there were no parameters to filter with, then we can just yield
@@ -414,9 +414,14 @@ class query_v0(object):
         return
 
     @classmethod
-    def blocks(cls, func, required=[], included=[]):
-        '''Query the basic blocks of the function `func` and yield a tuple containing the block and all of the `required` tags with any `included` ones.'''
+    def blocks(cls, func, require=[], include=[]):
+        '''Yield the basic block and tags from the basib blocks of the function `func` containing all the tags in `require` and including any from `include`.'''
         flags = getattr(idaapi, 'FC_NOEXT', 2) | getattr(idaapi, 'FC_CALL_ENDS', 0x20)
+        iterable = require if isinstance(require, (internal.types.unordered, internal.types.dictionary)) else {require}
+        required = {key for key in iterable}
+        iterable = include if isinstance(include, (internal.types.unordered, internal.types.dictionary)) else {include}
+        included = {key for key in iterable}
+
         fn = interface.function.by(func)
         ea = interface.range.start(fn)
 
@@ -458,26 +463,26 @@ class query_v0(object):
         return
 
     @classmethod
-    def hexfunctions(cls, required=[], included=[]):
-        '''Query the tags of all decompiled functions and yield a tuple containing the function address and all of the `required` tags with any `included` ones.'''
+    def hexfunctions(cls, require=[], include=[]):
+        '''Yield the function address and tags for each decompiled function containing all the tags in `require` and including any from `include`.'''
         return
         yield
 
     @classmethod
-    def hexfunction(cls, func, required=[], included=[]):
-        '''Query the tags of the decompiled function `func` and yield a tuple containing the location and all of the `required` tags with any `included` ones.'''
+    def hexfunction(cls, func, require=[], include=[]):
+        '''Yield the preciser and tags from the decompiled function `func` containing all the tags in `require` and including any from `include`.'''
         return
         yield
 
     @classmethod
-    def hexvariables(cls, required=[], included=[]):
-        '''Query the tags for the variables from all the decompiled functions and yield a tuple containing the function address and all of the `required` tags with any `included` ones.'''
+    def hexvariables(cls, require=[], include=[]):
+        '''Yield the function address and tags for the variables from each decompiled function containing all the tags in `require` and including any from `include`.'''
         return
         yield
 
     @classmethod
     def hexvariable(cls, func, *args, **kwargs):
-        '''Query the tags for the variables from the decompiled function `func` and yield a tuple containing the location and all of the `required` tags with any `included` ones.'''
+        '''Yield the variable locator and tags for the variables from the decompiled function `func` containing all the tags in `require` and including any from `include`.'''
         return
         yield
 
