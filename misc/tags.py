@@ -2705,7 +2705,13 @@ class member(object):
         idaname = idaapi.get_member_name(mptr.id) or ''
         name = utils.string.of(idaname)
         requested = {key for key in keys}
-        available = reference.members.get(mptr.id)
+        if reference == reference_v0:
+            available = {key for key in res}
+            available.add('__name__') if internal.structure.member.has_name(mptr) else available
+            available.add('__typeinfo__') if internal.structure.member.has_typeinfo(mptr) else available
+
+        else:
+            available = reference.members.get(mptr.id)
         selected = requested or available
 
         # If the name is defined and it's tagged, then go ahead and add it.
