@@ -2520,7 +2520,22 @@ class structure(object):
         # Now we need to add implicit tags which are related to the structure.
         is_frame = internal.structure.frame(sptr)
         requested = {key for key in keys}
-        available = reference.structure.get(sptr.id)
+        if reference == reference_v0:
+            available = {key for key in res}
+            available.add('__name__') if internal.structure.naming.has(sptr.id) else available
+
+            # Now we need to do the '__typeinfo__' tag. This is going to be a little
+            # bit different than how we usually determine it, because we're going to
+            # use it to determine whether the user created this type themselves or it
+            # was created automatically. So, if it was copied from the type library
+            # (SF_TYPLIB), from the local types (SF_GHOST), or the user chose not to
+            # list it (SF_NOLIST), then we don't assign '__typeinfo__'.
+            excluded = ['SF_FRAME', 'SF_GHOST', 'SF_TYPLIB', 'SF_NOLIST']
+            iterable = (sptr.props & getattr(idaapi, attribute) for attribute in excluded if hasattr(idaapi, attribute))
+            available.add('__typeinfo__') if not any(iterable) else available
+
+        else:
+            available = reference.structure.get(sptr.id)
         available.add('__ea__') if is_frame and interface.function.by_frame(sptr) else available
         selected = requested or available
 
