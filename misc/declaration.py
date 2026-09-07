@@ -331,6 +331,42 @@ class extract(object):
         return
 
     @classmethod
+    def __locate_parameters(cls, tree, string, range, segments):
+        '''Use the given `tree` with `range` on the prototype in `string` to return a tuple containing the parameters range, the preceding selection, and its segments.'''
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
+        segments = segments[:]
+
+        # keep popping away segments until we get to a parenthesized segment.
+        while segments:
+            left, right = segments[-1]
+            if string[left : left + 1] + string[right - 1 : right] == '()':
+                break
+            segments.pop()
+
+        # if no segments remain, there there aren't any parameters here..
+        if not segments:
+            return (stop, stop), (start, stop), segments
+
+        # if we already found what we were looking for in the last segment, then
+        # just go ahead and return it.
+        left, right = candidate = segments[-1]
+        if string[left + 1 : left + 2] not in {'*', '&', '('}:
+            return candidate, (start, left), segments[:-1]
+
+        # otherwise, a function can be inside a result. so, we seek through it
+        # trying to find a nested parentheses. if we did find one, then we just
+        # need to get the very last parenthesized child and return it.
+        nested = [(cleft, cright) for cleft, cright in tree.get(left, []) if string[cleft : cleft + 1] + string[cright - 1 : cright] == '()']
+        if nested:
+            pleft, pright = nested[-1]
+            before = [(cleft, cright) for cleft, cright in tree.get(left, []) if cright <= pleft]
+            return (pleft, pright), (left + 1, pleft), before
+
+        # if it wasn't a result, then the candidate we already grabbed is the
+        # parameter list that we can return.
+        return candidate, (start, left), segments[:-1]
+
+    @classmethod
     def prototype(cls, tree, string, range=None):
         '''Use the given `tree` with `range` on the prototype in `string` to return a tuple containing the result type with convention, name, segment for parameters, and list of segments for qualifiers.'''
         start, stop = range if isinstance(range, tuple) and range else (0, len(string))
@@ -341,14 +377,19 @@ class extract(object):
         declaration, qualifiers = cls.declaration(string, range, tree[start or None])
         (start, stop), segments = declaration
 
-        # now the last segment of our declaration should be our parameters.
-        parameters_range = stop, _ = left, right = segments.pop() if segments else (len(string), len(string))
-        if not(string[left : left + 1] + string[right - 1 : right] == '()'):
-            raise internal.exceptions.InvalidFormatError(u"{:s}.prototype({!r}, {!r}, {!s}) : The parameters expected at the end of the specified string ({!r}) are not parenthesized.".format('.'.join([__name__, cls.__name__]), tree, string, "{:d}..{:d}".format(*range) if range else range, string[left : right]))
+        # normally the last segment of our declaration is our parameters.
+        left, right = segments[-1] if segments else (len(string), len(string))
+        if string[left : left + 1] + string[right - 1 : right] == '()':
+            parameters_range = stop, _ = segments.pop() if segments else (len(string), len(string))
 
-        # XXX: we're using a hack to deal with "`adjustor(x)' ", due to not being in
-        # a demangled name. we can just pop the last segment (with the " ") to deal.
-        segments.pop() if string[stop - 2 : stop] == "' " else None
+            # XXX: we're using a hack to deal with "`adjustor(x)' ", due to not being in
+            # a demangled name. we can just pop the last segment (with the " ") to deal.
+            segments.pop() if string[stop - 2 : stop] == "' " else None
+
+        # otherwise, the function was declared inside a result and its
+        # parameters are nested. so we locate the parameters with a best-effort.
+        else:
+            parameters_range, (start, stop), segments = cls.__locate_parameters(tree, string, (start, stop), segments)
 
         # since we should be being used to parse output from the disassembler,
         # we can assume that everything up to the first whitespace is the name.
