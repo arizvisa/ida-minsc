@@ -10579,9 +10579,10 @@ class tinfo(object):
         # If any type-specific attributes were specified, then pull them out of
         # the attributes and assign them to variables that we will use later to
         # modify the result pointer type.
-        iterable = attributes if isinstance(attributes, (internal.types.integer, internal.types.unordered)) else [attributes]
-        attributes = {attribute for attribute in iterable}
-        if isinstance(attributes, internal.types.unordered):
+        if not isinstance(attributes, internal.types.integer):
+            iterable = attributes if isinstance(attributes, internal.types.unordered) else [attributes]
+            attributes = {attribute for attribute in iterable}
+
             keywords = {'const', 'constant'}
             iterable = (attribute for attribute in keywords if attribute in attributes)
             attribute = builtins.next(iterable, None)
