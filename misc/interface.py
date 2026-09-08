@@ -11761,10 +11761,14 @@ class instruction(object):
     @classmethod
     def is_branch(cls, ea):
         '''Return whether the instruction at the address `ea` is a branch instruction.'''
-        xiterable = (True for _, xiscode, xrtype in xref.of(ea) if xiscode and xrtype != idaapi.fl_F)
         target, bbargs = (ea, []) if idaapi.__version__ < 7.0 else (cls.at(ea), [False])
-        either = idaapi.is_indirect_jump_insn(target) or next(xiterable, False)
-        return idaapi.is_basic_block_end(target, *bbargs) and not idaapi.is_call_insn(target) and either
+        if not idaapi.is_basic_block_end(target, *bbargs):
+            return False
+        elif idaapi.is_call_insn(target) or cls.is_return(target):
+            return False
+        elif idaapi.is_indirect_jump_insn(target):
+            return True
+        return any(op.type in {idaapi.o_near, idaapi.o_far} for op in cls.operands(ea))
 
     @classmethod
     def is_call(cls, ea):
