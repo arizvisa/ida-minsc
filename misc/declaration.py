@@ -413,6 +413,8 @@ class extract(object):
         # in exchange we'll have the declaration that we need to interpret.
         declaration, qualifiers = cls.declaration(string, range, tree[start or None])
         (start, stop), segments = declaration
+        (point, _), _ = cls.exception(string, (start, stop), segments)
+        segments = [(left, right) for (left, right) in segments if right <= point]
 
         # normally the last segment of our declaration is our parameters.
         left, right = segments[-1] if segments else (len(string), len(string))
@@ -678,7 +680,11 @@ class extract(object):
         start, stop = range if isinstance(range, tuple) and range else (0, len(string))
         ignored, symbols = {'', ' '}, {' ', '*', '&'}
 
-        # first we need to find the parameters.
+        # first we strip out any exception information that is being referenced.
+        (point, _), _ = cls.exception(string, (start, stop), segments)
+        segments, stop = [(left, right) for left, right in segments if right <= point], point
+
+        # then we should be good to go and find the parameters.
         iterable = (1 + index for index, (left, right) in enumerate(segments[::-1]) if string[left] + string[left : right][-1] == '()')
         parameters_index = next(iterable)
         if not(all(string[left : right] in ignored for left, right in segments[-parameters_index:][1:])):
