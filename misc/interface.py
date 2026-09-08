@@ -13181,6 +13181,30 @@ class xref(object):
         '''Iterate through all the data references that originate from the address `ea`.'''
         return cls.iterate(ea, idaapi.get_first_dref_from, idaapi.get_next_dref_from)
 
+    @classmethod
+    def __promote_access(cls, target, ea, iscode, xrtype, *args):
+        '''Promote the reference at the address `ea` with the `iscode` flag and `xrtype` to the correct type when it does not correspond to the specified `target`.'''
+        filetype = database.filetype()
+        if iscode:
+            return (ea, iscode, xrtype) + args
+
+        # PECOFF/ELF executables will miscategorize a branch inside a thunk as a
+        # data-reference. So, we verify and hack the reference if it is.
+        elif filetype in {idaapi.f_PE, idaapi.f_ELF}:
+            if not instruction.is_branch(target):
+                res = (ea, iscode, xrtype) + args
+            elif idaapi.get_switch_info(target):
+                res = (ea, iscode, xrtype) + args
+            elif any(op.type == idaapi.o_mem for op in instruction.operands(target)):
+                res = (ea, True, idaapi.fl_JN) + args
+            else:
+                res = (ea, iscode, xrtype) + args
+            return res
+
+        # Otherwise, there's nothing that needs to be fixe and we can return
+        # exactly what it was that we were given.
+        return (ea, iscode, xrtype) + args
+
     @internal.utils.multicase(ea=internal.types.integer)
     @classmethod
     def to(cls, ea, **user):
@@ -13195,12 +13219,19 @@ class xref(object):
         # Check to see if we can find the first one and bail if we couldn't.
         if not X.first_to(ea, flags):
             return
-        yield (X.frm, X.iscode, X.type) if not has_user else (X.frm, X.iscode, X.type, X.user)
+        elif has_user:
+            yield cls.__promote_access(X.frm, X.frm, X.iscode, X.type, X.user)
+        else:
+            yield cls.__promote_access(X.frm, X.frm, X.iscode, X.type)
 
         # Since we were able to find one, we just continue to iterate through the
         # rest of the xrefblk_t while yielding the necessary properties.
         while X.next_to():
-            yield (X.frm, X.iscode, X.type) if not has_user else (X.frm, X.iscode, X.type, X.user)
+            if has_user:
+                yield cls.__promote_access(X.frm, X.frm, X.iscode, X.type, X.user)
+            else:
+                yield cls.__promote_access(X.frm, X.frm, X.iscode, X.type)
+            continue
         return
 
     @internal.utils.multicase(ea=internal.types.integer)
@@ -13217,12 +13248,19 @@ class xref(object):
         # Check to see if we can find the first one and bail if we couldn't.
         if not X.first_from(ea, flags):
             return
-        yield (X.to, X.iscode, X.type) if not user else (X.to, X.iscode, X.type, X.user)
+        elif has_user:
+            yield cls.__promote_access(ea, X.to, X.iscode, X.type, X.user)
+        else:
+            yield cls.__promote_access(ea, X.to, X.iscode, X.type)
 
         # Since we were able to find one, we just continue to iterate through the
         # rest of whatever xrefblk_t returns while yielding the necessary properties.
         while X.next_from():
-            yield (X.to, X.iscode, X.type) if not user else (X.to, X.iscode, X.type, X.user)
+            if has_user:
+                yield cls.__promote_access(ea, X.to, X.iscode, X.type, X.user)
+            else:
+                yield cls.__promote_access(ea, X.to, X.iscode, X.type)
+            continue
         return
 
     @internal.utils.multicase(ea=internal.types.integer, target=internal.types.integer, flowtype=internal.types.integer)
