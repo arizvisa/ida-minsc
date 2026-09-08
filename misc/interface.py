@@ -11840,10 +11840,14 @@ class instruction(object):
     def is_conditional(cls, ea):
         '''Return whether the instruction at the address `ea` is an conditional branch instruction.'''
         target, bbargs = (ea, []) if idaapi.__version__ < 7.0 else (cls.at(ea), [False])
-        feature, invalid = cls.feature(ea), any([idaapi.is_call_insn(target), cls.is_return(target)])
-        xiterable = (True for _, xiscode, xrtype in xref.of(ea) if xiscode and xrtype != idaapi.fl_F)
-        ok = idaapi.is_basic_block_end(target, *bbargs) and not invalid and not feature & idaapi.CF_STOP and next(xiterable, False)
-        return True if ok else False
+        if not idaapi.is_basic_block_end(target, *bbargs):
+            return False
+        elif idaapi.is_call_insn(target) or cls.is_return(target):
+            return False
+        feature = cls.feature(ea)
+        if feature & idaapi.CF_STOP:
+            return False
+        return any(op.type in {idaapi.o_near, idaapi.o_far} for op in cls.operands(ea))
 
     @classmethod
     def boundaries(cls, ea):
