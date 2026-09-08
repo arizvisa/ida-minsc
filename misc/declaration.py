@@ -366,6 +366,43 @@ class extract(object):
         # parameter list that we can return.
         return candidate, (start, left), segments[:-1]
 
+    __exception_characters = frozenset('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_')
+    @classmethod
+    def exception(cls, string, range, segments):
+        '''Use the given `range` and `segments` with `string` to return a pair of segments containing the exception information and its group.'''
+        start, stop = range if isinstance(range, tuple) and range else (0, len(string))
+
+        # first scan the segments looking for the exception specification.
+        specification = ()
+        for left, right in segments[::-1]:
+            if not (start <= left and right <= stop):
+                continue
+            if string[left : left + 1] + string[right - 1 : right] != '()':
+                continue
+
+            # skip all whitespace and any naming characters used the exception.
+            point = end = start + len(string[start : left].rstrip(' '))
+            while point > start and string[point - 1] in cls.__exception_characters:
+                point -= 1
+
+            # select the segment if we found an exception-related word.
+            specification = (point, (left, right)) if string[point : end] in {'throw', 'noexcept'} else specification
+            break
+
+        # if we didn't find an exception specification in a segment, then just
+        # check the selected string to see if the specification is at the end.
+        # if we didn't find one containing a segment,
+        trimmed = string[start : stop].rstrip()
+        if not specification and trimmed.endswith('noexcept'):
+            point = start + len(trimmed) - len('noexcept')
+            specification = (point, (stop, stop)) if point == start or string[point - 1] not in cls.__exception_characters else specification
+
+        # include any whitespace before the exception word, and return that
+        # keyword as a segment stretched to the end of the range and type.
+        point, group = specification if specification else (stop, (stop, stop))
+        point = start + len(string[start : point].rstrip(' ')) if specification else stop
+        return (point, stop), group
+
     @classmethod
     def prototype(cls, tree, string, range=None):
         '''Use the given `tree` with `range` on the prototype in `string` to return a tuple containing the result type with convention, name, segment for parameters, and list of segments for qualifiers.'''
