@@ -1478,6 +1478,71 @@ class wrap(object):
             iterable = itertools.chain(([ext, item] for item in operands[:-1]), ([opcode, item] for item in operands[-1:]))
             return bytes(bytearray(itertools.chain(*iterable)))
 
+    if (sys.version_info.major, sys.version_info.minor) < (3, 10):
+        @classmethod
+        def co_linetable(cls, code):
+            '''Return a line table for specified `code` that places every instruction on the first line.'''
+            return bytes()
+
+    # For 3.10, we now use deltas between lines instead of line numbers. These
+    # deltas are signed integers relative to the previous one and starting at
+    # the first line number, with -128 meaning there is no line whatsoever.
+    elif (sys.version_info.major, sys.version_info.minor) < (3, 11):
+        @classmethod
+        def co_linetable(cls, code):
+            '''Return a line table for specified `code` that places every instruction on the first line.'''
+
+            # Since all instructions are multiples of 2, we divide the code size
+            # by the largest multiple of 2 that can fit in a byte. That gives
+            # us the lengths that we can use.
+            count, remainder = divmod(len(code), 254)
+            lengths = itertools.chain([254] * count, [remainder] if remainder else [])
+
+            # Each length entry is composed of the byte and the offset (0).
+            iterable = ([length, 0] for length in lengths)
+            return bytes(bytearray(itertools.chain(*iterable)))
+
+    # For 3.11, the instructions are mapped to their positions with a table that
+    # is byte-encoded in pairs with the same signed delta from before and made
+    # up of entries covering up to 8 code units for each one.
+    else:
+        @classmethod
+        def co_linetable(cls, code):
+            '''Return a line table for specified `code` that places every instruction on the first line.'''
+
+            # Python 3.11 changed the line-number table so that it is actually
+            # a proper encoding with a byte that dictates the kind and number
+            # of code units. This way they can actually store a span containing
+            # the lines and columns inside a specific code object.
+
+            # The encoding of this byte only allots 3 bits for representing the
+            # length, so we divide our code unit by 8. However, they got a
+            # little smart and realized that instructions are always a multiple
+            # of 2, so we divide our code by 2 to get the instruction count, and
+            # then divide by 8 to get the actual lengths we will be encoding.
+            instructions, _ = divmod(len(code), 2)
+            count, remainder = divmod(instructions, 8)
+            lengths = itertools.chain([8] * count, [remainder] if remainder else [])
+
+            # We don't support all of the kinds because we really don't have any
+            # lines of code to point the spans at. So we use kind 13 which is
+            # the kind without any columns so that the encoded table always
+            # points at the first line number.
+
+            encoding = 0b00000000
+            encoding|= 0b10000000   # entry[7 : 8] = 1
+            encoding|= 0b01101000   # kind[3 : 7] = 13
+            encoding|= 0b00000000   # units[0 : 3] = x
+
+            # We use the encoding byte with the lengths we determined earlier,
+            # and use a 0 for the delta so that the span always points at the
+            # first line number and the very first column... basically a pixel.
+            iterable = ([encoding | length, 0] for length in map(functools.partial(operator.add, -1), lengths))
+            return bytes(bytearray(itertools.chain(*iterable)))
+
+    # Assign it so that we can use the names that match the Python version.
+    co_lnotab = co_linetable
+
     @classmethod
     def co_varargsQ(cls, co):
         '''Returns whether the provided code type, `co`, takes variable arguments.'''
