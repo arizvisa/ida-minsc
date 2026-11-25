@@ -743,10 +743,11 @@ class multicase(object):
         # that we defined. In order to preserve information within the backtrace, we just
         # make a copy of all of the relevant code properties.
         f, c = F, pycompat.function.code(F)
+        lnotab = c.co_linetable if hasattr(c, 'co_linetable') else c.co_lnotab
         cargs = c.co_argcount, c.co_nlocals, c.co_stacksize, c.co_flags, \
                 c.co_code, c.co_consts, c.co_names, c.co_varnames, \
                 c.co_filename, '.'.join([func.__module__, pycompat.function.name(func)]), \
-                c.co_firstlineno, c.co_lnotab, c.co_freevars, c.co_cellvars
+                c.co_firstlineno, lnotab, c.co_freevars, c.co_cellvars
         newcode = pycompat.code.new(cargs, pycompat.code.unpack_extra(c))
 
         # Now we can use the new code object that we created in order to create a function
