@@ -249,7 +249,43 @@ class pycompat(object):
             posonlyargcount, kwonlyargcount = extra
             return types.CodeType(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars)
 
-    class code_311(code_2x):
+    class code_310(code_38):
+        '''
+        This namespace is primarily responsible for dealing with the line-number
+        table (`lnotab`) changes that were introduced for 3.10 by PEP 626, and
+        the column additions that were introduced for 3.11 by PEP 657. These
+        changes affect how backtraces map directly to the source code and thus
+        will have an effect on how the interpreter displays exceptions to the
+        user.
+
+        Previously, we could just use an empty table which resulted in the first
+        line number being considered the location of the first instruciton for
+        the relevant code. However, the encoding of this table has changed as
+        3.10 has introduced a signed line delta, and 3.11 has added support for
+        column positions in order to support finer-grained exceptions.
+        '''
+        @classmethod
+        def unpack(cls, object):
+            '''Return the fields from the specified code `object` that can be used to instantiate a copy of it.'''
+            fieldmap = {}
+
+            # The constructor for a code object gives us only one parameter for
+            # the line table, but the code object has multiple fields that we
+            # can rip that from. Each have different encodings, so we try the
+            # linetable first, falling back to the linenumber if we couldn't.
+            fieldmap['co_lnotab'] = object.co_linetable if hasattr(object, 'co_linetable') else object.co_lnotab
+
+            # Iterate through all of the fields prioritizing our fieldmap first.
+            fields = []
+            for field in cls.cons._fields:
+                if field in fieldmap:
+                    fields.append(fieldmap[field])
+                else:
+                    fields.append(getattr(object, field))
+                continue
+            return cls.cons(*fields)
+
+    class code_311(code_310):
         @classmethod
         def unpack_extra(cls, object):
             return object.co_posonlyargcount, object.co_kwonlyargcount, object.co_qualname, object.co_exceptiontable
@@ -259,7 +295,17 @@ class pycompat(object):
             posonlyargcount, kwonlyargcount, qualname, exceptiontable = extra
             return types.CodeType(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, qualname or name, firstlineno, lnotab, exceptiontable, freevars, cellvars)
 
-    code = code_2x if sys.version_info.major < 3 else code_37 if (sys.version_info.major, sys.version_info.minor) < (3, 8) else code_38 if (sys.version_info.major, sys.version_info.minor) < (3, 11) else code_311
+    # Figure out the correct namespace to use from the current python version.
+    if sys.version_info.major < 3:
+        code = code_2x
+    elif (sys.version_info.major, sys.version_info.minor) < (3, 8):
+        code = code_37
+    elif (sys.version_info.major, sys.version_info.minor) < (3, 10):
+        code = code_38
+    elif (sys.version_info.major, sys.version_info.minor) < (3, 11):
+        code = code_310
+    else:
+        code = code_311
 
     class method_2x(object):
         @classmethod
@@ -697,10 +743,11 @@ class multicase(object):
         # that we defined. In order to preserve information within the backtrace, we just
         # make a copy of all of the relevant code properties.
         f, c = F, pycompat.function.code(F)
+        lnotab = c.co_linetable if hasattr(c, 'co_linetable') else c.co_lnotab
         cargs = c.co_argcount, c.co_nlocals, c.co_stacksize, c.co_flags, \
                 c.co_code, c.co_consts, c.co_names, c.co_varnames, \
                 c.co_filename, '.'.join([func.__module__, pycompat.function.name(func)]), \
-                c.co_firstlineno, c.co_lnotab, c.co_freevars, c.co_cellvars
+                c.co_firstlineno, lnotab, c.co_freevars, c.co_cellvars
         newcode = pycompat.code.new(cargs, pycompat.code.unpack_extra(c))
 
         # Now we can use the new code object that we created in order to create a function
@@ -1432,6 +1479,71 @@ class wrap(object):
             iterable = itertools.chain(([ext, item] for item in operands[:-1]), ([opcode, item] for item in operands[-1:]))
             return bytes(bytearray(itertools.chain(*iterable)))
 
+    if (sys.version_info.major, sys.version_info.minor) < (3, 10):
+        @classmethod
+        def co_linetable(cls, code):
+            '''Return a line table for specified `code` that places every instruction on the first line.'''
+            return bytes()
+
+    # For 3.10, we now use deltas between lines instead of line numbers. These
+    # deltas are signed integers relative to the previous one and starting at
+    # the first line number, with -128 meaning there is no line whatsoever.
+    elif (sys.version_info.major, sys.version_info.minor) < (3, 11):
+        @classmethod
+        def co_linetable(cls, code):
+            '''Return a line table for specified `code` that places every instruction on the first line.'''
+
+            # Since all instructions are multiples of 2, we divide the code size
+            # by the largest multiple of 2 that can fit in a byte. That gives
+            # us the lengths that we can use.
+            count, remainder = divmod(len(code), 254)
+            lengths = itertools.chain([254] * count, [remainder] if remainder else [])
+
+            # Each length entry is composed of the byte and the offset (0).
+            iterable = ([length, 0] for length in lengths)
+            return bytes(bytearray(itertools.chain(*iterable)))
+
+    # For 3.11, the instructions are mapped to their positions with a table that
+    # is byte-encoded in pairs with the same signed delta from before and made
+    # up of entries covering up to 8 code units for each one.
+    else:
+        @classmethod
+        def co_linetable(cls, code):
+            '''Return a line table for specified `code` that places every instruction on the first line.'''
+
+            # Python 3.11 changed the line-number table so that it is actually
+            # a proper encoding with a byte that dictates the kind and number
+            # of code units. This way they can actually store a span containing
+            # the lines and columns inside a specific code object.
+
+            # The encoding of this byte only allots 3 bits for representing the
+            # length, so we divide our code unit by 8. However, they got a
+            # little smart and realized that instructions are always a multiple
+            # of 2, so we divide our code by 2 to get the instruction count, and
+            # then divide by 8 to get the actual lengths we will be encoding.
+            instructions, _ = divmod(len(code), 2)
+            count, remainder = divmod(instructions, 8)
+            lengths = itertools.chain([8] * count, [remainder] if remainder else [])
+
+            # We don't support all of the kinds because we really don't have any
+            # lines of code to point the spans at. So we use kind 13 which is
+            # the kind without any columns so that the encoded table always
+            # points at the first line number.
+
+            encoding = 0b00000000
+            encoding|= 0b10000000   # entry[7 : 8] = 1
+            encoding|= 0b01101000   # kind[3 : 7] = 13
+            encoding|= 0b00000000   # units[0 : 3] = x
+
+            # We use the encoding byte with the lengths we determined earlier,
+            # and use a 0 for the delta so that the span always points at the
+            # first line number and the very first column... basically a pixel.
+            iterable = ([encoding | length, 0] for length in map(functools.partial(operator.add, -1), lengths))
+            return bytes(bytearray(itertools.chain(*iterable)))
+
+    # Assign it so that we can use the names that match the Python version.
+    co_lnotab = co_linetable
+
     @classmethod
     def co_varargsQ(cls, co):
         '''Returns whether the provided code type, `co`, takes variable arguments.'''
@@ -1642,16 +1754,18 @@ class wrap(object):
 
         ## next we'll construct the code type using our new opcodes.
 
-        # combine our opcodes into a single code string.
+        # combine our opcodes into a single code string, and generate the line
+        # number table. this version allows it to be an empty string of bytes.
         co_code = bytes().join(code_)
+        co_lnotab = cls.co_lnotab(co_code)
 
-        # consruct the new code object with all our fields.
+        # construct the new code object with all our fields.
         cargs = pycompat.code.cons(
             len(Fargs), len(co_names) + len(co_varnames) + len(co_freevars),
             co_stacksize, co_flags, co_code,
             co_consts, co_names, co_varnames,
             Fc.co_filename, Fc.co_name, Fc.co_firstlineno,
-            bytes(), co_freevars, ()
+            co_lnotab, co_freevars, ()
         )
 
         func_code = pycompat.code.new(cargs)
@@ -1748,8 +1862,10 @@ class wrap(object):
 
         ## next we'll construct the code type using our new opcodes.
 
-        # combine our opcodes into a single code string.
+        # combine our opcodes into a single code string and then use it to
+        # generate the line number table composed of an empty string of bytes.
         co_code = bytes().join(code_)
+        co_lnotab = cls.co_lnotab(co_code)
 
         # construct the new code object with all our fields.
         cargs = pycompat.code.cons(
@@ -1757,7 +1873,7 @@ class wrap(object):
             co_stacksize, co_flags, co_code,
             co_consts, co_names, co_varnames,
             Fc.co_filename, Fc.co_name, Fc.co_firstlineno,
-            bytes(), co_freevars, ()
+            co_lnotab, co_freevars, ()
         )
 
         func_code = pycompat.code.new(cargs)
@@ -1863,8 +1979,10 @@ class wrap(object):
 
         ## next we'll construct the code type using our new opcodes.
 
-        # combine our opcodes into a single code string.
+        # combine our opcodes into a single code string, and then use that code
+        # string to create a line number table that we can assign for it.
         co_code = bytes().join(code_)
+        co_linetable = cls.co_linetable(co_code)
 
         # construct the new code object with all our fields.
         cargs = pycompat.code.cons(
@@ -1872,7 +1990,7 @@ class wrap(object):
             co_stacksize, co_flags, co_code,
             co_consts, co_names, co_varnames,
             Fc.co_filename, Fc.co_name, Fc.co_firstlineno,
-            bytes(), co_freevars, ()
+            co_linetable, co_freevars, ()
         )
 
         func_code = pycompat.code.new(cargs)
