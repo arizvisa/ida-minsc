@@ -1753,16 +1753,18 @@ class wrap(object):
 
         ## next we'll construct the code type using our new opcodes.
 
-        # combine our opcodes into a single code string.
+        # combine our opcodes into a single code string, and generate the line
+        # number table. this version allows it to be an empty string of bytes.
         co_code = bytes().join(code_)
+        co_lnotab = cls.co_lnotab(co_code)
 
-        # consruct the new code object with all our fields.
+        # construct the new code object with all our fields.
         cargs = pycompat.code.cons(
             len(Fargs), len(co_names) + len(co_varnames) + len(co_freevars),
             co_stacksize, co_flags, co_code,
             co_consts, co_names, co_varnames,
             Fc.co_filename, Fc.co_name, Fc.co_firstlineno,
-            bytes(), co_freevars, ()
+            co_lnotab, co_freevars, ()
         )
 
         func_code = pycompat.code.new(cargs)
@@ -1859,8 +1861,10 @@ class wrap(object):
 
         ## next we'll construct the code type using our new opcodes.
 
-        # combine our opcodes into a single code string.
+        # combine our opcodes into a single code string and then use it to
+        # generate the line number table composed of an empty string of bytes.
         co_code = bytes().join(code_)
+        co_lnotab = cls.co_lnotab(co_code)
 
         # construct the new code object with all our fields.
         cargs = pycompat.code.cons(
@@ -1868,7 +1872,7 @@ class wrap(object):
             co_stacksize, co_flags, co_code,
             co_consts, co_names, co_varnames,
             Fc.co_filename, Fc.co_name, Fc.co_firstlineno,
-            bytes(), co_freevars, ()
+            co_lnotab, co_freevars, ()
         )
 
         func_code = pycompat.code.new(cargs)
@@ -1974,8 +1978,10 @@ class wrap(object):
 
         ## next we'll construct the code type using our new opcodes.
 
-        # combine our opcodes into a single code string.
+        # combine our opcodes into a single code string, and then use that code
+        # string to create a line number table that we can assign for it.
         co_code = bytes().join(code_)
+        co_linetable = cls.co_linetable(co_code)
 
         # construct the new code object with all our fields.
         cargs = pycompat.code.cons(
@@ -1983,7 +1989,7 @@ class wrap(object):
             co_stacksize, co_flags, co_code,
             co_consts, co_names, co_varnames,
             Fc.co_filename, Fc.co_name, Fc.co_firstlineno,
-            bytes(), co_freevars, ()
+            co_linetable, co_freevars, ()
         )
 
         func_code = pycompat.code.new(cargs)
