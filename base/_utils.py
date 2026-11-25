@@ -249,7 +249,43 @@ class pycompat(object):
             posonlyargcount, kwonlyargcount = extra
             return types.CodeType(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars)
 
-    class code_311(code_2x):
+    class code_310(code_38):
+        '''
+        This namespace is primarily responsible for dealing with the line-number
+        table (`lnotab`) changes that were introduced for 3.10 by PEP 626, and
+        the column additions that were introduced for 3.11 by PEP 657. These
+        changes affect how backtraces map directly to the source code and thus
+        will have an effect on how the interpreter displays exceptions to the
+        user.
+
+        Previously, we could just use an empty table which resulted in the first
+        line number being considered the location of the first instruciton for
+        the relevant code. However, the encoding of this table has changed as
+        3.10 has introduced a signed line delta, and 3.11 has added support for
+        column positions in order to support finer-grained exceptions.
+        '''
+        @classmethod
+        def unpack(cls, object):
+            '''Return the fields from the specified code `object` that can be used to instantiate a copy of it.'''
+            fieldmap = {}
+
+            # The constructor for a code object gives us only one parameter for
+            # the line table, but the code object has multiple fields that we
+            # can rip that from. Each have different encodings, so we try the
+            # linetable first, falling back to the linenumber if we couldn't.
+            fieldmap['co_lnotab'] = object.co_linetable if hasattr(object, 'co_linetable') else object.co_lnotab
+
+            # Iterate through all of the fields prioritizing our fieldmap first.
+            fields = []
+            for field in cls.cons._fields:
+                if field in fieldmap:
+                    fields.append(fieldmap[field])
+                else:
+                    fields.append(getattr(object, field))
+                continue
+            return cls.cons(*fields)
+
+    class code_311(code_310):
         @classmethod
         def unpack_extra(cls, object):
             return object.co_posonlyargcount, object.co_kwonlyargcount, object.co_qualname, object.co_exceptiontable
@@ -259,7 +295,17 @@ class pycompat(object):
             posonlyargcount, kwonlyargcount, qualname, exceptiontable = extra
             return types.CodeType(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, qualname or name, firstlineno, lnotab, exceptiontable, freevars, cellvars)
 
-    code = code_2x if sys.version_info.major < 3 else code_37 if (sys.version_info.major, sys.version_info.minor) < (3, 8) else code_38 if (sys.version_info.major, sys.version_info.minor) < (3, 11) else code_311
+    # Figure out the correct namespace to use from the current python version.
+    if sys.version_info.major < 3:
+        code = code_2x
+    elif (sys.version_info.major, sys.version_info.minor) < (3, 8):
+        code = code_37
+    elif (sys.version_info.major, sys.version_info.minor) < (3, 10):
+        code = code_38
+    elif (sys.version_info.major, sys.version_info.minor) < (3, 11):
+        code = code_310
+    else:
+        code = code_311
 
     class method_2x(object):
         @classmethod
